@@ -1,9 +1,11 @@
 {
-  "sample_count": 3,
-  "exact_match_rate": 1.0,
-  "success_match_rate": 1.0,
+  "sample_count": 12,
+  "exact_match_rate": 0.8333,
+  "success_match_rate": 0.75,
   "task_preferences": {
+    "chat": "llm_only",
     "code": "code_expert",
+    "mixed": "research_expert",
     "plan": "plan_expert",
     "research": "research_expert"
   }

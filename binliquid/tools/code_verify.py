@@ -13,27 +13,42 @@ def verify_python_snippet(
     *,
     workdir: str | Path = ".",
     run_lint: bool = True,
-    run_tests: bool = False,
+    run_test_collect: bool = True,
+    run_targeted_tests: bool = False,
+    targeted_test_args: list[str] | None = None,
+    timeout_s: float = 15,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "parse_ok": False,
         "lint_ok": None,
         "tests_ok": None,
+        "stage_reached": 0,
+        "failure_reason": None,
+        "retry_count": 0,
+        "retry_strategy": None,
         "details": {},
     }
+    if not code.strip():
+        result["failure_reason"] = "EMPTY_SNIPPET"
+        return result
 
     try:
         ast.parse(code)
         result["parse_ok"] = True
+        result["stage_reached"] = 1
     except SyntaxError as exc:
         result["details"]["parse_error"] = {
             "message": str(exc),
             "line": exc.lineno,
             "offset": exc.offset,
         }
+        if isinstance(exc, IndentationError):
+            result["failure_reason"] = "INDENTATION_ERROR"
+        else:
+            result["failure_reason"] = "SYNTAX_INVALID"
         return result
 
-    runner = SandboxRunner(workdir=workdir, timeout_s=15)
+    runner = SandboxRunner(workdir=workdir, timeout_s=timeout_s)
 
     # Use an ephemeral file for syntax/lint checks and avoid mutating the repo.
     with NamedTemporaryFile("w", suffix=".py", delete=True) as tmp:
@@ -44,8 +59,13 @@ def verify_python_snippet(
         if py_compile.exit_code != 0:
             result["lint_ok"] = False
             result["details"]["py_compile_stderr"] = py_compile.stderr.strip()
+            result["failure_reason"] = _classify_runner_failure(
+                py_compile,
+                default="IMPORT_PARSE_FAIL",
+            )
             return result
 
+        result["stage_reached"] = 2
         if run_lint:
             lint_run = runner.run(["ruff", "check", "--select", "E,F", "--quiet", tmp.name])
             # ruff not installed should not fail the full verification; keep explicit detail.
@@ -57,18 +77,70 @@ def verify_python_snippet(
                 result["details"]["lint_exit_code"] = lint_run.exit_code
                 if lint_run.exit_code != 0:
                     result["details"]["lint_stderr"] = lint_run.stderr.strip()
+                    result["failure_reason"] = _classify_runner_failure(
+                        lint_run,
+                        default="LINT_FAILED",
+                    )
+                    return result
         else:
             result["lint_ok"] = None
 
-    if run_tests:
+    if run_test_collect:
         test_run = runner.run(["uv", "run", "pytest", "--collect-only", "-q"])
         if test_run.exit_code == 127:
             result["tests_ok"] = None
             result["details"]["tests_skipped"] = "uv not found"
         else:
-            # collect-only can return non-zero on repo test issues; keep signal explicit.
-            result["tests_ok"] = test_run.exit_code == 0
-            result["details"]["tests_exit_code"] = test_run.exit_code
+            result["stage_reached"] = 3
+            result["details"]["test_collect_exit_code"] = test_run.exit_code
             if test_run.exit_code != 0:
-                result["details"]["tests_stderr"] = test_run.stderr.strip()
+                result["tests_ok"] = False
+                result["details"]["test_collect_stderr"] = test_run.stderr.strip()
+                result["failure_reason"] = _classify_runner_failure(
+                    test_run,
+                    default="TEST_COLLECT_FAILED",
+                )
+                return result
+
+    if run_targeted_tests:
+        args = targeted_test_args or ["-q", "-k", "not slow", "--maxfail=1"]
+        target_run = runner.run(["uv", "run", "pytest", *args])
+        result["stage_reached"] = 4
+        result["details"]["targeted_tests_exit_code"] = target_run.exit_code
+        if target_run.exit_code == 127:
+            result["tests_ok"] = None
+            result["details"]["targeted_tests_skipped"] = "uv not found"
+            result["failure_reason"] = "TARGETED_TESTS_SKIPPED"
+            return result
+        if target_run.exit_code != 0:
+            result["tests_ok"] = False
+            result["details"]["targeted_tests_stderr"] = target_run.stderr.strip()
+            result["failure_reason"] = _classify_runner_failure(
+                target_run,
+                default="TARGETED_TEST_FAILED",
+            )
+            return result
+        result["tests_ok"] = True
+        result["stage_reached"] = 5
+    elif run_test_collect:
+        result["tests_ok"] = True
+
     return result
+
+
+def _classify_runner_failure(run: Any, *, default: str) -> str:
+    exit_code = int(getattr(run, "exit_code", -1))
+    stderr = str(getattr(run, "stderr", "")).lower()
+    if exit_code == 124:
+        return "VERIFICATION_TIMEOUT"
+    if exit_code == 126:
+        return "COMMAND_NOT_ALLOWED"
+    if "indentation" in stderr:
+        return "INDENTATION_ERROR"
+    if "syntax" in stderr:
+        return "SYNTAX_INVALID"
+    if "import" in stderr or "module" in stderr:
+        return "IMPORT_PARSE_FAIL"
+    if "collect" in stderr:
+        return "TEST_COLLECT_FAILED"
+    return default

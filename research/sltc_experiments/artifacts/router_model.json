@@ -1,13 +1,17 @@
 {
   "seed": 42,
   "task_expert_preferences": {
+    "chat": "llm_only",
     "code": "code_expert",
+    "mixed": "research_expert",
     "plan": "plan_expert",
     "research": "research_expert"
   },
   "confidence_bias": {
-    "code": 0.918,
-    "plan": 0.936,
-    "research": 0.924
+    "chat": 1.0,
+    "code": 1.0,
+    "mixed": 0.5,
+    "plan": 1.0,
+    "research": 1.0
   }
 }

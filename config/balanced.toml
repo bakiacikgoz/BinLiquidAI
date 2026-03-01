@@ -36,9 +36,15 @@ max_recursion_depth = 3
 
 [sltc]
 enabled = true
+router_mode = "shadow"
 decay = 0.85
 spike_threshold = 0.52
 confidence_threshold = 0.58
+failure_penalty_weight = 0.35
+latency_penalty_weight = 0.12
+need_bonus = 0.12
+conf_bonus = 0.2
+task_bias_overrides = {}
 
 [memory]
 db_path = ".binliquid/memory.sqlite3"
@@ -46,3 +52,34 @@ salience_threshold = 0.58
 salience_decay = 0.84
 max_rows = 8000
 context_top_k = 5
+expert_bonus = 0.06
+task_bonus = 0.08
+spike_reduction = 0.5
+rank_salience_weight = 0.72
+rank_recency_weight = 0.28
+
+[memory.keyword_weights]
+remember = 0.18
+"hatırla" = 0.18
+plan = 0.12
+"adım" = 0.12
+deadline = 0.1
+todo = 0.1
+bug = 0.12
+hata = 0.12
+important = 0.16
+"önemli" = 0.16
+
+[planner]
+repair_enabled = true
+repair_max_attempts = 1
+prompt_variant = "strict_v2"
+
+[code_verify]
+enabled = true
+lint_enabled = true
+test_collect_enabled = true
+targeted_tests_enabled = true
+timeout_s = 15
+retry_max = 2
+retry_strategy = "failure_aware"

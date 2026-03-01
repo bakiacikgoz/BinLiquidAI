@@ -18,9 +18,12 @@ class SalienceGate:
 
     threshold: float = 0.62
     decay: float = 0.82
+    task_bonus: float = 0.08
+    expert_bonus: float = 0.06
+    spike_reduction: float = 0.5
     membrane_state: float = 0.0
     last_reason: str = "init"
-    _keyword_weights: dict[str, float] = field(
+    keyword_weights: dict[str, float] = field(
         default_factory=lambda: {
             "remember": 0.18,
             "hatırla": 0.18,
@@ -46,16 +49,16 @@ class SalienceGate:
         base = 0.05
         text = f"{user_input} {assistant_output}".lower()
 
-        keyword_score = sum(weight for key, weight in self._keyword_weights.items() if key in text)
+        keyword_score = sum(weight for key, weight in self.keyword_weights.items() if key in text)
         length_score = min(len(user_input) / 350.0, 0.2)
-        task_bonus = 0.08 if task_type in {"plan", "research", "mixed", "code"} else 0.0
-        expert_bonus = 0.06 if expert_payload else 0.0
+        task_bonus = self.task_bonus if task_type in {"plan", "research", "mixed", "code"} else 0.0
+        expert_bonus = self.expert_bonus if expert_payload else 0.0
         total_input = min(1.0, base + keyword_score + length_score + task_bonus + expert_bonus)
 
         membrane = (self.decay * self.membrane_state) + total_input
         spike = membrane >= self.threshold
 
-        self.membrane_state = membrane * (0.5 if spike else 1.0)
+        self.membrane_state = membrane * (self.spike_reduction if spike else 1.0)
         reason = "spike_threshold" if spike else "below_threshold"
         self.last_reason = reason
 

@@ -1,10 +1,12 @@
 # Router Training Report
 
-- Sample count: 3
-- Task count: 3
+- Sample count: 12
+- Task count: 5
 
 | Task | Preferred Expert | Support | Score |
 |---|---|---:|---:|
-| code | code_expert | 1 | 0.918 |
-| plan | plan_expert | 1 | 0.936 |
-| research | research_expert | 1 | 0.924 |
+| chat | llm_only | 2 | 1.0 |
+| code | code_expert | 2 | 1.0 |
+| mixed | research_expert | 2 | 0.5 |
+| plan | plan_expert | 2 | 1.0 |
+| research | research_expert | 2 | 1.0 |

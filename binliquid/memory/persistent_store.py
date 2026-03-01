@@ -22,6 +22,12 @@ class MemoryRecord:
     metadata: dict[str, Any]
 
 
+@dataclass(slots=True)
+class MemoryWriteStatus:
+    record_id: int
+    dedup_hit: bool
+
+
 class PersistentMemoryStore:
     """Local SQLite store for long-term memory candidates."""
 
@@ -84,6 +90,25 @@ class PersistentMemoryStore:
         metadata: dict[str, Any] | None = None,
         ttl_days: int | None = 30,
     ) -> int:
+        status = self.write_with_status(
+            session_id=session_id,
+            task_type=task_type,
+            content=content,
+            salience=salience,
+            metadata=metadata,
+            ttl_days=ttl_days,
+        )
+        return status.record_id
+
+    def write_with_status(
+        self,
+        session_id: str,
+        task_type: str,
+        content: str,
+        salience: float,
+        metadata: dict[str, Any] | None = None,
+        ttl_days: int | None = 30,
+    ) -> MemoryWriteStatus:
         content_hash = hashlib.sha256(content.strip().encode("utf-8")).hexdigest()
         now = _utc_now_iso()
         expires_at = _expires_at_iso(ttl_days)
@@ -129,7 +154,7 @@ class PersistentMemoryStore:
                 ),
             )
             self._conn.commit()
-            return record_id
+            return MemoryWriteStatus(record_id=record_id, dedup_hit=True)
 
         cursor = self._conn.execute(
             """
@@ -148,7 +173,7 @@ class PersistentMemoryStore:
             (session_id, task_type, content, content_hash, salience, meta_json, now, expires_at),
         )
         self._conn.commit()
-        return int(cursor.lastrowid)
+        return MemoryWriteStatus(record_id=int(cursor.lastrowid), dedup_hit=False)
 
     def recent(self, limit: int = 10, include_expired: bool = False) -> list[MemoryRecord]:
         if include_expired:

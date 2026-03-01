@@ -21,6 +21,7 @@ from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.schemas.models import ExpertName
+from binliquid.schemas.reason_codes import ReasonCode
 from binliquid.telemetry.tracer import Tracer
 
 
@@ -88,12 +89,15 @@ def _run_mode(
         planner_llm,
         default_latency_budget_ms=config.latency_budget_ms,
         llm_timeout_ms=config.limits.llm_timeout_ms,
+        repair_enabled=config.planner_tuning.repair_enabled,
+        repair_max_attempts=config.planner_tuning.repair_max_attempts,
+        prompt_variant=config.planner_tuning.prompt_variant,
     )
     router, use_router, memory_enabled = _build_mode_runtime(mode_name=mode_name, config=config)
     shadow_router = _build_shadow_router(config=config, active_router=router, use_router=use_router)
 
     experts = {
-        ExpertName.CODE.value: CodeExpert(workspace=Path.cwd()),
+        ExpertName.CODE.value: CodeExpert(workspace=Path.cwd(), verify_config=config.code_verify),
         ExpertName.RESEARCH.value: ResearchExpert(workspace=Path.cwd()),
         ExpertName.PLAN.value: MemoryPlanExpert(),
     }
@@ -125,6 +129,9 @@ def _run_mode(
     memory_writes = 0
     planner_parse_failures = 0
     planner_fallbacks = 0
+    planner_repair_applied = 0
+    planner_repair_success = 0
+    planner_schema_invalid = 0
     router_low_confidence = 0
     expert_schema_invalid = 0
     expert_timeouts = 0
@@ -132,6 +139,7 @@ def _run_mode(
     fast_path_usage = 0
     fast_path_regret = 0
     shadow_agreements = 0
+    shadow_disagreements: dict[str, int] = {}
     shadow_total = 0
     peak_rss = 0
     process = psutil.Process()
@@ -151,6 +159,12 @@ def _run_mode(
         if bool(output.metrics.get("planner_parse_failed", False)):
             planner_parse_failures += 1
             planner_fallbacks += 1
+        planner_reason = str(output.metrics.get("planner_reason_code", ""))
+        if planner_reason == ReasonCode.PLANNER_REPAIR_APPLIED.value:
+            planner_repair_applied += 1
+            planner_repair_success += 1
+        if planner_reason == ReasonCode.PLANNER_SCHEMA_INVALID.value:
+            planner_schema_invalid += 1
         if any("router_low_confidence" in item for item in output.fallback_events):
             router_low_confidence += 1
         if bool(output.metrics.get("expert_schema_invalid", False)):
@@ -166,6 +180,12 @@ def _run_mode(
             shadow_total += 1
             if bool(shadow_agreement):
                 shadow_agreements += 1
+            else:
+                bucket = (
+                    f"{output.metrics.get('active_router_choice')}->"
+                    f"{output.metrics.get('shadow_router_choice')}"
+                )
+                shadow_disagreements[bucket] = shadow_disagreements.get(bucket, 0) + 1
 
         if use_router:
             route_checks += 1
@@ -177,6 +197,7 @@ def _run_mode(
         peak_rss = max(peak_rss, process.memory_info().rss)
 
     total_latency_ms = sum(latencies)
+    memory_stats = memory_manager.stats() if memory_manager is not None else {}
     return {
         "task_count": len(tasks),
         "success_rate": round(successes / max(len(tasks), 1), 4),
@@ -188,6 +209,9 @@ def _run_mode(
         "expert_call_rate": round(expert_calls / max(len(tasks), 1), 4),
         "memory_write_rate": round(memory_writes / max(len(tasks), 1), 4),
         "planner_parse_fail_rate": round(planner_parse_failures / max(len(tasks), 1), 4),
+        "planner_repair_applied_rate": round(planner_repair_applied / max(len(tasks), 1), 4),
+        "planner_repair_success_rate": round(planner_repair_success / max(len(tasks), 1), 4),
+        "planner_schema_invalid_rate": round(planner_schema_invalid / max(len(tasks), 1), 4),
         "planner_fallback_rate": round(planner_fallbacks / max(len(tasks), 1), 4),
         "router_low_confidence_rate": round(router_low_confidence / max(len(tasks), 1), 4),
         "router_shadow_agreement_rate": (
@@ -198,10 +222,14 @@ def _run_mode(
         "fallback_activation_rate": round(fallback_activations / max(len(tasks), 1), 4),
         "fast_path_usage_rate": round(fast_path_usage / max(len(tasks), 1), 4),
         "fast_path_regret_rate": round(fast_path_regret / max(len(tasks), 1), 4),
-        "memory_retrieval_usefulness_rate": None,
+        "memory_retrieval_usefulness_rate": memory_stats.get("retrieval_usefulness_rate"),
+        "memory_dedup_hit_rate": memory_stats.get("dedup_hit_rate"),
+        "memory_retrieval_hit_rate": memory_stats.get("retrieval_hit_rate"),
+        "memory_stale_retrieval_ratio": memory_stats.get("stale_retrieval_ratio"),
         "energy_estimate_wh": round(_estimate_energy_wh(total_latency_ms, peak_rss), 5),
         "router_kind": type(router).__name__ if use_router else "None",
         "shadow_router_kind": type(shadow_router).__name__ if shadow_router is not None else None,
+        "router_shadow_disagreement_buckets": shadow_disagreements,
     }
 
 
@@ -236,6 +264,11 @@ def _build_mode_runtime(
                 confidence_threshold=config.sltc.confidence_threshold,
                 decay=config.sltc.decay,
                 spike_threshold=config.sltc.spike_threshold,
+                failure_penalty_weight=config.sltc.failure_penalty_weight,
+                latency_penalty_weight=config.sltc.latency_penalty_weight,
+                need_bonus=config.sltc.need_bonus,
+                conf_bonus=config.sltc.conf_bonus,
+                task_bias_overrides=config.sltc.task_bias_overrides,
             ),
             True,
             False,
@@ -246,6 +279,11 @@ def _build_mode_runtime(
                 confidence_threshold=config.sltc.confidence_threshold,
                 decay=config.sltc.decay,
                 spike_threshold=config.sltc.spike_threshold,
+                failure_penalty_weight=config.sltc.failure_penalty_weight,
+                latency_penalty_weight=config.sltc.latency_penalty_weight,
+                need_bonus=config.sltc.need_bonus,
+                conf_bonus=config.sltc.conf_bonus,
+                task_bias_overrides=config.sltc.task_bias_overrides,
             ),
             True,
             True,
@@ -258,6 +296,10 @@ def _build_memory_manager(config: RuntimeConfig, enabled: bool) -> MemoryManager
     gate = SalienceGate(
         threshold=config.memory.salience_threshold,
         decay=config.memory.salience_decay,
+        task_bonus=config.memory.task_bonus,
+        expert_bonus=config.memory.expert_bonus,
+        spike_reduction=config.memory.spike_reduction,
+        keyword_weights=config.memory.keyword_weights,
     )
     return MemoryManager(
         enabled=enabled,
@@ -265,6 +307,8 @@ def _build_memory_manager(config: RuntimeConfig, enabled: bool) -> MemoryManager
         gate=gate,
         max_rows=config.memory.max_rows,
         ttl_days=config.memory_ttl_days,
+        rank_salience_weight=config.memory.rank_salience_weight,
+        rank_recency_weight=config.memory.rank_recency_weight,
     )
 
 
@@ -276,6 +320,8 @@ def _build_shadow_router(
 ) -> RuleRouter | SLTCRouter | None:
     if not use_router or not config.shadow_router_enabled:
         return None
+    if config.sltc.router_mode.lower() == "off":
+        return None
     active_mode = "sltc" if isinstance(active_router, SLTCRouter) else "rule"
     shadow_mode = config.shadow_router_mode.lower()
     if shadow_mode == active_mode:
@@ -285,6 +331,11 @@ def _build_shadow_router(
             confidence_threshold=config.sltc.confidence_threshold,
             decay=config.sltc.decay,
             spike_threshold=config.sltc.spike_threshold,
+            failure_penalty_weight=config.sltc.failure_penalty_weight,
+            latency_penalty_weight=config.sltc.latency_penalty_weight,
+            need_bonus=config.sltc.need_bonus,
+            conf_bonus=config.sltc.conf_bonus,
+            task_bias_overrides=config.sltc.task_bias_overrides,
         )
     return RuleRouter(confidence_threshold=config.router_confidence_threshold)
 

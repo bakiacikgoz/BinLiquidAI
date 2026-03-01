@@ -54,3 +54,21 @@ def test_planner_rejects_invalid_enum_as_schema_invalid() -> None:
 
     assert run.parse_failed is True
     assert run.reason_code == ReasonCode.PLANNER_SCHEMA_INVALID
+
+
+def test_planner_reports_json_extract_failed() -> None:
+    planner = Planner(llm=StubLLM(responses=["no braces here"]), default_latency_budget_ms=1200)
+    run = planner.plan("selam")
+    assert run.parse_failed is True
+    assert run.reason_code == ReasonCode.PLANNER_JSON_EXTRACT_FAILED
+
+
+def test_planner_reports_repair_failed_when_disabled() -> None:
+    planner = Planner(
+        llm=StubLLM(responses=["{'broken': yes}"]),
+        default_latency_budget_ms=1200,
+        repair_enabled=False,
+    )
+    run = planner.plan("selam")
+    assert run.parse_failed is True
+    assert run.reason_code == ReasonCode.PLANNER_REPAIR_FAILED

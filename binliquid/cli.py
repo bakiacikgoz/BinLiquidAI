@@ -24,7 +24,7 @@ from binliquid.schemas.models import ExpertName
 from binliquid.telemetry.artifacts_writer import ensure_artifact_scaffold, write_artifact
 from binliquid.telemetry.tracer import Tracer
 from research.sltc_experiments.eval_router import evaluate_router_model
-from research.sltc_experiments.train_router import train_router_model
+from research.sltc_experiments.train_router import calibrate_router_params, train_router_model
 
 app = typer.Typer(help="BinLiquid AI CLI")
 benchmark_app = typer.Typer(help="Benchmark commands")
@@ -131,20 +131,35 @@ def _build_orchestrator(
         planner_llm,
         default_latency_budget_ms=config.latency_budget_ms,
         llm_timeout_ms=config.limits.llm_timeout_ms,
+        repair_enabled=config.planner_tuning.repair_enabled,
+        repair_max_attempts=config.planner_tuning.repair_max_attempts,
+        prompt_variant=config.planner_tuning.prompt_variant,
     )
     selected_router_mode = (router_mode or config.router_mode).lower()
+    sltc_mode = config.sltc.router_mode.lower()
+    if sltc_mode == "active":
+        selected_router_mode = "sltc"
+    if sltc_mode == "off" and selected_router_mode == "sltc":
+        selected_router_mode = "rule"
     router = _build_router(config=config, router_mode=selected_router_mode)
     effective_shadow_enabled = (
         config.shadow_router_enabled
         if shadow_router_enabled is None
         else shadow_router_enabled
     )
+    if sltc_mode == "shadow":
+        effective_shadow_enabled = True
+    if sltc_mode == "off":
+        effective_shadow_enabled = False
     shadow_router = None
     if effective_shadow_enabled:
         selected_shadow_mode = (shadow_router_mode or config.shadow_router_mode).lower()
         shadow_router = _build_router(config=config, router_mode=selected_shadow_mode)
     experts = {
-        ExpertName.CODE.value: CodeExpert(workspace=workspace_dir),
+        ExpertName.CODE.value: CodeExpert(
+            workspace=workspace_dir,
+            verify_config=config.code_verify,
+        ),
         ExpertName.RESEARCH.value: ResearchExpert(workspace=workspace_dir),
         ExpertName.PLAN.value: MemoryPlanExpert(),
     }
@@ -173,6 +188,11 @@ def _build_router(config: RuntimeConfig, router_mode: str) -> RuleRouter | SLTCR
             confidence_threshold=config.sltc.confidence_threshold,
             decay=config.sltc.decay,
             spike_threshold=config.sltc.spike_threshold,
+            failure_penalty_weight=config.sltc.failure_penalty_weight,
+            latency_penalty_weight=config.sltc.latency_penalty_weight,
+            need_bonus=config.sltc.need_bonus,
+            conf_bonus=config.sltc.conf_bonus,
+            task_bias_overrides=config.sltc.task_bias_overrides,
         )
     return RuleRouter(confidence_threshold=config.router_confidence_threshold)
 
@@ -186,6 +206,10 @@ def _build_memory_manager(config: RuntimeConfig) -> MemoryManager:
     gate = SalienceGate(
         threshold=config.memory.salience_threshold,
         decay=config.memory.salience_decay,
+        task_bonus=config.memory.task_bonus,
+        expert_bonus=config.memory.expert_bonus,
+        spike_reduction=config.memory.spike_reduction,
+        keyword_weights=config.memory.keyword_weights,
     )
     return MemoryManager(
         enabled=config.enable_persistent_memory,
@@ -193,6 +217,8 @@ def _build_memory_manager(config: RuntimeConfig) -> MemoryManager:
         gate=gate,
         max_rows=config.memory.max_rows,
         ttl_days=config.memory_ttl_days,
+        rank_salience_weight=config.memory.rank_salience_weight,
+        rank_recency_weight=config.memory.rank_recency_weight,
     )
 
 
@@ -576,6 +602,24 @@ def research_eval_router(
     payload = evaluate_router_model(dataset_path=dataset, model_path=model, output_dir=output_dir)
     typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
     write_artifact("research_summary", {"kind": "eval_router", "result": payload})
+
+
+@research_app.command("calibrate-router")
+def research_calibrate_router(
+    dataset: str = typer.Option(
+        ".binliquid/research/router_dataset.jsonl",
+        help="Dataset JSONL path",
+    ),
+    output_dir: str = typer.Option(
+        "research/sltc_experiments/artifacts",
+        help="Output directory",
+    ),
+    seed: int = typer.Option(42, help="Random seed"),
+) -> None:
+    ensure_artifact_scaffold()
+    payload = calibrate_router_params(dataset_path=dataset, output_dir=output_dir, seed=seed)
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+    write_artifact("research_summary", {"kind": "calibrate_router", "result": payload})
 
 
 if __name__ == "__main__":

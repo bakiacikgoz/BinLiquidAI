@@ -4,7 +4,7 @@ import os
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,9 +25,15 @@ class SLTCConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     enabled: bool = False
+    router_mode: Literal["active", "shadow", "off"] = "shadow"
     decay: float = Field(default=0.82, ge=0.0, le=1.0)
     spike_threshold: float = Field(default=0.55, ge=0.0, le=2.0)
     confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    failure_penalty_weight: float = Field(default=0.35, ge=0.0, le=2.0)
+    latency_penalty_weight: float = Field(default=0.12, ge=0.0, le=2.0)
+    need_bonus: float = Field(default=0.12, ge=0.0, le=2.0)
+    conf_bonus: float = Field(default=0.2, ge=0.0, le=2.0)
+    task_bias_overrides: dict[str, float] = Field(default_factory=dict)
 
 
 class MemoryConfig(BaseModel):
@@ -38,6 +44,45 @@ class MemoryConfig(BaseModel):
     salience_decay: float = Field(default=0.82, ge=0.0, le=1.0)
     max_rows: int = Field(default=5000, ge=100)
     context_top_k: int = Field(default=4, ge=0)
+    keyword_weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "remember": 0.18,
+            "hatırla": 0.18,
+            "plan": 0.12,
+            "adım": 0.12,
+            "deadline": 0.1,
+            "todo": 0.1,
+            "bug": 0.12,
+            "hata": 0.12,
+            "important": 0.16,
+            "önemli": 0.16,
+        }
+    )
+    expert_bonus: float = Field(default=0.06, ge=0.0, le=1.0)
+    task_bonus: float = Field(default=0.08, ge=0.0, le=1.0)
+    spike_reduction: float = Field(default=0.5, ge=0.0, le=1.0)
+    rank_salience_weight: float = Field(default=0.7, ge=0.0, le=1.0)
+    rank_recency_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+
+
+class PlannerTuningConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    repair_enabled: bool = True
+    repair_max_attempts: int = Field(default=1, ge=0, le=2)
+    prompt_variant: Literal["strict_v1", "strict_v2", "strict_v3"] = "strict_v2"
+
+
+class CodeVerifyConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = True
+    lint_enabled: bool = True
+    test_collect_enabled: bool = True
+    targeted_tests_enabled: bool = False
+    timeout_s: int = Field(default=15, ge=1, le=120)
+    retry_max: int = Field(default=1, ge=0, le=3)
+    retry_strategy: Literal["failure_aware", "minimal_only"] = "failure_aware"
 
 
 class RuntimeConfig(BaseModel):
@@ -71,6 +116,8 @@ class RuntimeConfig(BaseModel):
     limits: RuntimeLimits = Field(default_factory=RuntimeLimits)
     sltc: SLTCConfig = Field(default_factory=SLTCConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    planner_tuning: PlannerTuningConfig = Field(default_factory=PlannerTuningConfig)
+    code_verify: CodeVerifyConfig = Field(default_factory=CodeVerifyConfig)
 
     @classmethod
     def from_profile(cls, profile: str = "default", root_dir: Path | None = None) -> RuntimeConfig:
@@ -87,6 +134,8 @@ class RuntimeConfig(BaseModel):
         limits_data = data.get("limits", {})
         sltc_data = data.get("sltc", {})
         memory_data = data.get("memory", {})
+        planner_data = data.get("planner", {})
+        code_verify_data = data.get("code_verify", {})
         return cls(
             model_name=app_data.get("model_name", "lfm2.5-thinking:1.2b"),
             profile_name=app_data.get("profile_name", "default"),
@@ -127,9 +176,15 @@ class RuntimeConfig(BaseModel):
             ),
             sltc=SLTCConfig(
                 enabled=sltc_data.get("enabled", False),
+                router_mode=sltc_data.get("router_mode", "shadow"),
                 decay=sltc_data.get("decay", 0.82),
                 spike_threshold=sltc_data.get("spike_threshold", 0.55),
                 confidence_threshold=sltc_data.get("confidence_threshold", 0.6),
+                failure_penalty_weight=sltc_data.get("failure_penalty_weight", 0.35),
+                latency_penalty_weight=sltc_data.get("latency_penalty_weight", 0.12),
+                need_bonus=sltc_data.get("need_bonus", 0.12),
+                conf_bonus=sltc_data.get("conf_bonus", 0.2),
+                task_bias_overrides=sltc_data.get("task_bias_overrides", {}),
             ),
             memory=MemoryConfig(
                 db_path=memory_data.get("db_path", ".binliquid/memory.sqlite3"),
@@ -137,6 +192,26 @@ class RuntimeConfig(BaseModel):
                 salience_decay=memory_data.get("salience_decay", 0.82),
                 max_rows=memory_data.get("max_rows", 5000),
                 context_top_k=memory_data.get("context_top_k", 4),
+                keyword_weights=memory_data.get("keyword_weights", MemoryConfig().keyword_weights),
+                expert_bonus=memory_data.get("expert_bonus", 0.06),
+                task_bonus=memory_data.get("task_bonus", 0.08),
+                spike_reduction=memory_data.get("spike_reduction", 0.5),
+                rank_salience_weight=memory_data.get("rank_salience_weight", 0.7),
+                rank_recency_weight=memory_data.get("rank_recency_weight", 0.3),
+            ),
+            planner_tuning=PlannerTuningConfig(
+                repair_enabled=planner_data.get("repair_enabled", True),
+                repair_max_attempts=planner_data.get("repair_max_attempts", 1),
+                prompt_variant=planner_data.get("prompt_variant", "strict_v2"),
+            ),
+            code_verify=CodeVerifyConfig(
+                enabled=code_verify_data.get("enabled", True),
+                lint_enabled=code_verify_data.get("lint_enabled", True),
+                test_collect_enabled=code_verify_data.get("test_collect_enabled", True),
+                targeted_tests_enabled=code_verify_data.get("targeted_tests_enabled", False),
+                timeout_s=code_verify_data.get("timeout_s", 15),
+                retry_max=code_verify_data.get("retry_max", 1),
+                retry_strategy=code_verify_data.get("retry_strategy", "failure_aware"),
             ),
         )
 
@@ -174,14 +249,34 @@ ENV_PATHS: dict[str, str] = {
     "LIMITS_MAX_TOOL_CALLS": "limits.max_tool_calls",
     "LIMITS_MAX_RECURSION_DEPTH": "limits.max_recursion_depth",
     "SLTC_ENABLED": "sltc.enabled",
+    "SLTC_ROUTER_MODE": "sltc.router_mode",
     "SLTC_DECAY": "sltc.decay",
     "SLTC_SPIKE_THRESHOLD": "sltc.spike_threshold",
     "SLTC_CONFIDENCE_THRESHOLD": "sltc.confidence_threshold",
+    "SLTC_FAILURE_PENALTY_WEIGHT": "sltc.failure_penalty_weight",
+    "SLTC_LATENCY_PENALTY_WEIGHT": "sltc.latency_penalty_weight",
+    "SLTC_NEED_BONUS": "sltc.need_bonus",
+    "SLTC_CONF_BONUS": "sltc.conf_bonus",
     "MEMORY_DB_PATH": "memory.db_path",
     "MEMORY_SALIENCE_THRESHOLD": "memory.salience_threshold",
     "MEMORY_SALIENCE_DECAY": "memory.salience_decay",
     "MEMORY_MAX_ROWS": "memory.max_rows",
     "MEMORY_CONTEXT_TOP_K": "memory.context_top_k",
+    "MEMORY_EXPERT_BONUS": "memory.expert_bonus",
+    "MEMORY_TASK_BONUS": "memory.task_bonus",
+    "MEMORY_SPIKE_REDUCTION": "memory.spike_reduction",
+    "MEMORY_RANK_SALIENCE_WEIGHT": "memory.rank_salience_weight",
+    "MEMORY_RANK_RECENCY_WEIGHT": "memory.rank_recency_weight",
+    "PLANNER_REPAIR_ENABLED": "planner_tuning.repair_enabled",
+    "PLANNER_REPAIR_MAX_ATTEMPTS": "planner_tuning.repair_max_attempts",
+    "PLANNER_PROMPT_VARIANT": "planner_tuning.prompt_variant",
+    "CODE_VERIFY_ENABLED": "code_verify.enabled",
+    "CODE_VERIFY_LINT_ENABLED": "code_verify.lint_enabled",
+    "CODE_VERIFY_TEST_COLLECT_ENABLED": "code_verify.test_collect_enabled",
+    "CODE_VERIFY_TARGETED_TESTS_ENABLED": "code_verify.targeted_tests_enabled",
+    "CODE_VERIFY_TIMEOUT_S": "code_verify.timeout_s",
+    "CODE_RETRY_MAX": "code_verify.retry_max",
+    "CODE_RETRY_STRATEGY": "code_verify.retry_strategy",
 }
 
 
@@ -231,6 +326,8 @@ def _load_profile_payload(*, profile: str, root_dir: Path | None) -> dict[str, A
         "limits": dict(data.get("limits", {})),
         "sltc": dict(data.get("sltc", {})),
         "memory": dict(data.get("memory", {})),
+        "planner_tuning": dict(data.get("planner", {})),
+        "code_verify": dict(data.get("code_verify", {})),
     }
     return payload
 

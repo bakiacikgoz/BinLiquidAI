@@ -27,6 +27,11 @@ class SLTCRouter:
     confidence_threshold: float = 0.6
     decay: float = 0.82
     spike_threshold: float = 0.55
+    failure_penalty_weight: float = 0.35
+    latency_penalty_weight: float = 0.12
+    need_bonus: float = 0.12
+    conf_bonus: float = 0.2
+    task_bias_overrides: dict[str, float] = field(default_factory=dict)
     states: dict[ExpertName, ExpertTemporalState] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -113,7 +118,7 @@ class SLTCRouter:
             state.membrane = max(0.0, state.membrane * 0.5)
 
     @staticmethod
-    def _task_bias(task_type: TaskType, candidate: ExpertName) -> float:
+    def _base_task_bias(task_type: TaskType, candidate: ExpertName) -> float:
         table = {
             TaskType.CHAT: {ExpertName.LLM_ONLY: 0.25},
             TaskType.CODE: {ExpertName.CODE: 0.45, ExpertName.PLAN: 0.1},
@@ -127,6 +132,12 @@ class SLTCRouter:
         }
         return table.get(task_type, {}).get(candidate, 0.0)
 
+    def _task_bias(self, task_type: TaskType, candidate: ExpertName) -> float:
+        key = f"{task_type.value}:{candidate.value}"
+        if key in self.task_bias_overrides:
+            return float(self.task_bias_overrides[key])
+        return self._base_task_bias(task_type=task_type, candidate=candidate)
+
     def _spike_input(
         self,
         *,
@@ -134,19 +145,21 @@ class SLTCRouter:
         planner_output: PlannerOutput,
         state: ExpertTemporalState,
     ) -> float:
-        failure_penalty = (state.failures / max(state.successes + state.failures, 1)) * 0.35
+        failure_penalty = (
+            state.failures / max(state.successes + state.failures, 1)
+        ) * self.failure_penalty_weight
         latency_penalty = (
-            0.12
+            self.latency_penalty_weight
             if (state.last_latency_ms and state.last_latency_ms > planner_output.latency_budget_ms)
             else 0
         )
         task_bias = self._task_bias(task_type=planner_output.task_type, candidate=candidate)
         need_bonus = (
-            0.12
+            self.need_bonus
             if planner_output.needs_expert and candidate != ExpertName.LLM_ONLY
             else 0.0
         )
-        conf_bonus = planner_output.confidence * 0.2
+        conf_bonus = planner_output.confidence * self.conf_bonus
 
         return max(0.0, task_bias + need_bonus + conf_bonus - failure_penalty - latency_penalty)
 

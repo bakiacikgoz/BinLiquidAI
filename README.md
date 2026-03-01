@@ -88,7 +88,18 @@ uv run binliquid research eval-router \
   --dataset .binliquid/research/router_dataset.jsonl \
   --model research/sltc_experiments/artifacts/router_model.json \
   --output-dir research/sltc_experiments/artifacts
+
+uv run binliquid research calibrate-router \
+  --dataset .binliquid/research/router_dataset.jsonl \
+  --output-dir research/sltc_experiments/artifacts \
+  --seed 42
 ```
+
+Calibration outputs:
+
+- `research/sltc_experiments/artifacts/router_calibration_candidates.json`
+- `research/sltc_experiments/artifacts/router_calibration_report.json`
+- `research/sltc_experiments/artifacts/router_calibration_report.md`
 
 ## Artifacts
 

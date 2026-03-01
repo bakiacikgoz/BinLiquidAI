@@ -11,6 +11,10 @@ class VerificationResult(BaseModel):
     parse_ok: bool
     lint_ok: bool | None = None
     tests_ok: bool | None = None
+    stage_reached: int = Field(default=0, ge=0, le=5)
+    failure_reason: str | None = None
+    retry_count: int = Field(default=0, ge=0, le=10)
+    retry_strategy: str | None = None
     details: dict[str, str | int | bool | None] = Field(default_factory=dict)
 
 

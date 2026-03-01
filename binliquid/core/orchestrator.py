@@ -370,6 +370,7 @@ class Orchestrator:
             assistant_output=final_text,
             expert_payload=selected_result.payload if selected_result else None,
         )
+        code_metrics = self._extract_code_verification_metrics(selected_result)
 
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
         metrics = {
@@ -380,6 +381,12 @@ class Orchestrator:
             "total_latency_ms": total_elapsed,
             "planner_parse_failed": planner_run.parse_failed,
             "planner_reason_code": planner_run.reason_code.value,
+            "planner_repair_applied": planner_run.reason_code == ReasonCode.PLANNER_REPAIR_APPLIED,
+            "planner_repair_success": (
+                planner_run.reason_code == ReasonCode.PLANNER_REPAIR_APPLIED
+                and not planner_run.parse_failed
+            ),
+            "planner_schema_invalid": planner_run.reason_code == ReasonCode.PLANNER_SCHEMA_INVALID,
             "router_reason_code": effective_reason_code.value,
             "route_selected_expert": route.selected_expert.value,
             "memory_written": memory_write["written"],
@@ -405,6 +412,9 @@ class Orchestrator:
                 selected_result is not None
                 and selected_result.error_code == ReasonCode.EXPERT_SCHEMA_INVALID.value
             ),
+            "code_verification_stage_reached": code_metrics["stage_reached"],
+            "code_retry_count": code_metrics["retry_count"],
+            "code_failure_reason": code_metrics["failure_reason"],
         }
 
         self._tracer.emit(
@@ -433,6 +443,9 @@ class Orchestrator:
                 ),
                 "fast_path_taken": False,
                 "fast_path_regret_flag": fast_path_regret_flag,
+                "code_verification_stage_reached": code_metrics["stage_reached"],
+                "code_retry_count": code_metrics["retry_count"],
+                "code_failure_reason": code_metrics["failure_reason"],
             }
         )
         return OrchestratorResult(
@@ -522,6 +535,9 @@ class Orchestrator:
             "total_latency_ms": total_elapsed,
             "planner_parse_failed": False,
             "planner_reason_code": ReasonCode.PLANNER_OK.value,
+            "planner_repair_applied": False,
+            "planner_repair_success": False,
+            "planner_schema_invalid": False,
             "router_reason_code": ReasonCode.BASELINE_A.value,
             "route_selected_expert": ExpertName.LLM_ONLY.value,
             "memory_written": memory_write["written"],
@@ -766,6 +782,26 @@ class Orchestrator:
                     "error_code": ReasonCode.EXPERT_SCHEMA_INVALID.value,
                 }
             )
+
+    @staticmethod
+    def _extract_code_verification_metrics(
+        expert_result: ExpertResult | None,
+    ) -> dict[str, object]:
+        base = {
+            "stage_reached": None,
+            "retry_count": None,
+            "failure_reason": None,
+        }
+        if expert_result is None or expert_result.expert_name != ExpertName.CODE:
+            return base
+        verification = expert_result.payload.get("verification")
+        if not isinstance(verification, dict):
+            return base
+        return {
+            "stage_reached": verification.get("stage_reached"),
+            "retry_count": verification.get("retry_count"),
+            "failure_reason": verification.get("failure_reason"),
+        }
 
     @staticmethod
     def _build_synthesis_prompt(user_input: str, expert_result: ExpertResult) -> str:

@@ -5,18 +5,32 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from binliquid.core.llm_ollama import LLMClient
 from binliquid.schemas.models import ExpertName, PlannerOutput, ResponseMode, TaskType
 from binliquid.schemas.reason_codes import ReasonCode
 
-PLANNER_SYSTEM_PROMPT = """
-You are a strict planner. Return only valid JSON that exactly matches the required fields.
-Required fields: task_type, intent, needs_expert, expert_candidates, confidence,
-latency_budget_ms, can_fallback, response_mode.
-No markdown, no extra keys.
-""".strip()
+PLANNER_SYSTEM_PROMPTS: dict[str, str] = {
+    "strict_v1": (
+        "You are a strict planner. Output only a valid JSON object with required fields. "
+        "No markdown. No extra keys."
+    ),
+    "strict_v2": (
+        "Return ONLY a JSON object.\n"
+        "Do not include markdown fences.\n"
+        "Do not add extra keys.\n"
+        "Use valid enums and primitive types."
+    ),
+    "strict_v3": (
+        "You are PlannerJSON.\n"
+        "Output one JSON object only.\n"
+        "task_type in {chat,code,research,plan,mixed}\n"
+        "response_mode in {direct,tool-first,ask-clarify}\n"
+        "confidence must be float in [0,1].\n"
+        "No prose. No comments. No markdown."
+    ),
+}
 
 
 @dataclass(slots=True)
@@ -29,43 +43,41 @@ class PlannerRun:
     reason_code: ReasonCode
 
 
+class PlannerJSONExtractError(ValueError):
+    pass
+
+
+class PlannerRepairError(ValueError):
+    pass
+
+
 class Planner:
     def __init__(
         self,
         llm: LLMClient,
         default_latency_budget_ms: int = 3500,
         llm_timeout_ms: int = 60_000,
+        *,
+        repair_enabled: bool = True,
+        repair_max_attempts: int = 1,
+        prompt_variant: Literal["strict_v1", "strict_v2", "strict_v3"] = "strict_v2",
     ):
         self._llm = llm
         self._default_latency_budget_ms = default_latency_budget_ms
         self._llm_timeout_ms = llm_timeout_ms
+        self._repair_enabled = repair_enabled
+        self._repair_max_attempts = max(0, repair_max_attempts)
+        self._prompt_variant = prompt_variant
 
     def plan(self, user_input: str) -> PlannerRun:
-        prompt = (
-            "Analyze user request and return strict JSON only.\n"
-            f"User input: {user_input}\n"
-            "Task types: chat, code, research, plan, mixed.\n"
-            "Response modes: direct, tool-first, ask-clarify.\n"
-            "Expert candidates: code_expert, research_expert, plan_expert.\n"
-            "Return exactly this structure with valid values:\n"
-            "{"
-            '"task_type":"chat|code|research|plan|mixed",'
-            '"intent":"...",'
-            '"needs_expert":true,'
-            '"expert_candidates":["research_expert","plan_expert","code_expert"],'
-            '"confidence":0.0,'
-            '"latency_budget_ms":3000,'
-            '"can_fallback":true,'
-            '"response_mode":"direct|tool-first|ask-clarify"'
-            "}"
-        )
+        prompt = self._build_prompt(user_input)
 
         started = time.perf_counter()
         raw_output = ""
         try:
             raw_output = self._generate_with_timeout(
                 prompt=prompt,
-                system=PLANNER_SYSTEM_PROMPT,
+                system=self._system_prompt(),
                 json_mode=True,
             )
         except Exception as exc:  # noqa: BLE001
@@ -82,6 +94,31 @@ class Planner:
 
         try:
             payload, repaired = self._parse_json_payload(raw_output)
+        except PlannerJSONExtractError as exc:
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            fallback = self._heuristic_plan(
+                user_input=user_input,
+                intent="planner_json_extract_failed",
+            )
+            return PlannerRun(
+                output=fallback,
+                raw_output=raw_output,
+                parse_failed=True,
+                error=str(exc),
+                elapsed_ms=elapsed_ms,
+                reason_code=ReasonCode.PLANNER_JSON_EXTRACT_FAILED,
+            )
+        except PlannerRepairError as exc:
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            fallback = self._heuristic_plan(user_input=user_input, intent="planner_repair_failed")
+            return PlannerRun(
+                output=fallback,
+                raw_output=raw_output,
+                parse_failed=True,
+                error=str(exc),
+                elapsed_ms=elapsed_ms,
+                reason_code=ReasonCode.PLANNER_REPAIR_FAILED,
+            )
         except Exception as exc:  # noqa: BLE001
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             fallback = self._heuristic_plan(user_input=user_input, intent="planner_parse_fallback")
@@ -110,7 +147,7 @@ class Planner:
             )
         except Exception as exc:  # noqa: BLE001
             elapsed_ms = int((time.perf_counter() - started) * 1000)
-            fallback = self._heuristic_plan(user_input=user_input, intent="planner_parse_fallback")
+            fallback = self._heuristic_plan(user_input=user_input, intent="planner_schema_invalid")
             return PlannerRun(
                 output=fallback,
                 raw_output=raw_output,
@@ -120,11 +157,33 @@ class Planner:
                 reason_code=ReasonCode.PLANNER_SCHEMA_INVALID,
             )
 
-    @staticmethod
-    def _parse_json_payload(raw_output: str) -> tuple[dict[str, object], bool]:
+    def _build_prompt(self, user_input: str) -> str:
+        return (
+            "Analyze user request and return strict JSON only.\n"
+            f"User input: {user_input}\n"
+            "Task types: chat, code, research, plan, mixed.\n"
+            "Response modes: direct, tool-first, ask-clarify.\n"
+            "Expert candidates: code_expert, research_expert, plan_expert.\n"
+            "Return exactly this structure with valid values:\n"
+            "{"
+            '"task_type":"chat|code|research|plan|mixed",'
+            '"intent":"...",'
+            '"needs_expert":true,'
+            '"expert_candidates":["research_expert","plan_expert","code_expert"],'
+            '"confidence":0.0,'
+            '"latency_budget_ms":3000,'
+            '"can_fallback":true,'
+            '"response_mode":"direct|tool-first|ask-clarify"'
+            "}"
+        )
+
+    def _system_prompt(self) -> str:
+        return PLANNER_SYSTEM_PROMPTS.get(self._prompt_variant, PLANNER_SYSTEM_PROMPTS["strict_v2"])
+
+    def _parse_json_payload(self, raw_output: str) -> tuple[dict[str, object], bool]:
         text = raw_output.strip()
         if not text:
-            raise ValueError("empty planner output")
+            raise PlannerJSONExtractError("empty planner output")
 
         try:
             parsed = json.loads(text)
@@ -133,14 +192,28 @@ class Planner:
         except json.JSONDecodeError:
             pass
 
-        candidate = Planner._extract_json_object(text)
+        candidate = self._extract_json_object(text)
         try:
             parsed = json.loads(candidate)
             repaired = candidate.strip() != text.strip()
         except json.JSONDecodeError:
-            repaired_candidate = Planner._repair_json_object(candidate)
-            parsed = json.loads(repaired_candidate)
-            repaired = True
+            if not self._repair_enabled or self._repair_max_attempts <= 0:
+                raise PlannerRepairError("planner repair disabled") from None
+            parsed = None
+            repaired = False
+            current = candidate
+            for _attempt in range(self._repair_max_attempts):
+                current = self._repair_json_object(current)
+                try:
+                    maybe = json.loads(current)
+                    if isinstance(maybe, dict):
+                        parsed = maybe
+                        repaired = True
+                        break
+                except json.JSONDecodeError:
+                    continue
+            if parsed is None:
+                raise PlannerRepairError("planner repair attempts exhausted") from None
         if not isinstance(parsed, dict):
             raise ValueError("planner output JSON is not an object")
         return parsed, repaired
@@ -158,16 +231,19 @@ class Planner:
         start = cleaned.find("{")
         end = cleaned.rfind("}")
         if start == -1 or end == -1 or end <= start:
-            raise ValueError("no JSON object found in planner output")
+            raise PlannerJSONExtractError("no JSON object found in planner output")
         return cleaned[start : end + 1]
 
     @staticmethod
     def _repair_json_object(text: str) -> str:
         repaired = text.strip()
+        repaired = repaired.replace("```json", "").replace("```JSON", "").replace("```", "")
         repaired = re.sub(r",(\s*[}\]])", r"\1", repaired)
         repaired = repaired.replace("“", '"').replace("”", '"').replace("’", "'")
-        if "'" in repaired and '"' not in repaired:
-            repaired = repaired.replace("'", '"')
+        repaired = re.sub(r"\bTrue\b", "true", repaired)
+        repaired = re.sub(r"\bFalse\b", "false", repaired)
+        repaired = re.sub(r"\bNone\b", "null", repaired)
+        repaired = re.sub(r"(?<!\\)'([^'\\]*(?:\\.[^'\\]*)*)'", r'"\1"', repaired)
         return repaired
 
     @staticmethod
