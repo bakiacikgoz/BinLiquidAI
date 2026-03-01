@@ -8,11 +8,18 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from binliquid.core.llm_ollama import LLMClient
 from binliquid.core.planner import Planner
 from binliquid.experts.base import ExpertBase
 from binliquid.memory.manager import MemoryManager
 from binliquid.runtime.config import RuntimeConfig
+from binliquid.schemas.expert_payloads import (
+    CodeExpertPayload,
+    PlanExpertPayload,
+    ResearchExpertPayload,
+)
 from binliquid.schemas.models import (
     ExpertName,
     ExpertRequest,
@@ -69,14 +76,22 @@ class Orchestrator:
         tracer: Tracer,
         config: RuntimeConfig,
         memory_manager: MemoryManager | None = None,
+        shadow_router: RouterLike | None = None,
     ):
         self._planner = planner
         self._llm = llm
         self._router = router
+        self._shadow_router = shadow_router
         self._experts = experts
         self._tracer = tracer
         self._config = config
         self._memory_manager = memory_manager
+        self._fast_path_sessions: dict[str, dict[str, int]] = {}
+        self._expert_payload_models = {
+            ExpertName.CODE: CodeExpertPayload,
+            ExpertName.RESEARCH: ResearchExpertPayload,
+            ExpertName.PLAN: PlanExpertPayload,
+        }
         self._breaker = CircuitBreaker(
             threshold=config.limits.circuit_breaker_threshold,
             cooldown_s=config.limits.circuit_breaker_cooldown_s,
@@ -94,6 +109,9 @@ class Orchestrator:
         fallback_events: list[str] = []
         expert_latency_ms = 0
         tool_budget_state = {"used": int(session_context.get("tool_calls_used", 0))}
+        session_id = str(session_context.get("session_id", request_id))
+        session_state = self._ensure_session_state(session_id)
+        session_state["turn"] += 1
 
         recursion_depth = int(session_context.get("_depth", 0))
         if recursion_depth >= self._config.limits.max_recursion_depth:
@@ -107,6 +125,8 @@ class Orchestrator:
                 metrics={
                     "router_reason_code": ReasonCode.RECURSION_DEPTH_EXCEEDED.value,
                     "total_latency_ms": int((time.perf_counter() - started_total) * 1000),
+                    "fast_path_regret_flag": False,
+                    "followup_correction_rate": self._followup_correction_rate(session_state),
                 },
             )
 
@@ -143,11 +163,39 @@ class Orchestrator:
             routing_elapsed = 0
         effective_reason_code = route.reason_code
         self._tracer.emit(request_id, "router_decision", route.model_dump(mode="json"))
+        shadow_decision = None
+        if use_router and self._shadow_router is not None:
+            shadow_decision = self._shadow_router.decide(planner_output)
+            agreement = shadow_decision.selected_expert == route.selected_expert
+            disagreement_bucket = (
+                "agree"
+                if agreement
+                else f"{route.selected_expert.value}->{shadow_decision.selected_expert.value}"
+            )
+            self._tracer.emit(
+                request_id,
+                "router_shadow_decision",
+                {
+                    "active_router_choice": route.selected_expert.value,
+                    "shadow_router_choice": shadow_decision.selected_expert.value,
+                    "agreement": agreement,
+                    "disagreement_bucket": disagreement_bucket,
+                },
+            )
 
         selected_result: ExpertResult | None = None
         secondary_result: ExpertResult | None = None
         used_path = "llm_only"
-        session_id = str(session_context.get("session_id", request_id))
+        expert_needed_after_fast_path = self._is_expert_needed_after_fast_path(
+            session_state=session_state,
+            planner_output=planner_output,
+        )
+        fast_path_regret_flag = expert_needed_after_fast_path
+        if fast_path_regret_flag:
+            session_state["regret_count"] += 1
+        followup_rate = self._followup_correction_rate(session_state)
+        if followup_rate >= self._config.fast_path_regret_threshold:
+            fast_path_regret_flag = True
 
         if (
             use_router
@@ -338,6 +386,25 @@ class Orchestrator:
             "memory_salience_score": memory_write["salience_score"],
             "llm_error": llm_error,
             "tool_calls_used": tool_budget_state["used"],
+            "fast_path_taken": False,
+            "fast_path_candidate_reason": "none",
+            "fast_path_regret_flag": fast_path_regret_flag,
+            "expert_needed_after_fast_path": expert_needed_after_fast_path,
+            "followup_correction_rate": followup_rate,
+            "active_router_choice": route.selected_expert.value,
+            "shadow_router_choice": (
+                shadow_decision.selected_expert.value if shadow_decision is not None else None
+            ),
+            "router_shadow_agreement": (
+                shadow_decision.selected_expert == route.selected_expert
+                if shadow_decision is not None
+                else None
+            ),
+            "router_shadow_enabled": shadow_decision is not None,
+            "expert_schema_invalid": (
+                selected_result is not None
+                and selected_result.error_code == ReasonCode.EXPERT_SCHEMA_INVALID.value
+            ),
         }
 
         self._tracer.emit(
@@ -355,6 +422,17 @@ class Orchestrator:
                 "used_path": used_path,
                 "success": bool(final_text.strip()),
                 "total_latency_ms": total_elapsed,
+                "active_router_choice": route.selected_expert.value,
+                "shadow_router_choice": (
+                    shadow_decision.selected_expert.value if shadow_decision else None
+                ),
+                "shadow_agreement": (
+                    bool(shadow_decision.selected_expert == route.selected_expert)
+                    if shadow_decision
+                    else None
+                ),
+                "fast_path_taken": False,
+                "fast_path_regret_flag": fast_path_regret_flag,
             }
         )
         return OrchestratorResult(
@@ -371,12 +449,17 @@ class Orchestrator:
         session_context: dict[str, str] | None = None,
         *,
         stream: bool = False,
+        candidate_reason: str = "short_message",
         on_token: Callable[[str], None] | None = None,
     ) -> OrchestratorResult:
         started_total = time.perf_counter()
         request_id = str(uuid4())
         session_context = session_context or {}
         session_id = str(session_context.get("session_id", request_id))
+        session_state = self._ensure_session_state(session_id)
+        session_state["turn"] += 1
+        session_state["fast_path_count"] += 1
+        session_state["last_fast_path_turn"] = session_state["turn"]
         fallback_events: list[str] = []
 
         self._tracer.emit(
@@ -447,6 +530,16 @@ class Orchestrator:
             "tool_calls_used": 0,
             "fast_path": True,
             "stream": stream,
+            "fast_path_taken": True,
+            "fast_path_candidate_reason": candidate_reason,
+            "fast_path_regret_flag": False,
+            "expert_needed_after_fast_path": False,
+            "followup_correction_rate": self._followup_correction_rate(session_state),
+            "active_router_choice": ExpertName.LLM_ONLY.value,
+            "shadow_router_choice": None,
+            "router_shadow_agreement": None,
+            "router_shadow_enabled": False,
+            "expert_schema_invalid": False,
         }
         self._tracer.emit(
             request_id,
@@ -463,6 +556,11 @@ class Orchestrator:
                 "used_path": used_path,
                 "success": bool(final_text.strip()),
                 "total_latency_ms": total_elapsed,
+                "active_router_choice": ExpertName.LLM_ONLY.value,
+                "shadow_router_choice": None,
+                "shadow_agreement": None,
+                "fast_path_taken": True,
+                "fast_path_regret_flag": False,
             }
         )
         return OrchestratorResult(
@@ -558,7 +656,16 @@ class Orchestrator:
                 context=session_context,
                 latency_budget_ms=planner_output.latency_budget_ms,
             )
+            self._tracer.emit(
+                request_id,
+                "expert_start",
+                {
+                    "expert": expert_name.value,
+                    "attempt": attempt + 1,
+                },
+            )
             result = self._invoke_expert(expert_name, req, tool_budget_state)
+            result = self._normalize_expert_result(result)
             self._tracer.emit(
                 request_id,
                 "expert_call",
@@ -568,6 +675,7 @@ class Orchestrator:
                     "status": result.status.value,
                     "elapsed_ms": result.elapsed_ms,
                     "error_code": result.error_code,
+                    "schema_valid": result.error_code != ReasonCode.EXPERT_SCHEMA_INVALID.value,
                 },
             )
             if result.status == ExpertStatus.OK:
@@ -637,6 +745,28 @@ class Orchestrator:
                     elapsed_ms=elapsed,
                 )
 
+    def _normalize_expert_result(self, result: ExpertResult) -> ExpertResult:
+        if result.status != ExpertStatus.OK:
+            return result
+        model = self._expert_payload_models.get(result.expert_name)
+        if model is None:
+            return result
+        try:
+            normalized_payload = model.model_validate(result.payload).model_dump(mode="json")
+            return result.model_copy(update={"payload": normalized_payload})
+        except ValidationError as exc:
+            return result.model_copy(
+                update={
+                    "status": ExpertStatus.PARTIAL,
+                    "confidence": min(result.confidence, 0.4),
+                    "payload": {
+                        "validation_error": str(exc),
+                        "raw_payload": result.payload,
+                    },
+                    "error_code": ReasonCode.EXPERT_SCHEMA_INVALID.value,
+                }
+            )
+
     @staticmethod
     def _build_synthesis_prompt(user_input: str, expert_result: ExpertResult) -> str:
         evidence = json.dumps(expert_result.payload, ensure_ascii=False)
@@ -698,3 +828,37 @@ class Orchestrator:
         if any(marker in text for marker in turkish_markers):
             return "Respond in Turkish."
         return "Use the same language as the user."
+
+    def trace_events(self, request_id: str) -> list[dict[str, object]]:
+        return [event.model_dump(mode="json") for event in self._tracer.events_for(request_id)]
+
+    @staticmethod
+    def _ensure_session_state_data(state: dict[str, int]) -> dict[str, int]:
+        state.setdefault("turn", 0)
+        state.setdefault("fast_path_count", 0)
+        state.setdefault("regret_count", 0)
+        state.setdefault("last_fast_path_turn", -1000)
+        return state
+
+    def _ensure_session_state(self, session_id: str) -> dict[str, int]:
+        state = self._fast_path_sessions.setdefault(session_id, {})
+        return self._ensure_session_state_data(state)
+
+    def _followup_correction_rate(self, session_state: dict[str, int]) -> float:
+        fast_count = max(session_state.get("fast_path_count", 0), 0)
+        if fast_count == 0:
+            return 0.0
+        regret_count = max(session_state.get("regret_count", 0), 0)
+        return round(regret_count / fast_count, 4)
+
+    def _is_expert_needed_after_fast_path(
+        self,
+        *,
+        session_state: dict[str, int],
+        planner_output: PlannerOutput,
+    ) -> bool:
+        if not planner_output.needs_expert:
+            return False
+        window = self._config.fast_path_regret_window
+        since_last_fast = session_state["turn"] - session_state["last_fast_path_turn"]
+        return since_last_fast <= window

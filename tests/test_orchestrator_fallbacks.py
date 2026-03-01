@@ -45,7 +45,12 @@ class SlowResearchExpert(ExpertBase):
             expert_name=self.name,
             status=ExpertStatus.OK,
             confidence=0.5,
-            payload={"summary": "slow"},
+            payload={
+                "summary": "slow",
+                "evidence": [],
+                "citations": [],
+                "uncertainty": 0.5,
+            },
             elapsed_ms=50,
         )
 
@@ -59,7 +64,12 @@ class FastPlanExpert(ExpertBase):
             expert_name=self.name,
             status=ExpertStatus.OK,
             confidence=0.8,
-            payload={"plan_steps": ["A", "B"]},
+            payload={
+                "plan_steps": ["A", "B"],
+                "state_summary": "ok",
+                "memory_candidates": [],
+                "confidence": 0.8,
+            },
             elapsed_ms=1,
         )
 
@@ -85,7 +95,12 @@ class MixedResearchExpert(ExpertBase):
             expert_name=self.name,
             status=ExpertStatus.OK,
             confidence=0.8,
-            payload={"summary": "research_view"},
+            payload={
+                "summary": "research_view",
+                "evidence": ["e1"],
+                "citations": [],
+                "uncertainty": 0.2,
+            },
             elapsed_ms=1,
         )
 
@@ -99,7 +114,12 @@ class MixedPlanExpert(ExpertBase):
             expert_name=self.name,
             status=ExpertStatus.OK,
             confidence=0.8,
-            payload={"plan_steps": ["A", "B"]},
+            payload={
+                "plan_steps": ["A", "B"],
+                "state_summary": "plan_view",
+                "memory_candidates": ["A"],
+                "confidence": 0.8,
+            },
             elapsed_ms=1,
         )
 

@@ -5,4 +5,5 @@ __pycache__/
 .venv/
 .binliquid/
 benchmarks/results/
+artifacts/
 .DS_Store

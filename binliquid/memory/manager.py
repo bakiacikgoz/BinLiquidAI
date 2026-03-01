@@ -23,7 +23,7 @@ class MemoryManager:
         self,
         *,
         enabled: bool,
-        store: PersistentMemoryStore,
+        store: PersistentMemoryStore | None,
         gate: SalienceGate,
         max_rows: int = 5000,
         ttl_days: int = 30,
@@ -48,6 +48,13 @@ class MemoryManager:
                 written=False,
                 salience_score=0.0,
                 reason="memory_disabled",
+                record_id=None,
+            )
+        if self.store is None:
+            return MemoryWriteResult(
+                written=False,
+                salience_score=0.0,
+                reason="memory_store_missing",
                 record_id=None,
             )
 
@@ -83,16 +90,17 @@ class MemoryManager:
         )
 
     def context_snippets(self, query: str, limit: int = 4) -> list[str]:
-        if not self.enabled:
+        if not self.enabled or self.store is None:
             return []
         records = self.store.search(keyword=query, limit=max(limit * 2, limit))
         ranked = rank_records(records)
         return [record.content for record in ranked[:limit]]
 
     def stats(self) -> dict[str, int | bool]:
+        total_records = self.store.count() if self.store is not None else 0
         return {
             "enabled": self.enabled,
-            "total_records": self.store.count(),
+            "total_records": total_records,
             "max_rows": self.max_rows,
             "ttl_days": self.ttl_days,
         }

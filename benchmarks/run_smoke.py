@@ -27,6 +27,7 @@ from binliquid.telemetry.tracer import Tracer
 def run_smoke_benchmark(
     profile: str = "lite",
     mode: str = "both",
+    suite: str = "smoke",
     output_path: str | None = None,
     task_limit: int | None = None,
     provider: str | None = None,
@@ -34,7 +35,7 @@ def run_smoke_benchmark(
 ) -> dict[str, Any]:
     selected_modes = _resolve_modes(mode)
     tasks = _load_tasks(
-        Path(__file__).resolve().parent / "tasks" / "smoke_tasks.jsonl",
+        _resolve_tasks_path(suite),
         task_limit=task_limit,
     )
 
@@ -43,6 +44,7 @@ def run_smoke_benchmark(
         "timestamp": datetime.now(UTC).isoformat(),
         "profile": profile,
         "mode": mode,
+        "suite": suite,
         "results": {},
     }
 
@@ -88,6 +90,7 @@ def _run_mode(
         llm_timeout_ms=config.limits.llm_timeout_ms,
     )
     router, use_router, memory_enabled = _build_mode_runtime(mode_name=mode_name, config=config)
+    shadow_router = _build_shadow_router(config=config, active_router=router, use_router=use_router)
 
     experts = {
         ExpertName.CODE.value: CodeExpert(workspace=Path.cwd()),
@@ -110,6 +113,7 @@ def _run_mode(
         tracer=tracer,
         config=config,
         memory_manager=memory_manager,
+        shadow_router=shadow_router,
     )
 
     latencies: list[int] = []
@@ -119,6 +123,16 @@ def _run_mode(
     route_checks = 0
     expert_calls = 0
     memory_writes = 0
+    planner_parse_failures = 0
+    planner_fallbacks = 0
+    router_low_confidence = 0
+    expert_schema_invalid = 0
+    expert_timeouts = 0
+    fallback_activations = 0
+    fast_path_usage = 0
+    fast_path_regret = 0
+    shadow_agreements = 0
+    shadow_total = 0
     peak_rss = 0
     process = psutil.Process()
 
@@ -129,10 +143,29 @@ def _run_mode(
             successes += 1
         if output.fallback_events:
             fallbacks += 1
+            fallback_activations += 1
         if output.used_path.startswith("expert"):
             expert_calls += 1
         if bool(output.metrics.get("memory_written", False)):
             memory_writes += 1
+        if bool(output.metrics.get("planner_parse_failed", False)):
+            planner_parse_failures += 1
+            planner_fallbacks += 1
+        if any("router_low_confidence" in item for item in output.fallback_events):
+            router_low_confidence += 1
+        if bool(output.metrics.get("expert_schema_invalid", False)):
+            expert_schema_invalid += 1
+        if any(":timeout" in item for item in output.fallback_events):
+            expert_timeouts += 1
+        if bool(output.metrics.get("fast_path_taken", False)):
+            fast_path_usage += 1
+        if bool(output.metrics.get("fast_path_regret_flag", False)):
+            fast_path_regret += 1
+        shadow_agreement = output.metrics.get("router_shadow_agreement")
+        if shadow_agreement is not None:
+            shadow_total += 1
+            if bool(shadow_agreement):
+                shadow_agreements += 1
 
         if use_router:
             route_checks += 1
@@ -154,8 +187,21 @@ def _run_mode(
         "wrong_route_rate": round(wrong_routes / max(route_checks, 1), 4) if use_router else 0.0,
         "expert_call_rate": round(expert_calls / max(len(tasks), 1), 4),
         "memory_write_rate": round(memory_writes / max(len(tasks), 1), 4),
+        "planner_parse_fail_rate": round(planner_parse_failures / max(len(tasks), 1), 4),
+        "planner_fallback_rate": round(planner_fallbacks / max(len(tasks), 1), 4),
+        "router_low_confidence_rate": round(router_low_confidence / max(len(tasks), 1), 4),
+        "router_shadow_agreement_rate": (
+            round(shadow_agreements / max(shadow_total, 1), 4) if shadow_total else None
+        ),
+        "expert_schema_invalid_rate": round(expert_schema_invalid / max(len(tasks), 1), 4),
+        "expert_timeout_rate": round(expert_timeouts / max(len(tasks), 1), 4),
+        "fallback_activation_rate": round(fallback_activations / max(len(tasks), 1), 4),
+        "fast_path_usage_rate": round(fast_path_usage / max(len(tasks), 1), 4),
+        "fast_path_regret_rate": round(fast_path_regret / max(len(tasks), 1), 4),
+        "memory_retrieval_usefulness_rate": None,
         "energy_estimate_wh": round(_estimate_energy_wh(total_latency_ms, peak_rss), 5),
         "router_kind": type(router).__name__ if use_router else "None",
+        "shadow_router_kind": type(shadow_router).__name__ if shadow_router is not None else None,
     }
 
 
@@ -208,7 +254,7 @@ def _build_mode_runtime(
 
 
 def _build_memory_manager(config: RuntimeConfig, enabled: bool) -> MemoryManager:
-    store = PersistentMemoryStore(db_path=config.memory.db_path)
+    store = PersistentMemoryStore(db_path=config.memory.db_path) if enabled else None
     gate = SalienceGate(
         threshold=config.memory.salience_threshold,
         decay=config.memory.salience_decay,
@@ -220,6 +266,27 @@ def _build_memory_manager(config: RuntimeConfig, enabled: bool) -> MemoryManager
         max_rows=config.memory.max_rows,
         ttl_days=config.memory_ttl_days,
     )
+
+
+def _build_shadow_router(
+    *,
+    config: RuntimeConfig,
+    active_router: RuleRouter | SLTCRouter,
+    use_router: bool,
+) -> RuleRouter | SLTCRouter | None:
+    if not use_router or not config.shadow_router_enabled:
+        return None
+    active_mode = "sltc" if isinstance(active_router, SLTCRouter) else "rule"
+    shadow_mode = config.shadow_router_mode.lower()
+    if shadow_mode == active_mode:
+        shadow_mode = "rule" if active_mode == "sltc" else "sltc"
+    if shadow_mode == "sltc":
+        return SLTCRouter(
+            confidence_threshold=config.sltc.confidence_threshold,
+            decay=config.sltc.decay,
+            spike_threshold=config.sltc.spike_threshold,
+        )
+    return RuleRouter(confidence_threshold=config.router_confidence_threshold)
 
 
 def _resolve_modes(mode: str) -> list[str]:
@@ -242,6 +309,16 @@ def _load_tasks(path: Path, task_limit: int | None = None) -> list[dict[str, str
         if task_limit is not None and task_limit > 0 and len(tasks) >= task_limit:
             break
     return tasks
+
+
+def _resolve_tasks_path(suite: str) -> Path:
+    normalized = suite.strip().lower()
+    root = Path(__file__).resolve().parent / "tasks"
+    if normalized == "smoke":
+        return root / "smoke_tasks.jsonl"
+    if normalized == "quality":
+        return root / "quality" / "quality_tasks.jsonl"
+    raise ValueError("suite must be one of: smoke, quality")
 
 
 def _expected_route(task_type: str) -> str:

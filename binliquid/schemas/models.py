@@ -25,6 +25,7 @@ class ResponseMode(StrEnum):
 
 class ExpertStatus(StrEnum):
     OK = "ok"
+    PARTIAL = "partial"
     TIMEOUT = "timeout"
     ERROR = "error"
     SKIPPED = "skipped"

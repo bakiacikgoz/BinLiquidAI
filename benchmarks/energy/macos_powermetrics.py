@@ -11,6 +11,9 @@ class EnergyMeasurement:
     ok: bool
     wh: float | None
     detail: str
+    confidence: float
+    error_reason: str | None
+    notes: str
 
 
 def measure_energy_wh(duration_s: int = 6) -> EnergyMeasurement:
@@ -37,6 +40,9 @@ def measure_energy_wh(duration_s: int = 6) -> EnergyMeasurement:
             ok=False,
             wh=None,
             detail="powermetrics command not found",
+            confidence=0.0,
+            error_reason="tool_not_found",
+            notes="powermetrics binary missing from PATH",
         )
     except subprocess.TimeoutExpired:
         return EnergyMeasurement(
@@ -44,15 +50,28 @@ def measure_energy_wh(duration_s: int = 6) -> EnergyMeasurement:
             ok=False,
             wh=None,
             detail="powermetrics timed out",
+            confidence=0.0,
+            error_reason="timeout",
+            notes="powermetrics did not return in expected window",
         )
 
     if proc.returncode != 0:
         stderr = (proc.stderr or "").strip()
         if "permission" in stderr.lower() or "root" in stderr.lower() or "sudo" in stderr.lower():
             detail = "powermetrics requires elevated permission"
+            error_reason = "permission_denied"
         else:
             detail = stderr or "powermetrics failed"
-        return EnergyMeasurement(mode="measured", ok=False, wh=None, detail=detail)
+            error_reason = "tool_failure"
+        return EnergyMeasurement(
+            mode="measured",
+            ok=False,
+            wh=None,
+            detail=detail,
+            confidence=0.05,
+            error_reason=error_reason,
+            notes="measurement command returned non-zero exit code",
+        )
 
     watts = _extract_cpu_watts(proc.stdout)
     if watts is None:
@@ -61,6 +80,9 @@ def measure_energy_wh(duration_s: int = 6) -> EnergyMeasurement:
             ok=False,
             wh=None,
             detail="could not parse cpu power output",
+            confidence=0.1,
+            error_reason="parse_error",
+            notes="powermetrics output did not include CPU power lines",
         )
 
     wh = watts * (duration_s / 3600)
@@ -69,6 +91,9 @@ def measure_energy_wh(duration_s: int = 6) -> EnergyMeasurement:
         ok=True,
         wh=round(wh, 6),
         detail=f"parsed {watts:.3f} W from powermetrics",
+        confidence=0.75,
+        error_reason=None,
+        notes="single-sample cpu_power reading",
     )
 
 

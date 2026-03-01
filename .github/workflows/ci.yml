@@ -28,5 +28,24 @@ jobs:
       - name: Tests
         run: uv run pytest -q
 
+      - name: Config resolve gate
+        run: uv run binliquid config resolve --profile balanced --json
+
+      - name: Write test summary artifact
+        run: |
+          mkdir -p artifacts
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          payload = {
+              "artifact": "test_summary",
+              "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+              "status": "ok",
+              "data": {"ci": "github_actions", "tests": "passed"},
+          }
+          with open("artifacts/test_summary.json", "w", encoding="utf-8") as f:
+              json.dump(payload, f, indent=2, ensure_ascii=False)
+          PY
+
       - name: Smoke benchmark gate
         run: uv run binliquid benchmark smoke --mode A --profile balanced --task-limit 1

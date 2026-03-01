@@ -1,11 +1,11 @@
-# SECURITY_MODEL
+# SECURITY_MODEL (v0.2)
 
-## Default Security Posture
+## Default Posture
 
 - Web access disabled by default
 - Privacy mode enabled by default
-- Persistent traces only when `--debug --privacy-off`
-- Tool execution constrained by allowlist and sandbox runner
+- Persistent traces only when debug is on and privacy is explicitly disabled
+- Tool execution constrained by allowlist + sandbox runner
 
 ## Tool Allowlist
 
@@ -17,17 +17,18 @@ Allowed command roots:
 - `ruff`
 - `rg`
 
-Commands outside allowlist are rejected with deterministic error code.
+Commands outside allowlist are rejected with deterministic error (`exit_code=126`).
 
 ## Runtime Guardrails
 
 - `max_tool_calls` enforced per request
-- `max_recursion_depth` enforced via session context
-- Expert timeout and retry limits enforced by orchestrator
-- Circuit breaker prevents repeated failing experts
+- `max_recursion_depth` enforced per session context
+- expert timeout + retry limits
+- circuit breaker cooldown for repeated expert failures
 
-## Injection Defense
+## Prompt/Tool Injection Defense
 
 - Planner output must validate strict schema
-- Non-JSON planner output triggers deterministic fallback
-- Tool execution does not interpret document text as shell commands
+- Invalid planner output triggers deterministic fallback reason code
+- Document content is treated as content, never as executable shell command
+- Tool runner only accepts explicit allowlisted command arrays

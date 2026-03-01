@@ -9,13 +9,17 @@ def test_run_ablation_writes_json_and_report(monkeypatch, tmp_path: Path) -> Non
     def fake_smoke(**_: object):
         out = tmp_path / "smoke.json"
         out.write_text(
-            '{"timestamp":"x","profile":"lite","mode":"A","results":{"A":{"success_rate":1.0}}}',
+            (
+                '{"timestamp":"x","profile":"lite","mode":"A","suite":"smoke",'
+                '"results":{"A":{"success_rate":1.0}}}'
+            ),
             encoding="utf-8",
         )
         return {
             "timestamp": "x",
             "profile": "lite",
             "mode": "A",
+            "suite": "smoke",
             "results": {"A": {"success_rate": 1.0}},
             "output_path": str(out),
         }
@@ -42,6 +46,9 @@ def test_run_energy_measured_mode_returns_deterministic_payload(
         ok = False
         wh = None
         detail = "powermetrics requires elevated permission"
+        confidence = 0.0
+        error_reason = "permission_denied"
+        notes = "need sudo"
 
     monkeypatch.setattr("benchmarks.run_ablation.run_smoke_benchmark", fake_smoke)
     monkeypatch.setattr(

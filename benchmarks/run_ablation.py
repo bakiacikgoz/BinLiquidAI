@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -13,6 +15,7 @@ from benchmarks.run_smoke import run_smoke_benchmark
 def run_ablation_benchmark(
     profile: str = "balanced",
     mode: str = "all",
+    suite: str = "smoke",
     output_path: str | None = None,
     report_path: str | None = None,
     task_limit: int | None = None,
@@ -22,6 +25,7 @@ def run_ablation_benchmark(
     payload = run_smoke_benchmark(
         profile=profile,
         mode=mode,
+        suite=suite,
         output_path=output_path,
         task_limit=task_limit,
         provider=provider,
@@ -65,12 +69,32 @@ def run_energy_benchmark(
     payload: dict[str, Any] = {
         "timestamp": datetime.now(UTC).isoformat(),
         "profile": profile,
+        "measurement_mode": mode,
         "energy_mode": mode,
         "estimated_wh": estimated_wh,
+        "fallback_estimation_method": "latency_ram_linear_v1",
+        "platform_info": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+            "processor": platform.processor()[:64],
+        },
         "measured": {
             "ok": measured.ok if measured else False,
             "wh": measured.wh if measured else None,
             "detail": measured.detail if measured else "not requested",
+            "measurement_mode": "measured",
+            "is_privileged": bool(getattr(os, "geteuid", lambda: 1)() == 0),
+            "sampling_window_s": 6,
+            "tool_name": "powermetrics",
+            "confidence": measured.confidence if measured else 0.0,
+            "error_reason": measured.error_reason if measured else None,
+            "fallback_estimation_method": "latency_ram_linear_v1",
+            "platform_info": {
+                "system": platform.system(),
+                "machine": platform.machine(),
+            },
+            "notes": measured.notes if measured else "not requested",
         },
         "source_benchmark": baseline.get("output_path"),
     }

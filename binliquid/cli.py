@@ -19,8 +19,9 @@ from binliquid.memory.salience_gate import SalienceGate
 from binliquid.memory.session_store import SessionStore
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
-from binliquid.runtime.config import RuntimeConfig
+from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
 from binliquid.schemas.models import ExpertName
+from binliquid.telemetry.artifacts_writer import ensure_artifact_scaffold, write_artifact
 from binliquid.telemetry.tracer import Tracer
 from research.sltc_experiments.eval_router import evaluate_router_model
 from research.sltc_experiments.train_router import train_router_model
@@ -29,15 +30,22 @@ app = typer.Typer(help="BinLiquid AI CLI")
 benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
 research_app = typer.Typer(help="Research commands")
+config_app = typer.Typer(help="Config commands")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
 app.add_typer(research_app, name="research")
+app.add_typer(config_app, name="config")
 
 
 def _is_realtime_candidate(user_text: str) -> bool:
+    is_candidate, _reason = _realtime_candidate_reason(user_text)
+    return is_candidate
+
+
+def _realtime_candidate_reason(user_text: str) -> tuple[bool, str]:
     text = user_text.strip().lower()
     if not text:
-        return False
+        return False, "empty"
 
     greetings = {
         "selam",
@@ -51,12 +59,12 @@ def _is_realtime_candidate(user_text: str) -> bool:
         "iyi akşamlar",
     }
     if text in greetings:
-        return True
+        return True, "greeting"
 
     if len(text) > 64:
-        return False
+        return False, "too_long_chars"
     if len(text.split()) > 10:
-        return False
+        return False, "too_long_words"
 
     heavy_tokens = {
         "kod",
@@ -73,7 +81,9 @@ def _is_realtime_candidate(user_text: str) -> bool:
         "lint",
         "diff",
     }
-    return not any(token in text for token in heavy_tokens)
+    if any(token in text for token in heavy_tokens):
+        return False, "heavy_token_detected"
+    return True, "short_message"
 
 
 def _build_llm(
@@ -98,6 +108,8 @@ def _build_orchestrator(
     config: RuntimeConfig,
     workspace: Path | None = None,
     router_mode: str | None = None,
+    shadow_router_mode: str | None = None,
+    shadow_router_enabled: bool | None = None,
     provider_name: str | None = None,
     fallback_provider: str | None = None,
 ) -> Orchestrator:
@@ -122,6 +134,15 @@ def _build_orchestrator(
     )
     selected_router_mode = (router_mode or config.router_mode).lower()
     router = _build_router(config=config, router_mode=selected_router_mode)
+    effective_shadow_enabled = (
+        config.shadow_router_enabled
+        if shadow_router_enabled is None
+        else shadow_router_enabled
+    )
+    shadow_router = None
+    if effective_shadow_enabled:
+        selected_shadow_mode = (shadow_router_mode or config.shadow_router_mode).lower()
+        shadow_router = _build_router(config=config, router_mode=selected_shadow_mode)
     experts = {
         ExpertName.CODE.value: CodeExpert(workspace=workspace_dir),
         ExpertName.RESEARCH.value: ResearchExpert(workspace=workspace_dir),
@@ -142,6 +163,7 @@ def _build_orchestrator(
         tracer=tracer,
         config=config,
         memory_manager=memory_manager,
+        shadow_router=shadow_router,
     )
 
 
@@ -156,7 +178,11 @@ def _build_router(config: RuntimeConfig, router_mode: str) -> RuleRouter | SLTCR
 
 
 def _build_memory_manager(config: RuntimeConfig) -> MemoryManager:
-    store = PersistentMemoryStore(db_path=config.memory.db_path)
+    store = (
+        PersistentMemoryStore(db_path=config.memory.db_path)
+        if config.enable_persistent_memory
+        else None
+    )
     gate = SalienceGate(
         threshold=config.memory.salience_threshold,
         decay=config.memory.salience_decay,
@@ -170,9 +196,39 @@ def _build_memory_manager(config: RuntimeConfig) -> MemoryManager:
     )
 
 
+@config_app.command("resolve")
+def config_resolve(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    provider: str | None = typer.Option(None, help="Override provider"),
+    fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    cli_overrides = {
+        "llm_provider": provider,
+        "fallback_provider": fallback_provider,
+    }
+    resolved, source_map = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=cli_overrides,
+    )
+    payload = {
+        "profile": profile,
+        "resolved": redact_config_payload(resolved.model_dump(mode="python")),
+        "source_map": source_map,
+    }
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+    else:
+        typer.echo(f"profile={profile}")
+        typer.echo(f"router_mode={resolved.router_mode}")
+        typer.echo(f"shadow_router_enabled={resolved.shadow_router_enabled}")
+        typer.echo(f"shadow_router_mode={resolved.shadow_router_mode}")
+
+
 @app.command()
 def doctor(profile: str = typer.Option("lite", help="Config profile name")) -> None:
     """Runtime and provider health check."""
+    ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
     status = check_provider_chain(
         model_name=config.model_name,
@@ -185,6 +241,15 @@ def doctor(profile: str = typer.Option("lite", help="Config profile name")) -> N
     status["profile"] = profile
 
     typer.echo(json.dumps(status, indent=2, ensure_ascii=False))
+    write_artifact(
+        "status",
+        {
+            "profile": profile,
+            "selected_provider": status.get("selected_provider"),
+            "primary": status.get("primary", {}),
+            "secondary": status.get("secondary", {}),
+        },
+    )
 
     primary = status.get("primary", {})
     selected = str(status.get("selected_provider", ""))
@@ -218,9 +283,27 @@ def chat(
         "--fast-path/--no-fast-path",
         help="Use single-call realtime path for short chat inputs.",
     ),
+    json_output: bool = typer.Option(False, "--json", help="Emit single JSON payload."),
+    json_stream: bool = typer.Option(
+        False,
+        "--json-stream",
+        help="Emit line-delimited JSON events.",
+    ),
+    stdio_json: bool = typer.Option(
+        False,
+        "--stdio-json",
+        help="Alias for --json-stream with IPC-friendly events.",
+    ),
 ) -> None:
     """Interactive chat with orchestrator + router."""
-    config = RuntimeConfig.from_profile(profile)
+    ensure_artifact_scaffold()
+    config, _source_map = resolve_runtime_config(
+        profile=profile,
+        cli_overrides={
+            "llm_provider": provider,
+            "fallback_provider": fallback_provider,
+        },
+    )
     if debug:
         config = config.model_copy(update={"debug_mode": True})
     if privacy_off:
@@ -233,6 +316,33 @@ def chat(
         fallback_provider=fallback_provider,
     )
     memory = SessionStore()
+    stream_json = json_stream or stdio_json
+    use_json = json_output or stream_json
+
+    def _emit_json_event(event: str, data: dict[str, object]) -> None:
+        typer.echo(json.dumps({"event": event, "data": data}, ensure_ascii=False))
+
+    def _emit_trace_events(result_trace_id: str) -> None:
+        stage_to_event = {
+            "request_received": "status",
+            "planner_output": "status",
+            "router_decision": "router_decision",
+            "router_shadow_decision": "router_decision",
+            "expert_start": "expert_start",
+            "expert_call": "expert_end",
+            "memory_write_decision": "status",
+            "final_response": "final",
+        }
+        for event in orchestrator.trace_events(result_trace_id):
+            stage = str(event.get("stage", "status"))
+            _emit_json_event(
+                stage_to_event.get(stage, "status"),
+                {
+                    "stage": stage,
+                    "request_id": event.get("request_id"),
+                    "data": event.get("data", {}),
+                },
+            )
 
     def _run_once(user_text: str) -> None:
         sid = session_id or "session-default"
@@ -246,40 +356,96 @@ def chat(
             if snippets:
                 context["memory_hints"] = "\n---\n".join(snippets)
 
-        use_realtime = fast_path and _is_realtime_candidate(user_text)
+        use_realtime, candidate_reason = _realtime_candidate_reason(user_text)
+        use_realtime = fast_path and use_realtime
+        if stream_json:
+            _emit_json_event(
+                "status",
+                {
+                    "phase": "start",
+                    "session_id": sid,
+                    "realtime_candidate": use_realtime,
+                    "candidate_reason": candidate_reason,
+                },
+            )
         if use_realtime:
             if stream:
                 result = orchestrator.process_fast_chat(
                     user_text,
                     session_context=context,
                     stream=True,
-                    on_token=lambda token: print(token, end="", flush=True),
+                    candidate_reason=candidate_reason,
+                    on_token=(
+                        (lambda token: _emit_json_event("token", {"text": token}))
+                        if stream_json
+                        else (lambda token: print(token, end="", flush=True))
+                    ),
                 )
-                print()
-                if result.used_path != "llm_stream_fast":
+                if not stream_json:
+                    print()
+                if result.used_path != "llm_stream_fast" and not use_json:
                     typer.echo(result.final_text)
             else:
                 result = orchestrator.process_fast_chat(
                     user_text,
                     session_context=context,
                     stream=False,
+                    candidate_reason=candidate_reason,
                 )
-                typer.echo(result.final_text)
+                if not use_json:
+                    typer.echo(result.final_text)
         else:
             result = orchestrator.process(user_text, session_context=context, use_router=True)
-            typer.echo(result.final_text)
+            if not use_json:
+                typer.echo(result.final_text)
 
         memory.add("user", user_text)
         memory.add("assistant", result.final_text)
 
-        if config.debug_mode:
+        if use_json and json_output and not stream_json:
+            payload = {
+                "trace_id": result.trace_id,
+                "final_text": result.final_text,
+                "used_path": result.used_path,
+                "fallback_events": result.fallback_events,
+                "metrics": result.metrics,
+                "trace_events": orchestrator.trace_events(result.trace_id),
+            }
+            typer.echo(json.dumps(payload, ensure_ascii=False))
+        elif stream_json:
+            _emit_trace_events(result.trace_id)
+            _emit_json_event(
+                "final",
+                {
+                    "trace_id": result.trace_id,
+                    "final_text": result.final_text,
+                    "used_path": result.used_path,
+                    "fallback_events": result.fallback_events,
+                    "metrics": result.metrics,
+                },
+            )
+        elif config.debug_mode:
             meta = {
                 "used_path": result.used_path,
                 "fallback_events": result.fallback_events,
                 "metrics": result.metrics,
                 "realtime_candidate": use_realtime,
+                "fast_path_candidate_reason": candidate_reason,
             }
             typer.echo(json.dumps(meta, ensure_ascii=False))
+
+        write_artifact(
+            "router_shadow_summary",
+            {
+                "trace_id": result.trace_id,
+                "router_shadow_enabled": result.metrics.get("router_shadow_enabled"),
+                "router_shadow_agreement": result.metrics.get("router_shadow_agreement"),
+                "active_router_choice": result.metrics.get("active_router_choice"),
+                "shadow_router_choice": result.metrics.get("shadow_router_choice"),
+                "fast_path_regret_flag": result.metrics.get("fast_path_regret_flag"),
+                "followup_correction_rate": result.metrics.get("followup_correction_rate"),
+            },
+        )
 
     if once:
         _run_once(once)
@@ -297,42 +463,50 @@ def chat(
 def benchmark_smoke(
     profile: str = typer.Option("lite", help="Config profile"),
     mode: str = typer.Option("all", help="A|B|C|D|both|all"),
+    suite: str = typer.Option("smoke", help="smoke|quality"),
     output: str | None = typer.Option(None, help="Output JSON path"),
     task_limit: int | None = typer.Option(None, help="Limit number of benchmark tasks"),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
 ) -> None:
+    ensure_artifact_scaffold()
     result = run_smoke_benchmark(
         profile=profile,
         mode=mode,
+        suite=suite,
         output_path=output,
         task_limit=task_limit,
         provider=provider,
         fallback_provider=fallback_provider,
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+    write_artifact("benchmark_summary", {"kind": "smoke", "result": result})
 
 
 @benchmark_app.command("ablation")
 def benchmark_ablation(
     profile: str = typer.Option("balanced", help="Config profile"),
     mode: str = typer.Option("all", help="A|B|C|D|both|all"),
+    suite: str = typer.Option("smoke", help="smoke|quality"),
     output: str | None = typer.Option(None, help="Output JSON path"),
     report: str | None = typer.Option(None, help="Output markdown report path"),
     task_limit: int | None = typer.Option(None, help="Limit number of benchmark tasks"),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
 ) -> None:
+    ensure_artifact_scaffold()
     result = run_ablation_benchmark(
         profile=profile,
         mode=mode,
         output_path=output,
         report_path=report,
         task_limit=task_limit,
+        suite=suite,
         provider=provider,
         fallback_provider=fallback_provider,
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+    write_artifact("benchmark_summary", {"kind": "ablation", "result": result})
 
 
 @benchmark_app.command("energy")
@@ -344,6 +518,7 @@ def benchmark_energy(
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
 ) -> None:
+    ensure_artifact_scaffold()
     result = run_energy_benchmark(
         profile=profile,
         energy_mode=energy_mode,
@@ -353,10 +528,12 @@ def benchmark_energy(
         fallback_provider=fallback_provider,
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+    write_artifact("benchmark_summary", {"kind": "energy", "result": result})
 
 
 @memory_app.command("stats")
 def memory_stats(profile: str = typer.Option("balanced", help="Config profile")) -> None:
+    ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
     manager = _build_memory_manager(config)
     typer.echo(json.dumps(manager.stats(), indent=2, ensure_ascii=False))
@@ -374,8 +551,10 @@ def research_train_router(
     ),
     seed: int = typer.Option(42, help="Random seed"),
 ) -> None:
+    ensure_artifact_scaffold()
     payload = train_router_model(dataset_path=dataset, output_dir=output_dir, seed=seed)
     typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+    write_artifact("research_summary", {"kind": "train_router", "result": payload})
 
 
 @research_app.command("eval-router")
@@ -393,8 +572,10 @@ def research_eval_router(
         help="Output directory",
     ),
 ) -> None:
+    ensure_artifact_scaffold()
     payload = evaluate_router_model(dataset_path=dataset, model_path=model, output_dir=output_dir)
     typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+    write_artifact("research_summary", {"kind": "eval_router", "result": payload})
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 from typer.testing import CliRunner
 
 from binliquid.cli import app
+from binliquid.runtime.config import RuntimeConfig
 
 runner = CliRunner()
 
@@ -26,6 +27,7 @@ def test_benchmark_smoke_command(monkeypatch) -> None:
     def fake_benchmark(
         profile: str,
         mode: str,
+        suite: str,
         output_path: str | None,
         task_limit: int | None,
         provider: str | None = None,
@@ -34,6 +36,7 @@ def test_benchmark_smoke_command(monkeypatch) -> None:
         return {
             "profile": profile,
             "mode": mode,
+            "suite": suite,
             "output_path": output_path or "benchmarks/results/fake.json",
             "task_limit": task_limit,
             "provider": provider,
@@ -46,3 +49,14 @@ def test_benchmark_smoke_command(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert '"mode": "A"' in result.stdout
+
+
+def test_config_resolve_command(monkeypatch) -> None:
+    def fake_resolve(**_: object):
+        return RuntimeConfig.from_profile("lite"), {"llm_provider": "profile"}
+
+    monkeypatch.setattr("binliquid.cli.resolve_runtime_config", fake_resolve)
+    result = runner.invoke(app, ["config", "resolve", "--profile", "lite", "--json"])
+
+    assert result.exit_code == 0
+    assert '"profile": "lite"' in result.stdout

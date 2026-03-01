@@ -15,16 +15,20 @@ def build_markdown_report(payload: dict[str, Any]) -> str:
         "",
         "## Results",
         "",
-        "| Mode | Success | p50(ms) | p95(ms) | Peak RAM (MB) | Fallback |",
-        "| Wrong Route | Expert Call | Memory Write | Energy (Wh) |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        (
+            "| Mode | Success | p50(ms) | p95(ms) | Peak RAM (MB) | Fallback | "
+            "Wrong Route | Expert Call | Memory Write | Parse Fail | "
+            "Shadow Agree | Fast Regret | Energy (Wh) |"
+        ),
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     results = payload.get("results", {})
     for mode_name, row in sorted(results.items()):
         lines.append(
             (
                 "| {mode} | {success} | {p50} | {p95} | {ram} | "
-                "{fallback} | {wrong} | {expert} | {memory} | {energy} |"
+                "{fallback} | {wrong} | {expert} | {memory} | {parse_fail} | "
+                "{shadow} | {regret} | {energy} |"
             ).format(
                 mode=mode_name,
                 success=row.get("success_rate", 0),
@@ -35,6 +39,9 @@ def build_markdown_report(payload: dict[str, Any]) -> str:
                 wrong=row.get("wrong_route_rate", 0),
                 expert=row.get("expert_call_rate", 0),
                 memory=row.get("memory_write_rate", 0),
+                parse_fail=row.get("planner_parse_fail_rate", 0),
+                shadow=row.get("router_shadow_agreement_rate", "n/a"),
+                regret=row.get("fast_path_regret_rate", 0),
                 energy=row.get("energy_estimate_wh", 0),
             )
         )

@@ -1,59 +1,82 @@
-# BinLiquid AI v2.0
+# BinLiquid AI v0.2.0-beta
 
-Offline-first, local-first hybrid assistant with product and research paths.
+Offline-first, local-first hybrid assistant with a production-focused CLI core.
 
-## Highlights
+## Feature Status
 
-- Provider-agnostic LLM runtime (`auto -> ollama -> transformers fallback`)
-- Strict planner schema + typed reason codes
-- Orchestrator with timeout/retry/fallback/circuit-breaker/tool-budget controls
-- Upgraded experts (`code`, `research`, `plan`) with structured payload contracts
-- Persistent memory v2 (salience gate + dedup + TTL + ranked retrieval)
-- Benchmark suite (`smoke`, `ablation`, `energy`)
-- Research reproducibility CLI (`train-router`, `eval-router`)
+| Feature | Status | Notes |
+|---|---|---|
+| Provider chain (`auto -> ollama -> transformers`) | working | `doctor` checks active + fallback chain |
+| Planner strict schema + deterministic fallback | working | adversarial tests included |
+| Orchestrator timeout/retry/circuit-breaker/tool budget | working | limit enforcement tested |
+| Rule router (active) + sLTC shadow router | working | default in `balanced` |
+| Fast-path + realtime stream | working | regret metrics enabled |
+| Expert contracts (code/research/plan) | working | typed validation + partial failover |
+| Memory v2 (dedup + TTL + ranked retrieval) | working | privacy-safe defaults |
+| Benchmarks (smoke/ablation/energy) | working | quality suite (120 tasks) available |
+| Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
+| Desktop UI (Tauri thin shell) | deferred | v0.3 candidate |
 
-## Quick Start (macOS)
+## First 5 Minutes
 
 ```bash
 make bootstrap
 make install
-make check
+uv run ruff check .
+uv run pytest -q
 uv run binliquid doctor --profile balanced
 ```
 
-Optional full HF fallback runtime:
+## Profiles
+
+| Profile | Router | Shadow Router | Memory | Fallback | Telemetry |
+|---|---|---|---|---|---|
+| `lite` | rule | off | off | off | minimal |
+| `balanced` (default daily) | rule | sltc | on | on | short |
+| `research` | sltc | rule | on | on | debug-friendly |
+
+## CLI Quickstart
+
+### Chat
 
 ```bash
-uv sync --python 3.11 --extra dev --extra hf
+uv run binliquid chat --profile balanced --once "selam" --stream --fast-path
+uv run binliquid chat --profile balanced --once "kodu düzelt" --no-fast-path
 ```
 
-## Chat
+Structured output (thin-shell/UI ready):
 
 ```bash
-uv run binliquid chat --profile balanced --once "Bu haftayı 4 adıma böl"
-uv run binliquid chat --profile balanced --provider auto --fallback-provider transformers
-uv run binliquid chat --profile balanced --stream --fast-path
+uv run binliquid chat --profile balanced --once "selam" --json
+uv run binliquid chat --profile balanced --once "selam" --json-stream --stream
+uv run binliquid chat --profile balanced --once "selam" --stdio-json --stream
 ```
 
-`chat` options:
+### Config resolve
 
-- `--provider auto|ollama|transformers`
-- `--fallback-provider transformers|ollama`
-- `--session-id <id>`
-- `--stream/--no-stream` (kısa mesajlarda anlık token akışı)
-- `--fast-path/--no-fast-path` (kısa mesajlarda planner/router atlayıp tek çağrı)
+```bash
+uv run binliquid config resolve --profile balanced --json
+uv run binliquid config resolve --profile balanced --provider ollama --fallback-provider transformers
+```
 
-## Benchmark
+Precedence order: `defaults < profile < env < CLI flags`.
+
+### Benchmarks
 
 ```bash
 uv run binliquid benchmark smoke --mode all --profile balanced
-uv run binliquid benchmark ablation --mode all --profile balanced
+uv run binliquid benchmark ablation --mode all --profile balanced --suite smoke
+uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
 uv run binliquid benchmark energy --profile balanced --energy-mode measured
 ```
 
-Outputs are written under `benchmarks/results/*`.
+### Memory
 
-## Research
+```bash
+uv run binliquid memory stats --profile balanced
+```
+
+### Research
 
 ```bash
 uv run binliquid research train-router \
@@ -67,20 +90,25 @@ uv run binliquid research eval-router \
   --output-dir research/sltc_experiments/artifacts
 ```
 
-## Memory
+## Artifacts
 
-```bash
-uv run binliquid memory stats --profile balanced
-```
+`artifacts/` altında makine-okunur özetler yazılır:
 
-## Defaults
+- `status.json`
+- `test_summary.json`
+- `benchmark_summary.json`
+- `router_shadow_summary.json`
+- `research_summary.json`
 
-- Web access: off
-- Privacy mode: on
-- Persistent memory: off in `lite`, on in `balanced/research`
+## Privacy and Debug
 
-## Profiles
+- Default: `privacy_mode=true`
+- Persistent traces only when debug is on and privacy is explicitly off
+- Web access default: off
 
-- `lite`: minimal resources, rule router, fallback disabled
-- `balanced`: production defaults, sLTC router, fallback enabled
-- `research`: debug-heavy profile for reproducible experiments
+## Known Limits (v0.2)
+
+- `transformers` fallback is for continuity, not quality parity.
+- Measured energy depends on platform permissions (`powermetrics`).
+- sLTC gains vary by workload distribution.
+- UI thin shell is intentionally deferred to keep CLI reliability first.

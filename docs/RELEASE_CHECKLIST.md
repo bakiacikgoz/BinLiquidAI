@@ -4,8 +4,10 @@
 
 - [ ] `uv run ruff check .`
 - [ ] `uv run pytest -q`
+- [ ] `uv run binliquid config resolve --profile balanced --json`
 - [ ] `uv run binliquid doctor --profile balanced`
-- [ ] `uv run binliquid benchmark ablation --mode all --profile balanced --task-limit 2`
+- [ ] `uv run binliquid benchmark smoke --mode all --profile balanced`
+- [ ] `uv run binliquid benchmark ablation --mode all --profile balanced --suite quality`
 - [ ] `uv run binliquid benchmark energy --profile balanced --energy-mode measured`
 
 ## Research Gates
@@ -15,7 +17,11 @@
 
 ## Artifact Checks
 
-- [ ] JSON benchmark outputs exist in `benchmarks/results/`
-- [ ] Markdown ablation report exists
-- [ ] Router train/eval reports exist in `research/sltc_experiments/artifacts/`
+- [ ] `artifacts/status.json` exists and valid JSON
+- [ ] `artifacts/test_summary.json` exists and valid JSON
+- [ ] `artifacts/benchmark_summary.json` exists and valid JSON
+- [ ] `artifacts/router_shadow_summary.json` exists and valid JSON
+- [ ] `artifacts/research_summary.json` exists and valid JSON
+- [ ] Benchmark JSON outputs exist under `benchmarks/results/`
+- [ ] Ablation Markdown report exists
 - [ ] README command examples are current

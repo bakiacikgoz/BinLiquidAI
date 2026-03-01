@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "binliquid"
-version = "0.1.0"
-description = "BinLiquid AI v2.0 MVP Faz 0-1"
+version = "0.2.0"
+description = "BinLiquid AI v0.2 CLI-first reliability beta"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 authors = [

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
+from typing import Any
 
 from binliquid.core.llm_ollama import LLMClient
 from binliquid.schemas.models import ExpertName, PlannerOutput, ResponseMode, TaskType
@@ -79,18 +81,7 @@ class Planner:
             )
 
         try:
-            payload = self._parse_json_payload(raw_output)
-            payload = self._normalize_payload(payload)
-            output = PlannerOutput.model_validate(payload)
-            elapsed_ms = int((time.perf_counter() - started) * 1000)
-            return PlannerRun(
-                output=output,
-                raw_output=raw_output,
-                parse_failed=False,
-                error=None,
-                elapsed_ms=elapsed_ms,
-                reason_code=ReasonCode.PLANNER_OK,
-            )
+            payload, repaired = self._parse_json_payload(raw_output)
         except Exception as exc:  # noqa: BLE001
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             fallback = self._heuristic_plan(user_input=user_input, intent="planner_parse_fallback")
@@ -103,8 +94,34 @@ class Planner:
                 reason_code=ReasonCode.PLANNER_PARSE_FALLBACK,
             )
 
+        try:
+            payload = self._normalize_payload(payload)
+            output = PlannerOutput.model_validate(payload)
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            return PlannerRun(
+                output=output,
+                raw_output=raw_output,
+                parse_failed=False,
+                error=None,
+                elapsed_ms=elapsed_ms,
+                reason_code=(
+                    ReasonCode.PLANNER_REPAIR_APPLIED if repaired else ReasonCode.PLANNER_OK
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            fallback = self._heuristic_plan(user_input=user_input, intent="planner_parse_fallback")
+            return PlannerRun(
+                output=fallback,
+                raw_output=raw_output,
+                parse_failed=True,
+                error=str(exc),
+                elapsed_ms=elapsed_ms,
+                reason_code=ReasonCode.PLANNER_SCHEMA_INVALID,
+            )
+
     @staticmethod
-    def _parse_json_payload(raw_output: str) -> dict[str, object]:
+    def _parse_json_payload(raw_output: str) -> tuple[dict[str, object], bool]:
         text = raw_output.strip()
         if not text:
             raise ValueError("empty planner output")
@@ -112,15 +129,21 @@ class Planner:
         try:
             parsed = json.loads(text)
             if isinstance(parsed, dict):
-                return parsed
+                return parsed, False
         except json.JSONDecodeError:
             pass
 
         candidate = Planner._extract_json_object(text)
-        parsed = json.loads(candidate)
+        try:
+            parsed = json.loads(candidate)
+            repaired = candidate.strip() != text.strip()
+        except json.JSONDecodeError:
+            repaired_candidate = Planner._repair_json_object(candidate)
+            parsed = json.loads(repaired_candidate)
+            repaired = True
         if not isinstance(parsed, dict):
             raise ValueError("planner output JSON is not an object")
-        return parsed
+        return parsed, repaired
 
     @staticmethod
     def _extract_json_object(text: str) -> str:
@@ -139,23 +162,107 @@ class Planner:
         return cleaned[start : end + 1]
 
     @staticmethod
+    def _repair_json_object(text: str) -> str:
+        repaired = text.strip()
+        repaired = re.sub(r",(\s*[}\]])", r"\1", repaired)
+        repaired = repaired.replace("“", '"').replace("”", '"').replace("’", "'")
+        if "'" in repaired and '"' not in repaired:
+            repaired = repaired.replace("'", '"')
+        return repaired
+
+    @staticmethod
     def _normalize_payload(payload: dict[str, object]) -> dict[str, object]:
+        allowed = {
+            "task_type",
+            "intent",
+            "needs_expert",
+            "expert_candidates",
+            "confidence",
+            "latency_budget_ms",
+            "can_fallback",
+            "response_mode",
+        }
+        extra = sorted(set(payload.keys()) - allowed)
+        if extra:
+            raise ValueError(f"unknown planner fields: {', '.join(extra)}")
+
         normalized = dict(payload)
-        normalized["task_type"] = TaskType(str(normalized.get("task_type", "chat")))
-        normalized["response_mode"] = ResponseMode(str(normalized.get("response_mode", "direct")))
+        normalized["task_type"] = Planner._coerce_task_type(normalized.get("task_type", "chat"))
+        normalized["response_mode"] = Planner._coerce_response_mode(
+            normalized.get("response_mode", "direct")
+        )
         normalized["intent"] = str(normalized.get("intent", "unknown_intent"))
-        normalized["needs_expert"] = bool(normalized.get("needs_expert", False))
-        normalized["can_fallback"] = bool(normalized.get("can_fallback", True))
-        normalized["confidence"] = float(normalized.get("confidence", 0.0))
-        normalized["latency_budget_ms"] = int(normalized.get("latency_budget_ms", 3000))
+        normalized["needs_expert"] = Planner._coerce_bool(normalized.get("needs_expert", False))
+        normalized["can_fallback"] = Planner._coerce_bool(normalized.get("can_fallback", True))
+        normalized["confidence"] = Planner._coerce_float(normalized.get("confidence", 0.0))
+        normalized["latency_budget_ms"] = Planner._coerce_int(
+            normalized.get("latency_budget_ms", 3000)
+        )
 
         candidates = normalized.get("expert_candidates", [])
         if isinstance(candidates, list):
-            normalized["expert_candidates"] = [ExpertName(str(item)) for item in candidates]
+            normalized["expert_candidates"] = [
+                Planner._coerce_expert_name(item) for item in candidates
+            ]
         else:
-            normalized["expert_candidates"] = []
+            raise ValueError("expert_candidates must be a list")
 
         return normalized
+
+    @staticmethod
+    def _coerce_bool(value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes", "y", "on"}:
+                return True
+            if lowered in {"false", "0", "no", "n", "off"}:
+                return False
+        raise ValueError(f"invalid bool: {value!r}")
+
+    @staticmethod
+    def _coerce_float(value: object) -> float:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            return float(value.strip())
+        raise ValueError(f"invalid float: {value!r}")
+
+    @staticmethod
+    def _coerce_int(value: object) -> int:
+        if isinstance(value, bool):
+            raise ValueError(f"invalid int: {value!r}")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if isinstance(value, str):
+            return int(value.strip())
+        raise ValueError(f"invalid int: {value!r}")
+
+    @staticmethod
+    def _coerce_task_type(value: object) -> TaskType:
+        text = str(value)
+        if text not in TaskType._value2member_map_:
+            raise ValueError(f"invalid task_type: {value!r}")
+        return TaskType(text)
+
+    @staticmethod
+    def _coerce_response_mode(value: object) -> ResponseMode:
+        text = str(value)
+        if text not in ResponseMode._value2member_map_:
+            raise ValueError(f"invalid response_mode: {value!r}")
+        return ResponseMode(text)
+
+    @staticmethod
+    def _coerce_expert_name(value: Any) -> ExpertName:
+        text = str(value)
+        if text not in ExpertName._value2member_map_:
+            raise ValueError(f"invalid expert candidate: {value!r}")
+        return ExpertName(text)
 
     def _heuristic_plan(self, user_input: str, intent: str) -> PlannerOutput:
         text = user_input.lower()
