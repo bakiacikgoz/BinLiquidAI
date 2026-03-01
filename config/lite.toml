@@ -1,0 +1,36 @@
+[app]
+model_name = "lfm2.5-thinking:1.2b"
+profile_name = "lite"
+router_mode = "rule"
+planner_temperature = 0.0
+answer_temperature = 0.1
+router_confidence_threshold = 0.6
+latency_budget_ms = 3000
+debug_mode = false
+privacy_mode = true
+enable_persistent_memory = false
+web_enabled = false
+workspace_root = "."
+trace_dir = ".binliquid/traces"
+
+[limits]
+expert_timeout_ms = 1800
+max_retries = 1
+circuit_breaker_threshold = 3
+circuit_breaker_cooldown_s = 300
+llm_timeout_ms = 45000
+max_tool_calls = 3
+max_recursion_depth = 2
+
+[sltc]
+enabled = false
+decay = 0.82
+spike_threshold = 0.55
+confidence_threshold = 0.6
+
+[memory]
+db_path = ".binliquid/memory.sqlite3"
+salience_threshold = 0.65
+salience_decay = 0.84
+max_rows = 3000
+context_top_k = 3

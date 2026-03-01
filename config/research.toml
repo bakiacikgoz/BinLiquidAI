@@ -1,0 +1,36 @@
+[app]
+model_name = "lfm2.5-thinking:1.2b"
+profile_name = "research"
+router_mode = "sltc"
+planner_temperature = 0.0
+answer_temperature = 0.15
+router_confidence_threshold = 0.55
+latency_budget_ms = 5500
+debug_mode = true
+privacy_mode = true
+enable_persistent_memory = true
+web_enabled = false
+workspace_root = "."
+trace_dir = ".binliquid/traces"
+
+[limits]
+expert_timeout_ms = 3800
+max_retries = 1
+circuit_breaker_threshold = 3
+circuit_breaker_cooldown_s = 300
+llm_timeout_ms = 70000
+max_tool_calls = 6
+max_recursion_depth = 4
+
+[sltc]
+enabled = true
+decay = 0.87
+spike_threshold = 0.5
+confidence_threshold = 0.55
+
+[memory]
+db_path = ".binliquid/memory.sqlite3"
+salience_threshold = 0.55
+salience_decay = 0.86
+max_rows = 12000
+context_top_k = 6
