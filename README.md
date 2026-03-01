@@ -1,72 +1,86 @@
-# BinLiquid AI v2.0 (MVP Faz 0-1)
+# BinLiquid AI v2.0
 
-Offline-first, yerel çalışan hibrit asistan çekirdeği. Bu sürümde:
+Offline-first, local-first hybrid assistant with product and research paths.
 
-- `Ollama + lfm2.5-thinking:1.2b` LLM core
-- Strict şema tabanlı planner
-- Orchestrator + rule router + fallback + circuit breaker
-- Hafif code/research/plan expert protokolü
-- sLTC temporal router prototipi (Phase 3, product-safe)
-- Kalıcı hafıza + salience gate (opsiyonel, profile ile)
-- CLI (`doctor`, `chat`, `benchmark smoke`)
-- Smoke benchmark (A/B/C/D ablation)
+## Highlights
 
-## Hızlı Başlangıç (macOS)
+- Provider-agnostic LLM runtime (`auto -> ollama -> transformers fallback`)
+- Strict planner schema + typed reason codes
+- Orchestrator with timeout/retry/fallback/circuit-breaker/tool-budget controls
+- Upgraded experts (`code`, `research`, `plan`) with structured payload contracts
+- Persistent memory v2 (salience gate + dedup + TTL + ranked retrieval)
+- Benchmark suite (`smoke`, `ablation`, `energy`)
+- Research reproducibility CLI (`train-router`, `eval-router`)
+
+## Quick Start (macOS)
 
 ```bash
 make bootstrap
 make install
-make doctor
 make check
+uv run binliquid doctor --profile balanced
 ```
 
-Tek mesaj denemesi:
+Optional full HF fallback runtime:
 
 ```bash
-uv run binliquid chat --profile lite --once "Bugünkü işleri 3 adımda planla"
+uv sync --python 3.11 --extra dev --extra hf
 ```
 
-Smoke benchmark:
+## Chat
+
+```bash
+uv run binliquid chat --profile balanced --once "Bu haftayı 4 adıma böl"
+uv run binliquid chat --profile balanced --provider auto --fallback-provider transformers
+uv run binliquid chat --profile balanced --stream --fast-path
+```
+
+`chat` options:
+
+- `--provider auto|ollama|transformers`
+- `--fallback-provider transformers|ollama`
+- `--session-id <id>`
+- `--stream/--no-stream` (kısa mesajlarda anlık token akışı)
+- `--fast-path/--no-fast-path` (kısa mesajlarda planner/router atlayıp tek çağrı)
+
+## Benchmark
 
 ```bash
 uv run binliquid benchmark smoke --mode all --profile balanced
+uv run binliquid benchmark ablation --mode all --profile balanced
+uv run binliquid benchmark energy --profile balanced --energy-mode measured
 ```
 
-Hızlı kontrol (kısa):
+Outputs are written under `benchmarks/results/*`.
+
+## Research
 
 ```bash
-uv run binliquid benchmark smoke --mode all --profile balanced --task-limit 2
+uv run binliquid research train-router \
+  --dataset .binliquid/research/router_dataset.jsonl \
+  --output-dir research/sltc_experiments/artifacts \
+  --seed 42
+
+uv run binliquid research eval-router \
+  --dataset .binliquid/research/router_dataset.jsonl \
+  --model research/sltc_experiments/artifacts/router_model.json \
+  --output-dir research/sltc_experiments/artifacts
 ```
 
-10 ardışık chat stabilite kontrolü:
-
-```bash
-for i in {1..10}; do
-  uv run binliquid chat --profile lite --once "Stabilite testi ${i}: kısa cevap ver."
-done
-```
-
-Kalıcı hafıza istatistikleri:
+## Memory
 
 ```bash
 uv run binliquid memory stats --profile balanced
 ```
 
-## Önemli Varsayılanlar
+## Defaults
 
-- Web erişimi: kapalı
-- Kalıcı bellek: kapalı
-- Privacy mode: açık (kalıcı trace yok)
-- Debug trace için: `--debug --privacy-off`
+- Web access: off
+- Privacy mode: on
+- Persistent memory: off in `lite`, on in `balanced/research`
 
-## Profiller
+## Profiles
 
-- `lite`: minimum kaynak, rule-router, kalıcı bellek kapalı
-- `balanced`: sLTC router + kalıcı bellek salience gate
-- `research`: debug ağırlıklı sLTC + geniş kaynak limitleri
-
-## Dizinler
-
-- `binliquid/`: çekirdek uygulama
-- `benchmarks/`: smoke benchmark harness
-- `docs/`: teknik spec, benchmark ve güvenlik dokümanları
+- `lite`: minimal resources, rule router, fallback disabled
+- `balanced`: production defaults, sLTC router, fallback enabled
+- `research`: debug-heavy profile for reproducible experiments

@@ -42,6 +42,11 @@ class RuntimeConfig(BaseModel):
 
     model_name: str = "lfm2.5-thinking:1.2b"
     profile_name: str = "default"
+    llm_provider: str = "auto"
+    fallback_provider: str = "transformers"
+    fallback_enabled: bool = True
+    hf_model_id: str = "distilgpt2"
+    device: str = "cpu"
     router_mode: str = "rule"
     planner_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     answer_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
@@ -50,9 +55,11 @@ class RuntimeConfig(BaseModel):
     debug_mode: bool = False
     privacy_mode: bool = True
     enable_persistent_memory: bool = False
+    memory_ttl_days: int = Field(default=30, ge=1)
     web_enabled: bool = False
     workspace_root: str = "."
     trace_dir: str = ".binliquid/traces"
+    router_dataset_path: str = ".binliquid/research/router_dataset.jsonl"
     limits: RuntimeLimits = Field(default_factory=RuntimeLimits)
     sltc: SLTCConfig = Field(default_factory=SLTCConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
@@ -76,6 +83,11 @@ class RuntimeConfig(BaseModel):
         return cls(
             model_name=app_data.get("model_name", "lfm2.5-thinking:1.2b"),
             profile_name=app_data.get("profile_name", "default"),
+            llm_provider=app_data.get("llm_provider", "auto"),
+            fallback_provider=app_data.get("fallback_provider", "transformers"),
+            fallback_enabled=app_data.get("fallback_enabled", True),
+            hf_model_id=app_data.get("hf_model_id", "distilgpt2"),
+            device=app_data.get("device", "cpu"),
             router_mode=app_data.get("router_mode", "rule"),
             planner_temperature=app_data.get("planner_temperature", 0.0),
             answer_temperature=app_data.get("answer_temperature", 0.2),
@@ -84,9 +96,14 @@ class RuntimeConfig(BaseModel):
             debug_mode=app_data.get("debug_mode", False),
             privacy_mode=app_data.get("privacy_mode", True),
             enable_persistent_memory=app_data.get("enable_persistent_memory", False),
+            memory_ttl_days=app_data.get("memory_ttl_days", 30),
             web_enabled=app_data.get("web_enabled", False),
             workspace_root=app_data.get("workspace_root", "."),
             trace_dir=app_data.get("trace_dir", ".binliquid/traces"),
+            router_dataset_path=app_data.get(
+                "router_dataset_path",
+                ".binliquid/research/router_dataset.jsonl",
+            ),
             limits=RuntimeLimits(
                 expert_timeout_ms=limits_data.get("expert_timeout_ms", 2500),
                 max_retries=limits_data.get("max_retries", 1),

@@ -11,15 +11,16 @@ import psutil
 from binliquid.core.llm_ollama import OllamaLLM
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import Planner
-from binliquid.experts.code_lite import CodeLiteExpert
-from binliquid.experts.plan_lite import PlanLiteExpert
-from binliquid.experts.research_lite import ResearchLiteExpert
+from binliquid.experts.code_expert import CodeExpert
+from binliquid.experts.memory_plan_expert import MemoryPlanExpert
+from binliquid.experts.research_expert import ResearchExpert
 from binliquid.memory.manager import MemoryManager
 from binliquid.memory.persistent_store import PersistentMemoryStore
 from binliquid.memory.salience_gate import SalienceGate
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig
+from binliquid.schemas.models import ExpertName
 from binliquid.telemetry.tracer import Tracer
 
 
@@ -28,6 +29,8 @@ def run_smoke_benchmark(
     mode: str = "both",
     output_path: str | None = None,
     task_limit: int | None = None,
+    provider: str | None = None,
+    fallback_provider: str | None = None,
 ) -> dict[str, Any]:
     selected_modes = _resolve_modes(mode)
     tasks = _load_tasks(
@@ -44,7 +47,13 @@ def run_smoke_benchmark(
     }
 
     for mode_name in selected_modes:
-        run_result = _run_mode(tasks=tasks, config=config, mode_name=mode_name)
+        run_result = _run_mode(
+            tasks=tasks,
+            config=config,
+            mode_name=mode_name,
+            provider=provider,
+            fallback_provider=fallback_provider,
+        )
         result["results"][mode_name] = run_result
 
     destination = Path(output_path) if output_path else _default_output_path()
@@ -58,9 +67,21 @@ def _run_mode(
     tasks: list[dict[str, str]],
     config: RuntimeConfig,
     mode_name: str,
+    provider: str | None = None,
+    fallback_provider: str | None = None,
 ) -> dict[str, Any]:
-    answer_llm = OllamaLLM(model_name=config.model_name, temperature=config.answer_temperature)
-    planner_llm = OllamaLLM(model_name=config.model_name, temperature=config.planner_temperature)
+    answer_llm = _build_llm(
+        config=config,
+        temperature=config.answer_temperature,
+        provider=provider,
+        fallback_provider=fallback_provider,
+    )
+    planner_llm = _build_llm(
+        config=config,
+        temperature=config.planner_temperature,
+        provider=provider,
+        fallback_provider=fallback_provider,
+    )
     planner = Planner(
         planner_llm,
         default_latency_budget_ms=config.latency_budget_ms,
@@ -69,11 +90,16 @@ def _run_mode(
     router, use_router, memory_enabled = _build_mode_runtime(mode_name=mode_name, config=config)
 
     experts = {
-        "code_expert": CodeLiteExpert(),
-        "research_expert": ResearchLiteExpert(workspace=Path.cwd()),
-        "plan_expert": PlanLiteExpert(),
+        ExpertName.CODE.value: CodeExpert(workspace=Path.cwd()),
+        ExpertName.RESEARCH.value: ResearchExpert(workspace=Path.cwd()),
+        ExpertName.PLAN.value: MemoryPlanExpert(),
     }
-    tracer = Tracer(debug_mode=False, privacy_mode=True, trace_dir=config.trace_dir)
+    tracer = Tracer(
+        debug_mode=False,
+        privacy_mode=True,
+        trace_dir=config.trace_dir,
+        router_dataset_path=config.router_dataset_path,
+    )
     memory_manager = _build_memory_manager(config=config, enabled=memory_enabled)
 
     orchestrator = Orchestrator(
@@ -111,7 +137,7 @@ def _run_mode(
         if use_router:
             route_checks += 1
             expected = _expected_route(task["task_type"])
-            actual = str(output.metrics.get("route_selected_expert", "llm_only"))
+            actual = str(output.metrics.get("route_selected_expert", ExpertName.LLM_ONLY.value))
             if expected != actual:
                 wrong_routes += 1
 
@@ -131,6 +157,23 @@ def _run_mode(
         "energy_estimate_wh": round(_estimate_energy_wh(total_latency_ms, peak_rss), 5),
         "router_kind": type(router).__name__ if use_router else "None",
     }
+
+
+def _build_llm(
+    config: RuntimeConfig,
+    temperature: float,
+    provider: str | None = None,
+    fallback_provider: str | None = None,
+) -> OllamaLLM:
+    return OllamaLLM(
+        model_name=config.model_name,
+        temperature=temperature,
+        provider_name=(provider or config.llm_provider),
+        fallback_provider=(fallback_provider or config.fallback_provider),
+        fallback_enabled=config.fallback_enabled,
+        hf_model_id=config.hf_model_id,
+        device=config.device,
+    )
 
 
 def _build_mode_runtime(
@@ -170,7 +213,13 @@ def _build_memory_manager(config: RuntimeConfig, enabled: bool) -> MemoryManager
         threshold=config.memory.salience_threshold,
         decay=config.memory.salience_decay,
     )
-    return MemoryManager(enabled=enabled, store=store, gate=gate, max_rows=config.memory.max_rows)
+    return MemoryManager(
+        enabled=enabled,
+        store=store,
+        gate=gate,
+        max_rows=config.memory.max_rows,
+        ttl_days=config.memory_ttl_days,
+    )
 
 
 def _resolve_modes(mode: str) -> list[str]:
@@ -197,13 +246,13 @@ def _load_tasks(path: Path, task_limit: int | None = None) -> list[dict[str, str
 
 def _expected_route(task_type: str) -> str:
     mapping = {
-        "chat": "llm_only",
-        "plan": "plan_expert",
-        "research": "research_expert",
-        "code": "code_expert",
-        "mixed": "research_expert",
+        "chat": ExpertName.LLM_ONLY.value,
+        "plan": ExpertName.PLAN.value,
+        "research": ExpertName.RESEARCH.value,
+        "code": ExpertName.CODE.value,
+        "mixed": ExpertName.RESEARCH.value,
     }
-    return mapping.get(task_type, "llm_only")
+    return mapping.get(task_type, ExpertName.LLM_ONLY.value)
 
 
 def _percentile(values: list[int], percentile: int) -> int:
@@ -221,8 +270,6 @@ def _percentile(values: list[int], percentile: int) -> int:
 
 
 def _estimate_energy_wh(total_latency_ms: int, peak_rss_bytes: int) -> float:
-    # Simple system-level estimate for offline smoke runs when hardware power telemetry
-    # is unavailable. This is not a final energy benchmark.
     elapsed_h = max(total_latency_ms / 3_600_000, 0.000001)
     rss_gb = peak_rss_bytes / (1024**3)
     assumed_watts = 6.5 + (rss_gb * 1.3)

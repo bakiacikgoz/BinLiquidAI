@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from binliquid.schemas.models import PlannerOutput, RouterDecision, TaskType
+from binliquid.schemas.models import ExpertName, PlannerOutput, RouterDecision, TaskType
+from binliquid.schemas.reason_codes import ReasonCode
 
 
 @dataclass(slots=True)
@@ -12,22 +13,22 @@ class RuleRouter:
     def decide(self, planner_output: PlannerOutput) -> RouterDecision:
         if planner_output.confidence < self.confidence_threshold:
             return RouterDecision(
-                selected_expert="llm_only",
+                selected_expert=ExpertName.LLM_ONLY,
                 selection_confidence=planner_output.confidence,
                 estimated_cost=0.1,
                 estimated_latency_ms=planner_output.latency_budget_ms,
                 fallback_expert=None,
-                reason_code="LOW_CONFIDENCE",
+                reason_code=ReasonCode.LOW_CONFIDENCE,
             )
 
         if not planner_output.needs_expert or not planner_output.expert_candidates:
             return RouterDecision(
-                selected_expert="llm_only",
+                selected_expert=ExpertName.LLM_ONLY,
                 selection_confidence=planner_output.confidence,
                 estimated_cost=0.1,
                 estimated_latency_ms=max(100, planner_output.latency_budget_ms // 2),
                 fallback_expert=None,
-                reason_code="NO_EXPERT_NEEDED",
+                reason_code=ReasonCode.NO_EXPERT_NEEDED,
             )
 
         preferred = self._preferred_expert(planner_output.task_type)
@@ -41,22 +42,22 @@ class RuleRouter:
             estimated_cost=0.5,
             estimated_latency_ms=min(planner_output.latency_budget_ms, 2000),
             fallback_expert=fallback,
-            reason_code="RULE_ROUTE",
+            reason_code=ReasonCode.RULE_ROUTE,
         )
 
     @staticmethod
-    def _preferred_expert(task_type: TaskType) -> str:
+    def _preferred_expert(task_type: TaskType) -> ExpertName:
         mapping = {
-            TaskType.CODE: "code_expert",
-            TaskType.RESEARCH: "research_expert",
-            TaskType.PLAN: "plan_expert",
-            TaskType.MIXED: "research_expert",
-            TaskType.CHAT: "llm_only",
+            TaskType.CODE: ExpertName.CODE,
+            TaskType.RESEARCH: ExpertName.RESEARCH,
+            TaskType.PLAN: ExpertName.PLAN,
+            TaskType.MIXED: ExpertName.RESEARCH,
+            TaskType.CHAT: ExpertName.LLM_ONLY,
         }
-        return mapping.get(task_type, "llm_only")
+        return mapping.get(task_type, ExpertName.LLM_ONLY)
 
     @staticmethod
-    def _fallback_expert(selected: str, candidates: list[str]) -> str | None:
+    def _fallback_expert(selected: ExpertName, candidates: list[ExpertName]) -> ExpertName | None:
         for candidate in candidates:
             if candidate != selected:
                 return candidate

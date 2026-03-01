@@ -6,7 +6,8 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 
 from binliquid.core.llm_ollama import LLMClient
-from binliquid.schemas.models import PlannerOutput, ResponseMode, TaskType
+from binliquid.schemas.models import ExpertName, PlannerOutput, ResponseMode, TaskType
+from binliquid.schemas.reason_codes import ReasonCode
 
 PLANNER_SYSTEM_PROMPT = """
 You are a strict planner. Return only valid JSON that exactly matches the required fields.
@@ -23,6 +24,7 @@ class PlannerRun:
     parse_failed: bool
     error: str | None
     elapsed_ms: int
+    reason_code: ReasonCode
 
 
 class Planner:
@@ -42,6 +44,7 @@ class Planner:
             f"User input: {user_input}\n"
             "Task types: chat, code, research, plan, mixed.\n"
             "Response modes: direct, tool-first, ask-clarify.\n"
+            "Expert candidates: code_expert, research_expert, plan_expert.\n"
             "Return exactly this structure with valid values:\n"
             "{"
             '"task_type":"chat|code|research|plan|mixed",'
@@ -63,7 +66,7 @@ class Planner:
                 system=PLANNER_SYSTEM_PROMPT,
                 json_mode=True,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             fallback = self._heuristic_plan(user_input=user_input, intent="planner_llm_failure")
             return PlannerRun(
@@ -72,6 +75,7 @@ class Planner:
                 parse_failed=True,
                 error=str(exc),
                 elapsed_ms=elapsed_ms,
+                reason_code=ReasonCode.PLANNER_LLM_FAILURE,
             )
 
         try:
@@ -85,8 +89,9 @@ class Planner:
                 parse_failed=False,
                 error=None,
                 elapsed_ms=elapsed_ms,
+                reason_code=ReasonCode.PLANNER_OK,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             elapsed_ms = int((time.perf_counter() - started) * 1000)
             fallback = self._heuristic_plan(user_input=user_input, intent="planner_parse_fallback")
             return PlannerRun(
@@ -95,6 +100,7 @@ class Planner:
                 parse_failed=True,
                 error=str(exc),
                 elapsed_ms=elapsed_ms,
+                reason_code=ReasonCode.PLANNER_PARSE_FALLBACK,
             )
 
     @staticmethod
@@ -145,7 +151,7 @@ class Planner:
 
         candidates = normalized.get("expert_candidates", [])
         if isinstance(candidates, list):
-            normalized["expert_candidates"] = [str(item) for item in candidates]
+            normalized["expert_candidates"] = [ExpertName(str(item)) for item in candidates]
         else:
             normalized["expert_candidates"] = []
 
@@ -166,33 +172,30 @@ class Planner:
         plan_tokens = ("plan", "adım", "takvim", "roadmap", "schedule", "hafta", "faz")
 
         is_code = any(token in text for token in code_tokens)
-        is_research = any(
-            token in text
-            for token in research_tokens
-        )
+        is_research = any(token in text for token in research_tokens)
         is_plan = any(token in text for token in plan_tokens)
 
         if sum((is_code, is_research, is_plan)) >= 2:
             task_type = TaskType.MIXED
-            candidates = ["research_expert", "plan_expert", "code_expert"]
+            candidates = [ExpertName.RESEARCH, ExpertName.PLAN, ExpertName.CODE]
             needs_expert = True
             response_mode = ResponseMode.TOOL_FIRST
             confidence = 0.62
         elif is_code:
             task_type = TaskType.CODE
-            candidates = ["code_expert", "plan_expert"]
+            candidates = [ExpertName.CODE, ExpertName.PLAN]
             needs_expert = True
             response_mode = ResponseMode.TOOL_FIRST
             confidence = 0.62
         elif is_research:
             task_type = TaskType.RESEARCH
-            candidates = ["research_expert", "plan_expert"]
+            candidates = [ExpertName.RESEARCH, ExpertName.PLAN]
             needs_expert = True
             response_mode = ResponseMode.TOOL_FIRST
             confidence = 0.62
         elif is_plan:
             task_type = TaskType.PLAN
-            candidates = ["plan_expert", "research_expert"]
+            candidates = [ExpertName.PLAN, ExpertName.RESEARCH]
             needs_expert = True
             response_mode = ResponseMode.TOOL_FIRST
             confidence = 0.60

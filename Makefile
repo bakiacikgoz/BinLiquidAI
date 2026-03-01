@@ -1,4 +1,4 @@
-.PHONY: bootstrap install lint test check doctor chat benchmark
+.PHONY: bootstrap install lint test check doctor chat benchmark benchmark-ablation benchmark-energy
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -15,10 +15,16 @@ test:
 check: lint test
 
 doctor:
-	uv run binliquid doctor
+	uv run binliquid doctor --profile balanced
 
 chat:
 	uv run binliquid chat --profile lite
 
 benchmark:
 	uv run binliquid benchmark smoke --mode all --profile balanced
+
+benchmark-ablation:
+	uv run binliquid benchmark ablation --mode all --profile balanced
+
+benchmark-energy:
+	uv run binliquid benchmark energy --profile balanced --energy-mode measured

@@ -1,0 +1,24 @@
+{
+  "sample_count": 3,
+  "task_count": 3,
+  "summary": [
+    {
+      "task_type": "code",
+      "preferred_expert": "code_expert",
+      "support": 1,
+      "score": 0.918
+    },
+    {
+      "task_type": "plan",
+      "preferred_expert": "plan_expert",
+      "support": 1,
+      "score": 0.936
+    },
+    {
+      "task_type": "research",
+      "preferred_expert": "research_expert",
+      "support": 1,
+      "score": 0.924
+    }
+  ]
+}

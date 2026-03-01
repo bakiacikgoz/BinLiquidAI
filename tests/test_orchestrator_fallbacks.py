@@ -7,6 +7,7 @@ from binliquid.experts.base import ExpertBase
 from binliquid.router.rule_router import RuleRouter
 from binliquid.runtime.config import RuntimeConfig, RuntimeLimits
 from binliquid.schemas.models import (
+    ExpertName,
     ExpertRequest,
     ExpertResult,
     ExpertStatus,
@@ -14,6 +15,7 @@ from binliquid.schemas.models import (
     ResponseMode,
     TaskType,
 )
+from binliquid.schemas.reason_codes import ReasonCode
 from binliquid.telemetry.tracer import Tracer
 
 
@@ -29,11 +31,12 @@ class StaticPlanner:
             parse_failed=False,
             error=None,
             elapsed_ms=1,
+            reason_code=ReasonCode.PLANNER_OK,
         )
 
 
 class SlowResearchExpert(ExpertBase):
-    name = "research_expert"
+    name = ExpertName.RESEARCH
 
     def run(self, request: ExpertRequest) -> ExpertResult:
         del request
@@ -48,7 +51,7 @@ class SlowResearchExpert(ExpertBase):
 
 
 class FastPlanExpert(ExpertBase):
-    name = "plan_expert"
+    name = ExpertName.PLAN
 
     def run(self, request: ExpertRequest) -> ExpertResult:
         del request
@@ -62,7 +65,7 @@ class FastPlanExpert(ExpertBase):
 
 
 class FailingExpert(ExpertBase):
-    name = "research_expert"
+    name = ExpertName.RESEARCH
 
     def __init__(self) -> None:
         self.calls = 0
@@ -74,7 +77,7 @@ class FailingExpert(ExpertBase):
 
 
 class MixedResearchExpert(ExpertBase):
-    name = "research_expert"
+    name = ExpertName.RESEARCH
 
     def run(self, request: ExpertRequest) -> ExpertResult:
         del request
@@ -88,7 +91,7 @@ class MixedResearchExpert(ExpertBase):
 
 
 class MixedPlanExpert(ExpertBase):
-    name = "plan_expert"
+    name = ExpertName.PLAN
 
     def run(self, request: ExpertRequest) -> ExpertResult:
         del request
@@ -129,7 +132,7 @@ def test_orchestrator_timeout_uses_fallback_expert() -> None:
         task_type=TaskType.RESEARCH,
         intent="research",
         needs_expert=True,
-        expert_candidates=["research_expert", "plan_expert"],
+        expert_candidates=[ExpertName.RESEARCH, ExpertName.PLAN],
         confidence=0.95,
         latency_budget_ms=1000,
         can_fallback=True,
@@ -138,7 +141,10 @@ def test_orchestrator_timeout_uses_fallback_expert() -> None:
     planner = StaticPlanner(planner_output)
     llm = StubLLM(responses=["final from llm"])
     router = RuleRouter(confidence_threshold=0.6)
-    experts = {"research_expert": SlowResearchExpert(), "plan_expert": FastPlanExpert()}
+    experts = {
+        ExpertName.RESEARCH.value: SlowResearchExpert(),
+        ExpertName.PLAN.value: FastPlanExpert(),
+    }
     orchestrator = Orchestrator(
         planner=planner,
         llm=llm,
@@ -159,7 +165,7 @@ def test_orchestrator_opens_circuit_breaker_after_threshold() -> None:
         task_type=TaskType.RESEARCH,
         intent="research",
         needs_expert=True,
-        expert_candidates=["research_expert"],
+        expert_candidates=[ExpertName.RESEARCH],
         confidence=0.95,
         latency_budget_ms=1000,
         can_fallback=True,
@@ -171,7 +177,7 @@ def test_orchestrator_opens_circuit_breaker_after_threshold() -> None:
         planner=StaticPlanner(planner_output),
         llm=StubLLM(responses=["x", "x", "x", "x"]),
         router=RuleRouter(confidence_threshold=0.6),
-        experts={"research_expert": failing},
+        experts={ExpertName.RESEARCH.value: failing},
         tracer=Tracer(),
         config=_config(timeout_ms=100, threshold=3, cooldown_s=600),
     )
@@ -191,7 +197,7 @@ def test_orchestrator_adjudicates_mixed_expert_outputs() -> None:
         task_type=TaskType.MIXED,
         intent="mixed",
         needs_expert=True,
-        expert_candidates=["research_expert", "plan_expert"],
+        expert_candidates=[ExpertName.RESEARCH, ExpertName.PLAN],
         confidence=0.95,
         latency_budget_ms=1000,
         can_fallback=True,
@@ -202,7 +208,10 @@ def test_orchestrator_adjudicates_mixed_expert_outputs() -> None:
         planner=StaticPlanner(planner_output),
         llm=StubLLM(responses=["adjudicated-final"]),
         router=RuleRouter(confidence_threshold=0.6),
-        experts={"research_expert": MixedResearchExpert(), "plan_expert": MixedPlanExpert()},
+        experts={
+            ExpertName.RESEARCH.value: MixedResearchExpert(),
+            ExpertName.PLAN.value: MixedPlanExpert(),
+        },
         tracer=Tracer(),
         config=_config(timeout_ms=100),
     )

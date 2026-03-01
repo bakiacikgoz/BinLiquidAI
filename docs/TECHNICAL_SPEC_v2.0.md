@@ -1,24 +1,33 @@
 # TECHNICAL_SPEC_v2.0
 
-## Product Path (MVP Faz 0-1)
+## Product Path
 
-- LLM core text/token-native (`lfm2.5-thinking:1.2b` via Ollama)
-- Strict JSON planner output (`PlannerOutput`)
-- Orchestrator with timeout, retry, fallback and circuit breaker
-- Rule-based router (`RuleRouter`) + sLTC prototype router (`SLTCRouter`)
-- Lightweight experts (`code_expert`, `research_expert`, `plan_expert`)
-- Offline-first local tools
-- Optional persistent memory with salience gate (`MemoryManager`)
+- LLM generation is provider-agnostic through `OllamaLLM` chain
+- Primary provider: `auto` (Ollama first), fallback provider optional
+- Planner output is strict typed schema (`PlannerOutput`)
+- Router output is strict typed schema (`RouterDecision` with `ReasonCode` enum)
+- Experts expose structured payload contracts (code/research/plan)
+- Orchestrator enforces timeout, retries, fallback, circuit-breaker, tool budget, recursion depth
 
-## Research Path Boundary
+## Memory Path
 
-Bu sürümde sLTC yalnızca interface seviyesindedir (`router/sltc_interface.py`).
-Gerçek sLTC eğitim/çıkarım ve spike bridge ürün çekirdeğine dahil edilmez.
-Ancak ürün yolunu bozmayan `SLTCRouter` prototipi ile C/D ablation çalıştırılır.
+- SQLite-backed store with dedup (`content_hash`)
+- TTL-aware records (`expires_at`)
+- Salience-driven write gate
+- Ranked retrieval based on salience + recency
 
-## Reliability Rules
+## Research Path
 
-1. Planner parse fail -> LLM-only direct path
-2. Router confidence < 0.60 -> LLM-only
-3. Expert timeout/error -> fallback expert veya LLM-only
-4. Circuit breaker -> 3 ardışık hata sonrası 300s cooldown
+- Router telemetry samples can be persisted as JSONL
+- Offline scripts:
+  - `research/sltc_experiments/train_router.py`
+  - `research/sltc_experiments/eval_router.py`
+- Research path is isolated from product runtime
+
+## CLI Surface
+
+- `doctor`
+- `chat`
+- `benchmark smoke|ablation|energy`
+- `memory stats`
+- `research train-router|eval-router`

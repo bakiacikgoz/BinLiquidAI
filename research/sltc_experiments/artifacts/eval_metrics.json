@@ -1,0 +1,10 @@
+{
+  "sample_count": 3,
+  "exact_match_rate": 1.0,
+  "success_match_rate": 1.0,
+  "task_preferences": {
+    "code": "code_expert",
+    "plan": "plan_expert",
+    "research": "research_expert"
+  }
+}

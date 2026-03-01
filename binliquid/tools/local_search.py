@@ -26,6 +26,12 @@ def find_matches(
         str(max_columns),
         query,
         str(root),
+        "-g",
+        "!*.sqlite3",
+        "-g",
+        "!.git/*",
+        "-g",
+        "!.venv/*",
     ]
 
     try:
@@ -37,10 +43,14 @@ def find_matches(
         return []
 
     results: list[dict[str, str | int]] = []
-    for line in proc.stdout.splitlines()[:max_matches]:
+    for line in proc.stdout.splitlines():
         parts = line.split(":", 2)
         if len(parts) != 3:
             continue
         path, line_no, text = parts
         results.append({"path": path, "line": int(line_no), "text": text.strip()})
+        if len(results) >= max_matches:
+            break
+
+    results.sort(key=lambda item: (str(item["path"]), int(item["line"])))
     return results

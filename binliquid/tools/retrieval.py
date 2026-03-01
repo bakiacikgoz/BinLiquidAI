@@ -13,6 +13,8 @@ ALLOWED_EXTENSIONS = {
     ".rst",
 }
 
+EXCLUDED_PATH_PARTS = {".git", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache"}
+
 
 def retrieve_top_chunks(
     query: str,
@@ -33,10 +35,12 @@ def retrieve_top_chunks(
 
     candidates: list[dict[str, str | int | float]] = []
     file_count = 0
-    for path in root.rglob("*"):
+    for path in sorted(root.rglob("*")):
         if file_count >= max_files:
             break
         if not path.is_file() or path.suffix.lower() not in ALLOWED_EXTENSIONS:
+            continue
+        if any(part in EXCLUDED_PATH_PARTS for part in path.parts):
             continue
 
         file_count += 1
@@ -60,7 +64,13 @@ def retrieve_top_chunks(
                 }
             )
 
-    candidates.sort(key=lambda item: float(item["score"]), reverse=True)
+    candidates.sort(
+        key=lambda item: (
+            -float(item["score"]),
+            str(item["path"]),
+            int(item["line_start"]),
+        )
+    )
     return candidates[:max_chunks]
 
 
@@ -96,10 +106,7 @@ def _tokenize(text: str) -> list[str]:
 
 def _score_text(text: str, tokens: list[str]) -> float:
     lower_text = text.lower()
-    hits = 0
-    for token in tokens:
-        if token in lower_text:
-            hits += 1
+    hits = sum(1 for token in tokens if token in lower_text)
     if hits == 0:
         return 0.0
 

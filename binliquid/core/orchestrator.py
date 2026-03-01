@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -13,6 +14,7 @@ from binliquid.experts.base import ExpertBase
 from binliquid.memory.manager import MemoryManager
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.schemas.models import (
+    ExpertName,
     ExpertRequest,
     ExpertResult,
     ExpertStatus,
@@ -21,6 +23,7 @@ from binliquid.schemas.models import (
     RouterDecision,
     TaskType,
 )
+from binliquid.schemas.reason_codes import ReasonCode
 from binliquid.telemetry.tracer import Tracer
 
 
@@ -33,14 +36,14 @@ class RouterLike(Protocol):
 class CircuitBreaker:
     threshold: int
     cooldown_s: int
-    failures: dict[str, int] = field(default_factory=dict)
-    open_until: dict[str, float] = field(default_factory=dict)
+    failures: dict[ExpertName, int] = field(default_factory=dict)
+    open_until: dict[ExpertName, float] = field(default_factory=dict)
 
-    def is_open(self, expert_name: str) -> bool:
+    def is_open(self, expert_name: ExpertName) -> bool:
         until = self.open_until.get(expert_name)
         return until is not None and time.monotonic() < until
 
-    def record_failure(self, expert_name: str) -> None:
+    def record_failure(self, expert_name: ExpertName) -> None:
         if self.is_open(expert_name):
             return
 
@@ -52,7 +55,7 @@ class CircuitBreaker:
 
         self.failures[expert_name] = current
 
-    def record_success(self, expert_name: str) -> None:
+    def record_success(self, expert_name: ExpertName) -> None:
         self.failures[expert_name] = 0
 
 
@@ -90,6 +93,22 @@ class Orchestrator:
         session_context = session_context or {}
         fallback_events: list[str] = []
         expert_latency_ms = 0
+        tool_budget_state = {"used": int(session_context.get("tool_calls_used", 0))}
+
+        recursion_depth = int(session_context.get("_depth", 0))
+        if recursion_depth >= self._config.limits.max_recursion_depth:
+            fallback_events.append("recursion_depth_exceeded")
+            final_text = self._safe_fallback_text(user_input, "max recursion depth exceeded")
+            return OrchestratorResult(
+                final_text=final_text,
+                used_path="llm_only",
+                fallback_events=fallback_events,
+                trace_id=request_id,
+                metrics={
+                    "router_reason_code": ReasonCode.RECURSION_DEPTH_EXCEEDED.value,
+                    "total_latency_ms": int((time.perf_counter() - started_total) * 1000),
+                },
+            )
 
         self._tracer.emit(request_id, "request_received", {"input": user_input})
 
@@ -101,6 +120,7 @@ class Orchestrator:
             {
                 "parse_failed": planner_run.parse_failed,
                 "error": planner_run.error,
+                "reason_code": planner_run.reason_code.value,
                 "output": planner_output.model_dump(mode="json"),
             },
         )
@@ -113,12 +133,12 @@ class Orchestrator:
             routing_elapsed = int((time.perf_counter() - routing_started) * 1000)
         else:
             route = RouterDecision(
-                selected_expert="llm_only",
+                selected_expert=ExpertName.LLM_ONLY,
                 selection_confidence=planner_output.confidence,
                 estimated_cost=0.1,
                 estimated_latency_ms=planner_output.latency_budget_ms,
                 fallback_expert=None,
-                reason_code="BASELINE_A",
+                reason_code=ReasonCode.BASELINE_A,
             )
             routing_elapsed = 0
         effective_reason_code = route.reason_code
@@ -129,17 +149,24 @@ class Orchestrator:
         used_path = "llm_only"
         session_id = str(session_context.get("session_id", request_id))
 
-        if use_router and route.selected_expert != "llm_only" and planner_output.needs_expert:
+        if (
+            use_router
+            and route.selected_expert != ExpertName.LLM_ONLY
+            and planner_output.needs_expert
+        ):
             if route.selection_confidence < self._config.router_confidence_threshold:
                 fallback_events.append("router_low_confidence")
-                effective_reason_code = "LOW_CONFIDENCE_GATE"
+                effective_reason_code = ReasonCode.LOW_CONFIDENCE_GATE
             elif self._breaker.is_open(route.selected_expert):
                 fallback_events.append("CB_OPEN")
-                effective_reason_code = "CB_OPEN"
+                effective_reason_code = ReasonCode.CB_OPEN
                 self._tracer.emit(
                     request_id,
                     "router_decision_override",
-                    {"reason_code": "CB_OPEN", "expert": route.selected_expert},
+                    {
+                        "reason_code": ReasonCode.CB_OPEN.value,
+                        "expert": route.selected_expert.value,
+                    },
                 )
             else:
                 selected_result = self._run_expert_with_retries(
@@ -148,6 +175,7 @@ class Orchestrator:
                     expert_name=route.selected_expert,
                     user_input=user_input,
                     session_context=session_context,
+                    tool_budget_state=tool_budget_state,
                 )
                 expert_latency_ms += selected_result.elapsed_ms
 
@@ -158,7 +186,7 @@ class Orchestrator:
                         status=selected_result.status,
                         elapsed_ms=selected_result.elapsed_ms,
                     )
-                    used_path = f"expert:{route.selected_expert}"
+                    used_path = f"expert:{route.selected_expert.value}"
                 else:
                     self._breaker.record_failure(route.selected_expert)
                     self._update_router_feedback(
@@ -166,7 +194,9 @@ class Orchestrator:
                         status=selected_result.status,
                         elapsed_ms=selected_result.elapsed_ms,
                     )
-                    fallback_events.append(f"expert_failed:{route.selected_expert}:{selected_result.status.value}")
+                    fallback_events.append(
+                        f"expert_failed:{route.selected_expert.value}:{selected_result.status.value}"
+                    )
 
                 if selected_result.status != ExpertStatus.OK and route.fallback_expert:
                     if self._breaker.is_open(route.fallback_expert):
@@ -178,6 +208,7 @@ class Orchestrator:
                             expert_name=route.fallback_expert,
                             user_input=user_input,
                             session_context=session_context,
+                            tool_budget_state=tool_budget_state,
                         )
                         expert_latency_ms += fallback.elapsed_ms
                         if fallback.status == ExpertStatus.OK:
@@ -188,8 +219,8 @@ class Orchestrator:
                                 elapsed_ms=fallback.elapsed_ms,
                             )
                             selected_result = fallback
-                            used_path = f"expert:{route.fallback_expert}"
-                            fallback_events.append(f"fallback_expert_used:{route.fallback_expert}")
+                            used_path = f"expert:{route.fallback_expert.value}"
+                            fallback_events.append(f"fallback_expert_used:{route.fallback_expert.value}")
                         else:
                             self._breaker.record_failure(route.fallback_expert)
                             self._update_router_feedback(
@@ -198,7 +229,7 @@ class Orchestrator:
                                 elapsed_ms=fallback.elapsed_ms,
                             )
                             fallback_events.append(
-                                f"fallback_expert_failed:{route.fallback_expert}:{fallback.status.value}"
+                                f"fallback_expert_failed:{route.fallback_expert.value}:{fallback.status.value}"
                             )
                 elif planner_output.task_type == TaskType.MIXED and route.fallback_expert:
                     secondary_result = self._run_expert_with_retries(
@@ -207,6 +238,7 @@ class Orchestrator:
                         expert_name=route.fallback_expert,
                         user_input=user_input,
                         session_context=session_context,
+                        tool_budget_state=tool_budget_state,
                     )
                     expert_latency_ms += secondary_result.elapsed_ms
                     if secondary_result.status == ExpertStatus.OK:
@@ -216,7 +248,7 @@ class Orchestrator:
                             status=secondary_result.status,
                             elapsed_ms=secondary_result.elapsed_ms,
                         )
-                        fallback_events.append(f"secondary_expert_used:{route.fallback_expert}")
+                        fallback_events.append(f"secondary_expert_used:{route.fallback_expert.value}")
                     else:
                         self._breaker.record_failure(route.fallback_expert)
                         self._update_router_feedback(
@@ -225,7 +257,7 @@ class Orchestrator:
                             elapsed_ms=secondary_result.elapsed_ms,
                         )
                         fallback_events.append(
-                            f"secondary_expert_failed:{route.fallback_expert}:{secondary_result.status.value}"
+                            f"secondary_expert_failed:{route.fallback_expert.value}:{secondary_result.status.value}"
                         )
 
         llm_started = time.perf_counter()
@@ -246,12 +278,12 @@ class Orchestrator:
                         prompt=adjudication_prompt,
                         system=None,
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     llm_error = str(exc)
                     final_text = self._safe_fallback_text(user_input, llm_error)
                 used_path = (
                     "expert_adjudicated:"
-                    f"{selected_result.expert_name}+{secondary_result.expert_name}"
+                    f"{selected_result.expert_name.value}+{secondary_result.expert_name.value}"
                 )
                 fallback_events.append("expert_adjudication")
             else:
@@ -261,43 +293,35 @@ class Orchestrator:
                         prompt=synthesis_prompt,
                         system=None,
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     llm_error = str(exc)
                     final_text = self._safe_fallback_text(user_input, llm_error)
         else:
             try:
+                language_instruction = self._language_instruction(user_input)
                 final_text = self._generate_with_timeout(
-                    prompt=f"User request: {user_input}\nRespond concisely and clearly.",
+                    prompt=(
+                        f"User request: {user_input}\n"
+                        "Respond concisely and clearly.\n"
+                        f"{language_instruction}"
+                    ),
                     system="You are BinLiquid assistant in product mode.",
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 llm_error = str(exc)
                 final_text = self._safe_fallback_text(user_input, llm_error)
-            if use_router and route.selected_expert != "llm_only":
+            if use_router and route.selected_expert != ExpertName.LLM_ONLY:
                 fallback_events.append("llm_only_synthesis")
         llm_elapsed = int((time.perf_counter() - llm_started) * 1000)
 
-        memory_write = {
-            "written": False,
-            "salience_score": 0.0,
-            "reason": "memory_manager_missing",
-            "record_id": None,
-        }
-        if self._memory_manager is not None:
-            write_result = self._memory_manager.maybe_write(
-                session_id=session_id,
-                task_type=str(planner_output.task_type),
-                user_input=user_input,
-                assistant_output=final_text,
-                expert_payload=selected_result.payload if selected_result else None,
-            )
-            memory_write = {
-                "written": write_result.written,
-                "salience_score": write_result.salience_score,
-                "reason": write_result.reason,
-                "record_id": write_result.record_id,
-            }
-            self._tracer.emit(request_id, "memory_write_decision", memory_write)
+        memory_write = self._maybe_write_memory(
+            request_id=request_id,
+            session_id=session_id,
+            task_type=str(planner_output.task_type),
+            user_input=user_input,
+            assistant_output=final_text,
+            expert_payload=selected_result.payload if selected_result else None,
+        )
 
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
         metrics = {
@@ -307,17 +331,139 @@ class Orchestrator:
             "llm_latency_ms": llm_elapsed,
             "total_latency_ms": total_elapsed,
             "planner_parse_failed": planner_run.parse_failed,
-            "router_reason_code": effective_reason_code,
-            "route_selected_expert": route.selected_expert,
+            "planner_reason_code": planner_run.reason_code.value,
+            "router_reason_code": effective_reason_code.value,
+            "route_selected_expert": route.selected_expert.value,
             "memory_written": memory_write["written"],
             "memory_salience_score": memory_write["salience_score"],
             "llm_error": llm_error,
+            "tool_calls_used": tool_budget_state["used"],
         }
 
         self._tracer.emit(
             request_id,
             "final_response",
             {"used_path": used_path, "metrics": metrics},
+        )
+        self._tracer.emit_router_sample(
+            {
+                "request_id": request_id,
+                "task_type": planner_output.task_type.value,
+                "planner_confidence": planner_output.confidence,
+                "router_selected_expert": route.selected_expert.value,
+                "router_reason_code": effective_reason_code.value,
+                "used_path": used_path,
+                "success": bool(final_text.strip()),
+                "total_latency_ms": total_elapsed,
+            }
+        )
+        return OrchestratorResult(
+            final_text=final_text,
+            used_path=used_path,
+            fallback_events=fallback_events,
+            trace_id=request_id,
+            metrics=metrics,
+        )
+
+    def process_fast_chat(
+        self,
+        user_input: str,
+        session_context: dict[str, str] | None = None,
+        *,
+        stream: bool = False,
+        on_token: Callable[[str], None] | None = None,
+    ) -> OrchestratorResult:
+        started_total = time.perf_counter()
+        request_id = str(uuid4())
+        session_context = session_context or {}
+        session_id = str(session_context.get("session_id", request_id))
+        fallback_events: list[str] = []
+
+        self._tracer.emit(
+            request_id,
+            "request_received",
+            {"input": user_input, "fast_path": True, "stream": stream},
+        )
+
+        prompt = self._build_direct_prompt(user_input=user_input, session_context=session_context)
+        llm_started = time.perf_counter()
+        llm_error: str | None = None
+        used_path = "llm_only_fast"
+
+        try:
+            if stream and hasattr(self._llm, "generate_stream"):
+                used_path = "llm_stream_fast"
+                chunks: list[str] = []
+                for token in self._llm.generate_stream(
+                    prompt=prompt,
+                    system="You are BinLiquid assistant in product mode.",
+                    json_mode=False,
+                ):
+                    if not token:
+                        continue
+                    chunks.append(token)
+                    if on_token is not None:
+                        on_token(token)
+                final_text = "".join(chunks).strip()
+                if not final_text:
+                    final_text = self._generate_with_timeout(
+                        prompt=prompt,
+                        system="You are BinLiquid assistant in product mode.",
+                    )
+            else:
+                final_text = self._generate_with_timeout(
+                    prompt=prompt,
+                    system="You are BinLiquid assistant in product mode.",
+                )
+        except Exception as exc:  # noqa: BLE001
+            llm_error = str(exc)
+            final_text = self._safe_fallback_text(user_input, llm_error)
+            fallback_events.append("llm_error_fast_path")
+
+        llm_elapsed = int((time.perf_counter() - llm_started) * 1000)
+        memory_write = self._maybe_write_memory(
+            request_id=request_id,
+            session_id=session_id,
+            task_type=TaskType.CHAT.value,
+            user_input=user_input,
+            assistant_output=final_text,
+            expert_payload=None,
+        )
+        total_elapsed = int((time.perf_counter() - started_total) * 1000)
+
+        metrics = {
+            "planner_latency_ms": 0,
+            "routing_latency_ms": 0,
+            "expert_latency_ms": 0,
+            "llm_latency_ms": llm_elapsed,
+            "total_latency_ms": total_elapsed,
+            "planner_parse_failed": False,
+            "planner_reason_code": ReasonCode.PLANNER_OK.value,
+            "router_reason_code": ReasonCode.BASELINE_A.value,
+            "route_selected_expert": ExpertName.LLM_ONLY.value,
+            "memory_written": memory_write["written"],
+            "memory_salience_score": memory_write["salience_score"],
+            "llm_error": llm_error,
+            "tool_calls_used": 0,
+            "fast_path": True,
+            "stream": stream,
+        }
+        self._tracer.emit(
+            request_id,
+            "final_response",
+            {"used_path": used_path, "metrics": metrics},
+        )
+        self._tracer.emit_router_sample(
+            {
+                "request_id": request_id,
+                "task_type": TaskType.CHAT.value,
+                "planner_confidence": 1.0,
+                "router_selected_expert": ExpertName.LLM_ONLY.value,
+                "router_reason_code": ReasonCode.BASELINE_A.value,
+                "used_path": used_path,
+                "success": bool(final_text.strip()),
+                "total_latency_ms": total_elapsed,
+            }
         )
         return OrchestratorResult(
             final_text=final_text,
@@ -329,7 +475,7 @@ class Orchestrator:
 
     def _update_router_feedback(
         self,
-        expert_name: str,
+        expert_name: ExpertName,
         status: ExpertStatus,
         elapsed_ms: int,
     ) -> None:
@@ -357,13 +503,49 @@ class Orchestrator:
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
 
+    def _maybe_write_memory(
+        self,
+        *,
+        request_id: str,
+        session_id: str,
+        task_type: str,
+        user_input: str,
+        assistant_output: str,
+        expert_payload: dict[str, object] | None,
+    ) -> dict[str, object]:
+        memory_write: dict[str, object] = {
+            "written": False,
+            "salience_score": 0.0,
+            "reason": "memory_manager_missing",
+            "record_id": None,
+        }
+        if self._memory_manager is None:
+            return memory_write
+
+        write_result = self._memory_manager.maybe_write(
+            session_id=session_id,
+            task_type=task_type,
+            user_input=user_input,
+            assistant_output=assistant_output,
+            expert_payload=expert_payload,
+        )
+        memory_write = {
+            "written": write_result.written,
+            "salience_score": write_result.salience_score,
+            "reason": write_result.reason,
+            "record_id": write_result.record_id,
+        }
+        self._tracer.emit(request_id, "memory_write_decision", memory_write)
+        return memory_write
+
     def _run_expert_with_retries(
         self,
         request_id: str,
         planner_output: PlannerOutput,
-        expert_name: str,
+        expert_name: ExpertName,
         user_input: str,
         session_context: dict[str, str],
+        tool_budget_state: dict[str, int],
     ) -> ExpertResult:
         result: ExpertResult | None = None
         attempts = self._config.limits.max_retries + 1
@@ -376,12 +558,12 @@ class Orchestrator:
                 context=session_context,
                 latency_budget_ms=planner_output.latency_budget_ms,
             )
-            result = self._invoke_expert(expert_name, req)
+            result = self._invoke_expert(expert_name, req, tool_budget_state)
             self._tracer.emit(
                 request_id,
                 "expert_call",
                 {
-                    "expert": expert_name,
+                    "expert": expert_name.value,
                     "attempt": attempt + 1,
                     "status": result.status.value,
                     "elapsed_ms": result.elapsed_ms,
@@ -394,17 +576,35 @@ class Orchestrator:
         assert result is not None
         return result
 
-    def _invoke_expert(self, expert_name: str, request: ExpertRequest) -> ExpertResult:
-        expert = self._experts.get(expert_name)
+    def _invoke_expert(
+        self,
+        expert_name: ExpertName,
+        request: ExpertRequest,
+        tool_budget_state: dict[str, int],
+    ) -> ExpertResult:
+        expert = self._experts.get(expert_name.value)
         if expert is None:
             return ExpertResult(
                 expert_name=expert_name,
                 status=ExpertStatus.ERROR,
                 confidence=0.0,
                 payload={},
-                error_code="EXPERT_NOT_FOUND",
+                error_code=ReasonCode.EXPERT_NOT_FOUND.value,
                 elapsed_ms=0,
             )
+
+        required_tool_calls = max(0, int(getattr(expert, "estimated_tool_calls_per_run", 1)))
+        projected = tool_budget_state["used"] + required_tool_calls
+        if projected > self._config.limits.max_tool_calls:
+            return ExpertResult(
+                expert_name=expert_name,
+                status=ExpertStatus.SKIPPED,
+                confidence=0.0,
+                payload={"reason": "tool_budget_exceeded"},
+                error_code=ReasonCode.TOOL_BUDGET_EXCEEDED.value,
+                elapsed_ms=0,
+            )
+        tool_budget_state["used"] = projected
 
         timeout_s = self._config.limits.expert_timeout_ms / 1000
         started = time.perf_counter()
@@ -414,7 +614,6 @@ class Orchestrator:
             try:
                 result = future.result(timeout=timeout_s)
                 elapsed = int((time.perf_counter() - started) * 1000)
-                # Force returned elapsed to include orchestration overhead.
                 return result.model_copy(update={"elapsed_ms": max(result.elapsed_ms, elapsed)})
             except TimeoutError:
                 future.cancel()
@@ -427,7 +626,7 @@ class Orchestrator:
                     error_code="TIMEOUT",
                     elapsed_ms=elapsed,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 elapsed = int((time.perf_counter() - started) * 1000)
                 return ExpertResult(
                     expert_name=expert_name,
@@ -445,7 +644,7 @@ class Orchestrator:
             "You are BinLiquid response synthesizer. "
             "Use the expert evidence to answer clearly and cite uncertainty when needed.\n"
             f"User input: {user_input}\n"
-            f"Expert name: {expert_result.expert_name}\n"
+            f"Expert name: {expert_result.expert_name.value}\n"
             f"Expert payload JSON: {evidence}"
         )
 
@@ -461,7 +660,41 @@ class Orchestrator:
             "You are an evidence-first adjudicator.\n"
             "Resolve conflicts between two expert outputs.\n"
             f"User input: {user_input}\n"
-            f"Primary expert ({primary.expert_name}): {primary_payload}\n"
-            f"Secondary expert ({secondary.expert_name}): {secondary_payload}\n"
+            f"Primary expert ({primary.expert_name.value}): {primary_payload}\n"
+            f"Secondary expert ({secondary.expert_name.value}): {secondary_payload}\n"
             "Respond with a single coherent answer and mention uncertainty explicitly when needed."
         )
+
+    @staticmethod
+    def _build_direct_prompt(user_input: str, session_context: dict[str, str]) -> str:
+        summary = session_context.get("session_summary", "").strip()
+        memory_hints = session_context.get("memory_hints", "").strip()
+        pieces = []
+        if summary:
+            pieces.append(f"Session summary:\n{summary}")
+        if memory_hints:
+            pieces.append(f"Memory hints:\n{memory_hints}")
+        pieces.append(f"User request: {user_input}")
+        pieces.append("Respond concisely and clearly.")
+        pieces.append(Orchestrator._language_instruction(user_input))
+        return "\n\n".join(pieces)
+
+    @staticmethod
+    def _language_instruction(user_input: str) -> str:
+        text = user_input.lower()
+        turkish_markers = (
+            "ç",
+            "ğ",
+            "ı",
+            "ö",
+            "ş",
+            "ü",
+            "selam",
+            "merhaba",
+            "nasılsın",
+            "bugün",
+            "lütfen",
+        )
+        if any(marker in text for marker in turkish_markers):
+            return "Respond in Turkish."
+        return "Use the same language as the user."

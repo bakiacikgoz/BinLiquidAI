@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from binliquid.memory.persistent_store import PersistentMemoryStore
+from binliquid.memory.retrieval_ranker import rank_records
 from binliquid.memory.salience_gate import SalienceDecision, SalienceGate
 
 
@@ -25,11 +26,13 @@ class MemoryManager:
         store: PersistentMemoryStore,
         gate: SalienceGate,
         max_rows: int = 5000,
+        ttl_days: int = 30,
     ):
         self.enabled = enabled
         self.store = store
         self.gate = gate
         self.max_rows = max_rows
+        self.ttl_days = ttl_days
 
     def maybe_write(
         self,
@@ -62,16 +65,14 @@ class MemoryManager:
                 record_id=None,
             )
 
-        content = (
-            f"User: {user_input}\n"
-            f"Assistant: {assistant_output}"
-        )
+        content = f"User: {user_input}\nAssistant: {assistant_output}"
         record_id = self.store.write(
             session_id=session_id,
             task_type=task_type,
             content=content,
             salience=decision.salience_score,
             metadata={"event_id": str(uuid4())},
+            ttl_days=self.ttl_days,
         )
         self.store.prune_to_limit(self.max_rows)
         return MemoryWriteResult(
@@ -84,12 +85,14 @@ class MemoryManager:
     def context_snippets(self, query: str, limit: int = 4) -> list[str]:
         if not self.enabled:
             return []
-        records = self.store.search(keyword=query, limit=limit)
-        return [record.content for record in records]
+        records = self.store.search(keyword=query, limit=max(limit * 2, limit))
+        ranked = rank_records(records)
+        return [record.content for record in ranked[:limit]]
 
     def stats(self) -> dict[str, int | bool]:
         return {
             "enabled": self.enabled,
             "total_records": self.store.count(),
             "max_rows": self.max_rows,
+            "ttl_days": self.ttl_days,
         }

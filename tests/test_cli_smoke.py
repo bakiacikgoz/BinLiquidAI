@@ -6,30 +6,38 @@ runner = CliRunner()
 
 
 def test_doctor_reports_unhealthy_runtime(monkeypatch) -> None:
-    def fake_status(model_name: str):
+    def fake_status(**_: object):
         return {
-            "runtime_available": False,
-            "ollama_path": None,
-            "version": "not-found",
-            "daemon_ok": False,
-            "model_present": False,
-            "model_name": model_name,
+            "selected_provider": "ollama",
+            "primary": {
+                "daemon_ok": False,
+                "model_present": False,
+            },
         }
 
-    monkeypatch.setattr("binliquid.cli.check_ollama_runtime", fake_status)
+    monkeypatch.setattr("binliquid.cli.check_provider_chain", fake_status)
     result = runner.invoke(app, ["doctor", "--profile", "lite"])
 
     assert result.exit_code == 1
-    assert '"runtime_available": false' in result.stdout
+    assert '"selected_provider": "ollama"' in result.stdout
 
 
 def test_benchmark_smoke_command(monkeypatch) -> None:
-    def fake_benchmark(profile: str, mode: str, output_path: str | None, task_limit: int | None):
+    def fake_benchmark(
+        profile: str,
+        mode: str,
+        output_path: str | None,
+        task_limit: int | None,
+        provider: str | None = None,
+        fallback_provider: str | None = None,
+    ):
         return {
             "profile": profile,
             "mode": mode,
             "output_path": output_path or "benchmarks/results/fake.json",
             "task_limit": task_limit,
+            "provider": provider,
+            "fallback_provider": fallback_provider,
             "results": {"A": {"success_rate": 1.0}},
         }
 

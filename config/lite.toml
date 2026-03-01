@@ -1,6 +1,11 @@
 [app]
 model_name = "lfm2.5-thinking:1.2b"
 profile_name = "lite"
+llm_provider = "auto"
+fallback_provider = "transformers"
+fallback_enabled = false
+hf_model_id = "distilgpt2"
+device = "cpu"
 router_mode = "rule"
 planner_temperature = 0.0
 answer_temperature = 0.1
@@ -9,9 +14,11 @@ latency_budget_ms = 3000
 debug_mode = false
 privacy_mode = true
 enable_persistent_memory = false
+memory_ttl_days = 14
 web_enabled = false
 workspace_root = "."
 trace_dir = ".binliquid/traces"
+router_dataset_path = ".binliquid/research/router_dataset.jsonl"
 
 [limits]
 expert_timeout_ms = 1800

@@ -1,22 +1,33 @@
 # SECURITY_MODEL
 
-## Varsayılan Güvenlik İlkeleri
+## Default Security Posture
 
-- Web erişimi kapalı
-- Kalıcı bellek kapalı
-- Privacy mode açık (disk trace kapalı)
-- Tool çağrıları orchestrator kontrolünde
+- Web access disabled by default
+- Privacy mode enabled by default
+- Persistent traces only when `--debug --privacy-off`
+- Tool execution constrained by allowlist and sandbox runner
 
-> Not: `balanced` ve `research` profillerinde kalıcı bellek açılabilir; veri yalnızca yerel
-SQLite dosyasına (`.binliquid/memory.sqlite3`) yazılır.
+## Tool Allowlist
 
-## Kod Çalıştırma ve Tool Katmanı
+Allowed command roots:
 
-Bu MVP sürümünde tool katmanı read-only yerel arama odaklıdır. Yazma/komut çalıştırma
-kabiliyetleri kapsam dışıdır.
+- `python`
+- `uv`
+- `pytest`
+- `ruff`
+- `rg`
 
-## Injection Savunması
+Commands outside allowlist are rejected with deterministic error code.
 
-- Planner ve router JSON schema ile sınırlandırılmıştır.
-- Serbest metin planner çıktısı parse edilemezse fallback çalışır.
-- Doküman içeriği komut olarak yürütülmez.
+## Runtime Guardrails
+
+- `max_tool_calls` enforced per request
+- `max_recursion_depth` enforced via session context
+- Expert timeout and retry limits enforced by orchestrator
+- Circuit breaker prevents repeated failing experts
+
+## Injection Defense
+
+- Planner output must validate strict schema
+- Non-JSON planner output triggers deterministic fallback
+- Tool execution does not interpret document text as shell commands
