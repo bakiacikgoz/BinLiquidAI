@@ -236,8 +236,10 @@ def check_provider_chain(
     hf_model_id: str,
     device: str,
 ) -> dict[str, object]:
+    requested_provider = _normalize_provider_name(provider_name)
+    requested_fallback = _normalize_provider_name(fallback_provider)
     primary = OllamaLLM._build_provider(
-        provider_name=provider_name,
+        provider_name=requested_provider,
         model_name=model_name,
         temperature=0.0,
         host=None,
@@ -246,17 +248,29 @@ def check_provider_chain(
         hf_model_id=hf_model_id,
         device=device,
     )
+    primary_health = primary.health(model_name=model_name)
+    primary_usable = _is_provider_usable(primary.name, primary_health)
     report: dict[str, object] = {
-        "provider": provider_name,
+        "provider": requested_provider,
+        "requested_provider": requested_provider,
+        "requested_fallback_provider": requested_fallback,
+        "requested_model_name": model_name,
+        "requested_hf_model_id": hf_model_id,
         "fallback_enabled": fallback_enabled,
-        "fallback_provider": fallback_provider,
-        "primary": primary.health(model_name=model_name),
-        "selected_provider": primary.name,
+        "fallback_provider": requested_fallback,
+        "primary": primary_health,
+        "selected_provider": None,
+        "effective_model_name": None,
+        "effective_hf_model_id": None,
+        "fallback_used": False,
+        "status": "unrunnable",
     }
 
-    if fallback_enabled and fallback_provider and fallback_provider != provider_name:
+    secondary_usable = False
+    secondary_name: str | None = None
+    if fallback_enabled and requested_fallback and requested_fallback != requested_provider:
         secondary = OllamaLLM._build_provider(
-            provider_name=fallback_provider,
+            provider_name=requested_fallback,
             model_name=model_name,
             temperature=0.0,
             host=None,
@@ -265,11 +279,62 @@ def check_provider_chain(
             hf_model_id=hf_model_id,
             device=device,
         )
-        report["secondary"] = secondary.health(model_name=model_name)
+        secondary_health = secondary.health(model_name=model_name)
+        report["secondary"] = secondary_health
+        secondary_name = secondary.name
+        secondary_usable = _is_provider_usable(secondary.name, secondary_health)
 
-    if provider_name == "auto":
-        primary_health = primary.health(model_name=model_name)
-        daemon_ok = primary_health.get("daemon_ok")
-        if isinstance(daemon_ok, bool) and not daemon_ok:
-            report["selected_provider"] = fallback_provider if fallback_enabled else primary.name
+    selected_provider: str | None = None
+    fallback_used = False
+    status = "unrunnable"
+    if primary_usable:
+        selected_provider = primary.name
+        status = "healthy"
+    elif secondary_name is not None and secondary_usable:
+        selected_provider = secondary_name
+        fallback_used = True
+        status = "degraded_fallback"
+
+    report["selected_provider"] = selected_provider
+    report["fallback_used"] = fallback_used
+    report["status"] = status
+    if selected_provider == "ollama":
+        report["effective_model_name"] = model_name
+    elif selected_provider == "transformers":
+        report["effective_hf_model_id"] = hf_model_id
+
     return report
+
+
+def _normalize_provider_name(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized in {"hf", "huggingface"}:
+        return "transformers"
+    return normalized
+
+
+def _is_provider_usable(provider_name: str, health: dict[str, object]) -> bool:
+    normalized = _normalize_provider_name(provider_name)
+    if normalized == "ollama":
+        runtime_available = bool(health.get("runtime_available", True))
+        daemon_ok = bool(health.get("daemon_ok", False))
+        model_present = bool(health.get("model_present", False))
+        return runtime_available and daemon_ok and model_present
+    if normalized == "transformers":
+        runtime_available = bool(health.get("runtime_available", True))
+        has_transformers_fields = (
+            "transformers_pipeline_ready" in health or "heuristic_fallback" in health
+        )
+        if has_transformers_fields:
+            pipeline_ready = bool(health.get("transformers_pipeline_ready", False))
+            heuristic_fallback = bool(health.get("heuristic_fallback", False))
+            return runtime_available and (pipeline_ready or heuristic_fallback)
+        daemon_ok = health.get("daemon_ok")
+        model_present = health.get("model_present")
+        if isinstance(daemon_ok, bool) and isinstance(model_present, bool):
+            return runtime_available and daemon_ok and model_present
+        return runtime_available
+    runtime_available = health.get("runtime_available")
+    if isinstance(runtime_available, bool):
+        return runtime_available
+    return True

@@ -114,6 +114,7 @@ class Orchestrator:
         started_total = time.perf_counter()
         request_id = str(uuid4())
         session_context = session_context or {}
+        requested_model_metadata = self._requested_model_metadata(session_context)
         fallback_events: list[str] = []
         expert_latency_ms = 0
         tool_budget_state = {"used": int(session_context.get("tool_calls_used", 0))}
@@ -177,6 +178,7 @@ class Orchestrator:
                     reason_code=governance_decision.reason_code,
                     fallback_events=fallback_events,
                     governance_decision=governance_decision,
+                    requested_model_metadata=requested_model_metadata,
                 )
             if governance_decision.action == GovernanceAction.REQUIRE_APPROVAL:
                 fallback_events.append("approval_pending")
@@ -196,6 +198,7 @@ class Orchestrator:
                     fallback_events=fallback_events,
                     governance_decision=governance_decision,
                     approval_id=approval_ticket.approval_id if approval_ticket else None,
+                    requested_model_metadata=requested_model_metadata,
                 )
 
         if use_router:
@@ -424,6 +427,10 @@ class Orchestrator:
         code_metrics = self._extract_code_verification_metrics(selected_result)
 
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
+        run_model_metadata = self._resolve_run_model_metadata(
+            requested_model_metadata=requested_model_metadata,
+            selected_provider=self._selected_provider_from_llm(),
+        )
         metrics = {
             "planner_latency_ms": planner_run.elapsed_ms,
             "routing_latency_ms": routing_elapsed,
@@ -471,6 +478,16 @@ class Orchestrator:
                 governance_decision.reason_code if governance_decision else None
             ),
             "policy_hash": governance_decision.policy_hash if governance_decision else None,
+            "requested_provider": run_model_metadata["requested_provider"],
+            "requested_fallback_provider": run_model_metadata["requested_fallback_provider"],
+            "requested_model_name": run_model_metadata["requested_model_name"],
+            "requested_hf_model_id": run_model_metadata["requested_hf_model_id"],
+            "selected_provider": run_model_metadata["selected_provider"],
+            "selected_model_name": run_model_metadata["selected_model_name"],
+            "selected_hf_model_id": run_model_metadata["selected_hf_model_id"],
+            "fallback_used": run_model_metadata["fallback_used"],
+            "config_source_model_name": run_model_metadata["config_source_model_name"],
+            "config_source_hf_model_id": run_model_metadata["config_source_hf_model_id"],
         }
 
         audit_artifact_path = None
@@ -478,6 +495,7 @@ class Orchestrator:
             audit_artifact_path = self._governance_runtime.finalize_run(
                 run_id=request_id,
                 router_reason_code=effective_reason_code.value,
+                model_metadata=run_model_metadata,
             )
             if audit_artifact_path:
                 self._tracer.emit(
@@ -538,6 +556,7 @@ class Orchestrator:
         started_total = time.perf_counter()
         request_id = str(uuid4())
         session_context = session_context or {}
+        requested_model_metadata = self._requested_model_metadata(session_context)
         session_id = str(session_context.get("session_id", request_id))
         session_state = self._ensure_session_state(session_id)
         session_state["turn"] += 1
@@ -573,6 +592,7 @@ class Orchestrator:
                     reason_code=governance_decision.reason_code,
                     fallback_events=fallback_events,
                     governance_decision=governance_decision,
+                    requested_model_metadata=requested_model_metadata,
                 )
             if governance_decision.action == GovernanceAction.REQUIRE_APPROVAL:
                 fallback_events.append("approval_pending")
@@ -592,6 +612,7 @@ class Orchestrator:
                     fallback_events=fallback_events,
                     governance_decision=governance_decision,
                     approval_id=approval_ticket.approval_id if approval_ticket else None,
+                    requested_model_metadata=requested_model_metadata,
                 )
 
         prompt = self._build_direct_prompt(user_input=user_input, session_context=session_context)
@@ -639,6 +660,10 @@ class Orchestrator:
             expert_payload=None,
         )
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
+        run_model_metadata = self._resolve_run_model_metadata(
+            requested_model_metadata=requested_model_metadata,
+            selected_provider=self._selected_provider_from_llm(),
+        )
 
         metrics = {
             "planner_latency_ms": 0,
@@ -674,12 +699,23 @@ class Orchestrator:
                 governance_decision.reason_code if governance_decision else None
             ),
             "policy_hash": governance_decision.policy_hash if governance_decision else None,
+            "requested_provider": run_model_metadata["requested_provider"],
+            "requested_fallback_provider": run_model_metadata["requested_fallback_provider"],
+            "requested_model_name": run_model_metadata["requested_model_name"],
+            "requested_hf_model_id": run_model_metadata["requested_hf_model_id"],
+            "selected_provider": run_model_metadata["selected_provider"],
+            "selected_model_name": run_model_metadata["selected_model_name"],
+            "selected_hf_model_id": run_model_metadata["selected_hf_model_id"],
+            "fallback_used": run_model_metadata["fallback_used"],
+            "config_source_model_name": run_model_metadata["config_source_model_name"],
+            "config_source_hf_model_id": run_model_metadata["config_source_hf_model_id"],
         }
         audit_artifact_path = None
         if self._governance_runtime is not None:
             audit_artifact_path = self._governance_runtime.finalize_run(
                 run_id=request_id,
                 router_reason_code=ReasonCode.BASELINE_A.value,
+                model_metadata=run_model_metadata,
             )
             if audit_artifact_path:
                 self._tracer.emit(
@@ -996,6 +1032,88 @@ class Orchestrator:
             return "Respond in Turkish."
         return "Use the same language as the user."
 
+    def _requested_model_metadata(self, session_context: dict[str, str]) -> dict[str, str]:
+        return {
+            "requested_provider": str(
+                session_context.get("requested_provider", self._config.llm_provider)
+            ),
+            "requested_fallback_provider": str(
+                session_context.get("requested_fallback_provider", self._config.fallback_provider)
+            ),
+            "requested_model_name": str(
+                session_context.get("requested_model_name", self._config.model_name)
+            ),
+            "requested_hf_model_id": str(
+                session_context.get("requested_hf_model_id", self._config.hf_model_id)
+            ),
+            "config_source_model_name": str(
+                session_context.get("config_source_model_name", "profile")
+            ),
+            "config_source_hf_model_id": str(
+                session_context.get("config_source_hf_model_id", "profile")
+            ),
+        }
+
+    def _resolve_run_model_metadata(
+        self,
+        *,
+        requested_model_metadata: dict[str, str] | None,
+        selected_provider: str | None,
+    ) -> dict[str, str | bool | None]:
+        requested = requested_model_metadata or self._requested_model_metadata({})
+        requested_provider = str(requested.get("requested_provider", self._config.llm_provider))
+        requested_fallback_provider = str(
+            requested.get("requested_fallback_provider", self._config.fallback_provider)
+        )
+        requested_model_name = str(requested.get("requested_model_name", self._config.model_name))
+        requested_hf_model_id = str(
+            requested.get("requested_hf_model_id", self._config.hf_model_id)
+        )
+        selected = self._normalize_provider_name(selected_provider)
+        requested_norm = self._normalize_provider_name(requested_provider)
+        requested_fallback_norm = self._normalize_provider_name(requested_fallback_provider)
+
+        fallback_used = False
+        if selected is not None:
+            if requested_norm == "auto":
+                fallback_used = selected == requested_fallback_norm
+            else:
+                fallback_used = selected != requested_norm
+
+        return {
+            "requested_provider": requested_provider,
+            "requested_fallback_provider": requested_fallback_provider,
+            "requested_model_name": requested_model_name,
+            "requested_hf_model_id": requested_hf_model_id,
+            "selected_provider": selected,
+            "selected_model_name": requested_model_name if selected == "ollama" else None,
+            "selected_hf_model_id": requested_hf_model_id if selected == "transformers" else None,
+            "fallback_used": fallback_used,
+            "config_source_model_name": str(requested.get("config_source_model_name", "profile")),
+            "config_source_hf_model_id": str(
+                requested.get("config_source_hf_model_id", "profile")
+            ),
+        }
+
+    def _selected_provider_from_llm(self) -> str | None:
+        chain_report = getattr(self._llm, "chain_report", None)
+        if not callable(chain_report):
+            return None
+        report = chain_report()
+        provider = getattr(report, "selected_provider", None)
+        return self._normalize_provider_name(provider)
+
+    @staticmethod
+    def _normalize_provider_name(value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip().lower()
+        if not normalized:
+            return None
+        if normalized in {"hf", "huggingface"}:
+            return "transformers"
+        return normalized
+
     def trace_events(self, request_id: str) -> list[dict[str, object]]:
         return [event.model_dump(mode="json") for event in self._tracer.events_for(request_id)]
 
@@ -1008,6 +1126,7 @@ class Orchestrator:
         reason_code: str,
         fallback_events: list[str],
         governance_decision: GovernanceDecision,
+        requested_model_metadata: dict[str, str] | None = None,
     ) -> OrchestratorResult:
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
         final_text = (
@@ -1015,12 +1134,26 @@ class Orchestrator:
             f"İstek özeti: {user_input}\n"
             f"Neden: {reason_code}"
         )
+        run_model_metadata = self._resolve_run_model_metadata(
+            requested_model_metadata=requested_model_metadata,
+            selected_provider=None,
+        )
         metrics = {
             "total_latency_ms": total_elapsed,
             "router_reason_code": reason_code,
             "governance_action": governance_decision.action.value,
             "governance_reason_code": governance_decision.reason_code,
             "policy_hash": governance_decision.policy_hash,
+            "requested_provider": run_model_metadata["requested_provider"],
+            "requested_fallback_provider": run_model_metadata["requested_fallback_provider"],
+            "requested_model_name": run_model_metadata["requested_model_name"],
+            "requested_hf_model_id": run_model_metadata["requested_hf_model_id"],
+            "selected_provider": run_model_metadata["selected_provider"],
+            "selected_model_name": run_model_metadata["selected_model_name"],
+            "selected_hf_model_id": run_model_metadata["selected_hf_model_id"],
+            "fallback_used": run_model_metadata["fallback_used"],
+            "config_source_model_name": run_model_metadata["config_source_model_name"],
+            "config_source_hf_model_id": run_model_metadata["config_source_hf_model_id"],
             "fast_path_regret_flag": False,
             "followup_correction_rate": 0.0,
             "audit_artifact_path": None,
@@ -1029,6 +1162,7 @@ class Orchestrator:
             audit_artifact = self._governance_runtime.finalize_run(
                 run_id=request_id,
                 router_reason_code=reason_code,
+                model_metadata=run_model_metadata,
             )
             metrics["audit_artifact_path"] = audit_artifact
             if audit_artifact:
@@ -1050,12 +1184,17 @@ class Orchestrator:
         fallback_events: list[str],
         governance_decision: GovernanceDecision,
         approval_id: str | None,
+        requested_model_metadata: dict[str, str] | None = None,
     ) -> OrchestratorResult:
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
         final_text = (
             "Bu istek operator onayı gerektiriyor.\n"
             f"İstek özeti: {user_input}\n"
             f"Approval ID: {approval_id or 'unknown'}"
+        )
+        run_model_metadata = self._resolve_run_model_metadata(
+            requested_model_metadata=requested_model_metadata,
+            selected_provider=None,
         )
         metrics = {
             "total_latency_ms": total_elapsed,
@@ -1064,6 +1203,16 @@ class Orchestrator:
             "governance_reason_code": governance_decision.reason_code,
             "policy_hash": governance_decision.policy_hash,
             "approval_id": approval_id,
+            "requested_provider": run_model_metadata["requested_provider"],
+            "requested_fallback_provider": run_model_metadata["requested_fallback_provider"],
+            "requested_model_name": run_model_metadata["requested_model_name"],
+            "requested_hf_model_id": run_model_metadata["requested_hf_model_id"],
+            "selected_provider": run_model_metadata["selected_provider"],
+            "selected_model_name": run_model_metadata["selected_model_name"],
+            "selected_hf_model_id": run_model_metadata["selected_hf_model_id"],
+            "fallback_used": run_model_metadata["fallback_used"],
+            "config_source_model_name": run_model_metadata["config_source_model_name"],
+            "config_source_hf_model_id": run_model_metadata["config_source_hf_model_id"],
             "fast_path_regret_flag": False,
             "followup_correction_rate": 0.0,
             "audit_artifact_path": None,
@@ -1072,6 +1221,7 @@ class Orchestrator:
             audit_artifact = self._governance_runtime.finalize_run(
                 run_id=request_id,
                 router_reason_code=ReasonCode.APPROVAL_PENDING.value,
+                model_metadata=run_model_metadata,
             )
             metrics["audit_artifact_path"] = audit_artifact
             if audit_artifact:

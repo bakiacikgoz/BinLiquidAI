@@ -269,18 +269,66 @@ class GovernanceRuntime:
         *,
         run_id: str,
         router_reason_code: str | None,
+        model_metadata: dict[str, Any] | None = None,
     ) -> str | None:
         if not self._gov.enabled:
             return None
         if self._policy_bundle is None:
             return None
         state = self._runs.get(run_id, GovernanceRunState())
+        model_metadata = model_metadata or {}
+
+        requested_provider = str(
+            model_metadata.get("requested_provider")
+            or self._config.llm_provider
+        )
+        requested_model_name = str(
+            model_metadata.get("requested_model_name")
+            or self._config.model_name
+        )
+
         record = AuditRecord(
             run_id=run_id,
             runtime_version=__version__,
             profile=self._config.profile_name,
-            model_provider=self._config.llm_provider,
-            model_name=self._config.model_name,
+            model_provider=requested_provider,
+            model_name=requested_model_name,
+            requested_provider=requested_provider,
+            requested_fallback_provider=str(
+                model_metadata.get("requested_fallback_provider")
+                or self._config.fallback_provider
+            ),
+            requested_model_name=requested_model_name,
+            requested_hf_model_id=str(
+                model_metadata.get("requested_hf_model_id")
+                or self._config.hf_model_id
+            ),
+            selected_provider=(
+                str(model_metadata["selected_provider"])
+                if model_metadata.get("selected_provider") is not None
+                else None
+            ),
+            selected_model_name=(
+                str(model_metadata["selected_model_name"])
+                if model_metadata.get("selected_model_name") is not None
+                else None
+            ),
+            selected_hf_model_id=(
+                str(model_metadata["selected_hf_model_id"])
+                if model_metadata.get("selected_hf_model_id") is not None
+                else None
+            ),
+            fallback_used=bool(model_metadata.get("fallback_used", False)),
+            config_source_model_name=(
+                str(model_metadata["config_source_model_name"])
+                if model_metadata.get("config_source_model_name") is not None
+                else "profile"
+            ),
+            config_source_hf_model_id=(
+                str(model_metadata["config_source_hf_model_id"])
+                if model_metadata.get("config_source_hf_model_id") is not None
+                else "profile"
+            ),
             router_reason_code=router_reason_code,
             policy_schema_version=self._policy_bundle.policy.policy_schema_version,
             policy_version=self._policy_bundle.policy.policy_version,

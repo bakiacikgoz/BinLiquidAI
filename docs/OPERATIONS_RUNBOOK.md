@@ -10,12 +10,14 @@ uv run binliquid config resolve --profile balanced --json
 
 ```bash
 uv run binliquid doctor --profile balanced
+uv run binliquid doctor --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
 ```
 
 ## 3. Functional Smoke
 
 ```bash
 uv run binliquid chat --profile balanced --once "selam" --stream --fast-path
+uv run binliquid chat --profile balanced --provider ollama --model qwen3.5:4b --once "uzun plan çıkar"
 uv run binliquid benchmark smoke --mode all --profile balanced
 ```
 
@@ -29,6 +31,7 @@ uv run binliquid benchmark ablation --mode all --profile balanced --suite qualit
 
 ```bash
 uv run binliquid benchmark energy --profile balanced --energy-mode measured
+uv run binliquid benchmark energy --profile balanced --energy-mode measured --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
 ```
 
 If measured mode cannot run due permissions, confirm deterministic `error_reason` in JSON output.

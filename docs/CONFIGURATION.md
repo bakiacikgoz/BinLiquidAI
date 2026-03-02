@@ -13,6 +13,7 @@ Command:
 
 ```bash
 uv run binliquid config resolve --profile balanced --json
+uv run binliquid config resolve --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
 ```
 
 ## Important Fields
@@ -96,6 +97,34 @@ export BINLIQUID_GOVERNANCE_POLICY_PATH=config/policies/balanced.toml
 export BINLIQUID_GOVERNANCE_POLICY_FAIL_MODE=fail_closed
 export BINLIQUID_GOVERNANCE_APPROVAL_TTL_SECONDS=86400
 ```
+
+## Model Override Rules (v0.3.1)
+
+- `--model` only overrides `model_name`.
+- `--hf-model-id` only overrides `hf_model_id`.
+- `--provider transformers` with `--model` returns deterministic invalid input.
+- `--provider ollama` with `--hf-model-id` returns deterministic invalid input.
+- `--provider auto` accepts both; Ollama target comes from `--model`, fallback transformers target from `--hf-model-id`.
+
+## Doctor Status Contract (v0.3.1)
+
+`doctor` emits:
+
+- `requested_provider`
+- `requested_fallback_provider`
+- `requested_model_name`
+- `requested_hf_model_id`
+- `selected_provider`
+- `effective_model_name`
+- `effective_hf_model_id`
+- `fallback_used`
+- `status` (`healthy|degraded_fallback|unrunnable|invalid_input`)
+
+Exit codes:
+
+- `0`: runnable (`healthy` or `degraded_fallback`)
+- `1`: invalid input/config combination
+- `3`: unrunnable provider chain
 
 ## Privacy-Safe Output
 

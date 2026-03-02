@@ -1,4 +1,4 @@
-# BinLiquidAI v0.3.0
+# BinLiquidAI v0.3.1
 
 Offline-first, local-first hybrid assistant with a production-focused CLI core.
 
@@ -43,6 +43,7 @@ uv run binliquid doctor --profile balanced
 ```bash
 uv run binliquid chat --profile balanced --once "selam" --stream --fast-path
 uv run binliquid chat --profile balanced --once "kodu düzelt" --no-fast-path
+uv run binliquid chat --profile balanced --once "plan çıkar" --model qwen3.5:4b
 ```
 
 Structured output (thin-shell/UI ready):
@@ -72,6 +73,7 @@ uv run binliquid operator panel --profile balanced
 ```bash
 uv run binliquid config resolve --profile balanced --json
 uv run binliquid config resolve --profile balanced --provider ollama --fallback-provider transformers
+uv run binliquid config resolve --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
 ```
 
 Precedence order: `defaults < profile < env < CLI flags`.
@@ -83,6 +85,51 @@ uv run binliquid benchmark smoke --mode all --profile balanced
 uv run binliquid benchmark ablation --mode all --profile balanced --suite smoke
 uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
 uv run binliquid benchmark energy --profile balanced --energy-mode measured
+uv run binliquid benchmark smoke --mode A --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
+```
+
+## Model Recipes
+
+### 1) Varsayılan LFM (profile ile)
+
+```bash
+uv run binliquid chat --profile balanced --once "selam"
+```
+
+### 2) Ollama Qwen modeli
+
+```bash
+ollama pull qwen3.5:4b
+uv run binliquid doctor --profile balanced --provider ollama --model qwen3.5:4b
+uv run binliquid chat --profile balanced --provider ollama --model qwen3.5:4b --once "uzun plan çıkar"
+```
+
+### 3) Transformers custom model
+
+```bash
+uv run binliquid doctor --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct
+uv run binliquid chat --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "özetle"
+```
+
+### 4) Auto dual-target (Ollama primary + Transformers fallback)
+
+```bash
+uv run binliquid doctor --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
+uv run binliquid chat --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "adım adım anlat"
+```
+
+### 5) Model yoksa teşhis
+
+```bash
+uv run binliquid doctor --profile balanced --provider ollama --model qwen3.5:4b
+# model_present=false ise önce: ollama pull qwen3.5:4b
+```
+
+### 6) Override kaynağını görme
+
+```bash
+BINLIQUID_MODEL_NAME=qwen3.5:4b uv run binliquid config resolve --profile balanced --json
+# source_map.model_name alanı env/cli/profile kaynağını gösterir
 ```
 
 ### Memory
@@ -133,9 +180,10 @@ Calibration outputs:
 - Persistent traces only when debug is on and privacy is explicitly off
 - Web access default: off
 
-## Known Limits (v0.3)
+## Known Limits (v0.3.1)
 
 - `transformers` fallback is for continuity, not quality parity.
 - Measured energy depends on platform permissions (`powermetrics`).
 - sLTC gains vary by workload distribution.
 - UI thin shell is intentionally deferred to keep CLI reliability first.
+- v0.3.1 does not auto-install model assets (`ollama pull` remains operator-driven).

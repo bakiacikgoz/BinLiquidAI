@@ -91,6 +91,16 @@ class AuditRecord(BaseModel):
     profile: str
     model_provider: str
     model_name: str
+    requested_provider: str | None = None
+    requested_fallback_provider: str | None = None
+    requested_model_name: str | None = None
+    requested_hf_model_id: str | None = None
+    selected_provider: str | None = None
+    selected_model_name: str | None = None
+    selected_hf_model_id: str | None = None
+    fallback_used: bool = False
+    config_source_model_name: str | None = None
+    config_source_hf_model_id: str | None = None
     router_reason_code: str | None = None
     policy_schema_version: str
     policy_version: str

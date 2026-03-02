@@ -245,23 +245,112 @@ def _build_memory_manager(config: RuntimeConfig) -> MemoryManager:
     )
 
 
+def _normalize_provider_name(value: str | None) -> str:
+    if value is None:
+        return ""
+    normalized = value.strip().lower()
+    if normalized in {"hf", "huggingface"}:
+        return "transformers"
+    return normalized
+
+
+def _build_cli_overrides(
+    *,
+    provider: str | None = None,
+    fallback_provider: str | None = None,
+    model: str | None = None,
+    hf_model_id: str | None = None,
+) -> dict[str, str | None]:
+    return {
+        "llm_provider": provider,
+        "fallback_provider": fallback_provider,
+        "model_name": model,
+        "hf_model_id": hf_model_id,
+    }
+
+
+def _validate_model_override_combo(
+    *,
+    effective_provider: str,
+    model_override: str | None,
+    hf_model_id_override: str | None,
+) -> tuple[str, str] | None:
+    normalized = _normalize_provider_name(effective_provider)
+    if normalized == "transformers" and model_override is not None:
+        return (
+            "INVALID_MODEL_OVERRIDE",
+            "model override (--model) cannot be used with provider=transformers.",
+        )
+    if normalized == "ollama" and hf_model_id_override is not None:
+        return (
+            "INVALID_HF_MODEL_ID_OVERRIDE",
+            "hf model override (--hf-model-id) cannot be used with provider=ollama.",
+        )
+    return None
+
+
+def _model_selection_context(
+    *,
+    config: RuntimeConfig,
+    source_map: dict[str, str] | None,
+) -> dict[str, str]:
+    source_map = source_map or {}
+    return {
+        "requested_provider": str(config.llm_provider),
+        "requested_fallback_provider": str(config.fallback_provider),
+        "requested_model_name": str(config.model_name),
+        "requested_hf_model_id": str(config.hf_model_id),
+        "config_source_model_name": str(source_map.get("model_name", "profile")),
+        "config_source_hf_model_id": str(source_map.get("hf_model_id", "profile")),
+    }
+
+
 @config_app.command("resolve")
 def config_resolve(
     profile: str = typer.Option("balanced", help="Config profile"),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model name"),
+    hf_model_id: str | None = typer.Option(
+        None,
+        "--hf-model-id",
+        help="Override transformers model id",
+    ),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    cli_overrides = {
-        "llm_provider": provider,
-        "fallback_provider": fallback_provider,
-    }
+    cli_overrides = _build_cli_overrides(
+        provider=provider,
+        fallback_provider=fallback_provider,
+        model=model,
+        hf_model_id=hf_model_id,
+    )
     resolved, source_map = resolve_runtime_config(
         profile=profile,
         cli_overrides=cli_overrides,
     )
+    validation_error = _validate_model_override_combo(
+        effective_provider=resolved.llm_provider,
+        model_override=model,
+        hf_model_id_override=hf_model_id,
+    )
+    if validation_error is not None:
+        error_code, message = validation_error
+        payload = {
+            "profile": profile,
+            "status": "invalid_input",
+            "error_code": error_code,
+            "error": message,
+        }
+        if json_output:
+            typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+        else:
+            typer.echo(f"error_code={error_code}")
+            typer.echo(message)
+        raise typer.Exit(code=1)
+
     payload = {
         "profile": profile,
+        "status": "ok",
         "resolved": redact_config_payload(resolved.model_dump(mode="python")),
         "source_map": source_map,
     }
@@ -275,38 +364,124 @@ def config_resolve(
 
 
 @app.command()
-def doctor(profile: str = typer.Option("lite", help="Config profile name")) -> None:
+def doctor(
+    profile: str = typer.Option("lite", help="Config profile name"),
+    provider: str | None = typer.Option(
+        None,
+        help="Override provider: auto|ollama|transformers",
+    ),
+    fallback_provider: str | None = typer.Option(
+        None,
+        help="Override fallback provider: transformers|ollama",
+    ),
+    model: str | None = typer.Option(None, "--model", help="Override model name"),
+    hf_model_id: str | None = typer.Option(
+        None,
+        "--hf-model-id",
+        help="Override transformers model id",
+    ),
+) -> None:
     """Runtime and provider health check."""
     ensure_artifact_scaffold()
-    config = RuntimeConfig.from_profile(profile)
-    status = check_provider_chain(
-        model_name=config.model_name,
-        provider_name=config.llm_provider,
-        fallback_provider=config.fallback_provider,
-        fallback_enabled=config.fallback_enabled,
-        hf_model_id=config.hf_model_id,
-        device=config.device,
+    config, source_map = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
     )
+    validation_error = _validate_model_override_combo(
+        effective_provider=config.llm_provider,
+        model_override=model,
+        hf_model_id_override=hf_model_id,
+    )
+    if validation_error is not None:
+        error_code, message = validation_error
+        payload = {
+            "profile": profile,
+            "requested_provider": config.llm_provider,
+            "requested_fallback_provider": config.fallback_provider,
+            "requested_model_name": config.model_name,
+            "requested_hf_model_id": config.hf_model_id,
+            "selected_provider": None,
+            "effective_model_name": None,
+            "effective_hf_model_id": None,
+            "fallback_used": False,
+            "status": "invalid_input",
+            "error_code": error_code,
+            "error": message,
+            "config_source_model_name": source_map.get("model_name", "profile"),
+            "config_source_hf_model_id": source_map.get("hf_model_id", "profile"),
+        }
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        write_artifact("status", payload)
+        raise typer.Exit(code=1)
+
+    try:
+        status = check_provider_chain(
+            model_name=config.model_name,
+            provider_name=config.llm_provider,
+            fallback_provider=config.fallback_provider,
+            fallback_enabled=config.fallback_enabled,
+            hf_model_id=config.hf_model_id,
+            device=config.device,
+        )
+    except ValueError as exc:
+        payload = {
+            "profile": profile,
+            "requested_provider": config.llm_provider,
+            "requested_fallback_provider": config.fallback_provider,
+            "requested_model_name": config.model_name,
+            "requested_hf_model_id": config.hf_model_id,
+            "selected_provider": None,
+            "effective_model_name": None,
+            "effective_hf_model_id": None,
+            "fallback_used": False,
+            "status": "invalid_input",
+            "error_code": "INVALID_PROVIDER",
+            "error": str(exc),
+            "config_source_model_name": source_map.get("model_name", "profile"),
+            "config_source_hf_model_id": source_map.get("hf_model_id", "profile"),
+        }
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        write_artifact("status", payload)
+        raise typer.Exit(code=1) from None
+
+    status.setdefault("requested_provider", config.llm_provider)
+    status.setdefault("requested_fallback_provider", config.fallback_provider)
+    status.setdefault("requested_model_name", config.model_name)
+    status.setdefault("requested_hf_model_id", config.hf_model_id)
+    status.setdefault("effective_model_name", None)
+    status.setdefault("effective_hf_model_id", None)
+    status.setdefault("fallback_used", False)
+    status["config_source_model_name"] = source_map.get("model_name", "profile")
+    status["config_source_hf_model_id"] = source_map.get("hf_model_id", "profile")
     status["profile"] = profile
+
+    status_value = str(status.get("status", "")).lower()
+    if status_value not in {"healthy", "degraded_fallback", "unrunnable", "invalid_input"}:
+        selected = str(status.get("selected_provider", ""))
+        primary = status.get("primary", {})
+        if selected == "ollama":
+            daemon_ok = bool(primary.get("daemon_ok", False))
+            model_present = bool(primary.get("model_present", False))
+            status_value = "healthy" if (daemon_ok and model_present) else "unrunnable"
+        else:
+            status_value = "healthy"
+        status["status"] = status_value
 
     typer.echo(json.dumps(status, indent=2, ensure_ascii=False))
     write_artifact(
         "status",
-        {
-            "profile": profile,
-            "selected_provider": status.get("selected_provider"),
-            "primary": status.get("primary", {}),
-            "secondary": status.get("secondary", {}),
-        },
+        status,
     )
 
-    primary = status.get("primary", {})
-    selected = str(status.get("selected_provider", ""))
-    if selected == "ollama":
-        daemon_ok = bool(primary.get("daemon_ok", False))
-        model_present = bool(primary.get("model_present", False))
-        if not (daemon_ok and model_present):
-            raise typer.Exit(code=1)
+    if status_value == "invalid_input":
+        raise typer.Exit(code=1)
+    if status_value == "unrunnable":
+        raise typer.Exit(code=3)
 
 
 @app.command()
@@ -320,6 +495,12 @@ def chat(
     fallback_provider: str | None = typer.Option(
         None,
         help="Override fallback provider: transformers|ollama",
+    ),
+    model: str | None = typer.Option(None, "--model", help="Override model name"),
+    hf_model_id: str | None = typer.Option(
+        None,
+        "--hf-model-id",
+        help="Override transformers model id",
     ),
     session_id: str | None = typer.Option(None, help="Optional deterministic session id"),
     stream: bool = typer.Option(
@@ -346,13 +527,25 @@ def chat(
 ) -> None:
     """Interactive chat with orchestrator + router."""
     ensure_artifact_scaffold()
-    config, _source_map = resolve_runtime_config(
+    config, source_map = resolve_runtime_config(
         profile=profile,
-        cli_overrides={
-            "llm_provider": provider,
-            "fallback_provider": fallback_provider,
-        },
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
     )
+    validation_error = _validate_model_override_combo(
+        effective_provider=config.llm_provider,
+        model_override=model,
+        hf_model_id_override=hf_model_id,
+    )
+    if validation_error is not None:
+        _code, message = validation_error
+        typer.echo(message)
+        raise typer.Exit(code=1)
+
     if debug:
         config = config.model_copy(update={"debug_mode": True})
     if privacy_off:
@@ -361,8 +554,8 @@ def chat(
     orchestrator = _build_orchestrator(
         config,
         router_mode=router_mode,
-        provider_name=provider,
-        fallback_provider=fallback_provider,
+        provider_name=config.llm_provider,
+        fallback_provider=config.fallback_provider,
     )
     startup_error = governance_startup_abort(
         config,
@@ -409,6 +602,7 @@ def chat(
             "session_summary": memory.summary_text(),
             "session_id": sid,
         }
+        context.update(_model_selection_context(config=config, source_map=source_map))
         manager = getattr(orchestrator, "_memory_manager", None)
         if manager is not None:
             snippets = manager.context_snippets(user_text, limit=config.memory.context_top_k)
@@ -661,6 +855,12 @@ def approval_execute(
     context = {
         "session_id": f"approval-{approval_id[:8]}",
         "governance_approval_id": approval_id,
+        "requested_provider": str(config.llm_provider),
+        "requested_fallback_provider": str(config.fallback_provider),
+        "requested_model_name": str(config.model_name),
+        "requested_hf_model_id": str(config.hf_model_id),
+        "config_source_model_name": "profile",
+        "config_source_hf_model_id": "profile",
     }
     result = orchestrator.process(
         str(ticket.snapshot.get("user_input", "")),
@@ -783,16 +983,43 @@ def benchmark_smoke(
     task_limit: int | None = typer.Option(None, help="Limit number of benchmark tasks"),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model name"),
+    hf_model_id: str | None = typer.Option(
+        None,
+        "--hf-model-id",
+        help="Override transformers model id",
+    ),
 ) -> None:
     ensure_artifact_scaffold()
+    resolved, _ = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    validation_error = _validate_model_override_combo(
+        effective_provider=resolved.llm_provider,
+        model_override=model,
+        hf_model_id_override=hf_model_id,
+    )
+    if validation_error is not None:
+        _code, message = validation_error
+        typer.echo(message)
+        raise typer.Exit(code=1)
+
     result = run_smoke_benchmark(
         profile=profile,
         mode=mode,
         suite=suite,
         output_path=output,
         task_limit=task_limit,
-        provider=provider,
-        fallback_provider=fallback_provider,
+        provider=resolved.llm_provider,
+        fallback_provider=resolved.fallback_provider,
+        model=resolved.model_name,
+        hf_model_id=resolved.hf_model_id,
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
     write_artifact("benchmark_summary", {"kind": "smoke", "result": result})
@@ -808,8 +1035,33 @@ def benchmark_ablation(
     task_limit: int | None = typer.Option(None, help="Limit number of benchmark tasks"),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model name"),
+    hf_model_id: str | None = typer.Option(
+        None,
+        "--hf-model-id",
+        help="Override transformers model id",
+    ),
 ) -> None:
     ensure_artifact_scaffold()
+    resolved, _ = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    validation_error = _validate_model_override_combo(
+        effective_provider=resolved.llm_provider,
+        model_override=model,
+        hf_model_id_override=hf_model_id,
+    )
+    if validation_error is not None:
+        _code, message = validation_error
+        typer.echo(message)
+        raise typer.Exit(code=1)
+
     result = run_ablation_benchmark(
         profile=profile,
         mode=mode,
@@ -817,8 +1069,10 @@ def benchmark_ablation(
         report_path=report,
         task_limit=task_limit,
         suite=suite,
-        provider=provider,
-        fallback_provider=fallback_provider,
+        provider=resolved.llm_provider,
+        fallback_provider=resolved.fallback_provider,
+        model=resolved.model_name,
+        hf_model_id=resolved.hf_model_id,
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
     write_artifact("benchmark_summary", {"kind": "ablation", "result": result})
@@ -830,17 +1084,50 @@ def benchmark_energy(
     energy_mode: str = typer.Option("measured", help="measured|estimated"),
     output: str | None = typer.Option(None, help="Output JSON path"),
     task_limit: int | None = typer.Option(2, help="Limit number of benchmark tasks"),
-    provider: str | None = typer.Option(None, help="Override provider"),
-    fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    provider: str | None = typer.Option(
+        None,
+        help="Override provider (energy runs smoke mode-A workload with this provider).",
+    ),
+    fallback_provider: str | None = typer.Option(
+        None,
+        help="Override fallback provider for mode-A workload execution.",
+    ),
+    model: str | None = typer.Option(None, "--model", help="Override model name"),
+    hf_model_id: str | None = typer.Option(
+        None,
+        "--hf-model-id",
+        help="Override transformers model id",
+    ),
 ) -> None:
     ensure_artifact_scaffold()
+    resolved, _ = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    validation_error = _validate_model_override_combo(
+        effective_provider=resolved.llm_provider,
+        model_override=model,
+        hf_model_id_override=hf_model_id,
+    )
+    if validation_error is not None:
+        _code, message = validation_error
+        typer.echo(message)
+        raise typer.Exit(code=1)
+
     result = run_energy_benchmark(
         profile=profile,
         energy_mode=energy_mode,
         task_limit=task_limit,
         output_path=output,
-        provider=provider,
-        fallback_provider=fallback_provider,
+        provider=resolved.llm_provider,
+        fallback_provider=resolved.fallback_provider,
+        model=resolved.model_name,
+        hf_model_id=resolved.hf_model_id,
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
     write_artifact("benchmark_summary", {"kind": "energy", "result": result})

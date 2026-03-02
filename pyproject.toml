@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "binliquid"
-version = "0.3.0"
-description = "BinLiquidAI v0.3 private agent runtime + governance MVP"
+version = "0.3.1"
+description = "BinLiquidAI v0.3.1 CLI-first model switchability + governance runtime"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 authors = [

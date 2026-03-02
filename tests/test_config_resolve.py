@@ -20,6 +20,23 @@ def test_resolve_runtime_config_precedence_cli_wins_over_env_and_profile() -> No
     assert source_map["fallback_provider"] == "env"
 
 
+def test_resolve_runtime_config_model_and_hf_source_map() -> None:
+    env = {
+        "BINLIQUID_MODEL_NAME": "env-model",
+        "BINLIQUID_HF_MODEL_ID": "env/hf-model",
+    }
+    cfg, source_map = resolve_runtime_config(
+        profile="lite",
+        env=env,
+        cli_overrides={"model_name": "cli-model"},
+    )
+
+    assert cfg.model_name == "cli-model"
+    assert cfg.hf_model_id == "env/hf-model"
+    assert source_map["model_name"] == "cli"
+    assert source_map["hf_model_id"] == "env"
+
+
 def test_resolve_runtime_config_is_deterministic() -> None:
     env = {"BINLIQUID_ROUTER_MODE": "rule"}
     first, _ = resolve_runtime_config(profile="balanced", env=env)

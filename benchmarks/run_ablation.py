@@ -21,6 +21,8 @@ def run_ablation_benchmark(
     task_limit: int | None = None,
     provider: str | None = None,
     fallback_provider: str | None = None,
+    model: str | None = None,
+    hf_model_id: str | None = None,
 ) -> dict[str, Any]:
     payload = run_smoke_benchmark(
         profile=profile,
@@ -30,6 +32,8 @@ def run_ablation_benchmark(
         task_limit=task_limit,
         provider=provider,
         fallback_provider=fallback_provider,
+        model=model,
+        hf_model_id=hf_model_id,
     )
 
     if report_path is None:
@@ -47,6 +51,8 @@ def run_energy_benchmark(
     output_path: str | None = None,
     provider: str | None = None,
     fallback_provider: str | None = None,
+    model: str | None = None,
+    hf_model_id: str | None = None,
 ) -> dict[str, Any]:
     mode = energy_mode.strip().lower()
     if mode not in {"measured", "estimated"}:
@@ -59,6 +65,8 @@ def run_energy_benchmark(
         task_limit=task_limit,
         provider=provider,
         fallback_provider=fallback_provider,
+        model=model,
+        hf_model_id=hf_model_id,
     )
     estimated_wh = float(baseline["results"]["A"].get("energy_estimate_wh", 0.0))
 

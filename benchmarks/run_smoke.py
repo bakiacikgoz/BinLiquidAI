@@ -33,6 +33,8 @@ def run_smoke_benchmark(
     task_limit: int | None = None,
     provider: str | None = None,
     fallback_provider: str | None = None,
+    model: str | None = None,
+    hf_model_id: str | None = None,
 ) -> dict[str, Any]:
     selected_modes = _resolve_modes(mode)
     tasks = _load_tasks(
@@ -56,6 +58,8 @@ def run_smoke_benchmark(
             mode_name=mode_name,
             provider=provider,
             fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
         )
         result["results"][mode_name] = run_result
 
@@ -72,18 +76,24 @@ def _run_mode(
     mode_name: str,
     provider: str | None = None,
     fallback_provider: str | None = None,
+    model: str | None = None,
+    hf_model_id: str | None = None,
 ) -> dict[str, Any]:
     answer_llm = _build_llm(
         config=config,
         temperature=config.answer_temperature,
         provider=provider,
         fallback_provider=fallback_provider,
+        model=model,
+        hf_model_id=hf_model_id,
     )
     planner_llm = _build_llm(
         config=config,
         temperature=config.planner_temperature,
         provider=provider,
         fallback_provider=fallback_provider,
+        model=model,
+        hf_model_id=hf_model_id,
     )
     planner = Planner(
         planner_llm,
@@ -238,14 +248,16 @@ def _build_llm(
     temperature: float,
     provider: str | None = None,
     fallback_provider: str | None = None,
+    model: str | None = None,
+    hf_model_id: str | None = None,
 ) -> OllamaLLM:
     return OllamaLLM(
-        model_name=config.model_name,
+        model_name=(model or config.model_name),
         temperature=temperature,
         provider_name=(provider or config.llm_provider),
         fallback_provider=(fallback_provider or config.fallback_provider),
         fallback_enabled=config.fallback_enabled,
-        hf_model_id=config.hf_model_id,
+        hf_model_id=(hf_model_id or config.hf_model_id),
         device=config.device,
     )
 
