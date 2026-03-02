@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
+from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.tools.sandbox_runner import SandboxRunner
 
 
@@ -17,6 +18,8 @@ def verify_python_snippet(
     run_targeted_tests: bool = False,
     targeted_test_args: list[str] | None = None,
     timeout_s: float = 15,
+    governance_runtime: GovernanceRuntime | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "parse_ok": False,
@@ -48,7 +51,12 @@ def verify_python_snippet(
             result["failure_reason"] = "SYNTAX_INVALID"
         return result
 
-    runner = SandboxRunner(workdir=workdir, timeout_s=timeout_s)
+    runner = SandboxRunner(
+        workdir=workdir,
+        timeout_s=timeout_s,
+        governance_runtime=governance_runtime,
+        governance_run_id=run_id,
+    )
 
     # Use an ephemeral file for syntax/lint checks and avoid mutating the repo.
     with NamedTemporaryFile("w", suffix=".py", delete=True) as tmp:
@@ -135,6 +143,8 @@ def _classify_runner_failure(run: Any, *, default: str) -> str:
         return "VERIFICATION_TIMEOUT"
     if exit_code == 126:
         return "COMMAND_NOT_ALLOWED"
+    if exit_code == 125:
+        return "APPROVAL_REQUIRED"
     if "indentation" in stderr:
         return "INDENTATION_ERROR"
     if "syntax" in stderr:

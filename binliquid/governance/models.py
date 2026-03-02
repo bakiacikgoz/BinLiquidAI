@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class GovernanceAction(StrEnum):
+    ALLOW = "allow"
+    DENY = "deny"
+    REQUIRE_APPROVAL = "require_approval"
+
+
+class GovernancePhase(StrEnum):
+    TASK = "task"
+    TOOL = "tool"
+
+
+class ApprovalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    EXECUTED = "executed"
+    EXECUTION_FAILED = "execution_failed"
+    CANCELLED = "cancelled"
+
+
+class ExecutionStatus(StrEnum):
+    NOT_EXECUTED = "not_executed"
+    EXECUTED = "executed"
+    EXECUTION_FAILED = "execution_failed"
+
+
+class ToolCallRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    command_root: str
+    args_fingerprint: str
+    decision_action: GovernanceAction
+    reason_code: str
+
+
+class GovernanceDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    phase: GovernancePhase
+    target: str
+    action: GovernanceAction
+    reason_code: str
+    matched_rule_path: str | None = None
+    policy_schema_version: str
+    policy_version: str
+    policy_hash: str
+    decision_engine_version: str
+    approval_required: bool = False
+    approval_id: str | None = None
+    explain: str | None = None
+
+
+class ApprovalTicket(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    version: int = Field(ge=0)
+    approval_id: str
+    run_id: str
+    status: ApprovalStatus
+    request_hash: str
+    snapshot_hash: str
+    snapshot: dict[str, Any] = Field(default_factory=dict)
+    expires_at: datetime
+    actor: str | None = None
+    decision_reason: str | None = None
+    execution_status: ExecutionStatus = ExecutionStatus.NOT_EXECUTED
+    executed_at: datetime | None = None
+    execution_error_code: str | None = None
+    idempotency_key: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    decided_at: datetime | None = None
+
+
+class AuditRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    schema_version: str = "1.0"
+    run_id: str
+    runtime_version: str
+    git_commit: str | None = None
+    profile: str
+    model_provider: str
+    model_name: str
+    router_reason_code: str | None = None
+    policy_schema_version: str
+    policy_version: str
+    policy_hash: str
+    decision_engine_version: str
+    governance_decisions: list[GovernanceDecision] = Field(default_factory=list)
+    tool_calls: list[ToolCallRecord] = Field(default_factory=list)
+    approval_status: str = "none"
+    redaction_mode: str = "trace"
+    privacy_mode: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

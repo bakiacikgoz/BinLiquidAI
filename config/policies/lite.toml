@@ -1,0 +1,26 @@
+policy_schema_version = "1.0"
+policy_version = "v0.3-lite"
+web_egress = "deny"
+
+[[task_rules]]
+id = "task-chat-allow"
+task_types = ["chat", "plan", "research"]
+action = "allow"
+explain = "lite profile allows low-risk assistant tasks"
+
+[[task_rules]]
+id = "task-code-deny"
+task_types = ["code", "mixed"]
+action = "deny"
+explain = "lite profile blocks code execution tasks"
+
+[[tool_rules]]
+id = "tool-core"
+command_roots = ["python", "uv", "pytest", "ruff", "rg"]
+action = "allow"
+arg_deny_regex = ["rm\\s+-rf", "os\\.remove", "shutil\\.rmtree"]
+explain = "core developer tools allowed with deny patterns"
+
+[pii_rules]
+patterns = ["[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "(api|token|secret|password)[=: ]+[A-Za-z0-9._-]+"]
+

@@ -11,6 +11,7 @@ ARTIFACT_FILENAMES = {
     "benchmark_summary": "benchmark_summary.json",
     "router_shadow_summary": "router_shadow_summary.json",
     "research_summary": "research_summary.json",
+    "governance_summary": "governance_summary.json",
 }
 
 

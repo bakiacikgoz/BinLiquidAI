@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -13,6 +14,11 @@ from binliquid.core.planner import Planner
 from binliquid.experts.code_expert import CodeExpert
 from binliquid.experts.memory_plan_expert import MemoryPlanExpert
 from binliquid.experts.research_expert import ResearchExpert
+from binliquid.governance.runtime import (
+    GovernanceRuntime,
+    build_governance_runtime,
+    governance_startup_abort,
+)
 from binliquid.memory.manager import MemoryManager
 from binliquid.memory.persistent_store import PersistentMemoryStore
 from binliquid.memory.salience_gate import SalienceGate
@@ -26,15 +32,19 @@ from binliquid.telemetry.tracer import Tracer
 from research.sltc_experiments.eval_router import evaluate_router_model
 from research.sltc_experiments.train_router import calibrate_router_params, train_router_model
 
-app = typer.Typer(help="BinLiquid AI CLI")
+app = typer.Typer(help="BinLiquidAI CLI")
 benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
 research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
+approval_app = typer.Typer(help="Governance approval commands")
+operator_app = typer.Typer(help="Operator panel commands")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
+app.add_typer(approval_app, name="approval")
+app.add_typer(operator_app, name="operator")
 
 
 def _is_realtime_candidate(user_text: str) -> bool:
@@ -155,10 +165,12 @@ def _build_orchestrator(
     if effective_shadow_enabled:
         selected_shadow_mode = (shadow_router_mode or config.shadow_router_mode).lower()
         shadow_router = _build_router(config=config, router_mode=selected_shadow_mode)
+    governance_runtime = _build_governance_runtime(config)
     experts = {
         ExpertName.CODE.value: CodeExpert(
             workspace=workspace_dir,
             verify_config=config.code_verify,
+            governance_runtime=governance_runtime,
         ),
         ExpertName.RESEARCH.value: ResearchExpert(workspace=workspace_dir),
         ExpertName.PLAN.value: MemoryPlanExpert(),
@@ -169,6 +181,11 @@ def _build_orchestrator(
         privacy_mode=config.privacy_mode,
         trace_dir=config.trace_dir,
         router_dataset_path=config.router_dataset_path,
+        event_redactor=(
+            governance_runtime.trace_redact
+            if governance_runtime is not None and config.governance.pii_redaction_enabled
+            else None
+        ),
     )
     return Orchestrator(
         planner=planner,
@@ -179,7 +196,13 @@ def _build_orchestrator(
         config=config,
         memory_manager=memory_manager,
         shadow_router=shadow_router,
+        governance_runtime=governance_runtime,
     )
+
+
+def _build_governance_runtime(config: RuntimeConfig) -> GovernanceRuntime | None:
+    runtime = build_governance_runtime(config)
+    return runtime
 
 
 def _build_router(config: RuntimeConfig, router_mode: str) -> RuleRouter | SLTCRouter:
@@ -341,6 +364,13 @@ def chat(
         provider_name=provider,
         fallback_provider=fallback_provider,
     )
+    startup_error = governance_startup_abort(
+        config,
+        getattr(orchestrator, "governance_runtime", None),
+    )
+    if startup_error:
+        typer.echo(f"POLICY_UNAVAILABLE: {startup_error}")
+        raise typer.Exit(code=2)
     memory = SessionStore()
     stream_json = json_stream or stdio_json
     use_json = json_output or stream_json
@@ -354,9 +384,12 @@ def chat(
             "planner_output": "status",
             "router_decision": "router_decision",
             "router_shadow_decision": "router_decision",
+            "policy_decision": "policy_decision",
+            "approval_pending": "approval_pending",
             "expert_start": "expert_start",
             "expert_call": "expert_end",
             "memory_write_decision": "status",
+            "audit_artifact": "audit_artifact",
             "final_response": "final",
         }
         for event in orchestrator.trace_events(result_trace_id):
@@ -472,6 +505,17 @@ def chat(
                 "followup_correction_rate": result.metrics.get("followup_correction_rate"),
             },
         )
+        write_artifact(
+            "governance_summary",
+            {
+                "trace_id": result.trace_id,
+                "governance_action": result.metrics.get("governance_action"),
+                "governance_reason_code": result.metrics.get("governance_reason_code"),
+                "policy_hash": result.metrics.get("policy_hash"),
+                "approval_id": result.metrics.get("approval_id"),
+                "audit_artifact_path": result.metrics.get("audit_artifact_path"),
+            },
+        )
 
     if once:
         _run_once(once)
@@ -483,6 +527,251 @@ def chat(
         if user_text.strip().lower() in {"/exit", "exit", "quit", "/quit"}:
             break
         _run_once(user_text)
+
+
+def _hash_payload(value: object) -> str:
+    serialized = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+@approval_app.command("pending")
+def approval_pending(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    runtime = _build_governance_runtime(config)
+    if runtime is None:
+        typer.echo("Governance disabled.")
+        raise typer.Exit(code=1)
+    tickets = [item.model_dump(mode="json") for item in runtime.approval_store.list_pending()]
+    if json_output:
+        typer.echo(json.dumps({"pending": tickets}, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"pending_count={len(tickets)}")
+        for item in tickets:
+            typer.echo(
+                f"- {item['approval_id']} status={item['status']} "
+                f"expires_at={item['expires_at']} run_id={item['run_id']}"
+            )
+
+
+@approval_app.command("decide")
+def approval_decide(
+    approval_id: str = typer.Option(..., "--id", help="Approval ticket id"),
+    approve: bool = typer.Option(False, "--approve", help="Approve ticket"),
+    reject: bool = typer.Option(False, "--reject", help="Reject ticket"),
+    actor: str = typer.Option(..., "--actor", help="Actor identity"),
+    reason: str | None = typer.Option(None, "--reason", help="Decision note"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    if approve == reject:
+        typer.echo("Use exactly one of --approve or --reject.")
+        raise typer.Exit(code=2)
+
+    config = RuntimeConfig.from_profile(profile)
+    runtime = _build_governance_runtime(config)
+    if runtime is None:
+        typer.echo("Governance disabled.")
+        raise typer.Exit(code=1)
+
+    result = runtime.decide_approval(
+        approval_id=approval_id,
+        approve=approve,
+        actor=actor,
+        reason=reason,
+    )
+    payload = {
+        "approval_id": approval_id,
+        "error_code": result.error_code,
+        "ticket": result.ticket.model_dump(mode="json") if result.ticket else None,
+    }
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    if result.error_code:
+        raise typer.Exit(code=1)
+
+
+@approval_app.command("execute")
+def approval_execute(
+    approval_id: str = typer.Option(..., "--id", help="Approval ticket id"),
+    actor: str = typer.Option(..., "--actor", help="Execution actor identity"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    runtime = _build_governance_runtime(config)
+    if runtime is None:
+        typer.echo("Governance disabled.")
+        raise typer.Exit(code=1)
+
+    startup_error = governance_startup_abort(config, runtime)
+    if startup_error:
+        typer.echo(f"POLICY_UNAVAILABLE: {startup_error}")
+        raise typer.Exit(code=2)
+
+    ticket = runtime.approval_store.get(approval_id)
+    if ticket is None:
+        typer.echo(json.dumps({"error_code": "APPROVAL_NOT_FOUND", "approval_id": approval_id}))
+        raise typer.Exit(code=1)
+    if ticket.status.value == "expired":
+        typer.echo(json.dumps({"error_code": "APPROVAL_EXPIRED", "approval_id": approval_id}))
+        raise typer.Exit(code=1)
+    if ticket.execution_status.value == "executed":
+        typer.echo(json.dumps({"error_code": "REPLAY_BLOCKED", "approval_id": approval_id}))
+        raise typer.Exit(code=1)
+
+    snapshot_hash = _hash_payload(ticket.snapshot)
+    if snapshot_hash != ticket.snapshot_hash:
+        typer.echo(json.dumps({"error_code": "REPLAY_BLOCKED", "approval_id": approval_id}))
+        raise typer.Exit(code=1)
+
+    kind = str(ticket.snapshot.get("kind", ""))
+    if kind == "task":
+        request_hash = _hash_payload(
+            {
+                "task_type": ticket.snapshot.get("task_type"),
+                "user_input": ticket.snapshot.get("user_input"),
+            }
+        )
+    else:
+        request_hash = _hash_payload(ticket.snapshot.get("normalized", []))
+    if request_hash != ticket.request_hash:
+        typer.echo(json.dumps({"error_code": "REPLAY_BLOCKED", "approval_id": approval_id}))
+        raise typer.Exit(code=1)
+
+    if kind != "task":
+        fail = runtime.approval_store.mark_execution_failed(
+            approval_id=approval_id,
+            error_code="UNSUPPORTED_SNAPSHOT_KIND",
+        )
+        typer.echo(
+            json.dumps(
+                {
+                    "approval_id": approval_id,
+                    "error_code": "UNSUPPORTED_SNAPSHOT_KIND",
+                    "ticket": fail.ticket.model_dump(mode="json") if fail.ticket else None,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=1)
+
+    orchestrator = _build_orchestrator(config)
+    context = {
+        "session_id": f"approval-{approval_id[:8]}",
+        "governance_approval_id": approval_id,
+    }
+    result = orchestrator.process(
+        str(ticket.snapshot.get("user_input", "")),
+        session_context=context,
+        use_router=True,
+    )
+    output = {
+        "approval_id": approval_id,
+        "actor": actor,
+        "execution_used_path": result.used_path,
+        "trace_id": result.trace_id,
+        "fallback_events": result.fallback_events,
+        "metrics": result.metrics,
+    }
+    if result.used_path in {"governance_pending", "governance_blocked"}:
+        runtime.approval_store.mark_execution_failed(
+            approval_id=approval_id,
+            error_code="EXECUTION_FAILED",
+        )
+        output["error_code"] = "EXECUTION_FAILED"
+        typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
+        raise typer.Exit(code=1)
+
+    decision = runtime.execute_approval(approval_id=approval_id)
+    if decision.error_code:
+        output["error_code"] = decision.error_code
+        output["ticket"] = decision.ticket.model_dump(mode="json") if decision.ticket else None
+        typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
+        raise typer.Exit(code=1)
+
+    output["ticket"] = decision.ticket.model_dump(mode="json") if decision.ticket else None
+    typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+@operator_app.command("panel")
+def operator_panel(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    stream: bool = typer.Option(
+        True,
+        "--stream/--no-stream",
+        help="Reserved for future trace tail",
+    ),
+) -> None:
+    _ = stream
+    config = RuntimeConfig.from_profile(profile)
+    runtime = _build_governance_runtime(config)
+    startup_error = governance_startup_abort(config, runtime)
+    if startup_error:
+        typer.echo(f"[blocked-mode] POLICY_UNAVAILABLE: {startup_error}")
+        typer.echo("Commands available: /pending, /approve <id>, /reject <id>, /exit")
+    else:
+        typer.echo("Operator panel started. Commands: /pending, /approve <id>, /reject <id>, /exit")
+
+    if runtime is None:
+        typer.echo("Governance disabled; operator panel requires governance.")
+        raise typer.Exit(code=1)
+
+    while True:
+        line = typer.prompt("operator")
+        text = line.strip()
+        if text in {"/exit", "exit", "quit", "/quit"}:
+            break
+        if text == "/pending":
+            pending = runtime.approval_store.list_pending()
+            typer.echo(
+                json.dumps(
+                    {"pending": [item.model_dump(mode="json") for item in pending]},
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            continue
+        if text.startswith("/approve "):
+            approval_id = text.split(maxsplit=1)[1]
+            result = runtime.decide_approval(
+                approval_id=approval_id,
+                approve=True,
+                actor="operator-panel",
+                reason="approved from panel",
+            )
+            typer.echo(
+                json.dumps(
+                    {
+                        "error_code": result.error_code,
+                        "ticket": result.ticket.model_dump(mode="json") if result.ticket else None,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            continue
+        if text.startswith("/reject "):
+            approval_id = text.split(maxsplit=1)[1]
+            result = runtime.decide_approval(
+                approval_id=approval_id,
+                approve=False,
+                actor="operator-panel",
+                reason="rejected from panel",
+            )
+            typer.echo(
+                json.dumps(
+                    {
+                        "error_code": result.error_code,
+                        "ticket": result.ticket.model_dump(mode="json") if result.ticket else None,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            continue
+        typer.echo("Unknown command. Use /pending, /approve <id>, /reject <id>, /exit.")
 
 
 @benchmark_app.command("smoke")

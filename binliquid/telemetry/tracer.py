@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +17,11 @@ class Tracer:
         privacy_mode: bool = True,
         trace_dir: str = ".binliquid/traces",
         router_dataset_path: str = ".binliquid/research/router_dataset.jsonl",
+        event_redactor: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     ):
         self._events: list[TraceEvent] = []
+        self._privacy_mode = privacy_mode
+        self._event_redactor = event_redactor
         self._persist_to_disk = debug_mode and not privacy_mode
         self._trace_dir = Path(trace_dir)
         self._router_dataset_path = Path(router_dataset_path)
@@ -26,7 +30,10 @@ class Tracer:
             self._router_dataset_path.parent.mkdir(parents=True, exist_ok=True)
 
     def emit(self, request_id: str, stage: str, data: dict[str, Any] | None = None) -> TraceEvent:
-        event = TraceEvent(request_id=request_id, stage=stage, data=data or {})
+        payload = data or {}
+        if self._privacy_mode and self._event_redactor is not None:
+            payload = self._event_redactor(payload)
+        event = TraceEvent(request_id=request_id, stage=stage, data=payload)
         self._events.append(event)
 
         if self._persist_to_disk:

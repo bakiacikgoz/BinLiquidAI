@@ -1,4 +1,4 @@
-# ARCHITECTURE (v0.2)
+# ARCHITECTURE (v0.3)
 
 ## Product Path (Default)
 
@@ -22,6 +22,7 @@
 
 - `binliquid/core/planner.py`: strict planner + deterministic fallback.
 - `binliquid/core/orchestrator.py`: fallback logic, guardrails, synthesis, shadow metrics.
+- `binliquid/governance/*`: policy engine, approval queue, audit/redaction pipeline.
 - `binliquid/router/rule_router.py`: deterministic active routing baseline.
 - `binliquid/router/sltc_router.py`: temporal/spiking-inspired router.
 - `binliquid/experts/*`: typed expert payload producers.

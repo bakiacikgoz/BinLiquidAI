@@ -1,12 +1,12 @@
-# UI_STRATEGY_v0.2
+# UI_STRATEGY_v0.3
 
 ## Decision
 
-v0.2 is CLI-first. Desktop thin-shell UI is explicitly deferred.
+v0.3 keeps a CLI-first core. Desktop thin-shell UI is still deferred.
 
 ## Why
 
-- Reliability and benchmark quality are the v0.2 primary goals.
+- Reliability and governance correctness are the v0.3 primary goals.
 - CLI already exposes structured output modes for future IPC/UI integration.
 - Deferring UI avoids coupling regressions in product path.
 
@@ -25,6 +25,9 @@ Event vocabulary for stream mode:
 - `router_decision`
 - `expert_start`
 - `expert_end`
+- `policy_decision`
+- `approval_pending`
+- `audit_artifact`
 - `final`
 - `warning`
 - `error`

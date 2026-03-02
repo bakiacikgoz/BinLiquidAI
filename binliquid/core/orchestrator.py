@@ -13,6 +13,8 @@ from pydantic import ValidationError
 from binliquid.core.llm_ollama import LLMClient
 from binliquid.core.planner import Planner
 from binliquid.experts.base import ExpertBase
+from binliquid.governance.models import GovernanceAction, GovernanceDecision
+from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.memory.manager import MemoryManager
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.schemas.expert_payloads import (
@@ -77,6 +79,7 @@ class Orchestrator:
         config: RuntimeConfig,
         memory_manager: MemoryManager | None = None,
         shadow_router: RouterLike | None = None,
+        governance_runtime: GovernanceRuntime | None = None,
     ):
         self._planner = planner
         self._llm = llm
@@ -86,6 +89,7 @@ class Orchestrator:
         self._tracer = tracer
         self._config = config
         self._memory_manager = memory_manager
+        self._governance_runtime = governance_runtime
         self._fast_path_sessions: dict[str, dict[str, int]] = {}
         self._expert_payload_models = {
             ExpertName.CODE: CodeExpertPayload,
@@ -96,6 +100,10 @@ class Orchestrator:
             threshold=config.limits.circuit_breaker_threshold,
             cooldown_s=config.limits.circuit_breaker_cooldown_s,
         )
+
+    @property
+    def governance_runtime(self) -> GovernanceRuntime | None:
+        return self._governance_runtime
 
     def process(
         self,
@@ -146,6 +154,49 @@ class Orchestrator:
         )
         if planner_run.parse_failed:
             fallback_events.append("planner_parse_fallback")
+
+        governance_decision: GovernanceDecision | None = None
+        if self._governance_runtime is not None:
+            governance_decision, approval_ticket = self._governance_runtime.evaluate_task(
+                run_id=request_id,
+                task_type=planner_output.task_type.value,
+                user_input=user_input,
+                override_approval_id=session_context.get("governance_approval_id"),
+            )
+            self._tracer.emit(
+                request_id,
+                "policy_decision",
+                governance_decision.model_dump(mode="json"),
+            )
+            if governance_decision.action == GovernanceAction.DENY:
+                fallback_events.append("policy_denied")
+                return self._blocked_result(
+                    request_id=request_id,
+                    started_total=started_total,
+                    user_input=user_input,
+                    reason_code=governance_decision.reason_code,
+                    fallback_events=fallback_events,
+                    governance_decision=governance_decision,
+                )
+            if governance_decision.action == GovernanceAction.REQUIRE_APPROVAL:
+                fallback_events.append("approval_pending")
+                self._tracer.emit(
+                    request_id,
+                    "approval_pending",
+                    {
+                        "approval_id": approval_ticket.approval_id if approval_ticket else None,
+                        "run_id": request_id,
+                        "task_type": planner_output.task_type.value,
+                    },
+                )
+                return self._pending_result(
+                    request_id=request_id,
+                    started_total=started_total,
+                    user_input=user_input,
+                    fallback_events=fallback_events,
+                    governance_decision=governance_decision,
+                    approval_id=approval_ticket.approval_id if approval_ticket else None,
+                )
 
         if use_router:
             routing_started = time.perf_counter()
@@ -415,7 +466,26 @@ class Orchestrator:
             "code_verification_stage_reached": code_metrics["stage_reached"],
             "code_retry_count": code_metrics["retry_count"],
             "code_failure_reason": code_metrics["failure_reason"],
+            "governance_action": governance_decision.action.value if governance_decision else None,
+            "governance_reason_code": (
+                governance_decision.reason_code if governance_decision else None
+            ),
+            "policy_hash": governance_decision.policy_hash if governance_decision else None,
         }
+
+        audit_artifact_path = None
+        if self._governance_runtime is not None:
+            audit_artifact_path = self._governance_runtime.finalize_run(
+                run_id=request_id,
+                router_reason_code=effective_reason_code.value,
+            )
+            if audit_artifact_path:
+                self._tracer.emit(
+                    request_id,
+                    "audit_artifact",
+                    {"path": audit_artifact_path},
+                )
+        metrics["audit_artifact_path"] = audit_artifact_path
 
         self._tracer.emit(
             request_id,
@@ -480,6 +550,49 @@ class Orchestrator:
             "request_received",
             {"input": user_input, "fast_path": True, "stream": stream},
         )
+
+        governance_decision: GovernanceDecision | None = None
+        if self._governance_runtime is not None:
+            governance_decision, approval_ticket = self._governance_runtime.evaluate_task(
+                run_id=request_id,
+                task_type=TaskType.CHAT.value,
+                user_input=user_input,
+                override_approval_id=session_context.get("governance_approval_id"),
+            )
+            self._tracer.emit(
+                request_id,
+                "policy_decision",
+                governance_decision.model_dump(mode="json"),
+            )
+            if governance_decision.action == GovernanceAction.DENY:
+                fallback_events.append("policy_denied")
+                return self._blocked_result(
+                    request_id=request_id,
+                    started_total=started_total,
+                    user_input=user_input,
+                    reason_code=governance_decision.reason_code,
+                    fallback_events=fallback_events,
+                    governance_decision=governance_decision,
+                )
+            if governance_decision.action == GovernanceAction.REQUIRE_APPROVAL:
+                fallback_events.append("approval_pending")
+                self._tracer.emit(
+                    request_id,
+                    "approval_pending",
+                    {
+                        "approval_id": approval_ticket.approval_id if approval_ticket else None,
+                        "run_id": request_id,
+                        "task_type": TaskType.CHAT.value,
+                    },
+                )
+                return self._pending_result(
+                    request_id=request_id,
+                    started_total=started_total,
+                    user_input=user_input,
+                    fallback_events=fallback_events,
+                    governance_decision=governance_decision,
+                    approval_id=approval_ticket.approval_id if approval_ticket else None,
+                )
 
         prompt = self._build_direct_prompt(user_input=user_input, session_context=session_context)
         llm_started = time.perf_counter()
@@ -556,7 +669,25 @@ class Orchestrator:
             "router_shadow_agreement": None,
             "router_shadow_enabled": False,
             "expert_schema_invalid": False,
+            "governance_action": governance_decision.action.value if governance_decision else None,
+            "governance_reason_code": (
+                governance_decision.reason_code if governance_decision else None
+            ),
+            "policy_hash": governance_decision.policy_hash if governance_decision else None,
         }
+        audit_artifact_path = None
+        if self._governance_runtime is not None:
+            audit_artifact_path = self._governance_runtime.finalize_run(
+                run_id=request_id,
+                router_reason_code=ReasonCode.BASELINE_A.value,
+            )
+            if audit_artifact_path:
+                self._tracer.emit(
+                    request_id,
+                    "audit_artifact",
+                    {"path": audit_artifact_path},
+                )
+        metrics["audit_artifact_path"] = audit_artifact_path
         self._tracer.emit(
             request_id,
             "final_response",
@@ -867,6 +998,91 @@ class Orchestrator:
 
     def trace_events(self, request_id: str) -> list[dict[str, object]]:
         return [event.model_dump(mode="json") for event in self._tracer.events_for(request_id)]
+
+    def _blocked_result(
+        self,
+        *,
+        request_id: str,
+        started_total: float,
+        user_input: str,
+        reason_code: str,
+        fallback_events: list[str],
+        governance_decision: GovernanceDecision,
+    ) -> OrchestratorResult:
+        total_elapsed = int((time.perf_counter() - started_total) * 1000)
+        final_text = (
+            "Bu istek governance policy tarafından engellendi.\n"
+            f"İstek özeti: {user_input}\n"
+            f"Neden: {reason_code}"
+        )
+        metrics = {
+            "total_latency_ms": total_elapsed,
+            "router_reason_code": reason_code,
+            "governance_action": governance_decision.action.value,
+            "governance_reason_code": governance_decision.reason_code,
+            "policy_hash": governance_decision.policy_hash,
+            "fast_path_regret_flag": False,
+            "followup_correction_rate": 0.0,
+            "audit_artifact_path": None,
+        }
+        if self._governance_runtime is not None:
+            audit_artifact = self._governance_runtime.finalize_run(
+                run_id=request_id,
+                router_reason_code=reason_code,
+            )
+            metrics["audit_artifact_path"] = audit_artifact
+            if audit_artifact:
+                self._tracer.emit(request_id, "audit_artifact", {"path": audit_artifact})
+        return OrchestratorResult(
+            final_text=final_text,
+            used_path="governance_blocked",
+            fallback_events=fallback_events,
+            trace_id=request_id,
+            metrics=metrics,
+        )
+
+    def _pending_result(
+        self,
+        *,
+        request_id: str,
+        started_total: float,
+        user_input: str,
+        fallback_events: list[str],
+        governance_decision: GovernanceDecision,
+        approval_id: str | None,
+    ) -> OrchestratorResult:
+        total_elapsed = int((time.perf_counter() - started_total) * 1000)
+        final_text = (
+            "Bu istek operator onayı gerektiriyor.\n"
+            f"İstek özeti: {user_input}\n"
+            f"Approval ID: {approval_id or 'unknown'}"
+        )
+        metrics = {
+            "total_latency_ms": total_elapsed,
+            "router_reason_code": ReasonCode.APPROVAL_PENDING.value,
+            "governance_action": governance_decision.action.value,
+            "governance_reason_code": governance_decision.reason_code,
+            "policy_hash": governance_decision.policy_hash,
+            "approval_id": approval_id,
+            "fast_path_regret_flag": False,
+            "followup_correction_rate": 0.0,
+            "audit_artifact_path": None,
+        }
+        if self._governance_runtime is not None:
+            audit_artifact = self._governance_runtime.finalize_run(
+                run_id=request_id,
+                router_reason_code=ReasonCode.APPROVAL_PENDING.value,
+            )
+            metrics["audit_artifact_path"] = audit_artifact
+            if audit_artifact:
+                self._tracer.emit(request_id, "audit_artifact", {"path": audit_artifact})
+        return OrchestratorResult(
+            final_text=final_text,
+            used_path="governance_pending",
+            fallback_events=fallback_events,
+            trace_id=request_id,
+            metrics=metrics,
+        )
 
     @staticmethod
     def _ensure_session_state_data(state: dict[str, int]) -> dict[str, int]:

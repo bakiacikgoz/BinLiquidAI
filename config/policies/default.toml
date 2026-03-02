@@ -1,0 +1,39 @@
+policy_schema_version = "1.0"
+policy_version = "v0.3-default"
+web_egress = "deny"
+
+[[task_rules]]
+id = "task-chat-allow"
+task_types = ["chat"]
+action = "allow"
+explain = "chat tasks are allowed"
+
+[[task_rules]]
+id = "task-code-approval"
+task_types = ["code", "mixed"]
+action = "require_approval"
+explain = "code and mixed tasks require explicit approval"
+
+[[task_rules]]
+id = "task-research-allow"
+task_types = ["research", "plan"]
+action = "allow"
+explain = "research and planning tasks are allowed"
+
+[[tool_rules]]
+id = "tool-python"
+command_roots = ["python"]
+action = "allow"
+arg_deny_regex = ["rm\\s+-rf", "os\\.remove", "shutil\\.rmtree"]
+explain = "python commands allowed unless destructive patterns are detected"
+
+[[tool_rules]]
+id = "tool-uv"
+command_roots = ["uv", "pytest", "ruff", "rg"]
+action = "allow"
+arg_deny_regex = ["--system", "pip\\s+install\\s+--break-system-packages"]
+explain = "tooling commands allowed with restricted arguments"
+
+[pii_rules]
+patterns = ["[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "(api|token|secret|password)[=: ]+[A-Za-z0-9._-]+"]
+

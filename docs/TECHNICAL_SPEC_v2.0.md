@@ -8,6 +8,9 @@
 - Router output is strict typed schema (`RouterDecision` with `ReasonCode` enum)
 - Experts expose structured payload contracts (code/research/plan)
 - Orchestrator enforces timeout, retries, fallback, circuit-breaker, tool budget, recursion depth
+- Governance engine enforces task/tool policy (`allow|deny|require_approval`)
+- Async approval queue stores operator decisions with replay/idempotency guards
+- Per-run privacy-safe audit artifact is emitted under `.binliquid/audit/`
 
 ## Memory Path
 
@@ -31,3 +34,5 @@
 - `benchmark smoke|ablation|energy`
 - `memory stats`
 - `research train-router|eval-router`
+- `approval pending|decide|execute`
+- `operator panel`

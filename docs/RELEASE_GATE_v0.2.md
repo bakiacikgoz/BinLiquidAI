@@ -1,4 +1,4 @@
-# RELEASE_GATE_v0.2
+# RELEASE_GATE_v0.3
 
 ## 1. Code Quality
 
@@ -39,5 +39,23 @@ Required files under `artifacts/`:
 - `benchmark_summary.json`
 - `router_shadow_summary.json`
 - `research_summary.json`
+- `governance_summary.json`
 
 All files must be valid JSON with `artifact/generated_at/status/data` envelope.
+
+## 6. Governance Regression (v0.3)
+
+```bash
+uv run pytest -q tests/test_governance_policy.py
+uv run pytest -q tests/test_policy_fail_closed.py
+uv run pytest -q tests/test_approval_flow.py
+uv run pytest -q tests/test_sandbox_governance.py
+uv run pytest -q tests/test_audit_artifacts.py
+```
+
+Expected controls:
+
+- policy load fail -> fail-closed (`POLICY_UNAVAILABLE`)
+- approval state transitions + replay/idempotency checks
+- redaction regression (no raw sensitive strings in audit artifacts)
+- sandbox governance deny/approval enforcement

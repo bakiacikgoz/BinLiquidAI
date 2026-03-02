@@ -83,3 +83,13 @@ targeted_tests_enabled = false
 timeout_s = 12
 retry_max = 1
 retry_strategy = "failure_aware"
+
+[governance]
+enabled = true
+policy_path = "config/policies/lite.toml"
+policy_fail_mode = "fail_closed"
+approval_store_path = ".binliquid/governance/approvals.sqlite3"
+audit_dir = ".binliquid/audit"
+pii_redaction_enabled = true
+approval_ttl_seconds = 86400
+decision_engine_version = "v0.3"

@@ -85,6 +85,19 @@ class CodeVerifyConfig(BaseModel):
     retry_strategy: Literal["failure_aware", "minimal_only"] = "failure_aware"
 
 
+class GovernanceConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = True
+    policy_path: str = "config/policies/default.toml"
+    policy_fail_mode: Literal["fail_closed", "fail_open"] = "fail_closed"
+    approval_store_path: str = ".binliquid/governance/approvals.sqlite3"
+    audit_dir: str = ".binliquid/audit"
+    pii_redaction_enabled: bool = True
+    approval_ttl_seconds: int = Field(default=86400, ge=60)
+    decision_engine_version: str = "v0.3"
+
+
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -118,6 +131,7 @@ class RuntimeConfig(BaseModel):
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     planner_tuning: PlannerTuningConfig = Field(default_factory=PlannerTuningConfig)
     code_verify: CodeVerifyConfig = Field(default_factory=CodeVerifyConfig)
+    governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
 
     @classmethod
     def from_profile(cls, profile: str = "default", root_dir: Path | None = None) -> RuntimeConfig:
@@ -136,6 +150,7 @@ class RuntimeConfig(BaseModel):
         memory_data = data.get("memory", {})
         planner_data = data.get("planner", {})
         code_verify_data = data.get("code_verify", {})
+        governance_data = data.get("governance", {})
         return cls(
             model_name=app_data.get("model_name", "lfm2.5-thinking:1.2b"),
             profile_name=app_data.get("profile_name", "default"),
@@ -213,6 +228,19 @@ class RuntimeConfig(BaseModel):
                 retry_max=code_verify_data.get("retry_max", 1),
                 retry_strategy=code_verify_data.get("retry_strategy", "failure_aware"),
             ),
+            governance=GovernanceConfig(
+                enabled=governance_data.get("enabled", True),
+                policy_path=governance_data.get("policy_path", "config/policies/default.toml"),
+                policy_fail_mode=governance_data.get("policy_fail_mode", "fail_closed"),
+                approval_store_path=governance_data.get(
+                    "approval_store_path",
+                    ".binliquid/governance/approvals.sqlite3",
+                ),
+                audit_dir=governance_data.get("audit_dir", ".binliquid/audit"),
+                pii_redaction_enabled=governance_data.get("pii_redaction_enabled", True),
+                approval_ttl_seconds=governance_data.get("approval_ttl_seconds", 86400),
+                decision_engine_version=governance_data.get("decision_engine_version", "v0.3"),
+            ),
         )
 
 
@@ -277,6 +305,14 @@ ENV_PATHS: dict[str, str] = {
     "CODE_VERIFY_TIMEOUT_S": "code_verify.timeout_s",
     "CODE_RETRY_MAX": "code_verify.retry_max",
     "CODE_RETRY_STRATEGY": "code_verify.retry_strategy",
+    "GOVERNANCE_ENABLED": "governance.enabled",
+    "GOVERNANCE_POLICY_PATH": "governance.policy_path",
+    "GOVERNANCE_POLICY_FAIL_MODE": "governance.policy_fail_mode",
+    "GOVERNANCE_APPROVAL_STORE_PATH": "governance.approval_store_path",
+    "GOVERNANCE_AUDIT_DIR": "governance.audit_dir",
+    "GOVERNANCE_PII_REDACTION_ENABLED": "governance.pii_redaction_enabled",
+    "GOVERNANCE_APPROVAL_TTL_SECONDS": "governance.approval_ttl_seconds",
+    "GOVERNANCE_DECISION_ENGINE_VERSION": "governance.decision_engine_version",
 }
 
 
@@ -328,6 +364,7 @@ def _load_profile_payload(*, profile: str, root_dir: Path | None) -> dict[str, A
         "memory": dict(data.get("memory", {})),
         "planner_tuning": dict(data.get("planner", {})),
         "code_verify": dict(data.get("code_verify", {})),
+        "governance": dict(data.get("governance", {})),
     }
     return payload
 

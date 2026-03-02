@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 from binliquid.experts.base import ExpertBase
+from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.runtime.config import CodeVerifyConfig
 from binliquid.schemas.expert_payloads import CodeExpertPayload, VerificationResult
 from binliquid.schemas.models import ExpertName, ExpertRequest, ExpertResult, ExpertStatus
@@ -14,9 +15,15 @@ class CodeExpert(ExpertBase):
     name = ExpertName.CODE
     estimated_tool_calls_per_run = 2
 
-    def __init__(self, workspace: str | Path = ".", verify_config: CodeVerifyConfig | None = None):
+    def __init__(
+        self,
+        workspace: str | Path = ".",
+        verify_config: CodeVerifyConfig | None = None,
+        governance_runtime: GovernanceRuntime | None = None,
+    ):
         self.workspace = Path(workspace)
         self.verify_config = verify_config or CodeVerifyConfig()
+        self.governance_runtime = governance_runtime
 
     def run(self, request: ExpertRequest) -> ExpertResult:
         started = time.perf_counter()
@@ -50,6 +57,8 @@ class CodeExpert(ExpertBase):
                         and issue_type in {"test", "runtime"}
                     ),
                     timeout_s=float(self.verify_config.timeout_s),
+                    governance_runtime=self.governance_runtime,
+                    run_id=request.request_id,
                 )
                 verification_raw["retry_count"] = attempt
                 verification_raw["retry_strategy"] = self.verify_config.retry_strategy

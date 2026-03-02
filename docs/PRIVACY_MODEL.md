@@ -1,4 +1,4 @@
-# PRIVACY_MODEL (v0.2)
+# PRIVACY_MODEL (v0.3)
 
 ## Defaults
 
@@ -9,8 +9,10 @@
 ## Telemetry Behavior
 
 - In-memory events are always allowed for current request processing.
+- In-memory event payloads can be redacted via governance PII rules.
 - Disk persistence is privacy-gated.
 - Router dataset JSONL writes are also privacy-gated.
+- v0.3 audit artifacts are written as privacy-safe/redacted JSON envelopes.
 
 ## Memory Behavior
 

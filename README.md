@@ -1,4 +1,4 @@
-# BinLiquid AI v0.2.0-beta
+# BinLiquidAI v0.3.0
 
 Offline-first, local-first hybrid assistant with a production-focused CLI core.
 
@@ -15,7 +15,8 @@ Offline-first, local-first hybrid assistant with a production-focused CLI core.
 | Memory v2 (dedup + TTL + ranked retrieval) | working | privacy-safe defaults |
 | Benchmarks (smoke/ablation/energy) | working | quality suite (120 tasks) available |
 | Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
-| Desktop UI (Tauri thin shell) | deferred | v0.3 candidate |
+| Governance v0.3 (policy + approval + audit) | working | fail-closed + async approvals |
+| Desktop UI (Tauri thin shell) | deferred | post-v0.3 (operator panel is available) |
 
 ## First 5 Minutes
 
@@ -50,6 +51,20 @@ Structured output (thin-shell/UI ready):
 uv run binliquid chat --profile balanced --once "selam" --json
 uv run binliquid chat --profile balanced --once "selam" --json-stream --stream
 uv run binliquid chat --profile balanced --once "selam" --stdio-json --stream
+```
+
+Governance approvals:
+
+```bash
+uv run binliquid approval pending --json
+uv run binliquid approval decide --id <approval_id> --approve --actor ops-user
+uv run binliquid approval execute --id <approval_id> --actor ops-user
+```
+
+Operator panel (thin-shell terminal):
+
+```bash
+uv run binliquid operator panel --profile balanced
 ```
 
 ### Config resolve
@@ -110,6 +125,7 @@ Calibration outputs:
 - `benchmark_summary.json`
 - `router_shadow_summary.json`
 - `research_summary.json`
+- `governance_summary.json`
 
 ## Privacy and Debug
 
@@ -117,7 +133,7 @@ Calibration outputs:
 - Persistent traces only when debug is on and privacy is explicitly off
 - Web access default: off
 
-## Known Limits (v0.2)
+## Known Limits (v0.3)
 
 - `transformers` fallback is for continuity, not quality parity.
 - Measured energy depends on platform permissions (`powermetrics`).

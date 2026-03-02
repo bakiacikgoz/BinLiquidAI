@@ -30,6 +30,7 @@ def test_cli_doctor_creates_artifact_scaffold(monkeypatch, tmp_path: Path) -> No
     assert (root / "benchmark_summary.json").exists()
     assert (root / "router_shadow_summary.json").exists()
     assert (root / "research_summary.json").exists()
+    assert (root / "governance_summary.json").exists()
 
 
 def test_cli_benchmark_updates_benchmark_summary(monkeypatch, tmp_path: Path) -> None:

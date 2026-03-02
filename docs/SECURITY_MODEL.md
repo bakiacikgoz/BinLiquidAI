@@ -1,4 +1,4 @@
-# SECURITY_MODEL (v0.2)
+# SECURITY_MODEL (v0.3)
 
 ## Default Posture
 
@@ -6,6 +6,7 @@
 - Privacy mode enabled by default
 - Persistent traces only when debug is on and privacy is explicitly disabled
 - Tool execution constrained by allowlist + sandbox runner
+- Governance policy defaults to fail-closed for execution commands
 
 ## Tool Allowlist
 
@@ -25,6 +26,8 @@ Commands outside allowlist are rejected with deterministic error (`exit_code=126
 - `max_recursion_depth` enforced per session context
 - expert timeout + retry limits
 - circuit breaker cooldown for repeated expert failures
+- task/tool policy evaluation (`allow|deny|require_approval`)
+- async approval queue with audit trail
 
 ## Prompt/Tool Injection Defense
 
@@ -32,3 +35,4 @@ Commands outside allowlist are rejected with deterministic error (`exit_code=126
 - Invalid planner output triggers deterministic fallback reason code
 - Document content is treated as content, never as executable shell command
 - Tool runner only accepts explicit allowlisted command arrays
+- Tool commands are policy-evaluated on canonicalized command/arg form

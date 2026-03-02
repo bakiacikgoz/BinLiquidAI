@@ -1,4 +1,4 @@
-# CONFIGURATION (v0.2)
+# CONFIGURATION (v0.3)
 
 ## Sources and Precedence
 
@@ -43,6 +43,17 @@ Code verification tuning:
 - `code_verify.retry_max`: int
 - `code_verify.retry_strategy`: `failure_aware|minimal_only`
 
+Governance tuning (v0.3):
+
+- `governance.enabled`: bool
+- `governance.policy_path`: path to `config/policies/*.toml|json`
+- `governance.policy_fail_mode`: `fail_closed|fail_open`
+- `governance.approval_store_path`: sqlite path for approval queue
+- `governance.audit_dir`: per-run audit artifact directory
+- `governance.pii_redaction_enabled`: bool
+- `governance.approval_ttl_seconds`: int
+- `governance.decision_engine_version`: string
+
 sLTC calibration/tuning:
 
 - `sltc.router_mode`: `active|shadow|off`
@@ -80,6 +91,10 @@ export BINLIQUID_PLANNER_PROMPT_VARIANT=strict_v3
 export BINLIQUID_CODE_VERIFY_TIMEOUT_S=20
 export BINLIQUID_SLTC_ROUTER_MODE=shadow
 export BINLIQUID_MEMORY_RANK_SALIENCE_WEIGHT=0.72
+export BINLIQUID_GOVERNANCE_ENABLED=true
+export BINLIQUID_GOVERNANCE_POLICY_PATH=config/policies/balanced.toml
+export BINLIQUID_GOVERNANCE_POLICY_FAIL_MODE=fail_closed
+export BINLIQUID_GOVERNANCE_APPROVAL_TTL_SECONDS=86400
 ```
 
 ## Privacy-Safe Output
