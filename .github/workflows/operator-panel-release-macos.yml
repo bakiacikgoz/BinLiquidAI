@@ -18,12 +18,19 @@ jobs:
             arch: arm64
 
     runs-on: ${{ matrix.os }}
+    environment:
+      name: release-macos
 
     env:
       SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      MACOS_SIGNING_CERT_P12_B64: ${{ secrets.MACOS_SIGNING_CERT_P12_B64 }}
+      MACOS_SIGNING_CERT_PASSWORD: ${{ secrets.MACOS_SIGNING_CERT_PASSWORD }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+      APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+      APPLE_NOTARY_KEY_P8_B64: ${{ secrets.APPLE_NOTARY_KEY_P8_B64 }}
 
     steps:
       - name: Checkout
@@ -47,6 +54,45 @@ jobs:
       - name: Setup uv
         run: pip install uv
 
+      - name: Import signing certificate
+        run: |
+          : "${SIGNING_IDENTITY:?SIGNING_IDENTITY is required}"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/operator-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security list-keychains -d user -s "${KEYCHAIN_PATH}"
+          security default-keychain -d user -s "${KEYCHAIN_PATH}"
+
+          if [[ -n "${MACOS_SIGNING_CERT_P12_B64}" ]]; then
+            : "${MACOS_SIGNING_CERT_PASSWORD:?MACOS_SIGNING_CERT_PASSWORD is required when MACOS_SIGNING_CERT_P12_B64 is set}"
+            CERT_PATH="${RUNNER_TEMP}/signing-cert.p12"
+            CERT_PATH="${CERT_PATH}" python - <<'PY'
+            import base64
+            import os
+            from pathlib import Path
+
+            Path(os.environ["CERT_PATH"]).write_bytes(
+                base64.b64decode(os.environ["MACOS_SIGNING_CERT_P12_B64"])
+            )
+            PY
+            security import "${CERT_PATH}" -k "${KEYCHAIN_PATH}" -P "${MACOS_SIGNING_CERT_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
+            security set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+            rm -f "${CERT_PATH}"
+          else
+            echo "[release] MACOS_SIGNING_CERT_P12_B64 not provided; expecting signing identity preinstalled on runner"
+          fi
+
+          if ! security find-identity -v -p codesigning "${KEYCHAIN_PATH}" | grep -Fq "${SIGNING_IDENTITY}"; then
+            echo "[release] signing identity not found in keychain: ${SIGNING_IDENTITY}" >&2
+            exit 11
+          fi
+
+          echo "CI_KEYCHAIN_PATH=${KEYCHAIN_PATH}" >> "${GITHUB_ENV}"
+          echo "CI_KEYCHAIN_PASSWORD=${KEYCHAIN_PASSWORD}" >> "${GITHUB_ENV}"
+
       - name: Install UI deps
         run: pnpm install --dir apps/operator-panel
 
@@ -68,9 +114,47 @@ jobs:
 
       - name: Validate notarization credentials
         run: |
-          if [[ -z "${SIGNING_IDENTITY}" || -z "${APPLE_ID}" || -z "${APPLE_TEAM_ID}" || -z "${APPLE_APP_PASSWORD}" ]]; then
-            echo "[release] missing notarization/signing secrets (SIGNING_IDENTITY, APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD)" >&2
+          if [[ -z "${SIGNING_IDENTITY}" ]]; then
+            echo "[release] missing signing secret SIGNING_IDENTITY" >&2
             exit 10
+          fi
+
+          has_api_key=false
+          has_apple_id=false
+          if [[ -n "${APPLE_NOTARY_KEY_ID}" || -n "${APPLE_NOTARY_ISSUER_ID}" || -n "${APPLE_NOTARY_KEY_P8_B64}" ]]; then
+            has_api_key=true
+          fi
+          if [[ -n "${APPLE_ID}" || -n "${APPLE_TEAM_ID}" || -n "${APPLE_APP_PASSWORD}" ]]; then
+            has_apple_id=true
+          fi
+
+          if [[ "${has_api_key}" == "true" ]]; then
+            : "${APPLE_NOTARY_KEY_ID:?APPLE_NOTARY_KEY_ID is required in API key mode}"
+            : "${APPLE_NOTARY_ISSUER_ID:?APPLE_NOTARY_ISSUER_ID is required in API key mode}"
+            : "${APPLE_NOTARY_KEY_P8_B64:?APPLE_NOTARY_KEY_P8_B64 is required in API key mode}"
+            NOTARY_KEY_FILE="${RUNNER_TEMP}/notary-api-key.p8"
+            NOTARY_KEY_FILE="${NOTARY_KEY_FILE}" python - <<'PY'
+            import base64
+            import os
+            from pathlib import Path
+
+            Path(os.environ["NOTARY_KEY_FILE"]).write_bytes(
+                base64.b64decode(os.environ["APPLE_NOTARY_KEY_P8_B64"])
+            )
+            PY
+            chmod 600 "${NOTARY_KEY_FILE}"
+            echo "APPLE_NOTARY_KEY_FILE=${NOTARY_KEY_FILE}" >> "${GITHUB_ENV}"
+            echo "NOTARY_MODE=api-key" >> "${GITHUB_ENV}"
+            echo "[release] notarization auth mode: api-key"
+          elif [[ "${has_apple_id}" == "true" ]]; then
+            : "${APPLE_ID:?APPLE_ID is required in Apple ID mode}"
+            : "${APPLE_TEAM_ID:?APPLE_TEAM_ID is required in Apple ID mode}"
+            : "${APPLE_APP_PASSWORD:?APPLE_APP_PASSWORD is required in Apple ID mode}"
+            echo "NOTARY_MODE=apple-id" >> "${GITHUB_ENV}"
+            echo "[release] notarization auth mode: apple-id"
+          else
+            echo "[release] missing notarization auth. Provide API key secrets or Apple ID secrets." >&2
+            exit 12
           fi
 
       - name: Sign + notarize
@@ -88,6 +172,7 @@ jobs:
           runner_os=${{ matrix.os }}
           runtime_build=PASS
           runtime_gate=PASS
+          notary_auth_mode=${NOTARY_MODE}
           codesign_verify=PASS
           notarization_submit_wait=PASS
           stapler=PASS
@@ -108,3 +193,13 @@ jobs:
         with:
           name: operator-panel-release-gate-${{ matrix.arch }}
           path: artifacts/release-gate-${{ matrix.arch }}.txt
+
+      - name: Cleanup signing material
+        if: always()
+        run: |
+          if [[ -n "${APPLE_NOTARY_KEY_FILE:-}" && -f "${APPLE_NOTARY_KEY_FILE}" ]]; then
+            rm -f "${APPLE_NOTARY_KEY_FILE}"
+          fi
+          if [[ -n "${CI_KEYCHAIN_PATH:-}" ]]; then
+            security delete-keychain "${CI_KEYCHAIN_PATH}" || true
+          fi

@@ -32,6 +32,14 @@
 
 ## macOS Signing + Notarization (v0.5)
 
+- [ ] GitHub Environment `release-macos` exists and required reviewers/policies are configured
+- [ ] Signing cert secrets set:
+  - `MACOS_SIGNING_IDENTITY`
+  - `MACOS_SIGNING_CERT_P12_B64`
+  - `MACOS_SIGNING_CERT_PASSWORD`
+- [ ] Notarization auth set (choose one, API key preferred):
+  - API key: `APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID`, `APPLE_NOTARY_KEY_P8_B64`
+  - Apple ID: `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`
 - [ ] `apps/operator-panel/scripts/codesign_notarize_macos.sh <App.app> <artifact.dmg>`
 - [ ] `codesign --verify --deep --strict` PASS
 - [ ] `xcrun notarytool submit --wait` PASS

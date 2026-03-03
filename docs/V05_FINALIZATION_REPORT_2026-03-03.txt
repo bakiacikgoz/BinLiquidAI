@@ -19,6 +19,12 @@ Current closure state:
 - Core/UI/Bridge quality gates: PASS
 - Release notarization gate: BLOCKED by missing repository signing/notary secrets on CI (both arches)
 
+2026-03-04 hardening addendum:
+- Release workflow now runs inside GitHub Environment `release-macos`.
+- Signing certificate import is explicit via p12 secrets (with preinstalled identity fallback).
+- Notarization auth supports both API key (preferred) and Apple ID modes.
+- Notary submit includes retry with `--no-s3-acceleration` for transient network issues.
+
 This means the code and pipelines are release-ready in behavior and contracts, but notarized release cannot be marked PASS until required Apple credentials are configured in GitHub repository secrets.
 
 ====================================================================
@@ -45,6 +51,10 @@ This means the code and pipelines are release-ready in behavior and contracts, b
 - Added tag-triggered release workflow execution for reproducible release evidence.
 - Added explicit notarization secret validation step.
 - Added runtime verification step before signing/notarization.
+- Added GitHub Environment scoping for release secrets (`release-macos`).
+- Added signing certificate import/keychain setup from p12 secrets.
+- Added dual notarization auth support: API key or Apple ID.
+- Added notarization retry path using `--no-s3-acceleration`.
 - Added dedicated architecture runtime proof workflow:
   - arm64 lane
   - x86_64 lane
@@ -192,9 +202,16 @@ Evidence: release workflow exits before sign/notarize without credentials
 ====================================================================
 Configure these repository secrets in GitHub:
 - MACOS_SIGNING_IDENTITY
-- APPLE_ID
-- APPLE_TEAM_ID
-- APPLE_APP_PASSWORD
+- MACOS_SIGNING_CERT_P12_B64
+- MACOS_SIGNING_CERT_PASSWORD
+- Notary auth (preferred API key):
+  - APPLE_NOTARY_KEY_ID
+  - APPLE_NOTARY_ISSUER_ID
+  - APPLE_NOTARY_KEY_P8_B64
+- Or Apple ID mode:
+  - APPLE_ID
+  - APPLE_TEAM_ID
+  - APPLE_APP_PASSWORD
 
 After secrets are configured, rerun by pushing a new `operator-panel-v*` tag or manual dispatch:
 - workflow: Operator Panel Release (macOS)
