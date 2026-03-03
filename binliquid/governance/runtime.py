@@ -9,6 +9,7 @@ from typing import Any
 from binliquid import __version__
 from binliquid.governance.approval_store import ApprovalDecisionResult, ApprovalStore
 from binliquid.governance.models import (
+    ApprovalStatus,
     ApprovalTicket,
     AuditRecord,
     GovernanceAction,
@@ -118,25 +119,24 @@ class GovernanceRuntime:
             self._record_decision(run_id, decision)
             return decision, None
 
-        if override_approval_id:
-            ticket = self._approval_store.get(override_approval_id)
-            if ticket and ticket.status.value in {"approved", "executed"}:
-                decision = GovernanceDecision(
-                    phase=GovernancePhase.TASK,
-                    target=task_type,
-                    action=GovernanceAction.ALLOW,
-                    reason_code="APPROVAL_PENDING",
-                    matched_rule_path="approval_override",
-                    policy_schema_version=self._policy_bundle.policy.policy_schema_version,
-                    policy_version=self._policy_bundle.policy.policy_version,
-                    policy_hash=self._policy_bundle.policy_hash,
-                    decision_engine_version=self._gov.decision_engine_version,
-                    approval_required=False,
-                    approval_id=ticket.approval_id,
-                    explain="approved override",
-                )
-                self._record_decision(run_id, decision)
-                return decision, None
+        override_ticket = self._approved_override_ticket(override_approval_id)
+        if override_ticket is not None:
+            decision = GovernanceDecision(
+                phase=GovernancePhase.TASK,
+                target=task_type,
+                action=GovernanceAction.ALLOW,
+                reason_code="APPROVAL_PENDING",
+                matched_rule_path="approval_override",
+                policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+                policy_version=self._policy_bundle.policy.policy_version,
+                policy_hash=self._policy_bundle.policy_hash,
+                decision_engine_version=self._gov.decision_engine_version,
+                approval_required=False,
+                approval_id=override_ticket.approval_id,
+                explain="approved override",
+            )
+            self._record_decision(run_id, decision)
+            return decision, None
 
         match = evaluate_task(self._policy_bundle.policy, task_type=task_type)
         decision = GovernanceDecision(
@@ -265,6 +265,7 @@ class GovernanceRuntime:
         from_role: str,
         to_role: str,
         payload: dict[str, Any],
+        override_approval_id: str | None = None,
     ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
         if not self._gov.enabled:
             decision = self._default_allow_decision(
@@ -284,6 +285,36 @@ class GovernanceRuntime:
                 policy_hash="unavailable",
                 decision_engine_version=self._gov.decision_engine_version,
                 explain=self._policy_error,
+            )
+            self._record_decision(run_id, decision)
+            return decision, None
+
+        payload_hash = self._hash_payload(payload)
+        override_ticket = self._approved_override_ticket(override_approval_id)
+        if override_ticket is not None:
+            decision = GovernanceDecision(
+                phase=GovernancePhase.HANDOFF,
+                target=f"{from_role}->{to_role}",
+                action=GovernanceAction.ALLOW,
+                reason_code="APPROVAL_PENDING",
+                matched_rule_path="approval_override",
+                policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+                policy_version=self._policy_bundle.policy.policy_version,
+                policy_hash=self._policy_bundle.policy_hash,
+                decision_engine_version=self._gov.decision_engine_version,
+                approval_required=False,
+                approval_id=override_ticket.approval_id,
+                explain="approved override",
+            )
+            self._record_handoff(
+                run_id,
+                HandoffCallRecord(
+                    from_role=from_role,
+                    to_role=to_role,
+                    payload_hash=payload_hash,
+                    decision_action=decision.action,
+                    reason_code=decision.reason_code,
+                ),
             )
             self._record_decision(run_id, decision)
             return decision, None
@@ -308,7 +339,6 @@ class GovernanceRuntime:
         )
 
         ticket: ApprovalTicket | None = None
-        payload_hash = self._hash_payload(payload)
         if match.action == GovernanceAction.REQUIRE_APPROVAL:
             snapshot = {
                 "kind": "handoff",
@@ -351,6 +381,7 @@ class GovernanceRuntime:
         scope: str,
         producer_role: str,
         visibility: str,
+        override_approval_id: str | None = None,
     ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
         if not self._gov.enabled:
             decision = self._default_allow_decision(
@@ -370,6 +401,35 @@ class GovernanceRuntime:
                 policy_hash="unavailable",
                 decision_engine_version=self._gov.decision_engine_version,
                 explain=self._policy_error,
+            )
+            self._record_decision(run_id, decision)
+            return decision, None
+
+        override_ticket = self._approved_override_ticket(override_approval_id)
+        if override_ticket is not None:
+            decision = GovernanceDecision(
+                phase=GovernancePhase.MEMORY_WRITE,
+                target=f"{scope}:{producer_role}:{visibility}",
+                action=GovernanceAction.ALLOW,
+                reason_code="APPROVAL_PENDING",
+                matched_rule_path="approval_override",
+                policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+                policy_version=self._policy_bundle.policy.policy_version,
+                policy_hash=self._policy_bundle.policy_hash,
+                decision_engine_version=self._gov.decision_engine_version,
+                approval_required=False,
+                approval_id=override_ticket.approval_id,
+                explain="approved override",
+            )
+            self._record_memory_write(
+                run_id,
+                MemoryWriteRecord(
+                    scope=scope,
+                    producer_role=producer_role,
+                    visibility=visibility,
+                    decision_action=decision.action,
+                    reason_code=decision.reason_code,
+                ),
             )
             self._record_decision(run_id, decision)
             return decision, None
@@ -562,6 +622,17 @@ class GovernanceRuntime:
     def _set_approval_status(self, run_id: str, status: str) -> None:
         state = self._runs.setdefault(run_id, GovernanceRunState())
         state.approval_status = status
+
+    def _approved_override_ticket(self, approval_id: str | None) -> ApprovalTicket | None:
+        if not approval_id:
+            return None
+        self._approval_store.expire_pending()
+        ticket = self._approval_store.get(approval_id)
+        if ticket is None:
+            return None
+        if ticket.status not in {ApprovalStatus.APPROVED, ApprovalStatus.EXECUTED}:
+            return None
+        return ticket
 
     def _default_allow_decision(self, *, phase: GovernancePhase, target: str) -> GovernanceDecision:
         return GovernanceDecision(

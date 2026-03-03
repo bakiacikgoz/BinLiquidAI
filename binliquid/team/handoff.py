@@ -27,6 +27,7 @@ def evaluate_handoff_transfer(
     from_role: str,
     to_role: str,
     payload: dict[str, Any],
+    override_approval_id: str | None = None,
 ) -> HandoffDecisionResult:
     payload_hash = _hash_payload(payload)
     if governance_runtime is None:
@@ -47,6 +48,7 @@ def evaluate_handoff_transfer(
         from_role=from_role,
         to_role=to_role,
         payload=redacted_payload,
+        override_approval_id=override_approval_id,
     )
 
     if decision.action == GovernanceAction.DENY:

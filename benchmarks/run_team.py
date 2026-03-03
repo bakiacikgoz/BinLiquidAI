@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,7 +19,7 @@ from binliquid.memory.salience_gate import SalienceGate
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig
-from binliquid.schemas.models import ExpertName
+from binliquid.schemas.models import ExpertName, OrchestratorResult
 from binliquid.team.models import TeamSpec
 from binliquid.team.supervisor import TeamSupervisor
 from binliquid.telemetry.tracer import Tracer
@@ -34,6 +35,7 @@ def run_team_benchmark(
     fallback_provider: str | None = None,
     model: str | None = None,
     hf_model_id: str | None = None,
+    deterministic_mock: bool = False,
 ) -> dict[str, Any]:
     tasks = _load_tasks(_resolve_tasks_path(suite), task_limit=task_limit)
     spec = _load_team_spec(spec_path)
@@ -48,7 +50,11 @@ def run_team_benchmark(
     if hf_model_id is not None:
         config = config.model_copy(update={"hf_model_id": hf_model_id})
 
-    orchestrator = _build_orchestrator(config)
+    orchestrator = (
+        _build_mock_orchestrator(config)
+        if deterministic_mock
+        else _build_orchestrator(config)
+    )
     supervisor = TeamSupervisor(orchestrator=orchestrator, config=config)
 
     completed = 0
@@ -84,6 +90,7 @@ def run_team_benchmark(
         "failed_rate": round(failed / max(len(tasks), 1), 4),
         "avg_event_count": round(event_count / max(len(tasks), 1), 2),
         "avg_handoff_count": round(handoff_count / max(len(tasks), 1), 2),
+        "execution_mode": "deterministic_mock" if deterministic_mock else "provider_live",
     }
 
     destination = Path(output_path) if output_path else _default_output_path(suite)
@@ -91,6 +98,45 @@ def run_team_benchmark(
     destination.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     payload["output_path"] = str(destination)
     return payload
+
+
+class _DeterministicTeamOrchestrator:
+    def __init__(self, config: RuntimeConfig):
+        self.governance_runtime = build_governance_runtime(config)
+        self._memory_manager = _build_memory_manager(config)
+        self._counter = 0
+
+    def process(
+        self,
+        user_input: str,
+        session_context: dict[str, str] | None = None,
+        use_router: bool = True,
+    ) -> OrchestratorResult:
+        del session_context, use_router
+        self._counter += 1
+        digest = hashlib.sha256(user_input.encode("utf-8")).hexdigest()[:12]
+        return OrchestratorResult(
+            final_text=f"deterministic:{digest}",
+            used_path="llm_only",
+            fallback_events=[],
+            trace_id=f"trace-det-{self._counter}",
+            metrics={"router_reason_code": "RULE_ROUTE"},
+        )
+
+    def process_fast_chat(
+        self,
+        user_input: str,
+        session_context: dict[str, str] | None = None,
+        stream: bool = False,
+        candidate_reason: str | None = None,
+        on_token=None,
+    ) -> OrchestratorResult:
+        del stream, candidate_reason, on_token
+        return self.process(user_input, session_context=session_context, use_router=True)
+
+
+def _build_mock_orchestrator(config: RuntimeConfig) -> _DeterministicTeamOrchestrator:
+    return _DeterministicTeamOrchestrator(config)
 
 
 def _build_orchestrator(config: RuntimeConfig) -> Orchestrator:

@@ -12,8 +12,10 @@ team orchestration primitives, governance checkpoints for handoff and scoped mem
 team-level artifacts/replay, and team benchmark support.
 
 Current status at report time:
+- Scoped production-readiness pre-check: PASS
+- Enterprise GA readiness: not yet (hardening pending)
 - Full repository lint: PASS
-- Full test suite: PASS (91 tests)
+- Full test suite: PASS (103 tests)
 - Real provider live validation (Ollama): PASS for healthy completion paths
 - Fail-closed behavior in policy-triggered escalation paths: PASS
 - Team benchmark command with real provider: PASS
@@ -256,7 +258,7 @@ Files:
 9) Test Coverage and Quality Gates
 ====================================================================
 9.1 Current test inventory
-- Total collected tests: 91
+- Total collected tests: 103
 - Full suite pass confirmed
 
 9.2 New tests introduced
@@ -353,7 +355,7 @@ Updated docs/readmes:
 - docs/SECURITY_MODEL.md
 - docs/PRIVACY_MODEL.md
 - docs/RELEASE_CHECKLIST.md
-- docs/RELEASE_GATE_v0.2.md
+- docs/RELEASE_GATE_v0.4.md (v0.2 file retained as legacy alias)
 
 README now includes:
 - v0.4 identity
@@ -366,7 +368,7 @@ README now includes:
 13) Current Known Constraints (Post-Integration)
 ====================================================================
 - Approval-required governance decisions in dependency-critical tasks intentionally trigger
-  fail-closed progression behavior unless approval is resolved out-of-band.
+  fail-closed progression behavior unless approval is resolved and `team resume` is invoked.
 - Transformers fallback path remains continuity-focused; quality parity is not guaranteed.
 - Energy measured mode still depends on host permissions for powermetrics.
 - UI thin shell remains deferred by design.
@@ -374,7 +376,7 @@ README now includes:
 ====================================================================
 14) Final Validation Verdict
 ====================================================================
-Integration completeness verdict: PASS
+Integration completeness verdict: PASS (v0.4 foundation scope)
 - Planned v0.4 Team Runtime foundation is implemented in code, config, policy, CLI,
   telemetry/artifacts, benchmark, and tests.
 
@@ -384,10 +386,14 @@ Production-readiness pre-check verdict: PASS (for current scoped objectives)
 - Fail-closed behavior confirmed in escalation scenarios.
 - Critical live-discovered defects fixed and regression-tested.
 
+Enterprise GA readiness verdict: NOT YET
+- Additional hardening (approval continuation ops maturity, signed envelopes, stricter defaults,
+  and CI depth) remains outside this report's completion claim.
+
 ====================================================================
 15) Recommended Immediate Next Steps
 ====================================================================
-1) Add explicit approval-resolution continuation flow for escalated team tasks (resume semantics).
+1) Keep improving approval-resolution continuation flow (team resume semantics) for larger DAG cases.
 2) Expand multi-role reference specs under repository docs/examples for regulated workflows.
 3) Add CI gate that runs team smoke benchmark with deterministic mock provider and schema checks.
 4) Add optional signed envelope support in integrity section for next phase compliance hardening.

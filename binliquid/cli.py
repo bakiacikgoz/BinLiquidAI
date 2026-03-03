@@ -4,6 +4,7 @@ import hashlib
 import json
 import shutil
 import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -736,6 +737,149 @@ def _hash_payload(value: object) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _collect_resume_overrides(
+    *,
+    events: list[dict[str, object]],
+    governance_runtime: GovernanceRuntime | None,
+) -> tuple[dict[str, dict[str, str]], list[dict[str, str]]]:
+    if governance_runtime is None:
+        return {}, []
+    governance_runtime.approval_store.expire_pending()
+
+    overrides: dict[str, dict[str, str]] = {}
+    resolved: list[dict[str, str]] = []
+    for item in events:
+        if str(item.get("event") or "") != "approval_requested":
+            continue
+        task_id = str(item.get("task_id") or "").strip()
+        data = item.get("data")
+        if not isinstance(data, dict):
+            continue
+        approval_id = str(data.get("approval_id") or "").strip()
+        if not task_id or not approval_id:
+            continue
+
+        target = _normalize_resume_target(str(data.get("target") or "handoff"))
+        ticket = governance_runtime.approval_store.get(approval_id)
+        if ticket is None:
+            continue
+        status = ticket.status.value
+        if status not in {"approved", "executed"}:
+            continue
+        overrides.setdefault(task_id, {})[target] = approval_id
+        resolved.append(
+            {
+                "task_id": task_id,
+                "target": target,
+                "approval_id": approval_id,
+                "status": status,
+            }
+        )
+    return overrides, resolved
+
+
+def _normalize_resume_target(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized in {"task", "handoff", "memory_write"}:
+        return normalized
+    return "handoff"
+
+
+def _team_init_template(template_name: str) -> str:
+    normalized = template_name.strip().lower()
+    if normalized == "balanced":
+        return """version: "1"
+team:
+  team_id: "aegis-team"
+  supervisor_policy: "sequential_then_parallel"
+  agents:
+    - agent_id: "agent-intake"
+      role: "Intake Agent"
+      allowed_task_types: ["chat", "plan"]
+      profile_name: "balanced"
+      model_overrides: {}
+      memory_scope_access: ["session", "case"]
+      tool_policy_profile: "default"
+      approval_mode: "auto"
+    - agent_id: "agent-research"
+      role: "Research Analyst Agent"
+      allowed_task_types: ["research", "plan"]
+      profile_name: "balanced"
+      model_overrides: {}
+      memory_scope_access: ["team", "case"]
+      tool_policy_profile: "default"
+      approval_mode: "auto"
+    - agent_id: "agent-review"
+      role: "Reviewer/QA Agent"
+      allowed_task_types: ["chat", "plan"]
+      profile_name: "balanced"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "default"
+      approval_mode: "always"
+  handoff_rules: []
+  termination_rules:
+    max_tasks: 64
+    max_retries: 1
+    max_handoff_depth: 8
+tasks: []
+"""
+    if normalized in {"regulated", "restricted"}:
+        return """version: "1"
+team:
+  team_id: "aegis-regulated-team"
+  supervisor_policy: "sequential_then_parallel"
+  agents:
+    - agent_id: "agent-intake"
+      role: "Intake Agent"
+      allowed_task_types: ["chat", "plan"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["session", "case"]
+      tool_policy_profile: "restricted"
+      approval_mode: "auto"
+    - agent_id: "agent-research"
+      role: "Research Analyst Agent"
+      allowed_task_types: ["research", "plan"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "restricted"
+      approval_mode: "auto"
+    - agent_id: "agent-compliance"
+      role: "Policy/Compliance Agent"
+      allowed_task_types: ["plan"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "restricted"
+      approval_mode: "always"
+    - agent_id: "agent-execution"
+      role: "Execution Agent"
+      allowed_task_types: ["mixed", "code"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["session"]
+      tool_policy_profile: "restricted"
+      approval_mode: "always"
+    - agent_id: "agent-review"
+      role: "Reviewer/QA Agent"
+      allowed_task_types: ["chat", "plan"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "restricted"
+      approval_mode: "always"
+  handoff_rules: []
+  termination_rules:
+    max_tasks: 64
+    max_retries: 1
+    max_handoff_depth: 8
+tasks: []
+"""
+    raise ValueError("unsupported template. use one of: balanced, regulated")
+
+
 def _load_team_spec(spec_path: str | Path) -> TeamSpec:
     path = Path(spec_path)
     if not path.exists():
@@ -1010,6 +1154,11 @@ def operator_panel(
 @team_app.command("init")
 def team_init(
     output: str = typer.Option("team.yaml", "--output", help="Target team spec path"),
+    template_name: str = typer.Option(
+        "balanced",
+        "--template",
+        help="Template preset: balanced|regulated",
+    ),
     force: bool = typer.Option(False, "--force", help="Overwrite existing file"),
 ) -> None:
     path = Path(output)
@@ -1017,47 +1166,20 @@ def team_init(
         typer.echo("Spec file already exists. Use --force to overwrite.")
         raise typer.Exit(code=1)
 
-    template = """version: "1"
-team:
-  team_id: "aegis-team"
-  supervisor_policy: "sequential_then_parallel"
-  agents:
-    - agent_id: "agent-intake"
-      role: "Intake Agent"
-      allowed_task_types: ["chat", "plan"]
-      profile_name: "balanced"
-      model_overrides: {}
-      memory_scope_access: ["session", "case"]
-      tool_policy_profile: "default"
-      approval_mode: "auto"
-    - agent_id: "agent-research"
-      role: "Research Analyst Agent"
-      allowed_task_types: ["research", "plan"]
-      profile_name: "balanced"
-      model_overrides: {}
-      memory_scope_access: ["team", "case"]
-      tool_policy_profile: "default"
-      approval_mode: "auto"
-    - agent_id: "agent-review"
-      role: "Reviewer/QA Agent"
-      allowed_task_types: ["chat", "plan"]
-      profile_name: "balanced"
-      model_overrides: {}
-      memory_scope_access: ["case"]
-      tool_policy_profile: "default"
-      approval_mode: "always"
-  handoff_rules: []
-  termination_rules:
-    max_tasks: 64
-    max_retries: 1
-    max_handoff_depth: 8
-tasks: []
-"""
+    try:
+        template = _team_init_template(template_name)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2) from None
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(template, encoding="utf-8")
     typer.echo(
         json.dumps(
-            {"status": "ok", "spec_path": str(path)},
+            {
+                "status": "ok",
+                "spec_path": str(path),
+                "template": template_name,
+            },
             ensure_ascii=False,
             indent=2,
         )
@@ -1139,6 +1261,137 @@ def team_run(
         "tasks": [item.model_dump(mode="json") for item in result.tasks],
         "handoff_count": len(result.handoffs),
         "event_count": len(result.events),
+        "audit_envelope_path": result.audit_envelope_path,
+    }
+    write_artifact("team_summary", payload)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(result.job.final_output or "")
+
+
+@team_app.command("resume")
+def team_resume(
+    spec: str = typer.Option(..., "--spec", help="Team spec path"),
+    job_id: str = typer.Option(..., "--job-id", help="Blocked/escalated source job id"),
+    root_dir: str = typer.Option(
+        ".binliquid/team/jobs",
+        "--root-dir",
+        help="Source and destination team artifact root directory",
+    ),
+    resume_job_id: str | None = typer.Option(
+        None,
+        "--resume-job-id",
+        help="Optional explicit resume job id",
+    ),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    provider: str | None = typer.Option(None, help="Override provider"),
+    fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model"),
+    hf_model_id: str | None = typer.Option(None, "--hf-model-id", help="Override HF model id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    ensure_artifact_scaffold()
+    parsed = _load_team_spec(spec)
+
+    try:
+        source_status = load_job_status(job_id, root_dir=root_dir)
+        source_events = load_events(job_id, root_dir=root_dir)
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(
+            json.dumps(
+                {"status": "error", "error": str(exc), "job_id": job_id, "root_dir": root_dir},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=1) from None
+
+    source_job = source_status.get("job", {})
+    source_request = str(source_job.get("request") or "").strip()
+    source_case_id = str(source_job.get("case_id") or "").strip()
+    if not source_request or not source_case_id:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error": "source job status missing request/case_id",
+                    "job_id": job_id,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=1)
+
+    config, _source_map = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    config = config.model_copy(
+        update={"team": config.team.model_copy(update={"artifact_dir": root_dir})}
+    )
+
+    orchestrator = _build_orchestrator(
+        config=config,
+        provider_name=config.llm_provider,
+        fallback_provider=config.fallback_provider,
+    )
+    startup_error = governance_startup_abort(
+        config,
+        getattr(orchestrator, "governance_runtime", None),
+    )
+    if startup_error:
+        typer.echo(f"POLICY_UNAVAILABLE: {startup_error}")
+        raise typer.Exit(code=2)
+    if not config.team.enabled:
+        typer.echo("Team runtime disabled in runtime config.")
+        raise typer.Exit(code=2)
+
+    governance_runtime = getattr(orchestrator, "governance_runtime", None)
+    overrides, resolved = _collect_resume_overrides(
+        events=source_events,
+        governance_runtime=governance_runtime,
+    )
+    if not overrides:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error": "no approved approvals found for resume",
+                    "job_id": job_id,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=1)
+
+    generated_resume_job_id = resume_job_id or (
+        f"{job_id}-resume-{datetime.now(UTC).strftime('%H%M%S')}"
+    )
+    supervisor = TeamSupervisor(orchestrator=orchestrator, config=config)
+    result = supervisor.run(
+        spec=parsed,
+        request=source_request,
+        case_id=source_case_id,
+        job_id=generated_resume_job_id,
+        approval_overrides=overrides,
+    )
+
+    payload = {
+        "status": "ok",
+        "resumed_from_job_id": job_id,
+        "job": result.job.model_dump(mode="json"),
+        "tasks": [item.model_dump(mode="json") for item in result.tasks],
+        "handoff_count": len(result.handoffs),
+        "event_count": len(result.events),
+        "resolved_approvals": resolved,
         "audit_envelope_path": result.audit_envelope_path,
     }
     write_artifact("team_summary", payload)
@@ -1308,6 +1561,11 @@ def benchmark_team(
     spec: str = typer.Option("team.yaml", "--spec", help="Team spec path"),
     output: str | None = typer.Option(None, help="Output JSON path"),
     task_limit: int | None = typer.Option(None, help="Limit number of benchmark tasks"),
+    deterministic_mock: bool = typer.Option(
+        False,
+        "--deterministic-mock",
+        help="Use deterministic mock orchestrator (CI-friendly).",
+    ),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
     model: str | None = typer.Option(None, "--model", help="Override model name"),
@@ -1347,6 +1605,7 @@ def benchmark_team(
         fallback_provider=resolved.fallback_provider,
         model=resolved.model_name,
         hf_model_id=resolved.hf_model_id,
+        deterministic_mock=deterministic_mock,
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
     write_artifact("benchmark_summary", {"kind": "team", "result": result})

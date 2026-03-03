@@ -53,6 +53,7 @@ class TeamSupervisor:
         request: str,
         case_id: str | None = None,
         job_id: str | None = None,
+        approval_overrides: dict[str, dict[str, str]] | None = None,
     ) -> TeamRunResult:
         created_at = datetime.now(UTC)
         resolved_case_id = case_id or f"case-{uuid4().hex[:12]}"
@@ -149,6 +150,20 @@ class TeamSupervisor:
         )
 
         tasks_by_id = {item.task_id: item for item in tasks}
+        if approval_overrides:
+            for task_id, target_map in sorted(approval_overrides.items()):
+                task_def = tasks_by_id.get(task_id)
+                for target, approval_id in sorted(target_map.items()):
+                    emit(
+                        "approval_resolved",
+                        task_id=task_id,
+                        role=task_def.role if task_def else None,
+                        data={
+                            "approval_id": approval_id,
+                            "status": "approved",
+                            "target": target,
+                        },
+                    )
 
         def execute_task(task_def: TaskDefinition) -> TaskRun:
             agent = _select_agent(spec, task_def.role)
@@ -191,6 +206,11 @@ class TeamSupervisor:
                     from_role=dep_task.role,
                     to_role=task_def.role,
                     payload=dep_output,
+                    override_approval_id=_task_override(
+                        approval_overrides,
+                        task_id=task_def.task_id,
+                        target="handoff",
+                    ),
                 )
                 handoff_record = HandoffRecord(
                     from_agent=str(dep_output.get("agent_id", "unknown")),
@@ -225,7 +245,11 @@ class TeamSupervisor:
                         task_id=task_def.task_id,
                         agent_id=agent.agent_id,
                         role=task_def.role,
-                        data={"approval_id": handoff.approval_id, "reason_code": "TASK_ESCALATED"},
+                        data={
+                            "approval_id": handoff.approval_id,
+                            "reason_code": "TASK_ESCALATED",
+                            "target": "handoff",
+                        },
                     )
                     return TaskRun(
                         task_id=task_def.task_id,
@@ -264,6 +288,13 @@ class TeamSupervisor:
                 "agent_id": agent.agent_id,
                 "role": task_def.role,
             }
+            task_override = _task_override(
+                approval_overrides,
+                task_id=task_def.task_id,
+                target="task",
+            )
+            if task_override:
+                session_context["governance_approval_id"] = task_override
             if (
                 task_def.task_type == "chat"
                 and _is_team_fast_chat_candidate(task_input)
@@ -290,6 +321,19 @@ class TeamSupervisor:
                 status = TaskStatus.ESCALATED
                 reason_code = "TASK_ESCALATED"
                 approval_state = "pending"
+                approval_id = str(result.metrics.get("approval_id") or "").strip()
+                if approval_id:
+                    emit(
+                        "approval_requested",
+                        task_id=task_def.task_id,
+                        agent_id=agent.agent_id,
+                        role=task_def.role,
+                        data={
+                            "approval_id": approval_id,
+                            "reason_code": "TASK_ESCALATED",
+                            "target": "task",
+                        },
+                    )
             elif result.used_path == "governance_blocked":
                 status = TaskStatus.BLOCKED
                 reason_code = str(result.metrics.get("governance_reason_code", "POLICY_DENY"))
@@ -300,6 +344,11 @@ class TeamSupervisor:
                 scope="case",
                 producer_role=task_def.role,
                 visibility="team",
+                override_approval_id=_task_override(
+                    approval_overrides,
+                    task_id=task_def.task_id,
+                    target="memory_write",
+                ),
             )
             emit(
                 "memory_write_attempt",
@@ -601,6 +650,24 @@ def _team_parallelism(config: RuntimeConfig) -> int:
     if team_cfg is None:
         return 2
     return int(getattr(team_cfg, "max_parallel_tasks", 2))
+
+
+def _task_override(
+    approval_overrides: dict[str, dict[str, str]] | None,
+    *,
+    task_id: str,
+    target: str,
+) -> str | None:
+    if approval_overrides is None:
+        return None
+    task_map = approval_overrides.get(task_id)
+    if not isinstance(task_map, dict):
+        return None
+    value = task_map.get(target)
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 def _is_team_fast_chat_candidate(text: str) -> bool:

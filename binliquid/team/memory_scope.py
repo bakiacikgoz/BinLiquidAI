@@ -22,6 +22,7 @@ def evaluate_memory_scope_write(
     scope: str,
     producer_role: str,
     visibility: str,
+    override_approval_id: str | None = None,
 ) -> MemoryScopeDecision:
     if governance_runtime is None:
         return MemoryScopeDecision(
@@ -36,6 +37,7 @@ def evaluate_memory_scope_write(
         scope=scope,
         producer_role=producer_role,
         visibility=visibility,
+        override_approval_id=override_approval_id,
     )
 
     if decision.action == GovernanceAction.DENY:

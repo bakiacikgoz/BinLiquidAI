@@ -114,6 +114,7 @@ def test_benchmark_team_command(monkeypatch) -> None:
         spec_path: str,
         task_limit: int | None,
         output_path: str | None,
+        deterministic_mock: bool = False,
         provider: str | None = None,
         fallback_provider: str | None = None,
         model: str | None = None,
@@ -125,6 +126,7 @@ def test_benchmark_team_command(monkeypatch) -> None:
             "spec_path": spec_path,
             "task_limit": task_limit,
             "output_path": output_path or "benchmarks/results/team_fake.json",
+            "deterministic_mock": deterministic_mock,
             "provider": provider,
             "fallback_provider": fallback_provider,
             "model": model,
@@ -148,6 +150,45 @@ def test_benchmark_team_command(monkeypatch) -> None:
     )
     assert result.exit_code == 0
     assert '"suite": "smoke"' in result.stdout
+
+
+def test_benchmark_team_command_passes_deterministic_mock(monkeypatch) -> None:
+    captured: dict[str, bool] = {}
+
+    def fake_team_benchmark(
+        profile: str,
+        suite: str,
+        spec_path: str,
+        task_limit: int | None,
+        output_path: str | None,
+        deterministic_mock: bool = False,
+        provider: str | None = None,
+        fallback_provider: str | None = None,
+        model: str | None = None,
+        hf_model_id: str | None = None,
+    ):
+        del profile, suite, spec_path, task_limit, output_path
+        del provider, fallback_provider, model, hf_model_id
+        captured["deterministic_mock"] = deterministic_mock
+        return {"success_rate": 1.0}
+
+    monkeypatch.setattr("binliquid.cli.run_team_benchmark", fake_team_benchmark)
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "team",
+            "--profile",
+            "lite",
+            "--suite",
+            "smoke",
+            "--spec",
+            "team.yaml",
+            "--deterministic-mock",
+        ],
+    )
+    assert result.exit_code == 0
+    assert captured["deterministic_mock"] is True
 
 
 def test_config_resolve_command(monkeypatch) -> None:

@@ -5,6 +5,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 
@@ -22,24 +23,33 @@ class TeamCheckpointStore:
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.db_path)
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._lock = RLock()
+        self._configure_connection()
         self._init_db()
 
+    def _configure_connection(self) -> None:
+        with self._lock:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA busy_timeout=5000")
+
     def _init_db(self) -> None:
-        self._conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS team_checkpoints (
-                job_id TEXT PRIMARY KEY,
-                case_id TEXT NOT NULL,
-                team_id TEXT NOT NULL,
-                status TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                payload_json TEXT NOT NULL
+        with self._lock:
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS team_checkpoints (
+                    job_id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    team_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
             )
-            """
-        )
-        self._conn.commit()
+            self._conn.commit()
 
     def upsert(
         self,
@@ -52,34 +62,36 @@ class TeamCheckpointStore:
     ) -> None:
         updated_at = datetime.now(UTC).isoformat()
         payload_json = json.dumps(payload, ensure_ascii=False)
-        self._conn.execute(
-            """
-            INSERT INTO team_checkpoints (
-                job_id,
-                case_id,
-                team_id,
-                status,
-                updated_at,
-                payload_json
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO team_checkpoints (
+                    job_id,
+                    case_id,
+                    team_id,
+                    status,
+                    updated_at,
+                    payload_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(job_id)
+                DO UPDATE SET
+                    case_id = excluded.case_id,
+                    team_id = excluded.team_id,
+                    status = excluded.status,
+                    updated_at = excluded.updated_at,
+                    payload_json = excluded.payload_json
+                """,
+                (job_id, case_id, team_id, status, updated_at, payload_json),
             )
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(job_id)
-            DO UPDATE SET
-                case_id = excluded.case_id,
-                team_id = excluded.team_id,
-                status = excluded.status,
-                updated_at = excluded.updated_at,
-                payload_json = excluded.payload_json
-            """,
-            (job_id, case_id, team_id, status, updated_at, payload_json),
-        )
-        self._conn.commit()
+            self._conn.commit()
 
     def get(self, job_id: str) -> CheckpointRecord | None:
-        row = self._conn.execute(
-            "SELECT * FROM team_checkpoints WHERE job_id = ?",
-            (job_id,),
-        ).fetchone()
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM team_checkpoints WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
         if row is None:
             return None
         return CheckpointRecord(
@@ -92,4 +104,5 @@ class TeamCheckpointStore:
         )
 
     def close(self) -> None:
-        self._conn.close()
+        with self._lock:
+            self._conn.close()

@@ -45,7 +45,14 @@ class PersistentMemoryStore:
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._lock = RLock()
+        self._configure_connection()
         self._ensure_schema()
+
+    def _configure_connection(self) -> None:
+        with self._lock:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA busy_timeout=5000")
 
     def _ensure_schema(self) -> None:
         with self._lock:

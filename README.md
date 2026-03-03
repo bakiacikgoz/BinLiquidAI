@@ -15,7 +15,7 @@ Offline-first, local-first hybrid assistant with a production-focused CLI core.
 | Memory v2 (dedup + TTL + ranked retrieval) | working | privacy-safe defaults |
 | Benchmarks (smoke/ablation/energy) | working | quality suite (120 tasks) available |
 | Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
-| Governance v0.3 (policy + approval + audit) | working | fail-closed + async approvals |
+| Governance v0.4 (policy + approval + audit) | working | fail-closed + async approvals |
 | Team Runtime v0.4 (DAG + parallel scheduler + handoff/memory governance) | working | `binliquid team *` command group |
 | Desktop UI (Tauri thin shell) | deferred | post-v0.3 (operator panel is available) |
 
@@ -36,6 +36,7 @@ uv run binliquid doctor --profile balanced
 | `lite` | rule | off | off | off | minimal |
 | `balanced` (default daily) | rule | sltc | on | on | short |
 | `research` | sltc | rule | on | on | debug-friendly |
+| `restricted` (regulated pilot) | rule | sltc | on | on | short |
 
 ## CLI Quickstart
 
@@ -84,6 +85,7 @@ Precedence order: `defaults < profile < env < CLI flags`.
 ```bash
 uv run binliquid benchmark smoke --mode all --profile balanced
 uv run binliquid benchmark team --profile balanced --suite smoke --spec team.yaml
+uv run binliquid benchmark team --profile restricted --suite smoke --spec team.yaml --deterministic-mock
 uv run binliquid benchmark ablation --mode all --profile balanced --suite smoke
 uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
 uv run binliquid benchmark energy --profile balanced --energy-mode measured
@@ -94,8 +96,10 @@ uv run binliquid benchmark smoke --mode A --profile balanced --provider auto --m
 
 ```bash
 uv run binliquid team init --output team.yaml
+uv run binliquid team init --output team-regulated.yaml --template regulated
 uv run binliquid team validate --spec team.yaml --json
 uv run binliquid team run --spec team.yaml --once "Build a compliance-aware rollout plan" --json
+uv run binliquid team resume --spec team.yaml --job-id <blocked_job_id> --root-dir .binliquid/team/jobs --json
 uv run binliquid team status --job-id <id> --root-dir .binliquid/team/jobs --json
 uv run binliquid team logs --job-id <id> --root-dir .binliquid/team/jobs --json-stream
 uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs
@@ -203,3 +207,5 @@ Calibration outputs:
 - UI thin shell is intentionally deferred to keep CLI reliability first.
 - Model assets are not auto-installed (`ollama pull` remains operator-driven).
 - Team runs intentionally fail-closed when governance requires approval in a blocking dependency chain.
+- `team resume` depends on resolved approvals; unresolved/expired approvals keep runs blocked by design.
+- Enterprise GA hardening is still in progress (scoped production-readiness pre-check only).

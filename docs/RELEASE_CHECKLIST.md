@@ -7,9 +7,12 @@
 - [ ] `uv run binliquid config resolve --profile balanced --json`
 - [ ] `uv run binliquid doctor --profile balanced`
 - [ ] `uv run binliquid benchmark smoke --mode all --profile balanced`
+- [ ] `uv run binliquid benchmark team --profile restricted --suite smoke --spec team.yaml --deterministic-mock`
 - [ ] `uv run binliquid benchmark team --profile balanced --suite smoke --spec team.yaml`
 - [ ] `uv run binliquid benchmark ablation --mode all --profile balanced --suite quality`
 - [ ] `uv run binliquid benchmark energy --profile balanced --energy-mode measured`
+- [ ] `uv run pytest -q tests/test_memory_concurrency.py`
+- [ ] `uv run pytest -q tests/test_team_checkpoint_concurrency.py`
 
 ## Research Gates
 
@@ -27,4 +30,6 @@
 - [ ] Benchmark JSON outputs exist under `benchmarks/results/`
 - [ ] Ablation Markdown report exists
 - [ ] Team run artifacts exist under `.binliquid/team/jobs/<job_id>/`
+- [ ] `uv run binliquid team resume --spec team.yaml --job-id <id> --root-dir .binliquid/team/jobs --json` works when approvals are resolved
 - [ ] README command examples are current
+- [ ] Pre-production: one real provider team E2E run completed in target environment

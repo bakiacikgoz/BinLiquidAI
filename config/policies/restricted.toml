@@ -1,0 +1,105 @@
+policy_schema_version = "1.0"
+policy_version = "v0.4-restricted"
+web_egress = "deny"
+
+[[task_rules]]
+id = "task-chat-allow"
+task_types = ["chat", "plan"]
+action = "allow"
+explain = "chat and planning are low-risk defaults"
+
+[[task_rules]]
+id = "task-research-approval"
+task_types = ["research"]
+action = "require_approval"
+explain = "research may process sensitive corpora"
+
+[[task_rules]]
+id = "task-code-approval"
+task_types = ["code", "mixed"]
+action = "require_approval"
+explain = "code/mixed execution requires explicit operator approval"
+
+[[tool_rules]]
+id = "tool-python-approval"
+command_roots = ["python"]
+action = "require_approval"
+arg_deny_regex = ["rm\\s+-rf", "os\\.remove", "shutil\\.rmtree"]
+explain = "python execution requires approval under restricted profile"
+
+[[tool_rules]]
+id = "tool-maintenance-allow"
+command_roots = ["uv", "pytest", "ruff", "rg"]
+action = "allow"
+arg_deny_regex = ["--system", "pip\\s+install\\s+--break-system-packages"]
+explain = "maintenance tooling allowed with guarded arguments"
+
+[[handoff_rules]]
+id = "handoff-intake-to-research"
+from_roles = ["Intake Agent"]
+to_roles = ["Research Analyst Agent"]
+action = "allow"
+explain = "intake may delegate to analyst"
+
+[[handoff_rules]]
+id = "handoff-intake-to-policy"
+from_roles = ["Intake Agent"]
+to_roles = ["Policy/Compliance Agent"]
+action = "allow"
+explain = "intake may delegate to compliance"
+
+[[handoff_rules]]
+id = "handoff-analyst-to-review"
+from_roles = ["Research Analyst Agent"]
+to_roles = ["Reviewer/QA Agent"]
+action = "allow"
+explain = "analyst may hand off to reviewer"
+
+[[handoff_rules]]
+id = "handoff-compliance-to-review"
+from_roles = ["Policy/Compliance Agent"]
+to_roles = ["Reviewer/QA Agent"]
+action = "allow"
+explain = "compliance may hand off to reviewer"
+
+[[handoff_rules]]
+id = "handoff-to-execution-approval"
+from_roles = []
+to_roles = ["Execution Agent"]
+action = "require_approval"
+explain = "execution role transitions require explicit approval"
+
+[[memory_scope_rules]]
+id = "memory-session-private"
+scopes = ["session"]
+producer_roles = []
+visibilities = ["private"]
+action = "allow"
+explain = "session-private writes are allowed"
+
+[[memory_scope_rules]]
+id = "memory-case-team-allow-safe-roles"
+scopes = ["case"]
+producer_roles = ["Intake Agent", "Research Analyst Agent", "Policy/Compliance Agent", "Reviewer/QA Agent", "Case Manager Agent"]
+visibilities = ["team"]
+action = "allow"
+explain = "non-execution roles may write team-visible case memory"
+
+[[memory_scope_rules]]
+id = "memory-case-team-execution-approval"
+scopes = ["case"]
+producer_roles = ["Execution Agent"]
+visibilities = ["team"]
+action = "require_approval"
+explain = "execution role case/team writes require approval"
+
+[[memory_scope_rules]]
+id = "memory-case-private-allow"
+scopes = ["case"]
+producer_roles = []
+visibilities = ["private"]
+action = "allow"
+explain = "case-private memory writes are allowed"
+
+[pii_rules]
+patterns = ["[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "(api|token|secret|password)[=: ]+[A-Za-z0-9._-]+"]
