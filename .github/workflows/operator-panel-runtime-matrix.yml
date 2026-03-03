@@ -1,0 +1,62 @@
+name: Operator Panel Runtime Matrix Proof
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'operator-panel-v*'
+
+jobs:
+  runtime-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: x86_64
+          - os: macos-14
+            arch: arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        run: pip install uv
+
+      - name: Build bundled runtime
+        run: apps/operator-panel/scripts/build_bundled_runtime_macos.sh "${{ matrix.arch }}"
+
+      - name: Verify bundled runtime
+        run: |
+          RUNTIME_ROOT="apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          test -f "${RUNTIME_ROOT}/README.txt"
+          test -f "${RUNTIME_ROOT}/RUNTIME_MANIFEST.txt"
+          test -x "${RUNTIME_ROOT}/python/bin/python"
+          "${RUNTIME_ROOT}/python/bin/python" -m binliquid --version
+          cat "${RUNTIME_ROOT}/RUNTIME_MANIFEST.txt"
+
+      - name: Write runtime proof
+        run: |
+          mkdir -p artifacts
+          cat > "artifacts/runtime-proof-${{ matrix.arch }}.txt" <<EOF
+          workflow=operator-panel-runtime-matrix
+          runner_os=${{ matrix.os }}
+          arch=${{ matrix.arch }}
+          runtime_build=PASS
+          runtime_verify=PASS
+          created_at_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EOF
+
+      - name: Upload runtime proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-proof-${{ matrix.arch }}
+          path: artifacts/runtime-proof-${{ matrix.arch }}.txt
