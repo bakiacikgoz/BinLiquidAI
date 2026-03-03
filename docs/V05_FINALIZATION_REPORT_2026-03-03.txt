@@ -1,0 +1,237 @@
+AegisOS / BinLiquid v0.5 Finalization Report (Zero-Gap Closure)
+Date: 2026-03-03
+Generated At (UTC): 2026-03-03T21:08:00Z
+Repository: https://github.com/bakiacikgoz/BinLiquidAI
+Branch: main
+
+====================================================================
+1) Executive Closure Summary
+====================================================================
+This report documents the finalization effort requested for v0.5 with focus on:
+- eliminating temporary/mock behaviors,
+- enforcing deterministic lint/build behavior,
+- hardening bundled runtime gates,
+- proving macOS architecture runtime coverage (arm64 + x86_64),
+- proving/signing/notarization gate execution status on CI runners.
+
+Current closure state:
+- Runtime architecture proof: PASS (arm64 + x86_64 on GitHub macOS runners)
+- Core/UI/Bridge quality gates: PASS
+- Release notarization gate: BLOCKED by missing repository signing/notary secrets on CI (both arches)
+
+This means the code and pipelines are release-ready in behavior and contracts, but notarized release cannot be marked PASS until required Apple credentials are configured in GitHub repository secrets.
+
+====================================================================
+2) Implemented Changes (Code + Pipeline)
+====================================================================
+2.1 Critical behavior hardening
+- Removed non-Tauri mock bridge fallback and enforced fail-fast error path:
+  - code: CLI_FAILED
+  - message: Tauri runtime not available
+- Deterministic lint behavior fixed by ignoring generated Tauri output paths.
+- Bundled runtime gate hardened with:
+  - architecture compatibility checks,
+  - executable interpreter check,
+  - binliquid module execution check,
+  - runtime manifest generation.
+- Python module entrypoint added for deterministic `python -m binliquid` behavior.
+
+2.2 Security/contract guard formalization
+- Capability handshake mismatch logic extracted and unit tested.
+- Operator identity mutation gate extracted and unit tested.
+- Actor format normalization retained as `ui:<operator_id>` and tested.
+
+2.3 CI/release workflow hardening
+- Added tag-triggered release workflow execution for reproducible release evidence.
+- Added explicit notarization secret validation step.
+- Added runtime verification step before signing/notarization.
+- Added dedicated architecture runtime proof workflow:
+  - arm64 lane
+  - x86_64 lane
+  - proof artifact upload per architecture.
+
+2.4 Commit history for this closure
+- Commit #1: 2b5032486f451e1b238461066a60beed16364e3f
+  Message: "Finalize v0.5 operator panel release gates and verification"
+- Commit #2: e5ae779a46b8cd327bb9326a6c8e96566bd110e0
+  Message: "Harden macOS release matrix and add runtime proof workflow"
+
+2.5 Tags pushed for release-gate execution
+- operator-panel-v0.5.0-beta.1-final
+- operator-panel-v0.5.0-beta.1-final2
+
+====================================================================
+3) Local Verification Evidence
+====================================================================
+All commands executed from repository root unless noted.
+
+3.1 Core quality
+- `uv run ruff check .` -> PASS
+- `uv run pytest -q` -> PASS
+
+3.2 Core contract/API
+- `uv run binliquid --version` -> 0.4.1
+- `uv run python -m binliquid --version` -> 0.4.1
+- `uv run binliquid operator capabilities --json` checks -> PASS:
+  - contractVersion == "1.0"
+  - commands.teamListJson == true
+  - commands.teamReplayJson == true
+  - commands.approvalShowJson == true
+  - artifactSchema.auditEnvelope == "1"
+  - artifactSchema.events == "1"
+
+3.3 Functional JSON gates
+- `uv run binliquid team list --root-dir .binliquid/team/jobs --json` -> PASS
+- `uv run binliquid team replay --job-id <fixture> --root-dir .binliquid/team/jobs --json` -> parse PASS
+- `uv run binliquid approval show --id <fixture_approval_id> --json` -> redaction default PASS (`***REDACTED***`)
+
+3.4 Operator panel quality gates
+- `pnpm --dir apps/operator-panel test` -> PASS
+- `pnpm --dir apps/operator-panel lint` -> PASS
+- `pnpm --dir apps/operator-panel build` -> PASS
+- `cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml` -> PASS
+- `pnpm --dir apps/operator-panel tauri build --debug --no-bundle` -> PASS
+- post-build lint stability (`tauri build` then `pnpm lint`) -> PASS
+
+3.5 Runtime bundling gates
+- `apps/operator-panel/scripts/build_bundled_runtime_macos.sh arm64` -> PASS
+- Runtime executable gate confirmed:
+  - `apps/operator-panel/src-tauri/resources/binliquid-runtime/python/bin/python -m binliquid --version` -> 0.4.1
+- Local x86_64 build with arm64 interpreter intentionally fails fast (expected guard behavior):
+  - architecture mismatch correctly rejected.
+
+====================================================================
+4) CI/CD Evidence (GitHub Actions)
+====================================================================
+4.1 First tagged release attempt (baseline)
+Tag: operator-panel-v0.5.0-beta.1-final
+Head SHA: 2b5032486f451e1b238461066a60beed16364e3f
+
+Runs:
+- CI: success
+  https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642335382
+- Operator Panel CI: success
+  https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642335358
+- Operator Panel Release (macOS): cancelled/failure
+  https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642335356
+  Notes:
+  - arm64 lane built runtime + bundle then failed at sign/notarize phase
+  - x86 lane on old runner label did not execute cleanly (cancelled)
+
+4.2 Final tagged release attempt (hardened workflows)
+Tag: operator-panel-v0.5.0-beta.1-final2
+Head SHA: e5ae779a46b8cd327bb9326a6c8e96566bd110e0
+
+Runs:
+- CI: success
+  https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642550630
+- Operator Panel CI: success
+  https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642550601
+- Operator Panel Runtime Matrix Proof: success
+  https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642550604
+  Job results:
+  - runtime-matrix (macos-15-intel, x86_64): success
+    https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642550604/job/65622111279
+  - runtime-matrix (macos-14, arm64): success
+    https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642550604/job/65622111281
+  Artifacts generated:
+  - runtime-proof-arm64 (artifact id: 5748631871)
+  - runtime-proof-x86_64 (artifact id: 5748632806)
+
+- Operator Panel Release (macOS): failure
+  https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642550636
+  Job results:
+  - build-and-notarize (macos-15-intel, x86_64): failure
+    https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642550636/job/65622111338
+  - build-and-notarize (macos-14, arm64): failure
+    https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22642550636/job/65622111368
+
+Failure point for both lanes (explicit step-level evidence):
+- Step 11: "Validate notarization credentials" -> failure
+- Consequence: Sign + notarize / stapler / quarantine steps skipped
+
+This confirms pipeline logic and lane execution are correct, and blocking cause is credential provisioning, not build/runtime correctness.
+
+====================================================================
+5) Release Gate Matrix (Final)
+====================================================================
+Gate: Core lint/tests
+Status: PASS
+Evidence: local commands and CI runs
+
+Gate: Capability handshake contract 1.0
+Status: PASS
+Evidence: local JSON validation against required keys
+
+Gate: No non-Tauri mock fallback
+Status: PASS
+Evidence: bridge fail-fast behavior + unit test
+
+Gate: Lint deterministic after Tauri build
+Status: PASS
+Evidence: repeated tauri build -> lint sequence PASS
+
+Gate: Bundled runtime arm64
+Status: PASS
+Evidence: local runtime build + CI runtime proof
+
+Gate: Bundled runtime x86_64
+Status: PASS
+Evidence: runtime-matrix job success on macos-15-intel x86_64
+
+Gate: Codesign verify + notarytool + stapler + quarantine
+Status: BLOCKED (credentials missing)
+Evidence: release workflow step "Validate notarization credentials" failure on both lanes
+
+Gate: No-ship policy (notarization/quarantine fail => no ship)
+Status: ENFORCED
+Evidence: release workflow exits before sign/notarize without credentials
+
+====================================================================
+6) Required Secrets To Fully Close Notarization Gate
+====================================================================
+Configure these repository secrets in GitHub:
+- MACOS_SIGNING_IDENTITY
+- APPLE_ID
+- APPLE_TEAM_ID
+- APPLE_APP_PASSWORD
+
+After secrets are configured, rerun by pushing a new `operator-panel-v*` tag or manual dispatch:
+- workflow: Operator Panel Release (macOS)
+
+Expected post-secret PASS criteria:
+- codesign --verify --deep --strict PASS
+- xcrun notarytool submit --wait PASS
+- xcrun stapler staple/validate PASS
+- quarantine/spctl step PASS
+
+====================================================================
+7) File-Level Closure Inventory
+====================================================================
+High-impact files changed/added in this closure:
+- .github/workflows/operator-panel-ci.yml
+- .github/workflows/operator-panel-release-macos.yml
+- .github/workflows/operator-panel-runtime-matrix.yml
+- apps/operator-panel/scripts/build_bundled_runtime_macos.sh
+- apps/operator-panel/scripts/codesign_notarize_macos.sh
+- apps/operator-panel/src/bridge.ts
+- apps/operator-panel/src/bridge.test.ts
+- apps/operator-panel/src/capabilities.ts
+- apps/operator-panel/src/capabilities.test.ts
+- apps/operator-panel/src/operator.ts
+- apps/operator-panel/src/operator.test.ts
+- apps/operator-panel/eslint.config.js
+- apps/operator-panel/src/App.tsx
+- binliquid/__main__.py
+- tests/test_module_entrypoint.py
+- docs/RELEASE_GATE_v0.5.md
+- docs/RELEASE_CHECKLIST.md
+
+====================================================================
+8) Final Technical Verdict
+====================================================================
+v0.5 codebase and CI structure are implementation-complete and hardened.
+Architecture/runtime proof is complete on both target macOS lanes.
+The only remaining blocker to declare "v0.5 finalized + releasable notarized artifacts produced" is external secret provisioning for Apple signing/notarization.
+
+Until those secrets are present and release workflow is rerun successfully, the project remains in "release-candidate with external credential blocker" state.
