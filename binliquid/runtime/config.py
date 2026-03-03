@@ -98,6 +98,17 @@ class GovernanceConfig(BaseModel):
     decision_engine_version: str = "v0.3"
 
 
+class TeamRuntimeConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = True
+    max_parallel_tasks: int = Field(default=4, ge=1, le=64)
+    max_total_tasks: int = Field(default=64, ge=1)
+    max_handoff_depth: int = Field(default=8, ge=1)
+    checkpoint_db_path: str = ".binliquid/team/checkpoints.sqlite3"
+    artifact_dir: str = ".binliquid/team/jobs"
+
+
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -132,6 +143,7 @@ class RuntimeConfig(BaseModel):
     planner_tuning: PlannerTuningConfig = Field(default_factory=PlannerTuningConfig)
     code_verify: CodeVerifyConfig = Field(default_factory=CodeVerifyConfig)
     governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
+    team: TeamRuntimeConfig = Field(default_factory=TeamRuntimeConfig)
 
     @classmethod
     def from_profile(cls, profile: str = "default", root_dir: Path | None = None) -> RuntimeConfig:
@@ -151,6 +163,7 @@ class RuntimeConfig(BaseModel):
         planner_data = data.get("planner", {})
         code_verify_data = data.get("code_verify", {})
         governance_data = data.get("governance", {})
+        team_data = data.get("team", {})
         return cls(
             model_name=app_data.get("model_name", "lfm2.5-thinking:1.2b"),
             profile_name=app_data.get("profile_name", "default"),
@@ -241,6 +254,17 @@ class RuntimeConfig(BaseModel):
                 approval_ttl_seconds=governance_data.get("approval_ttl_seconds", 86400),
                 decision_engine_version=governance_data.get("decision_engine_version", "v0.3"),
             ),
+            team=TeamRuntimeConfig(
+                enabled=team_data.get("enabled", True),
+                max_parallel_tasks=team_data.get("max_parallel_tasks", 4),
+                max_total_tasks=team_data.get("max_total_tasks", 64),
+                max_handoff_depth=team_data.get("max_handoff_depth", 8),
+                checkpoint_db_path=team_data.get(
+                    "checkpoint_db_path",
+                    ".binliquid/team/checkpoints.sqlite3",
+                ),
+                artifact_dir=team_data.get("artifact_dir", ".binliquid/team/jobs"),
+            ),
         )
 
 
@@ -313,6 +337,12 @@ ENV_PATHS: dict[str, str] = {
     "GOVERNANCE_PII_REDACTION_ENABLED": "governance.pii_redaction_enabled",
     "GOVERNANCE_APPROVAL_TTL_SECONDS": "governance.approval_ttl_seconds",
     "GOVERNANCE_DECISION_ENGINE_VERSION": "governance.decision_engine_version",
+    "TEAM_ENABLED": "team.enabled",
+    "TEAM_MAX_PARALLEL_TASKS": "team.max_parallel_tasks",
+    "TEAM_MAX_TOTAL_TASKS": "team.max_total_tasks",
+    "TEAM_MAX_HANDOFF_DEPTH": "team.max_handoff_depth",
+    "TEAM_CHECKPOINT_DB_PATH": "team.checkpoint_db_path",
+    "TEAM_ARTIFACT_DIR": "team.artifact_dir",
 }
 
 
@@ -365,6 +395,7 @@ def _load_profile_payload(*, profile: str, root_dir: Path | None) -> dict[str, A
         "planner_tuning": dict(data.get("planner", {})),
         "code_verify": dict(data.get("code_verify", {})),
         "governance": dict(data.get("governance", {})),
+        "team": dict(data.get("team", {})),
     }
     return payload
 

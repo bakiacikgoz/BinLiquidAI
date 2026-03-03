@@ -107,6 +107,49 @@ def test_benchmark_smoke_passes_model_overrides(monkeypatch) -> None:
     assert captured["hf_model_id"] == "Qwen/Qwen3.5-4B-Instruct"
 
 
+def test_benchmark_team_command(monkeypatch) -> None:
+    def fake_team_benchmark(
+        profile: str,
+        suite: str,
+        spec_path: str,
+        task_limit: int | None,
+        output_path: str | None,
+        provider: str | None = None,
+        fallback_provider: str | None = None,
+        model: str | None = None,
+        hf_model_id: str | None = None,
+    ):
+        return {
+            "profile": profile,
+            "suite": suite,
+            "spec_path": spec_path,
+            "task_limit": task_limit,
+            "output_path": output_path or "benchmarks/results/team_fake.json",
+            "provider": provider,
+            "fallback_provider": fallback_provider,
+            "model": model,
+            "hf_model_id": hf_model_id,
+            "success_rate": 1.0,
+        }
+
+    monkeypatch.setattr("binliquid.cli.run_team_benchmark", fake_team_benchmark)
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "team",
+            "--profile",
+            "lite",
+            "--suite",
+            "smoke",
+            "--spec",
+            "team.yaml",
+        ],
+    )
+    assert result.exit_code == 0
+    assert '"suite": "smoke"' in result.stdout
+
+
 def test_config_resolve_command(monkeypatch) -> None:
     def fake_resolve(**_: object):
         return RuntimeConfig.from_profile("lite"), {"llm_provider": "profile"}

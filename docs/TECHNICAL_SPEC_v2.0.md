@@ -11,6 +11,8 @@
 - Governance engine enforces task/tool policy (`allow|deny|require_approval`)
 - Async approval queue stores operator decisions with replay/idempotency guards
 - Per-run privacy-safe audit artifact is emitted under `.binliquid/audit/`
+- Team runtime supports DAG task orchestration with governed handoffs and scoped memory writes
+- Team run artifacts are emitted under `.binliquid/team/jobs/<job_id>/`
 
 ## Memory Path
 
@@ -31,7 +33,9 @@
 
 - `doctor`
 - `chat`
+- `team init|validate|run|status|logs|replay|artifacts`
 - `benchmark smoke|ablation|energy`
+- `benchmark team`
 - `memory stats`
 - `research train-router|eval-router`
 - `approval pending|decide|execute`

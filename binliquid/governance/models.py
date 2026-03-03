@@ -16,6 +16,8 @@ class GovernanceAction(StrEnum):
 class GovernancePhase(StrEnum):
     TASK = "task"
     TOOL = "tool"
+    HANDOFF = "handoff"
+    MEMORY_WRITE = "memory_write"
 
 
 class ApprovalStatus(StrEnum):
@@ -39,6 +41,26 @@ class ToolCallRecord(BaseModel):
 
     command_root: str
     args_fingerprint: str
+    decision_action: GovernanceAction
+    reason_code: str
+
+
+class HandoffCallRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    from_role: str
+    to_role: str
+    payload_hash: str
+    decision_action: GovernanceAction
+    reason_code: str
+
+
+class MemoryWriteRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    scope: str
+    producer_role: str
+    visibility: str
     decision_action: GovernanceAction
     reason_code: str
 
@@ -108,6 +130,8 @@ class AuditRecord(BaseModel):
     decision_engine_version: str
     governance_decisions: list[GovernanceDecision] = Field(default_factory=list)
     tool_calls: list[ToolCallRecord] = Field(default_factory=list)
+    handoffs: list[HandoffCallRecord] = Field(default_factory=list)
+    memory_writes: list[MemoryWriteRecord] = Field(default_factory=list)
     approval_status: str = "none"
     redaction_mode: str = "trace"
     privacy_mode: bool = True

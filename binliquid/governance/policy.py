@@ -41,6 +41,27 @@ class ApprovalRule(BaseModel):
     explain: str | None = None
 
 
+class HandoffRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    from_roles: list[str] = Field(default_factory=list)
+    to_roles: list[str] = Field(default_factory=list)
+    action: GovernanceAction
+    explain: str | None = None
+
+
+class MemoryScopeRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    scopes: list[str] = Field(default_factory=list)
+    producer_roles: list[str] = Field(default_factory=list)
+    visibilities: list[str] = Field(default_factory=list)
+    action: GovernanceAction
+    explain: str | None = None
+
+
 class PIIRule(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +78,8 @@ class PolicyFile(BaseModel):
     tool_rules: list[ToolRule] = Field(default_factory=list)
     pii_rules: PIIRule = Field(default_factory=PIIRule)
     approval_rules: list[ApprovalRule] = Field(default_factory=list)
+    handoff_rules: list[HandoffRule] = Field(default_factory=list)
+    memory_scope_rules: list[MemoryScopeRule] = Field(default_factory=list)
 
 
 class PolicyMatch(BaseModel):
@@ -166,6 +189,85 @@ def evaluate_tool(policy: PolicyFile, *, command_root: str, args: list[str]) -> 
         matched_rule_path=None,
         explain="default allow",
         reason_code=_reason_for_action(GovernanceAction.ALLOW),
+    )
+
+
+def evaluate_handoff(
+    policy: PolicyFile,
+    *,
+    from_role: str,
+    to_role: str,
+) -> PolicyMatch:
+    from_norm = from_role.strip().lower()
+    to_norm = to_role.strip().lower()
+
+    for idx, rule in enumerate(policy.handoff_rules):
+        from_candidates = [item.strip().lower() for item in rule.from_roles]
+        to_candidates = [item.strip().lower() for item in rule.to_roles]
+        if from_candidates and from_norm not in from_candidates:
+            continue
+        if to_candidates and to_norm not in to_candidates:
+            continue
+        if rule.action == GovernanceAction.DENY:
+            reason_code = "HANDOFF_DENY"
+        elif rule.action == GovernanceAction.REQUIRE_APPROVAL:
+            reason_code = "POLICY_REQUIRE_APPROVAL"
+        else:
+            reason_code = "RULE_ROUTE"
+        return PolicyMatch(
+            action=rule.action,
+            matched_rule_path=f"handoff_rules[{idx}]",
+            explain=rule.explain,
+            reason_code=reason_code,
+        )
+
+    return PolicyMatch(
+        action=GovernanceAction.DENY,
+        matched_rule_path=None,
+        explain="default deny for handoff",
+        reason_code="HANDOFF_DENY",
+    )
+
+
+def evaluate_memory_scope_write(
+    policy: PolicyFile,
+    *,
+    scope: str,
+    producer_role: str,
+    visibility: str,
+) -> PolicyMatch:
+    scope_norm = scope.strip().lower()
+    role_norm = producer_role.strip().lower()
+    visibility_norm = visibility.strip().lower()
+
+    for idx, rule in enumerate(policy.memory_scope_rules):
+        scope_candidates = [item.strip().lower() for item in rule.scopes]
+        role_candidates = [item.strip().lower() for item in rule.producer_roles]
+        visibility_candidates = [item.strip().lower() for item in rule.visibilities]
+        if scope_candidates and scope_norm not in scope_candidates:
+            continue
+        if role_candidates and role_norm not in role_candidates:
+            continue
+        if visibility_candidates and visibility_norm not in visibility_candidates:
+            continue
+        if rule.action == GovernanceAction.DENY:
+            reason_code = "MEMORY_SCOPE_DENY"
+        elif rule.action == GovernanceAction.REQUIRE_APPROVAL:
+            reason_code = "POLICY_REQUIRE_APPROVAL"
+        else:
+            reason_code = "RULE_ROUTE"
+        return PolicyMatch(
+            action=rule.action,
+            matched_rule_path=f"memory_scope_rules[{idx}]",
+            explain=rule.explain,
+            reason_code=reason_code,
+        )
+
+    return PolicyMatch(
+        action=GovernanceAction.DENY,
+        matched_rule_path=None,
+        explain="default deny for memory scope writes",
+        reason_code="MEMORY_SCOPE_DENY",
     )
 
 

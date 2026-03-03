@@ -6,6 +6,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 
@@ -14,6 +15,13 @@ class MemoryRecord:
     id: int
     session_id: str
     task_type: str
+    scope: str
+    team_id: str | None
+    case_id: str | None
+    job_id: str | None
+    producer_agent_id: str | None
+    producer_role: str | None
+    visibility: str
     content: str
     content_hash: str
     salience: float
@@ -34,52 +42,85 @@ class PersistentMemoryStore:
     def __init__(self, db_path: str | Path = ".binliquid/memory.sqlite3"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.db_path)
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._lock = RLock()
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
-        self._conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS memories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                task_type TEXT NOT NULL,
-                content TEXT NOT NULL,
-                content_hash TEXT NOT NULL,
-                salience REAL NOT NULL,
-                metadata_json TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-                expires_at TEXT
-            );
+        with self._lock:
+            self._conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS memories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    task_type TEXT NOT NULL,
+                    scope TEXT NOT NULL DEFAULT 'session',
+                    team_id TEXT,
+                    case_id TEXT,
+                    job_id TEXT,
+                    producer_agent_id TEXT,
+                    producer_role TEXT,
+                    visibility TEXT NOT NULL DEFAULT 'private',
+                    content TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    salience REAL NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    expires_at TEXT
+                );
 
-            CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_memories_task_type ON memories(task_type);
-            CREATE INDEX IF NOT EXISTS idx_memories_session_id ON memories(session_id);
-            """
-        )
-
-        # Backward-compatible migration for earlier MVP schemas.
-        existing_cols = {
-            row["name"]
-            for row in self._conn.execute("PRAGMA table_info(memories)").fetchall()
-        }
-        if "content_hash" not in existing_cols:
-            self._conn.execute("ALTER TABLE memories ADD COLUMN content_hash TEXT DEFAULT ''")
-            self._conn.execute(
-                "UPDATE memories "
-                "SET content_hash = lower(hex(randomblob(16))) "
-                "WHERE content_hash = ''"
+                CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_memories_task_type ON memories(task_type);
+                CREATE INDEX IF NOT EXISTS idx_memories_session_id ON memories(session_id);
+                """
             )
-        if "expires_at" not in existing_cols:
-            self._conn.execute("ALTER TABLE memories ADD COLUMN expires_at TEXT")
 
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_hash ON memories(content_hash)")
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_memories_expires_at ON memories(expires_at)"
-        )
+            # Backward-compatible migration for earlier schemas.
+            existing_cols = {
+                row["name"]
+                for row in self._conn.execute("PRAGMA table_info(memories)").fetchall()
+            }
+            migrations = {
+                "content_hash": "ALTER TABLE memories ADD COLUMN content_hash TEXT DEFAULT ''",
+                "expires_at": "ALTER TABLE memories ADD COLUMN expires_at TEXT",
+                "scope": "ALTER TABLE memories ADD COLUMN scope TEXT DEFAULT 'session'",
+                "team_id": "ALTER TABLE memories ADD COLUMN team_id TEXT",
+                "case_id": "ALTER TABLE memories ADD COLUMN case_id TEXT",
+                "job_id": "ALTER TABLE memories ADD COLUMN job_id TEXT",
+                "producer_agent_id": "ALTER TABLE memories ADD COLUMN producer_agent_id TEXT",
+                "producer_role": "ALTER TABLE memories ADD COLUMN producer_role TEXT",
+                "visibility": "ALTER TABLE memories ADD COLUMN visibility TEXT DEFAULT 'private'",
+            }
+            for column, statement in migrations.items():
+                if column in existing_cols:
+                    continue
+                self._conn.execute(statement)
 
-        self._conn.commit()
+            if "content_hash" not in existing_cols:
+                self._conn.execute(
+                    "UPDATE memories "
+                    "SET content_hash = lower(hex(randomblob(16))) "
+                    "WHERE content_hash = ''"
+                )
+
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_hash ON memories(content_hash)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_expires_at ON memories(expires_at)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_team_case ON memories(team_id, case_id)"
+            )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_scope_visibility "
+                "ON memories(scope, visibility)"
+            )
+            self._conn.commit()
 
     def write(
         self,
@@ -89,6 +130,14 @@ class PersistentMemoryStore:
         salience: float,
         metadata: dict[str, Any] | None = None,
         ttl_days: int | None = 30,
+        *,
+        scope: str = "session",
+        team_id: str | None = None,
+        case_id: str | None = None,
+        job_id: str | None = None,
+        producer_agent_id: str | None = None,
+        producer_role: str | None = None,
+        visibility: str = "private",
     ) -> int:
         status = self.write_with_status(
             session_id=session_id,
@@ -97,6 +146,13 @@ class PersistentMemoryStore:
             salience=salience,
             metadata=metadata,
             ttl_days=ttl_days,
+            scope=scope,
+            team_id=team_id,
+            case_id=case_id,
+            job_id=job_id,
+            producer_agent_id=producer_agent_id,
+            producer_role=producer_role,
+            visibility=visibility,
         )
         return status.record_id
 
@@ -108,169 +164,247 @@ class PersistentMemoryStore:
         salience: float,
         metadata: dict[str, Any] | None = None,
         ttl_days: int | None = 30,
+        *,
+        scope: str = "session",
+        team_id: str | None = None,
+        case_id: str | None = None,
+        job_id: str | None = None,
+        producer_agent_id: str | None = None,
+        producer_role: str | None = None,
+        visibility: str = "private",
     ) -> MemoryWriteStatus:
-        content_hash = hashlib.sha256(content.strip().encode("utf-8")).hexdigest()
-        now = _utc_now_iso()
-        expires_at = _expires_at_iso(ttl_days)
-        meta_json = json.dumps(metadata or {}, ensure_ascii=False)
+        with self._lock:
+            content_hash = hashlib.sha256(content.strip().encode("utf-8")).hexdigest()
+            now = _utc_now_iso()
+            expires_at = _expires_at_iso(ttl_days)
+            meta_json = json.dumps(metadata or {}, ensure_ascii=False)
 
-        existing = self._conn.execute(
-            """
-            SELECT id FROM memories
-            WHERE content_hash = ?
-              AND (expires_at IS NULL OR expires_at > ?)
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            (content_hash, now),
-        ).fetchone()
-
-        if existing is not None:
-            record_id = int(existing["id"])
-            self._conn.execute(
+            existing = self._conn.execute(
                 """
-                UPDATE memories
-                SET session_id = ?,
-                    task_type = ?,
-                    content = ?,
-                    salience = CASE WHEN salience > ? THEN salience ELSE ? END,
-                    metadata_json = ?,
-                    created_at = ?,
-                    expires_at = ?,
-                    content_hash = ?
-                WHERE id = ?
+                SELECT id FROM memories
+                WHERE content_hash = ?
+                  AND scope = ?
+                  AND COALESCE(team_id, '') = COALESCE(?, '')
+                  AND COALESCE(case_id, '') = COALESCE(?, '')
+                  AND COALESCE(job_id, '') = COALESCE(?, '')
+                  AND visibility = ?
+                  AND (expires_at IS NULL OR expires_at > ?)
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (content_hash, scope, team_id, case_id, job_id, visibility, now),
+            ).fetchone()
+
+            if existing is not None:
+                record_id = int(existing["id"])
+                self._conn.execute(
+                    """
+                    UPDATE memories
+                    SET session_id = ?,
+                        task_type = ?,
+                        scope = ?,
+                        team_id = ?,
+                        case_id = ?,
+                        job_id = ?,
+                        producer_agent_id = ?,
+                        producer_role = ?,
+                        visibility = ?,
+                        content = ?,
+                        salience = CASE WHEN salience > ? THEN salience ELSE ? END,
+                        metadata_json = ?,
+                        created_at = ?,
+                        expires_at = ?,
+                        content_hash = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        session_id,
+                        task_type,
+                        scope,
+                        team_id,
+                        case_id,
+                        job_id,
+                        producer_agent_id,
+                        producer_role,
+                        visibility,
+                        content,
+                        salience,
+                        salience,
+                        meta_json,
+                        now,
+                        expires_at,
+                        content_hash,
+                        record_id,
+                    ),
+                )
+                self._conn.commit()
+                return MemoryWriteStatus(record_id=record_id, dedup_hit=True)
+
+            cursor = self._conn.execute(
+                """
+                INSERT INTO memories (
+                    session_id,
+                    task_type,
+                    scope,
+                    team_id,
+                    case_id,
+                    job_id,
+                    producer_agent_id,
+                    producer_role,
+                    visibility,
+                    content,
+                    content_hash,
+                    salience,
+                    metadata_json,
+                    created_at,
+                    expires_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session_id,
                     task_type,
+                    scope,
+                    team_id,
+                    case_id,
+                    job_id,
+                    producer_agent_id,
+                    producer_role,
+                    visibility,
                     content,
-                    salience,
+                    content_hash,
                     salience,
                     meta_json,
                     now,
                     expires_at,
-                    content_hash,
-                    record_id,
                 ),
             )
             self._conn.commit()
-            return MemoryWriteStatus(record_id=record_id, dedup_hit=True)
-
-        cursor = self._conn.execute(
-            """
-            INSERT INTO memories (
-                session_id,
-                task_type,
-                content,
-                content_hash,
-                salience,
-                metadata_json,
-                created_at,
-                expires_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (session_id, task_type, content, content_hash, salience, meta_json, now, expires_at),
-        )
-        self._conn.commit()
-        return MemoryWriteStatus(record_id=int(cursor.lastrowid), dedup_hit=False)
+            return MemoryWriteStatus(record_id=int(cursor.lastrowid), dedup_hit=False)
 
     def recent(self, limit: int = 10, include_expired: bool = False) -> list[MemoryRecord]:
-        if include_expired:
-            query = """
-                SELECT id, session_id, task_type, content, content_hash, salience,
-                       metadata_json, created_at, expires_at
-                FROM memories
-                ORDER BY created_at DESC
-                LIMIT ?
-            """
-            params: tuple[object, ...] = (limit,)
-        else:
-            query = """
-                SELECT id, session_id, task_type, content, content_hash, salience,
-                       metadata_json, created_at, expires_at
-                FROM memories
-                WHERE (expires_at IS NULL OR expires_at > ?)
-                ORDER BY created_at DESC
-                LIMIT ?
-            """
-            params = (self._now_iso(), limit)
-        rows = self._conn.execute(query, params).fetchall()
-        return [self._row_to_record(row) for row in rows]
+        with self._lock:
+            if include_expired:
+                query = """
+                    SELECT id, session_id, task_type, scope, team_id, case_id, job_id,
+                           producer_agent_id, producer_role, visibility, content, content_hash,
+                           salience, metadata_json, created_at, expires_at
+                    FROM memories
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """
+                params: tuple[object, ...] = (limit,)
+            else:
+                query = """
+                    SELECT id, session_id, task_type, scope, team_id, case_id, job_id,
+                           producer_agent_id, producer_role, visibility, content, content_hash,
+                           salience, metadata_json, created_at, expires_at
+                    FROM memories
+                    WHERE (expires_at IS NULL OR expires_at > ?)
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """
+                params = (self._now_iso(), limit)
+            rows = self._conn.execute(query, params).fetchall()
+            return [self._row_to_record(row) for row in rows]
 
     def search(
         self,
         keyword: str,
         limit: int = 10,
         include_expired: bool = False,
+        *,
+        scope: str | None = None,
+        team_id: str | None = None,
+        case_id: str | None = None,
+        job_id: str | None = None,
+        visibility: str | None = None,
     ) -> list[MemoryRecord]:
-        if include_expired:
-            query = """
-                SELECT id, session_id, task_type, content, content_hash, salience,
-                       metadata_json, created_at, expires_at
-                FROM memories
-                WHERE content LIKE ?
-                ORDER BY salience DESC, created_at DESC
-                LIMIT ?
-            """
-            params = (f"%{keyword}%", limit)
-        else:
-            query = """
-                SELECT id, session_id, task_type, content, content_hash, salience,
-                       metadata_json, created_at, expires_at
-                FROM memories
-                WHERE content LIKE ?
-                  AND (expires_at IS NULL OR expires_at > ?)
-                ORDER BY salience DESC, created_at DESC
-                LIMIT ?
-            """
-            params = (f"%{keyword}%", self._now_iso(), limit)
-        rows = self._conn.execute(query, params).fetchall()
-        return [self._row_to_record(row) for row in rows]
+        with self._lock:
+            clauses = ["content LIKE ?"]
+            params: list[object] = [f"%{keyword}%"]
+
+            if not include_expired:
+                clauses.append("(expires_at IS NULL OR expires_at > ?)")
+                params.append(self._now_iso())
+
+            if scope is not None:
+                clauses.append("scope = ?")
+                params.append(scope)
+            if team_id is not None:
+                clauses.append("COALESCE(team_id, '') = COALESCE(?, '')")
+                params.append(team_id)
+            if case_id is not None:
+                clauses.append("COALESCE(case_id, '') = COALESCE(?, '')")
+                params.append(case_id)
+            if job_id is not None:
+                clauses.append("COALESCE(job_id, '') = COALESCE(?, '')")
+                params.append(job_id)
+            if visibility is not None:
+                clauses.append("visibility = ?")
+                params.append(visibility)
+
+            where_sql = " AND ".join(clauses)
+            query = (
+                "SELECT id, session_id, task_type, scope, team_id, case_id, job_id, "
+                "producer_agent_id, producer_role, visibility, content, content_hash, salience, "
+                "metadata_json, created_at, expires_at "
+                "FROM memories "
+                f"WHERE {where_sql} "
+                "ORDER BY salience DESC, created_at DESC "
+                "LIMIT ?"
+            )
+            params.append(limit)
+            rows = self._conn.execute(query, tuple(params)).fetchall()
+            return [self._row_to_record(row) for row in rows]
 
     def prune_to_limit(self, max_rows: int) -> int:
-        if max_rows <= 0:
-            return 0
+        with self._lock:
+            if max_rows <= 0:
+                return 0
 
-        now = self._now_iso()
-        expired_deleted = self._conn.execute(
-            "DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at <= ?",
-            (now,),
-        ).rowcount
+            now = self._now_iso()
+            expired_deleted = self._conn.execute(
+                "DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at <= ?",
+                (now,),
+            ).rowcount
 
-        total = self.count(include_expired=False)
-        if total <= max_rows:
-            self._conn.commit()
-            return int(expired_deleted)
+            total = self.count(include_expired=False)
+            if total <= max_rows:
+                self._conn.commit()
+                return int(expired_deleted)
 
-        to_delete = total - max_rows
-        self._conn.execute(
-            """
-            DELETE FROM memories
-            WHERE id IN (
-                SELECT id FROM memories
-                WHERE (expires_at IS NULL OR expires_at > ?)
-                ORDER BY created_at ASC
-                LIMIT ?
+            to_delete = total - max_rows
+            self._conn.execute(
+                """
+                DELETE FROM memories
+                WHERE id IN (
+                    SELECT id FROM memories
+                    WHERE (expires_at IS NULL OR expires_at > ?)
+                    ORDER BY created_at ASC
+                    LIMIT ?
+                )
+                """,
+                (now, to_delete),
             )
-            """,
-            (now, to_delete),
-        )
-        self._conn.commit()
-        return int(expired_deleted + to_delete)
+            self._conn.commit()
+            return int(expired_deleted + to_delete)
 
     def count(self, include_expired: bool = False) -> int:
-        if include_expired:
-            row = self._conn.execute("SELECT COUNT(*) AS c FROM memories").fetchone()
-        else:
-            row = self._conn.execute(
-                "SELECT COUNT(*) AS c FROM memories WHERE (expires_at IS NULL OR expires_at > ?)",
-                (self._now_iso(),),
-            ).fetchone()
-        return int(row["c"]) if row is not None else 0
+        with self._lock:
+            if include_expired:
+                row = self._conn.execute("SELECT COUNT(*) AS c FROM memories").fetchone()
+            else:
+                row = self._conn.execute(
+                    "SELECT COUNT(*) AS c FROM memories "
+                    "WHERE (expires_at IS NULL OR expires_at > ?)",
+                    (self._now_iso(),),
+                ).fetchone()
+            return int(row["c"]) if row is not None else 0
 
     def close(self) -> None:
-        self._conn.close()
+        with self._lock:
+            self._conn.close()
 
     @staticmethod
     def _row_to_record(row: sqlite3.Row) -> MemoryRecord:
@@ -278,6 +412,15 @@ class PersistentMemoryStore:
             id=int(row["id"]),
             session_id=str(row["session_id"]),
             task_type=str(row["task_type"]),
+            scope=str(row["scope"]),
+            team_id=str(row["team_id"]) if row["team_id"] is not None else None,
+            case_id=str(row["case_id"]) if row["case_id"] is not None else None,
+            job_id=str(row["job_id"]) if row["job_id"] is not None else None,
+            producer_agent_id=(
+                str(row["producer_agent_id"]) if row["producer_agent_id"] is not None else None
+            ),
+            producer_role=str(row["producer_role"]) if row["producer_role"] is not None else None,
+            visibility=str(row["visibility"]),
             content=str(row["content"]),
             content_hash=str(row["content_hash"]),
             salience=float(row["salience"]),

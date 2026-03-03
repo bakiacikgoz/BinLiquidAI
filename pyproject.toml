@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "binliquid"
-version = "0.3.1"
-description = "BinLiquidAI v0.3.1 CLI-first model switchability + governance runtime"
+version = "0.4.0"
+description = "AegisOS v0.4.0 Team Runtime MVP on BinLiquid core"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 authors = [
@@ -15,6 +15,7 @@ dependencies = [
   "pydantic>=2.10.0,<3.0.0",
   "typer>=0.17.0,<1.0.0",
   "rich>=14.0.0,<15.0.0",
+  "PyYAML>=6.0.0,<7.0.0",
   "ollama>=0.5.0,<1.0.0",
   "psutil>=6.1.0,<7.0.0",
 ]
@@ -31,6 +32,7 @@ hf = [
 
 [project.scripts]
 binliquid = "binliquid.cli:app"
+aegis = "binliquid.cli:app"
 
 [tool.ruff]
 line-length = 100

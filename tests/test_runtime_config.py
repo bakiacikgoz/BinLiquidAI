@@ -10,6 +10,8 @@ def test_runtime_config_loads_balanced_profile() -> None:
     assert cfg.shadow_router_mode == "sltc"
     assert cfg.sltc.enabled is True
     assert cfg.enable_persistent_memory is True
+    assert cfg.team.enabled is True
+    assert cfg.team.max_parallel_tasks >= 1
 
 
 def test_runtime_config_exposes_llm_timeout() -> None:

@@ -34,6 +34,20 @@ action = "allow"
 arg_deny_regex = ["--system", "pip\\s+install\\s+--break-system-packages"]
 explain = "tooling commands allowed with restricted arguments"
 
+[[handoff_rules]]
+id = "handoff-default-allow"
+from_roles = []
+to_roles = []
+action = "allow"
+explain = "allow role handoffs by explicit default rule"
+
+[[memory_scope_rules]]
+id = "memory-default-allow"
+scopes = ["session", "team", "case"]
+producer_roles = []
+visibilities = ["private", "team", "case"]
+action = "allow"
+explain = "allow scoped memory writes by explicit default rule"
+
 [pii_rules]
 patterns = ["[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "(api|token|secret|password)[=: ]+[A-Za-z0-9._-]+"]
-

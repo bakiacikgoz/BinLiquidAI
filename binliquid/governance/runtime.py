@@ -14,10 +14,14 @@ from binliquid.governance.models import (
     GovernanceAction,
     GovernanceDecision,
     GovernancePhase,
+    HandoffCallRecord,
+    MemoryWriteRecord,
     ToolCallRecord,
 )
 from binliquid.governance.policy import (
     PolicyBundle,
+    evaluate_handoff,
+    evaluate_memory_scope_write,
     evaluate_task,
     evaluate_tool,
     load_policy,
@@ -35,6 +39,8 @@ from binliquid.runtime.config import GovernanceConfig, RuntimeConfig
 class GovernanceRunState:
     decisions: list[GovernanceDecision] = field(default_factory=list)
     tool_calls: list[ToolCallRecord] = field(default_factory=list)
+    handoffs: list[HandoffCallRecord] = field(default_factory=list)
+    memory_writes: list[MemoryWriteRecord] = field(default_factory=list)
     approval_status: str = "none"
 
 
@@ -252,6 +258,178 @@ class GovernanceRuntime:
         self._record_decision(run_id, decision)
         return decision, ticket, normalized_args
 
+    def evaluate_handoff(
+        self,
+        *,
+        run_id: str,
+        from_role: str,
+        to_role: str,
+        payload: dict[str, Any],
+    ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
+        if not self._gov.enabled:
+            decision = self._default_allow_decision(
+                phase=GovernancePhase.HANDOFF,
+                target=f"{from_role}->{to_role}",
+            )
+            return decision, None
+        if self._policy_bundle is None:
+            decision = GovernanceDecision(
+                phase=GovernancePhase.HANDOFF,
+                target=f"{from_role}->{to_role}",
+                action=GovernanceAction.DENY,
+                reason_code="POLICY_UNAVAILABLE",
+                matched_rule_path=None,
+                policy_schema_version="unavailable",
+                policy_version="unavailable",
+                policy_hash="unavailable",
+                decision_engine_version=self._gov.decision_engine_version,
+                explain=self._policy_error,
+            )
+            self._record_decision(run_id, decision)
+            return decision, None
+
+        match = evaluate_handoff(
+            self._policy_bundle.policy,
+            from_role=from_role,
+            to_role=to_role,
+        )
+        decision = GovernanceDecision(
+            phase=GovernancePhase.HANDOFF,
+            target=f"{from_role}->{to_role}",
+            action=match.action,
+            reason_code=match.reason_code,
+            matched_rule_path=match.matched_rule_path,
+            policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+            policy_version=self._policy_bundle.policy.policy_version,
+            policy_hash=self._policy_bundle.policy_hash,
+            decision_engine_version=self._gov.decision_engine_version,
+            approval_required=match.action == GovernanceAction.REQUIRE_APPROVAL,
+            explain=match.explain,
+        )
+
+        ticket: ApprovalTicket | None = None
+        payload_hash = self._hash_payload(payload)
+        if match.action == GovernanceAction.REQUIRE_APPROVAL:
+            snapshot = {
+                "kind": "handoff",
+                "from_role": from_role,
+                "to_role": to_role,
+                "payload_hash": payload_hash,
+                "run_id": run_id,
+                "policy_hash": self._policy_bundle.policy_hash,
+            }
+            request_hash = self._hash_payload([from_role, to_role, payload_hash])
+            snapshot_hash = self._hash_payload(snapshot)
+            ticket = self._approval_store.create_ticket(
+                run_id=run_id,
+                request_hash=request_hash,
+                snapshot_hash=snapshot_hash,
+                snapshot=snapshot,
+                ttl_seconds=self._gov.approval_ttl_seconds,
+                idempotency_key=f"handoff:{run_id}:{snapshot_hash}",
+            )
+            decision = decision.model_copy(update={"approval_id": ticket.approval_id})
+            self._set_approval_status(run_id, "pending")
+
+        self._record_handoff(
+            run_id,
+            HandoffCallRecord(
+                from_role=from_role,
+                to_role=to_role,
+                payload_hash=payload_hash,
+                decision_action=decision.action,
+                reason_code=decision.reason_code,
+            ),
+        )
+        self._record_decision(run_id, decision)
+        return decision, ticket
+
+    def evaluate_memory_write(
+        self,
+        *,
+        run_id: str,
+        scope: str,
+        producer_role: str,
+        visibility: str,
+    ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
+        if not self._gov.enabled:
+            decision = self._default_allow_decision(
+                phase=GovernancePhase.MEMORY_WRITE,
+                target=f"{scope}:{producer_role}:{visibility}",
+            )
+            return decision, None
+        if self._policy_bundle is None:
+            decision = GovernanceDecision(
+                phase=GovernancePhase.MEMORY_WRITE,
+                target=f"{scope}:{producer_role}:{visibility}",
+                action=GovernanceAction.DENY,
+                reason_code="POLICY_UNAVAILABLE",
+                matched_rule_path=None,
+                policy_schema_version="unavailable",
+                policy_version="unavailable",
+                policy_hash="unavailable",
+                decision_engine_version=self._gov.decision_engine_version,
+                explain=self._policy_error,
+            )
+            self._record_decision(run_id, decision)
+            return decision, None
+
+        match = evaluate_memory_scope_write(
+            self._policy_bundle.policy,
+            scope=scope,
+            producer_role=producer_role,
+            visibility=visibility,
+        )
+        decision = GovernanceDecision(
+            phase=GovernancePhase.MEMORY_WRITE,
+            target=f"{scope}:{producer_role}:{visibility}",
+            action=match.action,
+            reason_code=match.reason_code,
+            matched_rule_path=match.matched_rule_path,
+            policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+            policy_version=self._policy_bundle.policy.policy_version,
+            policy_hash=self._policy_bundle.policy_hash,
+            decision_engine_version=self._gov.decision_engine_version,
+            approval_required=match.action == GovernanceAction.REQUIRE_APPROVAL,
+            explain=match.explain,
+        )
+
+        ticket: ApprovalTicket | None = None
+        if match.action == GovernanceAction.REQUIRE_APPROVAL:
+            snapshot = {
+                "kind": "memory_write",
+                "scope": scope,
+                "producer_role": producer_role,
+                "visibility": visibility,
+                "run_id": run_id,
+                "policy_hash": self._policy_bundle.policy_hash,
+            }
+            request_hash = self._hash_payload([scope, producer_role, visibility])
+            snapshot_hash = self._hash_payload(snapshot)
+            ticket = self._approval_store.create_ticket(
+                run_id=run_id,
+                request_hash=request_hash,
+                snapshot_hash=snapshot_hash,
+                snapshot=snapshot,
+                ttl_seconds=self._gov.approval_ttl_seconds,
+                idempotency_key=f"memory:{run_id}:{snapshot_hash}",
+            )
+            decision = decision.model_copy(update={"approval_id": ticket.approval_id})
+            self._set_approval_status(run_id, "pending")
+
+        self._record_memory_write(
+            run_id,
+            MemoryWriteRecord(
+                scope=scope,
+                producer_role=producer_role,
+                visibility=visibility,
+                decision_action=decision.action,
+                reason_code=decision.reason_code,
+            ),
+        )
+        self._record_decision(run_id, decision)
+        return decision, ticket
+
     def trace_redact(self, data: dict[str, Any]) -> dict[str, Any]:
         patterns = []
         if self._policy_bundle is not None:
@@ -336,6 +514,8 @@ class GovernanceRuntime:
             decision_engine_version=self._gov.decision_engine_version,
             governance_decisions=state.decisions,
             tool_calls=state.tool_calls,
+            handoffs=state.handoffs,
+            memory_writes=state.memory_writes,
             approval_status=state.approval_status,
             redaction_mode="audit",
             privacy_mode=self._config.privacy_mode,
@@ -370,6 +550,14 @@ class GovernanceRuntime:
     def _record_tool_call(self, run_id: str, tool_call: ToolCallRecord) -> None:
         state = self._runs.setdefault(run_id, GovernanceRunState())
         state.tool_calls.append(tool_call)
+
+    def _record_handoff(self, run_id: str, handoff: HandoffCallRecord) -> None:
+        state = self._runs.setdefault(run_id, GovernanceRunState())
+        state.handoffs.append(handoff)
+
+    def _record_memory_write(self, run_id: str, memory_write: MemoryWriteRecord) -> None:
+        state = self._runs.setdefault(run_id, GovernanceRunState())
+        state.memory_writes.append(memory_write)
 
     def _set_approval_status(self, run_id: str, status: str) -> None:
         state = self._runs.setdefault(run_id, GovernanceRunState())

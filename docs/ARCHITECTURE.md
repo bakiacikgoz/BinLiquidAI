@@ -1,4 +1,4 @@
-# ARCHITECTURE (v0.3)
+# ARCHITECTURE (v0.4)
 
 ## Product Path (Default)
 
@@ -23,11 +23,21 @@
 - `binliquid/core/planner.py`: strict planner + deterministic fallback.
 - `binliquid/core/orchestrator.py`: fallback logic, guardrails, synthesis, shadow metrics.
 - `binliquid/governance/*`: policy engine, approval queue, audit/redaction pipeline.
+- `binliquid/team/*`: team supervisor, DAG scheduler, handoff protocol, replay/export artifacts.
 - `binliquid/router/rule_router.py`: deterministic active routing baseline.
 - `binliquid/router/sltc_router.py`: temporal/spiking-inspired router.
 - `binliquid/experts/*`: typed expert payload producers.
 - `binliquid/memory/*`: salience gate + store + retrieval ranking.
 - `binliquid/telemetry/tracer.py`: trace events and router samples.
+
+## Team Runtime Path
+
+1. `team run` resolves spec and creates `case_id` + `job_id`.
+2. Supervisor builds task graph (spec-defined DAG or deterministic auto-decomposition).
+3. Parallel scheduler executes runnable tasks with dependency tracking.
+4. Inter-task handoffs pass governance + redaction checks.
+5. Scoped memory writes pass governance checks (`session|team|case`).
+6. Team audit envelope is emitted with hash-chain integrity metadata.
 
 ## Active vs Experimental
 

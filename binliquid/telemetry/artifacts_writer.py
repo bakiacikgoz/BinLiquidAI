@@ -12,6 +12,7 @@ ARTIFACT_FILENAMES = {
     "router_shadow_summary": "router_shadow_summary.json",
     "research_summary": "research_summary.json",
     "governance_summary": "governance_summary.json",
+    "team_summary": "team_summary.json",
 }
 
 

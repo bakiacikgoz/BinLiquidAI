@@ -27,6 +27,7 @@ Commands outside allowlist are rejected with deterministic error (`exit_code=126
 - expert timeout + retry limits
 - circuit breaker cooldown for repeated expert failures
 - task/tool policy evaluation (`allow|deny|require_approval`)
+- handoff/memory-scope policy evaluation (`allow|deny|require_approval`)
 - async approval queue with audit trail
 
 ## Prompt/Tool Injection Defense

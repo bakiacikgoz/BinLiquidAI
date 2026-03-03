@@ -104,11 +104,116 @@ class MemoryManager:
             record_id=record_id,
         )
 
+    def maybe_write_scoped(
+        self,
+        *,
+        session_id: str,
+        task_type: str,
+        user_input: str,
+        assistant_output: str,
+        scope: str,
+        team_id: str,
+        case_id: str,
+        job_id: str,
+        producer_agent_id: str,
+        producer_role: str,
+        visibility: str,
+        expert_payload: dict[str, object] | None = None,
+    ) -> MemoryWriteResult:
+        self._write_attempts += 1
+        if not self.enabled:
+            return MemoryWriteResult(
+                written=False,
+                salience_score=0.0,
+                reason="memory_disabled",
+                record_id=None,
+            )
+        if self.store is None:
+            return MemoryWriteResult(
+                written=False,
+                salience_score=0.0,
+                reason="memory_store_missing",
+                record_id=None,
+            )
+
+        decision: SalienceDecision = self.gate.evaluate(
+            task_type=task_type,
+            user_input=user_input,
+            assistant_output=assistant_output,
+            expert_payload=expert_payload,
+        )
+        if not decision.should_write:
+            return MemoryWriteResult(
+                written=False,
+                salience_score=decision.salience_score,
+                reason=decision.reason,
+                record_id=None,
+            )
+
+        content = f"User: {user_input}\nAssistant: {assistant_output}"
+        status = self.store.write_with_status(
+            session_id=session_id,
+            task_type=task_type,
+            content=content,
+            salience=decision.salience_score,
+            metadata={"event_id": str(uuid4())},
+            ttl_days=self.ttl_days,
+            scope=scope,
+            team_id=team_id,
+            case_id=case_id,
+            job_id=job_id,
+            producer_agent_id=producer_agent_id,
+            producer_role=producer_role,
+            visibility=visibility,
+        )
+        record_id = status.record_id
+        self._writes_accepted += 1
+        if status.dedup_hit:
+            self._dedup_hits += 1
+        self.store.prune_to_limit(self.max_rows)
+        return MemoryWriteResult(
+            written=True,
+            salience_score=decision.salience_score,
+            reason=decision.reason,
+            record_id=record_id,
+        )
+
     def context_snippets(self, query: str, limit: int = 4) -> list[str]:
         if not self.enabled or self.store is None:
             return []
         self._retrieval_queries += 1
         records = self.store.search(keyword=query, limit=max(limit * 2, limit))
+        if records:
+            self._retrieval_hits += 1
+        ranked = rank_records(
+            records,
+            salience_weight=self.rank_salience_weight,
+            recency_weight=self.rank_recency_weight,
+        )
+        snippets = [record.content for record in ranked[:limit]]
+        if snippets:
+            self._retrieval_useful += 1
+        return snippets
+
+    def context_snippets_scoped(
+        self,
+        query: str,
+        *,
+        scope: str,
+        team_id: str,
+        case_id: str,
+        limit: int = 4,
+    ) -> list[str]:
+        if not self.enabled or self.store is None:
+            return []
+        self._retrieval_queries += 1
+        records = self.store.search(
+            keyword=query,
+            limit=max(limit * 2, limit),
+            scope=scope,
+            team_id=team_id,
+            case_id=case_id,
+        )
         if records:
             self._retrieval_hits += 1
         ranked = rank_records(

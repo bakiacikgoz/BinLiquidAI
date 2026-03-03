@@ -93,3 +93,11 @@ audit_dir = ".binliquid/audit"
 pii_redaction_enabled = true
 approval_ttl_seconds = 86400
 decision_engine_version = "v0.3"
+
+[team]
+enabled = true
+max_parallel_tasks = 4
+max_total_tasks = 64
+max_handoff_depth = 8
+checkpoint_db_path = ".binliquid/team/checkpoints.sqlite3"
+artifact_dir = ".binliquid/team/jobs"

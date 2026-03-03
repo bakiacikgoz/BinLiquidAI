@@ -17,6 +17,7 @@ uv run binliquid doctor --profile balanced
 
 ```bash
 uv run binliquid benchmark smoke --mode all --profile balanced
+uv run binliquid benchmark team --profile balanced --suite smoke --spec team.yaml
 uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
 uv run binliquid benchmark energy --profile balanced --energy-mode measured
 ```
@@ -40,6 +41,7 @@ Required files under `artifacts/`:
 - `router_shadow_summary.json`
 - `research_summary.json`
 - `governance_summary.json`
+- `team_summary.json`
 
 All files must be valid JSON with `artifact/generated_at/status/data` envelope.
 
@@ -51,6 +53,7 @@ uv run pytest -q tests/test_policy_fail_closed.py
 uv run pytest -q tests/test_approval_flow.py
 uv run pytest -q tests/test_sandbox_governance.py
 uv run pytest -q tests/test_audit_artifacts.py
+uv run pytest -q tests/test_team_*.py
 ```
 
 Expected controls:

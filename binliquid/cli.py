@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import tomllib
 from pathlib import Path
 
 import typer
 
 from benchmarks.run_ablation import run_ablation_benchmark, run_energy_benchmark
 from benchmarks.run_smoke import run_smoke_benchmark
+from benchmarks.run_team import run_team_benchmark
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import Planner
@@ -27,6 +30,9 @@ from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
 from binliquid.schemas.models import ExpertName
+from binliquid.team.models import TeamSpec
+from binliquid.team.replay import load_events, load_job_status, replay_job
+from binliquid.team.supervisor import TeamSupervisor
 from binliquid.telemetry.artifacts_writer import ensure_artifact_scaffold, write_artifact
 from binliquid.telemetry.tracer import Tracer
 from research.sltc_experiments.eval_router import evaluate_router_model
@@ -39,12 +45,14 @@ research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
 approval_app = typer.Typer(help="Governance approval commands")
 operator_app = typer.Typer(help="Operator panel commands")
+team_app = typer.Typer(help="Team runtime commands")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
+app.add_typer(team_app, name="team")
 
 
 def _is_realtime_candidate(user_text: str) -> bool:
@@ -728,6 +736,31 @@ def _hash_payload(value: object) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _load_team_spec(spec_path: str | Path) -> TeamSpec:
+    path = Path(spec_path)
+    if not path.exists():
+        raise FileNotFoundError(f"team spec not found: {path}")
+
+    suffix = path.suffix.lower()
+    if suffix == ".json":
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    elif suffix == ".toml":
+        with path.open("rb") as file_obj:
+            payload = tomllib.load(file_obj)
+    elif suffix in {".yaml", ".yml"}:
+        try:
+            import yaml  # type: ignore[import-not-found]
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(
+                "YAML support requires PyYAML. Use .json/.toml or install pyyaml."
+            ) from exc
+        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    else:
+        raise ValueError("Unsupported team spec format. Use .json, .toml, .yaml, or .yml.")
+
+    return TeamSpec.model_validate(payload)
+
+
 @approval_app.command("pending")
 def approval_pending(
     profile: str = typer.Option("balanced", help="Config profile"),
@@ -974,6 +1007,249 @@ def operator_panel(
         typer.echo("Unknown command. Use /pending, /approve <id>, /reject <id>, /exit.")
 
 
+@team_app.command("init")
+def team_init(
+    output: str = typer.Option("team.yaml", "--output", help="Target team spec path"),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing file"),
+) -> None:
+    path = Path(output)
+    if path.exists() and not force:
+        typer.echo("Spec file already exists. Use --force to overwrite.")
+        raise typer.Exit(code=1)
+
+    template = """version: "1"
+team:
+  team_id: "aegis-team"
+  supervisor_policy: "sequential_then_parallel"
+  agents:
+    - agent_id: "agent-intake"
+      role: "Intake Agent"
+      allowed_task_types: ["chat", "plan"]
+      profile_name: "balanced"
+      model_overrides: {}
+      memory_scope_access: ["session", "case"]
+      tool_policy_profile: "default"
+      approval_mode: "auto"
+    - agent_id: "agent-research"
+      role: "Research Analyst Agent"
+      allowed_task_types: ["research", "plan"]
+      profile_name: "balanced"
+      model_overrides: {}
+      memory_scope_access: ["team", "case"]
+      tool_policy_profile: "default"
+      approval_mode: "auto"
+    - agent_id: "agent-review"
+      role: "Reviewer/QA Agent"
+      allowed_task_types: ["chat", "plan"]
+      profile_name: "balanced"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "default"
+      approval_mode: "always"
+  handoff_rules: []
+  termination_rules:
+    max_tasks: 64
+    max_retries: 1
+    max_handoff_depth: 8
+tasks: []
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(template, encoding="utf-8")
+    typer.echo(
+        json.dumps(
+            {"status": "ok", "spec_path": str(path)},
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
+@team_app.command("validate")
+def team_validate(
+    spec: str = typer.Option(..., "--spec", help="Team spec path (.yaml/.json/.toml)"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        parsed = _load_team_spec(spec)
+    except Exception as exc:  # noqa: BLE001
+        payload = {"status": "invalid", "error": str(exc), "spec": spec}
+        if json_output:
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            typer.echo(f"invalid: {exc}")
+        raise typer.Exit(code=1) from None
+
+    payload = {
+        "status": "ok",
+        "team_id": parsed.team.team_id,
+        "agent_count": len(parsed.team.agents),
+        "task_count": len(parsed.tasks),
+        "roles": [item.role for item in parsed.team.agents],
+    }
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"team_id={payload['team_id']} agent_count={payload['agent_count']}")
+
+
+@team_app.command("run")
+def team_run(
+    spec: str = typer.Option(..., "--spec", help="Team spec path"),
+    once: str = typer.Option(..., "--once", help="Single request for one team job"),
+    case_id: str | None = typer.Option(None, "--case-id", help="Optional existing case id"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    provider: str | None = typer.Option(None, help="Override provider"),
+    fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model"),
+    hf_model_id: str | None = typer.Option(None, "--hf-model-id", help="Override HF model id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    ensure_artifact_scaffold()
+    parsed = _load_team_spec(spec)
+
+    config, _source_map = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    orchestrator = _build_orchestrator(
+        config=config,
+        provider_name=config.llm_provider,
+        fallback_provider=config.fallback_provider,
+    )
+    startup_error = governance_startup_abort(
+        config,
+        getattr(orchestrator, "governance_runtime", None),
+    )
+    if startup_error:
+        typer.echo(f"POLICY_UNAVAILABLE: {startup_error}")
+        raise typer.Exit(code=2)
+    if not config.team.enabled:
+        typer.echo("Team runtime disabled in runtime config.")
+        raise typer.Exit(code=2)
+
+    supervisor = TeamSupervisor(orchestrator=orchestrator, config=config)
+    result = supervisor.run(spec=parsed, request=once, case_id=case_id)
+    payload = {
+        "job": result.job.model_dump(mode="json"),
+        "tasks": [item.model_dump(mode="json") for item in result.tasks],
+        "handoff_count": len(result.handoffs),
+        "event_count": len(result.events),
+        "audit_envelope_path": result.audit_envelope_path,
+    }
+    write_artifact("team_summary", payload)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(result.job.final_output or "")
+
+
+@team_app.command("status")
+def team_status(
+    job_id: str = typer.Option(..., "--job-id", help="Job id"),
+    root_dir: str = typer.Option(
+        ".binliquid/team/jobs",
+        "--root-dir",
+        help="Team artifact root directory",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        payload = load_job_status(job_id, root_dir=root_dir)
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(
+            json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2)
+        )
+        raise typer.Exit(code=1) from None
+
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        job = payload.get("job", {})
+        typer.echo(
+            f"job_id={job.get('job_id')} status={job.get('status')} "
+            f"team_id={job.get('team_id')} case_id={job.get('case_id')}"
+        )
+
+
+@team_app.command("logs")
+def team_logs(
+    job_id: str = typer.Option(..., "--job-id", help="Job id"),
+    root_dir: str = typer.Option(
+        ".binliquid/team/jobs",
+        "--root-dir",
+        help="Team artifact root directory",
+    ),
+    json_stream: bool = typer.Option(True, "--json-stream/--no-json-stream", help="Emit JSONL"),
+) -> None:
+    events = load_events(job_id, root_dir=root_dir)
+    if json_stream:
+        for item in events:
+            typer.echo(json.dumps(item, ensure_ascii=False))
+        return
+    typer.echo(json.dumps({"job_id": job_id, "events": events}, ensure_ascii=False, indent=2))
+
+
+@team_app.command("replay")
+def team_replay(
+    job_id: str = typer.Option(..., "--job-id", help="Job id"),
+    root_dir: str = typer.Option(
+        ".binliquid/team/jobs",
+        "--root-dir",
+        help="Team artifact root directory",
+    ),
+) -> None:
+    try:
+        payload = replay_job(job_id, root_dir=root_dir)
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(
+            json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2)
+        )
+        raise typer.Exit(code=1) from None
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+@team_app.command("artifacts")
+def team_artifacts(
+    job_id: str = typer.Option(..., "--job-id", help="Job id"),
+    export: str = typer.Option(..., "--export", help="Export directory"),
+    root_dir: str = typer.Option(
+        ".binliquid/team/jobs",
+        "--root-dir",
+        help="Team artifact root directory",
+    ),
+) -> None:
+    source = Path(root_dir) / job_id
+    if not source.exists():
+        typer.echo(json.dumps({"status": "error", "error": "job not found", "job_id": job_id}))
+        raise typer.Exit(code=1)
+
+    destination = Path(export)
+    destination.mkdir(parents=True, exist_ok=True)
+    copied: list[str] = []
+    for item in source.iterdir():
+        if item.is_file():
+            target = destination / item.name
+            shutil.copy2(item, target)
+            copied.append(str(target))
+    typer.echo(
+        json.dumps(
+            {
+                "status": "ok",
+                "job_id": job_id,
+                "export_dir": str(destination),
+                "files": copied,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
 @benchmark_app.command("smoke")
 def benchmark_smoke(
     profile: str = typer.Option("lite", help="Config profile"),
@@ -1023,6 +1299,57 @@ def benchmark_smoke(
     )
     typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
     write_artifact("benchmark_summary", {"kind": "smoke", "result": result})
+
+
+@benchmark_app.command("team")
+def benchmark_team(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    suite: str = typer.Option("smoke", help="smoke|quality"),
+    spec: str = typer.Option("team.yaml", "--spec", help="Team spec path"),
+    output: str | None = typer.Option(None, help="Output JSON path"),
+    task_limit: int | None = typer.Option(None, help="Limit number of benchmark tasks"),
+    provider: str | None = typer.Option(None, help="Override provider"),
+    fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model name"),
+    hf_model_id: str | None = typer.Option(
+        None,
+        "--hf-model-id",
+        help="Override transformers model id",
+    ),
+) -> None:
+    ensure_artifact_scaffold()
+    resolved, _ = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    validation_error = _validate_model_override_combo(
+        effective_provider=resolved.llm_provider,
+        model_override=model,
+        hf_model_id_override=hf_model_id,
+    )
+    if validation_error is not None:
+        _code, message = validation_error
+        typer.echo(message)
+        raise typer.Exit(code=1)
+
+    result = run_team_benchmark(
+        profile=profile,
+        suite=suite,
+        spec_path=spec,
+        output_path=output,
+        task_limit=task_limit,
+        provider=resolved.llm_provider,
+        fallback_provider=resolved.fallback_provider,
+        model=resolved.model_name,
+        hf_model_id=resolved.hf_model_id,
+    )
+    typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+    write_artifact("benchmark_summary", {"kind": "team", "result": result})
 
 
 @benchmark_app.command("ablation")

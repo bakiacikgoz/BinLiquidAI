@@ -1,4 +1,4 @@
-# BinLiquidAI v0.3.1
+# AegisOS / BinLiquid v0.4.0
 
 Offline-first, local-first hybrid assistant with a production-focused CLI core.
 
@@ -16,6 +16,7 @@ Offline-first, local-first hybrid assistant with a production-focused CLI core.
 | Benchmarks (smoke/ablation/energy) | working | quality suite (120 tasks) available |
 | Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
 | Governance v0.3 (policy + approval + audit) | working | fail-closed + async approvals |
+| Team Runtime v0.4 (DAG + parallel scheduler + handoff/memory governance) | working | `binliquid team *` command group |
 | Desktop UI (Tauri thin shell) | deferred | post-v0.3 (operator panel is available) |
 
 ## First 5 Minutes
@@ -82,10 +83,23 @@ Precedence order: `defaults < profile < env < CLI flags`.
 
 ```bash
 uv run binliquid benchmark smoke --mode all --profile balanced
+uv run binliquid benchmark team --profile balanced --suite smoke --spec team.yaml
 uv run binliquid benchmark ablation --mode all --profile balanced --suite smoke
 uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
 uv run binliquid benchmark energy --profile balanced --energy-mode measured
 uv run binliquid benchmark smoke --mode A --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
+```
+
+### Team Runtime
+
+```bash
+uv run binliquid team init --output team.yaml
+uv run binliquid team validate --spec team.yaml --json
+uv run binliquid team run --spec team.yaml --once "Build a compliance-aware rollout plan" --json
+uv run binliquid team status --job-id <id> --root-dir .binliquid/team/jobs --json
+uv run binliquid team logs --job-id <id> --root-dir .binliquid/team/jobs --json-stream
+uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs
+uv run binliquid team artifacts --job-id <id> --root-dir .binliquid/team/jobs --export ./team-artifacts
 ```
 
 ## Model Recipes
@@ -173,6 +187,7 @@ Calibration outputs:
 - `router_shadow_summary.json`
 - `research_summary.json`
 - `governance_summary.json`
+- `team_summary.json`
 
 ## Privacy and Debug
 
@@ -180,10 +195,11 @@ Calibration outputs:
 - Persistent traces only when debug is on and privacy is explicitly off
 - Web access default: off
 
-## Known Limits (v0.3.1)
+## Known Limits (v0.4.0)
 
 - `transformers` fallback is for continuity, not quality parity.
 - Measured energy depends on platform permissions (`powermetrics`).
 - sLTC gains vary by workload distribution.
 - UI thin shell is intentionally deferred to keep CLI reliability first.
-- v0.3.1 does not auto-install model assets (`ollama pull` remains operator-driven).
+- Model assets are not auto-installed (`ollama pull` remains operator-driven).
+- Team runs intentionally fail-closed when governance requires approval in a blocking dependency chain.

@@ -13,6 +13,7 @@
 - Disk persistence is privacy-gated.
 - Router dataset JSONL writes are also privacy-gated.
 - v0.3 audit artifacts are written as privacy-safe/redacted JSON envelopes.
+- v0.4 team artifacts include redacted handoff payloads and hash-chained audit envelopes.
 
 ## Memory Behavior
 
