@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -155,6 +157,7 @@ def write_audit_envelope(
         "redaction_report": redaction_report,
     }
     current_hash = _sha256_payload(envelope_wo_integrity, prev_hash)
+    signature = _sign_hash_if_configured(current_hash)
     envelope = AuditEnvelope(
         envelope_version="1",
         job_id=job.job_id,
@@ -170,7 +173,7 @@ def write_audit_envelope(
         tool_calls=tool_calls,
         handoffs=handoff_payload,
         redaction_report=redaction_report,
-        integrity=AuditIntegrity(prev_hash=prev_hash, hash=current_hash, signature=None),
+        integrity=AuditIntegrity(prev_hash=prev_hash, hash=current_hash, signature=signature),
     )
     paths.envelope_path.write_text(
         json.dumps(envelope.model_dump(mode="json"), indent=2, ensure_ascii=False),
@@ -211,6 +214,18 @@ def _read_prev_chain_hash(root_dir: Path) -> str | None:
 
 def _write_chain_hash(root_dir: Path, value: str) -> None:
     _chain_head_path(root_dir).write_text(value, encoding="utf-8")
+
+
+def _sign_hash_if_configured(hash_value: str) -> str | None:
+    key = os.getenv("BINLIQUID_AUDIT_SIGNING_KEY", "").strip()
+    if not key:
+        return None
+    digest = hmac.new(
+        key.encode("utf-8"),
+        hash_value.encode("utf-8"),
+        hashlib.sha256,
+    )
+    return digest.hexdigest()
 
 
 def _now_iso() -> str:

@@ -90,3 +90,66 @@ def test_team_audit_envelope_contains_policy_and_runtime_hashes(tmp_path: Path) 
     assert len(envelope["policy_bundle_hash"]) == 64
     assert len(envelope["runtime_config_hash"]) == 64
     assert len(envelope["integrity"]["hash"]) == 64
+
+
+def test_team_audit_envelope_signature_when_key_configured(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("BINLIQUID_AUDIT_SIGNING_KEY", "test-signing-key")
+    cfg = RuntimeConfig.from_profile("default")
+    cfg = cfg.model_copy(
+        update={
+            "governance": cfg.governance.model_copy(
+                update={
+                    "approval_store_path": str(tmp_path / "approvals.sqlite3"),
+                    "audit_dir": str(tmp_path / "audit"),
+                }
+            ),
+            "team": cfg.team.model_copy(
+                update={
+                    "artifact_dir": str(tmp_path / "team_jobs"),
+                    "checkpoint_db_path": str(tmp_path / "checkpoints.sqlite3"),
+                }
+            ),
+        }
+    )
+    runtime = GovernanceRuntime(config=cfg)
+    supervisor = TeamSupervisor(orchestrator=_EnvelopeOrchestrator(runtime), config=cfg)
+
+    spec = TeamSpec.model_validate(
+        {
+            "version": "1",
+            "team": {
+                "team_id": "team-envelope",
+                "agents": [
+                    {
+                        "agent_id": "agent-intake",
+                        "role": "Intake Agent",
+                        "allowed_task_types": ["chat", "plan"],
+                        "profile_name": "balanced",
+                        "model_overrides": {},
+                        "memory_scope_access": ["session", "case"],
+                        "tool_policy_profile": "default",
+                        "approval_mode": "auto",
+                    }
+                ],
+                "supervisor_policy": "sequential_then_parallel",
+                "handoff_rules": [],
+                "termination_rules": {
+                    "max_tasks": 8,
+                    "max_retries": 1,
+                    "max_handoff_depth": 8,
+                },
+            },
+            "tasks": [],
+        }
+    )
+
+    result = supervisor.run(spec=spec, request="hello", case_id="case-1", job_id="job-sign")
+    assert result.audit_envelope_path is not None
+    envelope = json.loads(Path(result.audit_envelope_path).read_text(encoding="utf-8"))
+
+    signature = envelope["integrity"]["signature"]
+    assert isinstance(signature, str)
+    assert len(signature) == 64

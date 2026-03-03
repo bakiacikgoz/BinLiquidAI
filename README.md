@@ -209,3 +209,4 @@ Calibration outputs:
 - Team runs intentionally fail-closed when governance requires approval in a blocking dependency chain.
 - `team resume` depends on resolved approvals; unresolved/expired approvals keep runs blocked by design.
 - Enterprise GA hardening is still in progress (scoped production-readiness pre-check only).
+- Optional envelope signing is available via `BINLIQUID_AUDIT_SIGNING_KEY` (HMAC-SHA256).

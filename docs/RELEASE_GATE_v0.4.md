@@ -68,6 +68,7 @@ Expected controls:
 - team resume path only proceeds with approved approvals
 - SQLite write path remains stable under parallel memory writes
 - checkpoint writes remain stable under concurrent updates
+- when `BINLIQUID_AUDIT_SIGNING_KEY` is set, `audit_envelope.integrity.signature` must be populated
 
 ## 7. Pre-Production Field Validation
 
