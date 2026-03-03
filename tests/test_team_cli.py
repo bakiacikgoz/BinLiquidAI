@@ -298,3 +298,74 @@ def test_team_resume_replays_approved_task_gate(monkeypatch, tmp_path: Path) -> 
     resume_payload = json.loads(resume.stdout)
     assert resume_payload["job"]["status"] == "completed"
     assert any(item["target"] == "task" for item in resume_payload["resolved_approvals"])
+
+
+def test_team_list_returns_jobs_and_since_filter(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / ".binliquid" / "team" / "jobs"
+    root.mkdir(parents=True, exist_ok=True)
+
+    older = root / "job-old"
+    older.mkdir(parents=True, exist_ok=True)
+    (older / "status.json").write_text(
+        json.dumps(
+            {
+                "job": {
+                    "job_id": "job-old",
+                    "case_id": "case-old",
+                    "team_id": "team-test",
+                    "request": "older",
+                    "status": "completed",
+                    "created_at": "2026-03-01T10:00:00Z",
+                    "finished_at": "2026-03-01T10:05:00Z",
+                },
+                "audit_envelope_path": str(older / "audit_envelope.json"),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    recent = root / "job-new"
+    recent.mkdir(parents=True, exist_ok=True)
+    (recent / "status.json").write_text(
+        json.dumps(
+            {
+                "job": {
+                    "job_id": "job-new",
+                    "case_id": "case-new",
+                    "team_id": "team-test",
+                    "request": "recent",
+                    "status": "running",
+                    "created_at": "2026-03-03T18:00:00Z",
+                    "finished_at": None,
+                },
+                "audit_envelope_path": str(recent / "audit_envelope.json"),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    listed = runner.invoke(app, ["team", "list", "--root-dir", str(root), "--json"])
+    assert listed.exit_code == 0
+    listed_payload = json.loads(listed.stdout)
+    assert listed_payload["count"] == 2
+    assert [item["job_id"] for item in listed_payload["items"]] == ["job-new", "job-old"]
+
+    filtered = runner.invoke(
+        app,
+        [
+            "team",
+            "list",
+            "--root-dir",
+            str(root),
+            "--since",
+            "2026-03-03T00:00:00Z",
+            "--json",
+        ],
+    )
+    assert filtered.exit_code == 0
+    filtered_payload = json.loads(filtered.stdout)
+    assert filtered_payload["count"] == 1
+    assert filtered_payload["items"][0]["job_id"] == "job-new"

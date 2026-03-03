@@ -12,6 +12,7 @@ import typer
 from benchmarks.run_ablation import run_ablation_benchmark, run_energy_benchmark
 from benchmarks.run_smoke import run_smoke_benchmark
 from benchmarks.run_team import run_team_benchmark
+from binliquid import __version__
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import Planner
@@ -54,6 +55,25 @@ app.add_typer(config_app, name="config")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
 app.add_typer(team_app, name="team")
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit()
+
+
+@app.callback()
+def app_callback(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        help="Show BinLiquid core version and exit.",
+        callback=_version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    _ = version
 
 
 def _is_realtime_candidate(user_text: str) -> bool:
@@ -737,6 +757,34 @@ def _hash_payload(value: object) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _redact_snapshot_payload(value: object) -> object:
+    sensitive_markers = ("token", "secret", "password", "key", "user_input", "payload")
+    if isinstance(value, dict):
+        redacted: dict[str, object] = {}
+        for key, inner in value.items():
+            lowered = key.lower()
+            if any(marker in lowered for marker in sensitive_markers):
+                redacted[key] = "***REDACTED***"
+                continue
+            redacted[key] = _redact_snapshot_payload(inner)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_snapshot_payload(item) for item in value]
+    return value
+
+
+def _parse_iso_datetime(value: str) -> datetime:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("empty datetime")
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def _collect_resume_overrides(
     *,
     events: list[dict[str, object]],
@@ -925,6 +973,52 @@ def approval_pending(
                 f"- {item['approval_id']} status={item['status']} "
                 f"expires_at={item['expires_at']} run_id={item['run_id']}"
             )
+
+
+@approval_app.command("show")
+def approval_show(
+    approval_id: str = typer.Option(..., "--id", help="Approval ticket id"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+    show_raw_snapshot: bool = typer.Option(
+        False,
+        "--show-raw-snapshot",
+        help="Include raw snapshot payload.",
+    ),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    runtime = _build_governance_runtime(config)
+    if runtime is None:
+        typer.echo("Governance disabled.")
+        raise typer.Exit(code=1)
+
+    runtime.approval_store.expire_pending()
+    ticket = runtime.approval_store.get(approval_id)
+    if ticket is None:
+        payload = {"approval_id": approval_id, "error_code": "APPROVAL_NOT_FOUND"}
+        if json_output:
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            typer.echo("APPROVAL_NOT_FOUND")
+        raise typer.Exit(code=1)
+
+    ticket_payload = ticket.model_dump(mode="json")
+    ticket_payload["snapshot"] = (
+        ticket.snapshot if show_raw_snapshot else _redact_snapshot_payload(ticket.snapshot)
+    )
+    payload = {
+        "approval_id": approval_id,
+        "status": ticket.status.value,
+        "execution_status": ticket.execution_status.value,
+        "ticket": ticket_payload,
+    }
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(
+            f"approval_id={approval_id} status={ticket.status.value} "
+            f"execution_status={ticket.execution_status.value}"
+        )
 
 
 @approval_app.command("decide")
@@ -1151,6 +1245,34 @@ def operator_panel(
         typer.echo("Unknown command. Use /pending, /approve <id>, /reject <id>, /exit.")
 
 
+@operator_app.command("capabilities")
+def operator_capabilities(
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = {
+        "coreVersion": __version__,
+        "contractVersion": "1.0",
+        "commands": {
+            "teamListJson": True,
+            "teamReplayJson": True,
+            "approvalShowJson": True,
+            "approvalPendingJson": True,
+            "approvalDecide": True,
+            "approvalExecute": True,
+        },
+        "artifactSchema": {
+            "auditEnvelope": "1",
+            "events": "1",
+        },
+    }
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(
+            f"coreVersion={payload['coreVersion']} contractVersion={payload['contractVersion']}"
+        )
+
+
 @team_app.command("init")
 def team_init(
     output: str = typer.Option("team.yaml", "--output", help="Target team spec path"),
@@ -1212,6 +1334,109 @@ def team_validate(
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         typer.echo(f"team_id={payload['team_id']} agent_count={payload['agent_count']}")
+
+
+@team_app.command("list")
+def team_list(
+    root_dir: str = typer.Option(
+        ".binliquid/team/jobs",
+        "--root-dir",
+        help="Team artifact root directory",
+    ),
+    since: str | None = typer.Option(
+        None,
+        "--since",
+        help="Return jobs created at or after this ISO-8601 timestamp.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    since_dt = None
+    if since is not None:
+        try:
+            since_dt = _parse_iso_datetime(since)
+        except ValueError:
+            typer.echo(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "error_code": "INVALID_INPUT",
+                        "error": "Invalid --since value; expected ISO-8601 datetime.",
+                        "since": since,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            raise typer.Exit(code=2) from None
+
+    base = Path(root_dir)
+    if not base.exists():
+        payload = {"status": "ok", "root_dir": str(base), "count": 0, "items": [], "errors": []}
+        if json_output:
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            typer.echo("count=0")
+        return
+
+    items: list[dict[str, object]] = []
+    errors: list[dict[str, str]] = []
+    for job_dir in sorted(base.iterdir(), key=lambda p: p.name):
+        if not job_dir.is_dir():
+            continue
+        status_path = job_dir / "status.json"
+        if not status_path.exists():
+            continue
+        try:
+            payload = json.loads(status_path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            errors.append({"job_id": job_dir.name, "error": str(exc)})
+            continue
+        job = payload.get("job")
+        if not isinstance(job, dict):
+            errors.append({"job_id": job_dir.name, "error": "invalid status payload"})
+            continue
+
+        created_at = str(job.get("created_at") or "")
+        if since_dt is not None:
+            try:
+                created_at_dt = _parse_iso_datetime(created_at)
+            except ValueError:
+                errors.append({"job_id": job_dir.name, "error": "invalid created_at format"})
+                continue
+            if created_at_dt < since_dt:
+                continue
+
+        items.append(
+            {
+                "job_id": str(job.get("job_id") or job_dir.name),
+                "case_id": str(job.get("case_id") or ""),
+                "team_id": str(job.get("team_id") or ""),
+                "status": str(job.get("status") or ""),
+                "request": str(job.get("request") or ""),
+                "created_at": created_at,
+                "finished_at": str(job.get("finished_at") or ""),
+                "audit_envelope_path": str(payload.get("audit_envelope_path") or ""),
+                "job_dir": str(job_dir),
+            }
+        )
+
+    items.sort(key=lambda item: str(item.get("created_at") or ""), reverse=True)
+    output = {
+        "status": "ok",
+        "root_dir": str(base),
+        "count": len(items),
+        "items": items,
+        "errors": errors,
+    }
+    if json_output:
+        typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"count={len(items)}")
+        for item in items:
+            typer.echo(
+                f"- {item['job_id']} status={item['status']} "
+                f"team_id={item['team_id']} created_at={item['created_at']}"
+            )
 
 
 @team_app.command("run")
@@ -1455,6 +1680,7 @@ def team_replay(
         "--root-dir",
         help="Team artifact root directory",
     ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
         payload = replay_job(job_id, root_dir=root_dir)
@@ -1463,7 +1689,13 @@ def team_replay(
             json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2)
         )
         raise typer.Exit(code=1) from None
-    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(
+            f"job_id={payload.get('job_id')} status={payload.get('status')} "
+            f"event_count={payload.get('event_count')}"
+        )
 
 
 @team_app.command("artifacts")

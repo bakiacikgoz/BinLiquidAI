@@ -53,7 +53,17 @@ Check that all files exist:
 - `artifacts/router_shadow_summary.json`
 - `artifacts/research_summary.json`
 
-## 8. Incident Hints
+## 8. Operator Panel Compatibility Check
+
+```bash
+uv run binliquid --version
+uv run binliquid operator capabilities --json
+uv run binliquid team list --root-dir .binliquid/team/jobs --json
+```
+
+If capabilities contract or command flags are missing, keep UI mutations disabled.
+
+## 9. Incident Hints
 
 - Planner fallback spikes: inspect `planner_parse_fail_rate` and `planner_fallback_rate`.
 - Router drift: inspect `router_shadow_agreement_rate` and disagreement samples.

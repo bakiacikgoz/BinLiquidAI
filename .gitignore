@@ -7,3 +7,10 @@ __pycache__/
 benchmarks/results/
 artifacts/
 .DS_Store
+node_modules/
+apps/**/node_modules/
+apps/**/dist/
+apps/**/src-tauri/target/
+apps/**/src-tauri/gen/
+apps/**/src-tauri/resources/binliquid-runtime/python/
+apps/**/src-tauri/resources/binliquid-runtime/RUNTIME_MANIFEST.txt

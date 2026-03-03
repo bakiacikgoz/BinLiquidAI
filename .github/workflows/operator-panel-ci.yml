@@ -1,0 +1,59 @@
+name: Operator Panel CI
+
+on:
+  push:
+    paths:
+      - 'apps/operator-panel/**'
+      - 'binliquid/cli.py'
+      - 'docs/RELEASE_GATE_v0.5.md'
+      - '.github/workflows/operator-panel-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/operator-panel/**'
+      - 'binliquid/cli.py'
+      - 'docs/RELEASE_GATE_v0.5.md'
+      - '.github/workflows/operator-panel-ci.yml'
+
+jobs:
+  operator-panel:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        run: pip install uv
+
+      - name: Install Python deps
+        run: uv sync --python 3.11 --extra dev
+
+      - name: Install UI deps
+        run: pnpm install --dir apps/operator-panel
+
+      - name: UI lint
+        run: pnpm --dir apps/operator-panel lint
+
+      - name: UI build
+        run: pnpm --dir apps/operator-panel build
+
+      - name: Rust bridge tests
+        run: cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml
+
+      - name: Capabilities command smoke
+        run: uv run binliquid operator capabilities --json

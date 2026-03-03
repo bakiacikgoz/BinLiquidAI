@@ -1,4 +1,4 @@
-.PHONY: bootstrap install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy
+.PHONY: bootstrap install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -31,3 +31,15 @@ benchmark-ablation:
 
 benchmark-energy:
 	uv run binliquid benchmark energy --profile balanced --energy-mode measured
+
+ui-install:
+	cd apps/operator-panel && pnpm install
+
+ui-dev:
+	cd apps/operator-panel && pnpm tauri:dev
+
+ui-build:
+	cd apps/operator-panel && pnpm build
+
+ui-tauri-build:
+	cd apps/operator-panel && pnpm tauri:build

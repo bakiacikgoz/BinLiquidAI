@@ -1,4 +1,4 @@
-# AegisOS / BinLiquid v0.4.0
+# AegisOS / BinLiquid v0.4.1
 
 Offline-first, local-first hybrid assistant with a production-focused CLI core.
 
@@ -17,7 +17,7 @@ Offline-first, local-first hybrid assistant with a production-focused CLI core.
 | Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
 | Governance v0.4 (policy + approval + audit) | working | fail-closed + async approvals |
 | Team Runtime v0.4 (DAG + parallel scheduler + handoff/memory governance) | working | `binliquid team *` command group |
-| Desktop UI (Tauri thin shell) | deferred | post-v0.3 (operator panel is available) |
+| Desktop UI (Tauri operator panel) | beta | `apps/operator-panel` (macOS-first) |
 
 ## First 5 Minutes
 
@@ -60,8 +60,10 @@ Governance approvals:
 
 ```bash
 uv run binliquid approval pending --json
+uv run binliquid approval show --id <approval_id> --json
 uv run binliquid approval decide --id <approval_id> --approve --actor ops-user
 uv run binliquid approval execute --id <approval_id> --actor ops-user
+uv run binliquid operator capabilities --json
 ```
 
 Operator panel (thin-shell terminal):
@@ -101,10 +103,20 @@ uv run binliquid team validate --spec team.yaml --json
 uv run binliquid team run --spec team.yaml --once "Build a compliance-aware rollout plan" --json
 uv run binliquid team resume --spec team.yaml --job-id <blocked_job_id> --root-dir .binliquid/team/jobs --json
 uv run binliquid team status --job-id <id> --root-dir .binliquid/team/jobs --json
+uv run binliquid team list --root-dir .binliquid/team/jobs --json
 uv run binliquid team logs --job-id <id> --root-dir .binliquid/team/jobs --json-stream
-uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs
+uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs --json
 uv run binliquid team artifacts --job-id <id> --root-dir .binliquid/team/jobs --export ./team-artifacts
 ```
+
+### Operator Panel (v0.5.0-beta)
+
+```bash
+make ui-install
+make ui-dev
+```
+
+Packaging and release scripts live under `apps/operator-panel/scripts/`.
 
 ## Model Recipes
 
@@ -199,7 +211,7 @@ Calibration outputs:
 - Persistent traces only when debug is on and privacy is explicitly off
 - Web access default: off
 
-## Known Limits (v0.4.0)
+## Known Limits (v0.4.1)
 
 - `transformers` fallback is for continuity, not quality parity.
 - Measured energy depends on platform permissions (`powermetrics`).

@@ -1,6 +1,9 @@
+import json
+
 from typer.testing import CliRunner
 
 from binliquid.cli import app
+from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.runtime.config import RuntimeConfig
 
 runner = CliRunner()
@@ -256,3 +259,49 @@ def test_config_resolve_rejects_conflicting_transformers_model_override() -> Non
 
     assert result.exit_code == 1
     assert '"status": "invalid_input"' in result.stdout
+
+
+def test_cli_root_version_flag() -> None:
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "0.4.1"
+
+
+def test_operator_capabilities_contract() -> None:
+    result = runner.invoke(app, ["operator", "capabilities", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["contractVersion"] == "1.0"
+    assert payload["commands"]["teamListJson"] is True
+    assert payload["commands"]["approvalShowJson"] is True
+    assert payload["artifactSchema"]["auditEnvelope"] == "1"
+    assert payload["artifactSchema"]["events"] == "1"
+
+
+def test_approval_show_redacts_snapshot(monkeypatch, tmp_path) -> None:
+    cfg = RuntimeConfig.from_profile("default").model_copy(
+        update={
+            "governance": RuntimeConfig.from_profile("default").governance.model_copy(
+                update={
+                    "approval_store_path": str(tmp_path / "approvals.sqlite3"),
+                    "audit_dir": str(tmp_path / "audit"),
+                }
+            )
+        }
+    )
+    runtime = GovernanceRuntime(config=cfg)
+    decision, ticket = runtime.evaluate_task(
+        run_id="run-approval-show",
+        task_type="code",
+        user_input="secret input",
+    )
+    assert decision.action.value == "require_approval"
+    assert ticket is not None
+
+    monkeypatch.setattr("binliquid.cli._build_governance_runtime", lambda _cfg: runtime)
+    result = runner.invoke(app, ["approval", "show", "--id", ticket.approval_id, "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ticket"]["snapshot"]["user_input"] == "***REDACTED***"
+    assert isinstance(payload["ticket"]["snapshot"]["policy_hash"], str)

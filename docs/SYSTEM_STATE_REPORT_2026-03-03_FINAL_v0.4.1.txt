@@ -1,0 +1,374 @@
+AegisOS / BinLiquid
+Final Technical System State Report (v0.4.1 Hardening)
+Date: 2026-03-03 (Europe/Istanbul)
+Repository: /Users/baki/Desktop/lnn
+Branch: main
+Head Commit: 314d8dc
+
+====================================================================
+0) Scope and Purpose
+====================================================================
+This report documents the exact current state of the repository after:
+- 18c7412: v0.4.1 hardening (team resume, restricted profile/policy, sqlite concurrency, CI deterministic team benchmark)
+- 314d8dc: optional audit envelope signature support
+
+Primary goals of this report:
+1. Confirm whether critical defects remain after hardening changes.
+2. Provide a deep technical inventory of runtime, governance, orchestration, storage, CLI, tests, and release controls.
+3. Record objective validation evidence (commands + observed outcomes).
+4. Clarify what is production-ready in scoped terms vs what is still GA-hardening backlog.
+
+====================================================================
+1) Executive Verdict
+====================================================================
+Current verdict:
+- Scoped production-readiness pre-check: PASS
+- Enterprise GA readiness: NOT YET (hardening still required in ops/integration dimensions)
+
+Why PASS for scoped readiness:
+- Lint clean, full test suite clean.
+- Team runtime flow is operational (init/validate/run/status/logs/replay/artifacts).
+- Approval continuation path exists and works (`team resume`), verified via CLI flow.
+- Governance remains fail-closed under policy ambiguity / blocked approvals.
+- SQLite concurrency posture improved (WAL + busy_timeout + lock discipline) with dedicated stress tests.
+- CI-friendly deterministic team benchmark mode exists.
+- Optional audit envelope signature now available.
+
+Why NOT YET for enterprise GA:
+- Signature mode currently env-key based; enterprise KMS/HSM integration and rotation policy are not implemented.
+- Deterministic mock benchmark is in place; broader quality/real-provider matrix depth can be expanded.
+- Auth/IAM/SSO and UI control plane are still intentionally out-of-scope for v0.4.x.
+
+====================================================================
+2) Repository Integrity Snapshot
+====================================================================
+State at validation time:
+- `git status --short`: clean (no pending changes)
+- active branch: `main`
+- latest commits:
+  - 314d8dc hardening: optional audit envelope signature support
+  - 18c7412 v0.4.1 hardening: team resume, restricted profile, sqlite concurrency, CI mock benchmark
+  - 28a828b feat: integrate aegisos v0.4 team runtime and publish system report
+
+Changed-file footprint by hardening wave:
+- Core runtime/orchestration/governance
+  - `binliquid/cli.py`
+  - `binliquid/governance/runtime.py`
+  - `binliquid/governance/approval_store.py`
+  - `binliquid/team/supervisor.py`
+  - `binliquid/team/handoff.py`
+  - `binliquid/team/memory_scope.py`
+  - `binliquid/team/checkpoint_store.py`
+  - `binliquid/team/artifacts.py`
+  - `binliquid/memory/persistent_store.py`
+  - `benchmarks/run_team.py`
+- New policy/config/docs
+  - `config/policies/restricted.toml`
+  - `config/restricted.toml`
+  - `docs/RELEASE_GATE_v0.4.md`
+- Alias/documentation updates
+  - `docs/RELEASE_GATE_v0.2.md` (legacy alias)
+  - `docs/RELEASE_CHECKLIST.md`
+  - `docs/SYSTEM_STATE_REPORT_2026-03-03.txt`
+  - `README.md`
+- New tests
+  - `tests/test_memory_concurrency.py`
+  - `tests/test_team_checkpoint_concurrency.py`
+  - `tests/test_team_benchmark.py`
+  - `tests/test_team_audit_envelope.py`
+  - plus updates to team/governance/cli/runtime tests
+
+====================================================================
+3) Runtime Architecture (Current)
+====================================================================
+3.1 Core + Team layering
+- Aegis Core runtime (planner/router/orchestrator/governance/memory/tracing) remains foundational.
+- Team runtime is a layer above orchestrator:
+  - task decomposition/materialization
+  - dependency-aware scheduling
+  - role-based task assignment
+  - governance-gated handoffs and scoped memory writes
+  - team artifact emission and replay support
+
+3.2 Team runtime modules
+- `binliquid/team/models.py`
+  - job/task/handoff/event/envelope typed models
+- `binliquid/team/scheduler.py`
+  - parallel scheduler; deadlock/limit handling
+- `binliquid/team/supervisor.py`
+  - primary team execution loop
+  - approval override injection for resume semantics
+- `binliquid/team/handoff.py`
+  - handoff governance evaluation wrapper
+- `binliquid/team/memory_scope.py`
+  - memory write governance wrapper
+- `binliquid/team/artifacts.py`
+  - status/tasks/handoffs/events/envelope writing
+  - hash-chain integrity + optional signature
+- `binliquid/team/replay.py`
+  - status/events/envelope replay view
+- `binliquid/team/checkpoint_store.py`
+  - checkpoint persistence (sqlite)
+
+3.3 Governance phases covered in team runtime
+- TASK
+- TOOL
+- HANDOFF
+- MEMORY_WRITE
+
+Team path now enforces governance checkpoints at:
+1) subtask entry (task-level)
+2) inter-task handoff
+3) scoped memory write
+
+====================================================================
+4) Approval Continuation (Resume Semantics)
+====================================================================
+4.1 What was missing before
+- Team runs correctly escalated/blocked on approval-required gates.
+- But continuation after approval required external/manual restart semantics.
+
+4.2 What is implemented now
+- New CLI command:
+  - `binliquid team resume --spec <spec> --job-id <blocked_job> --root-dir <jobs_dir> [--resume-job-id ...]`
+- Resume flow:
+  1. Load source job status/events.
+  2. Discover `approval_requested` events.
+  3. Resolve approval tickets from approval store.
+  4. Keep only `approved|executed` tickets.
+  5. Build task-target override map (`task|handoff|memory_write`).
+  6. Start new team run for same request/case with overrides.
+- Supervisor/orchestrator glue:
+  - Task-level override passes via session context `governance_approval_id`.
+  - Handoff/memory write evaluators accept `override_approval_id`.
+  - Governance runtime returns ALLOW on approved override with `matched_rule_path=approval_override`.
+
+4.3 Coverage
+- `governance/runtime.py`: task + handoff + memory_write override path
+- `team/supervisor.py`: emits `approval_resolved` and applies per-task target override
+- `team/handoff.py`, `team/memory_scope.py`: override plumbed
+- `cli.py`: `team resume` implementation + override collector
+- Tests cover explicit override behavior and full CLI resume flow.
+
+====================================================================
+5) Policy and Profile Hardening (Regulated Baseline)
+====================================================================
+5.1 New restricted policy profile
+- Runtime profile: `config/restricted.toml`
+- Governance policy: `config/policies/restricted.toml`
+
+5.2 Intent
+- Reduce mismatch between regulated positioning and permissive defaults.
+- Introduce least-privilege defaults for handoff/memory/tooling around high-risk paths.
+
+5.3 Notable restricted policy behavior
+- `research`, `code`, `mixed` routes are approval-gated.
+- Python tool invocation requires approval.
+- Transitions into `Execution Agent` require approval.
+- Case/team memory writes by `Execution Agent` require approval.
+- Session-private and selected case-private writes are allowed.
+- Unmatched handoff/memory routes remain deny-by-default by evaluator fallback.
+
+5.4 Team template support
+- `binliquid team init --template regulated` now produces a regulated-oriented team spec
+  with role set:
+  - Intake Agent
+  - Research Analyst Agent
+  - Policy/Compliance Agent
+  - Execution Agent
+  - Reviewer/QA Agent
+
+====================================================================
+6) SQLite Concurrency Hardening
+====================================================================
+6.1 Memory store (`PersistentMemoryStore`)
+- Connection uses `check_same_thread=False`.
+- Internal `RLock` serializes operations.
+- Connection pragmas:
+  - `PRAGMA journal_mode=WAL`
+  - `PRAGMA synchronous=NORMAL`
+  - `PRAGMA busy_timeout=5000`
+
+6.2 Team checkpoint store (`TeamCheckpointStore`)
+- Thread-safe access via `RLock`.
+- `check_same_thread=False`.
+- Same WAL/busy_timeout pragmas applied.
+
+6.3 Approval store (`ApprovalStore`)
+- Per-connection pragmas include WAL/synchronous/busy_timeout.
+
+6.4 Stress/regression tests
+- `tests/test_memory_concurrency.py`
+- `tests/test_team_checkpoint_concurrency.py`
+
+====================================================================
+7) Benchmarking and CI Signal Improvements
+====================================================================
+7.1 Deterministic team benchmark mode
+- `benchmark team` now supports `--deterministic-mock`.
+- Adds CI-friendly stable execution without provider/model variance.
+
+7.2 Behavior
+- Deterministic orchestrator returns reproducible outputs from request hash.
+- Payload includes `execution_mode`:
+  - `deterministic_mock` or `provider_live`
+
+7.3 Coverage
+- CLI pass-through tests for `--deterministic-mock`.
+- Direct benchmark functional test.
+
+====================================================================
+8) Audit Integrity and Signature
+====================================================================
+8.1 Existing integrity model
+- Per-job envelope includes:
+  - `integrity.prev_hash`
+  - `integrity.hash`
+  - `integrity.signature`
+- Hash chain head persisted under team artifact root parent.
+
+8.2 New signature support
+- If `BINLIQUID_AUDIT_SIGNING_KEY` is set:
+  - signature is computed as HMAC-SHA256 over current envelope hash.
+- If unset:
+  - signature remains `null` (previous behavior).
+
+8.3 Coverage
+- Envelope fields and hash length assertions.
+- Signature presence assertion when signing key is set.
+
+====================================================================
+9) CLI Surface (Current Effective)
+====================================================================
+Team group:
+- `team init --output <path> [--template balanced|regulated]`
+- `team validate --spec <file> --json`
+- `team run --spec <file> --once "..." --json`
+- `team resume --spec <file> --job-id <id> --root-dir <dir> --json`
+- `team status --job-id <id> --root-dir <dir> --json`
+- `team logs --job-id <id> --root-dir <dir> --json-stream`
+- `team replay --job-id <id> --root-dir <dir>`
+- `team artifacts --job-id <id> --root-dir <dir> --export <dir>`
+
+Benchmark group (team relevant):
+- `benchmark team --profile <p> --suite smoke|quality --spec <file>`
+- optional: `--deterministic-mock`
+
+Approval group (resume pipeline support):
+- `approval pending --json`
+- `approval decide --id <approval_id> --approve|--reject --actor <actor>`
+- `approval execute --id <approval_id> --actor <actor>`
+
+====================================================================
+10) Data Contracts and Artifact Surface
+====================================================================
+10.1 Team artifact set per job
+Default root (configurable): `.binliquid/team/jobs/<job_id>/`
+- `status.json`
+- `events.jsonl`
+- `tasks.json`
+- `handoffs.json`
+- `audit_envelope.json`
+
+10.2 Global artifact summary additions
+- `artifacts/team_summary.json`
+
+10.3 Envelope important fields
+- `envelope_version`
+- `job_id`, `case_id`, `team_id`
+- `policy_bundle_id`, `policy_bundle_hash`
+- `runtime_config_hash`
+- `decision_chain`, `approvals`, `tool_calls`, `handoffs`
+- `redaction_report`
+- `integrity.prev_hash`, `integrity.hash`, `integrity.signature`
+
+====================================================================
+11) Test and Gate Status (Validation Evidence)
+====================================================================
+11.1 Static and unit/integration checks
+Executed:
+- `uv run ruff check .` -> PASS
+- `uv run pytest -q` -> PASS
+- `uv run pytest --collect-only` -> 104 tests collected
+
+11.2 Runtime health
+Executed:
+- `uv run binliquid doctor --profile restricted --provider auto`
+Observed:
+- selected provider: `ollama`
+- status: `healthy`
+- model present: true (`lfm2.5-thinking:1.2b`)
+- fallback transformers import issue reported (`No module named 'transformers'`) but primary chain healthy
+
+11.3 Team deterministic benchmark smoke
+Executed:
+- `team init --template regulated`
+- `team validate --spec <tmp/team.yaml> --json`
+- `benchmark team --profile restricted --suite smoke --spec <tmp/team.yaml> --task-limit 1 --deterministic-mock`
+Observed:
+- success_rate: `1.0`
+- blocked_rate: `0.0`
+- failed_rate: `0.0`
+- execution_mode: `deterministic_mock`
+
+11.4 Team resume CLI E2E smoke (approval-required scenario)
+Executed with temporary policy where chat requires approval:
+1. `team run` -> `blocked`
+2. extracted `approval_id` from `team logs`
+3. `approval decide --approve`
+4. `team resume`
+Observed:
+- first run status: `blocked`
+- approval resolved: yes
+- resume run status: `completed`
+
+====================================================================
+12) Release Gate and Documentation Alignment
+====================================================================
+12.1 Gate files
+- Active gate: `docs/RELEASE_GATE_v0.4.md`
+- Legacy alias: `docs/RELEASE_GATE_v0.2.md` (points to v0.4 gate)
+
+12.2 Checklist updates
+- deterministic mock team benchmark step added
+- memory/checkpoint concurrency stress test checks added
+- team resume verification check added
+- pre-production real provider team E2E reminder added
+
+12.3 Report language alignment
+- PASS semantics scoped correctly in existing report
+- enterprise GA not overstated
+
+====================================================================
+13) Known Limits and Residual Risks (Current)
+====================================================================
+1. Signature mode is env-key based (HMAC), not centralized enterprise key management.
+2. Transformers runtime may be unavailable in local env; auto provider currently healthy due Ollama primary.
+3. Deterministic mock benchmark proves determinism/contracts, not model quality.
+4. Approval resume semantics validated for current flow; broader long DAG/parallel-heavy continuation matrices can be expanded.
+5. UI/SSO/IAM and cloud tenancy remain out of v0.4.x scope.
+
+====================================================================
+14) Production/Pre-Production Positioning
+====================================================================
+Recommended language for external/internal status:
+- "Scoped production-readiness pre-check: PASS"
+- "Enterprise GA readiness: not yet (hardening/integration pending)"
+
+Mandatory final field validation (before production cut):
+- Run at least one real-provider live team run E2E in target environment.
+- This validation is provider/model dependent and should remain a separate gate from deterministic CI smoke.
+
+====================================================================
+15) Final Conclusion
+====================================================================
+No blocking defect was found in the implemented v0.4.1 hardening set during this re-check.
+
+The system is currently a solid "Team Runtime Foundation + Hardening" build with:
+- governed multi-agent runtime,
+- resume-capable approval continuation,
+- stricter regulated baseline option,
+- improved sqlite concurrency behavior,
+- auditable artifacts with optional signing,
+- passing quality gates (lint/tests) and CLI/runtime smoke validations.
+

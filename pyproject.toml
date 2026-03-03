@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "binliquid"
-version = "0.4.0"
-description = "AegisOS v0.4.0 Team Runtime MVP on BinLiquid core"
+version = "0.4.1"
+description = "AegisOS v0.4.1 Team Runtime MVP on BinLiquid core"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 authors = [
