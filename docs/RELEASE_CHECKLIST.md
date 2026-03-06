@@ -4,6 +4,10 @@
 
 - [ ] `uv run ruff check .`
 - [ ] `uv run pytest -q`
+- [ ] `make pilot-gate`
+- [ ] `uv run binliquid team validate --spec examples/team/restricted_pilot.yaml --json`
+- [ ] `uv run binliquid team pilot-check --spec examples/team/restricted_pilot.yaml --profile restricted --mode deterministic --report artifacts/team_pilot_report.json --json`
+- [ ] `artifacts/team_pilot_report.json` shows `checks.bounded_concurrency.status=pass`
 - [ ] `uv run binliquid config resolve --profile balanced --json`
 - [ ] `uv run binliquid doctor --profile balanced`
 - [ ] `uv run binliquid benchmark smoke --mode all --profile balanced`
@@ -54,9 +58,18 @@
 - [ ] `artifacts/router_shadow_summary.json` exists and valid JSON
 - [ ] `artifacts/research_summary.json` exists and valid JSON
 - [ ] `artifacts/team_summary.json` exists and valid JSON
+- [ ] `artifacts/team_pilot_report.json` exists and reports `overall_status=pass`
 - [ ] Benchmark JSON outputs exist under `benchmarks/results/`
 - [ ] Ablation Markdown report exists
 - [ ] Team run artifacts exist under `.binliquid/team/jobs/<job_id>/`
-- [ ] `uv run binliquid team resume --spec team.yaml --job-id <id> --root-dir .binliquid/team/jobs --json` works when approvals are resolved
+- [ ] `uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs --verify --json` passes on clean smoke traces
+- [ ] `uv run binliquid team resume --spec team.yaml --job-id <id> --root-dir .binliquid/team/jobs --json` only works when approvals are `executed` and not yet `consumed`
 - [ ] README command examples are current
 - [ ] Pre-production: one real provider team E2E run completed in target environment
+
+## Controlled Pilot Smoke
+
+- [ ] `uv run binliquid team pilot-check --spec examples/team/restricted_pilot_live.yaml --profile restricted --mode live-provider --provider auto --report artifacts/team_pilot_live_report.json --json`
+- [ ] live-provider report classifies failures (`failure_class`) and reports `bounded_concurrency_status=pass`
+- [ ] live smoke emits audit envelope, replay verify passes, and tamper probe still fails under the same release candidate
+- [ ] approval reuse probe remains blocked after the live smoke

@@ -1,6 +1,50 @@
-# AegisOS / BinLiquid v0.4.1
+# BinLiquid (AegisOS)
 
-Offline-first, local-first hybrid assistant with a production-focused CLI core.
+BinLiquid is a private, security-first agentic runtime designed to run fully local/offline in enterprise-controlled environments, including on-prem datacenters and edge deployments.
+
+It provides two layers:
+
+- **BinLiquid Runtime (core):** the production-grade foundation for single-assistant execution, including planning, routing, specialist execution, scoped memory, and governance.
+- **Team Runtime:** a governed multi-agent execution layer that supports delegated task handoff, shared/scoped memory access, approval-gated actions, bounded-concurrency controls, and audit-grade replayable traces.
+
+> **Status:**
+> BinLiquid core is production-grade.
+> Team Runtime is pilot-hardened for controlled/restricted profiles, with release-blocking gates, replay verification, approval hardening, and bounded-concurrency safeguards.
+> Broader live-provider rollout still requires target-environment rehearsal and controlled rollout qualification.
+
+## Current Status
+
+### Core Runtime
+
+The core runtime is the most mature part of the system and should be considered the production-grade foundation of the platform.
+
+### Team Runtime
+
+Team Runtime has completed pilot-readiness hardening for restricted, controlled profiles and currently includes:
+
+- deterministic release-blocking pilot gate
+- approval lifecycle hardening (`pending -> approved -> executed -> consumed`)
+- stale approval snapshot detection
+- duplicate resume suppression / idempotent resume claims
+- optimistic shared-memory conflict rejection
+- concurrency-aware audit/replay metadata
+- bounded-concurrency fallback / serialization events
+- restricted smoke scenarios and machine-readable pilot reports
+- release-gate, runbook, rollback, and messaging alignment
+
+Under restricted pilot profiles, Team Runtime now provides fail-closed approval handling, audit-grade event trails, replay verification, bounded-concurrency safety controls, visible fallback/serialization behavior, and conflict rejection instead of silent shared-state overwrite.
+
+Team Runtime should currently be described as:
+
+- pilot-ready under controlled/restricted profiles
+- bounded-concurrency capable with safety degradation
+- governable and auditable by design
+
+Team Runtime should not yet be described as:
+
+- unrestricted enterprise-wide multi-agent orchestration
+- fully general high-concurrency agent execution
+- universally production-ready across arbitrary live-provider environments
 
 ## Feature Status
 
@@ -16,7 +60,7 @@ Offline-first, local-first hybrid assistant with a production-focused CLI core.
 | Benchmarks (smoke/ablation/energy) | working | quality suite (120 tasks) available |
 | Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
 | Governance v0.4 (policy + approval + audit) | working | fail-closed + async approvals |
-| Team Runtime v0.4 (DAG + parallel scheduler + handoff/memory governance) | working | `binliquid team *` command group |
+| Team Runtime v0.4 (DAG + bounded concurrency + handoff/memory governance) | pilot-hardened under restricted profile | bounded-concurrency safeguards, replay verification, and pilot usage only behind `team pilot-check` plus target-environment live-provider rehearsal |
 | Desktop UI (Tauri operator panel) | beta | `apps/operator-panel` (macOS-first) |
 
 ## First 5 Minutes
@@ -36,7 +80,7 @@ uv run binliquid doctor --profile balanced
 | `lite` | rule | off | off | off | minimal |
 | `balanced` (default daily) | rule | sltc | on | on | short |
 | `research` | sltc | rule | on | on | debug-friendly |
-| `restricted` (regulated pilot) | rule | sltc | on | on | short |
+| `restricted` (controlled pilot profile) | rule | sltc | on | on | short |
 
 ## CLI Quickstart
 
@@ -65,6 +109,9 @@ uv run binliquid approval decide --id <approval_id> --approve --actor ops-user
 uv run binliquid approval execute --id <approval_id> --actor ops-user
 uv run binliquid operator capabilities --json
 ```
+
+Approval lifecycle is `pending -> approved -> executed -> consumed`.
+`approved` alone does not authorize override use; team resume and pilot gate only consume `executed` approvals.
 
 Operator panel (thin-shell terminal):
 
@@ -105,8 +152,10 @@ uv run binliquid team resume --spec team.yaml --job-id <blocked_job_id> --root-d
 uv run binliquid team status --job-id <id> --root-dir .binliquid/team/jobs --json
 uv run binliquid team list --root-dir .binliquid/team/jobs --json
 uv run binliquid team logs --job-id <id> --root-dir .binliquid/team/jobs --json-stream
-uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs --json
+uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs --verify --json
 uv run binliquid team artifacts --job-id <id> --root-dir .binliquid/team/jobs --export ./team-artifacts
+uv run binliquid team pilot-check --spec examples/team/restricted_pilot.yaml --profile restricted --mode deterministic --report artifacts/team_pilot_report.json --json
+uv run binliquid team pilot-check --spec examples/team/restricted_pilot_live.yaml --profile restricted --mode live-provider --provider auto --report artifacts/team_pilot_live_report.json --json
 ```
 
 ### Operator Panel (v0.5.0-beta)
@@ -219,6 +268,10 @@ Calibration outputs:
 - UI thin shell is intentionally deferred to keep CLI reliability first.
 - Model assets are not auto-installed (`ollama pull` remains operator-driven).
 - Team runs intentionally fail-closed when governance requires approval in a blocking dependency chain.
-- `team resume` depends on resolved approvals; unresolved/expired approvals keep runs blocked by design.
+- `team resume` and `team pilot-check` only consume approvals that are both `executed` and not yet `consumed`.
+- approval-gated resume now freezes the execution contract; context drift raises `STALE_APPROVAL_SNAPSHOT` instead of silently continuing.
+- shared `memory_target` writes use optimistic version checks and reject on conflict; there is no last-write-wins path in restricted pilot mode.
+- approval-gated subtrees may serialize themselves under bounded fallback; those decisions are visible in audit/replay artifacts.
+- `team replay --verify` checks event ordering, causal continuity, handoff consistency, and trace integrity; it does not guarantee business correctness or external side-effect validation.
 - Enterprise GA hardening is still in progress (scoped production-readiness pre-check only).
 - Optional envelope signing is available via `BINLIQUID_AUDIT_SIGNING_KEY` (HMAC-SHA256).

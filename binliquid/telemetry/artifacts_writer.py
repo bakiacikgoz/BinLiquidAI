@@ -13,6 +13,7 @@ ARTIFACT_FILENAMES = {
     "research_summary": "research_summary.json",
     "governance_summary": "governance_summary.json",
     "team_summary": "team_summary.json",
+    "team_pilot_report": "team_pilot_report.json",
 }
 
 

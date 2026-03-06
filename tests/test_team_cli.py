@@ -55,6 +55,8 @@ class ApprovalAwareFakeTeamOrchestrator:
             task_type="chat",
             user_input=user_input,
             override_approval_id=override_id,
+            execution_contract_hash=session_context.get("governance_execution_contract_hash"),
+            resume_token_ref=session_context.get("governance_resume_token_ref"),
         )
         self._counter += 1
         if decision.action.value == "require_approval":
@@ -279,6 +281,8 @@ def test_team_resume_replays_approved_task_gate(monkeypatch, tmp_path: Path) -> 
         reason="approved",
     )
     assert approval.error_code is None
+    executed = runtime.execute_approval(approval_id=approval_id)
+    assert executed.error_code is None
 
     resume = runner.invoke(
         app,
@@ -298,6 +302,80 @@ def test_team_resume_replays_approved_task_gate(monkeypatch, tmp_path: Path) -> 
     resume_payload = json.loads(resume.stdout)
     assert resume_payload["job"]["status"] == "completed"
     assert any(item["target"] == "task" for item in resume_payload["resolved_approvals"])
+
+
+def test_team_resume_rejects_approved_but_not_executed_ticket(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    spec_path = tmp_path / "team.json"
+    policy_path = tmp_path / "policy.toml"
+    _write_spec(spec_path)
+    _write_task_approval_policy(policy_path)
+
+    cfg = RuntimeConfig.from_profile("default").model_copy(
+        update={
+            "governance": RuntimeConfig.from_profile("default").governance.model_copy(
+                update={
+                    "policy_path": str(policy_path),
+                    "approval_store_path": str(tmp_path / "approvals.sqlite3"),
+                    "audit_dir": str(tmp_path / "audit"),
+                }
+            ),
+            "team": RuntimeConfig.from_profile("default").team.model_copy(
+                update={
+                    "artifact_dir": str(tmp_path / "team_jobs"),
+                    "checkpoint_db_path": str(tmp_path / "checkpoints.sqlite3"),
+                }
+            ),
+        }
+    )
+    runtime = GovernanceRuntime(config=cfg)
+
+    monkeypatch.setattr("binliquid.cli.resolve_runtime_config", lambda *a, **k: (cfg, {}))
+    monkeypatch.setattr(
+        "binliquid.cli._build_orchestrator",
+        lambda *a, **k: ApprovalAwareFakeTeamOrchestrator(runtime),
+    )
+
+    first_run = runner.invoke(
+        app,
+        [
+            "team",
+            "run",
+            "--spec",
+            str(spec_path),
+            "--once",
+            "short request",
+            "--json",
+        ],
+    )
+    assert first_run.exit_code == 0
+    first_payload = json.loads(first_run.stdout)
+
+    approval_id = runtime.approval_store.list_pending()[0].approval_id
+    approval = runtime.decide_approval(
+        approval_id=approval_id,
+        approve=True,
+        actor="tester",
+        reason="approved",
+    )
+    assert approval.error_code is None
+
+    resume = runner.invoke(
+        app,
+        [
+            "team",
+            "resume",
+            "--spec",
+            str(spec_path),
+            "--job-id",
+            first_payload["job"]["job_id"],
+            "--root-dir",
+            str(tmp_path / "team_jobs"),
+            "--json",
+        ],
+    )
+    assert resume.exit_code == 1
+    assert "no executed approvals found for resume" in resume.stdout
 
 
 def test_team_list_returns_jobs_and_since_filter(monkeypatch, tmp_path: Path) -> None:
@@ -369,3 +447,72 @@ def test_team_list_returns_jobs_and_since_filter(monkeypatch, tmp_path: Path) ->
     filtered_payload = json.loads(filtered.stdout)
     assert filtered_payload["count"] == 1
     assert filtered_payload["items"][0]["job_id"] == "job-new"
+
+
+def test_team_replay_verify_reports_verified(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    spec_path = tmp_path / "team.json"
+    _write_spec(spec_path)
+
+    monkeypatch.setattr(
+        "binliquid.cli._build_orchestrator",
+        lambda *a, **k: FakeTeamOrchestrator(),
+    )
+
+    run = runner.invoke(
+        app,
+        [
+            "team",
+            "run",
+            "--spec",
+            str(spec_path),
+            "--once",
+            "short request",
+            "--json",
+        ],
+    )
+    assert run.exit_code == 0
+    payload = json.loads(run.stdout)
+
+    replay = runner.invoke(
+        app,
+        ["team", "replay", "--job-id", payload["job"]["job_id"], "--verify", "--json"],
+    )
+    assert replay.exit_code == 0
+    replay_payload = json.loads(replay.stdout)
+    assert replay_payload["verified"] is True
+    assert replay_payload["checks"]["event_count"] >= 1
+    assert isinstance(replay_payload["trace_refs"], list)
+
+
+def test_team_validate_rejects_unknown_tool_policy_profile(tmp_path: Path) -> None:
+    spec_path = tmp_path / "team.json"
+    payload = {
+        "version": "1",
+        "team": {
+            "team_id": "team-invalid",
+            "supervisor_policy": "sequential_then_parallel",
+            "agents": [
+                {
+                    "agent_id": "agent-intake",
+                    "role": "Intake Agent",
+                    "allowed_task_types": ["chat"],
+                    "profile_name": "balanced",
+                    "model_overrides": {},
+                    "memory_scope_access": ["session"],
+                    "tool_policy_profile": "missing-profile",
+                    "approval_mode": "auto",
+                }
+            ],
+            "handoff_rules": [],
+            "termination_rules": {"max_tasks": 8, "max_retries": 1, "max_handoff_depth": 8},
+        },
+        "tasks": [],
+    }
+    spec_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    validate = runner.invoke(app, ["team", "validate", "--spec", str(spec_path), "--json"])
+    assert validate.exit_code == 1
+    result = json.loads(validate.stdout)
+    assert result["status"] == "invalid"
+    assert any("tool_policy_profile" in item for item in result["errors"])

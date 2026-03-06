@@ -33,8 +33,10 @@ from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
 from binliquid.schemas.models import ExpertName
 from binliquid.team.models import TeamSpec
+from binliquid.team.pilot_gate import run_pilot_check, write_pilot_report
 from binliquid.team.replay import load_events, load_job_status, replay_job
 from binliquid.team.supervisor import TeamSupervisor
+from binliquid.team.validation import validate_team_spec
 from binliquid.telemetry.artifacts_writer import ensure_artifact_scaffold, write_artifact
 from binliquid.telemetry.tracer import Tracer
 from research.sltc_experiments.eval_router import evaluate_router_model
@@ -812,7 +814,11 @@ def _collect_resume_overrides(
         if ticket is None:
             continue
         status = ticket.status.value
-        if status not in {"approved", "executed"}:
+        if status != "executed":
+            continue
+        if ticket.execution_status.value != "executed":
+            continue
+        if ticket.consumed_at is not None or ticket.consumed_by_job_id is not None:
             continue
         overrides.setdefault(task_id, {})[target] = approval_id
         resolved.append(
@@ -1330,6 +1336,19 @@ def team_validate(
         "task_count": len(parsed.tasks),
         "roles": [item.role for item in parsed.team.agents],
     }
+    validation_errors = validate_team_spec(parsed)
+    if validation_errors:
+        payload = {
+            "status": "invalid",
+            "error": "runtime contract validation failed",
+            "spec": spec,
+            "errors": validation_errors,
+        }
+        if json_output:
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            typer.echo("invalid: runtime contract validation failed")
+        raise typer.Exit(code=1)
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -1588,7 +1607,7 @@ def team_resume(
             json.dumps(
                 {
                     "status": "error",
-                    "error": "no approved approvals found for resume",
+                    "error": "no executed approvals found for resume",
                     "job_id": job_id,
                 },
                 ensure_ascii=False,
@@ -1617,6 +1636,7 @@ def team_resume(
         "handoff_count": len(result.handoffs),
         "event_count": len(result.events),
         "resolved_approvals": resolved,
+        "resume_outcomes": result.resume_outcomes,
         "audit_envelope_path": result.audit_envelope_path,
     }
     write_artifact("team_summary", payload)
@@ -1680,10 +1700,11 @@ def team_replay(
         "--root-dir",
         help="Team artifact root directory",
     ),
+    verify: bool = typer.Option(True, "--verify/--no-verify", help="Run replay consistency checks"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
-        payload = replay_job(job_id, root_dir=root_dir)
+        payload = replay_job(job_id, root_dir=root_dir, verify=verify)
     except Exception as exc:  # noqa: BLE001
         typer.echo(
             json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2)
@@ -1733,6 +1754,131 @@ def team_artifacts(
             indent=2,
         )
     )
+
+
+@team_app.command("pilot-check")
+def team_pilot_check(
+    spec: str = typer.Option(..., "--spec", help="Restricted pilot smoke spec path"),
+    profile: str = typer.Option("restricted", "--profile", help="Runtime profile"),
+    mode: str = typer.Option(
+        "deterministic",
+        "--mode",
+        help="Pilot gate mode: deterministic|live-provider",
+    ),
+    root_dir: str = typer.Option(
+        ".binliquid/team/pilot",
+        "--root-dir",
+        help="Pilot gate artifact root directory",
+    ),
+    report: str = typer.Option(
+        "artifacts/team_pilot_report.json",
+        "--report",
+        help="Pilot gate report output path",
+    ),
+    provider: str | None = typer.Option(None, help="Override provider"),
+    fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model"),
+    hf_model_id: str | None = typer.Option(None, "--hf-model-id", help="Override HF model id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    ensure_artifact_scaffold()
+    parsed = _load_team_spec(spec)
+    config, _source_map = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    if not config.team.enabled:
+        typer.echo("Team runtime disabled in runtime config.")
+        raise typer.Exit(code=2)
+
+    runtime = _build_governance_runtime(config)
+    startup_error = governance_startup_abort(config, runtime)
+    if startup_error:
+        typer.echo(f"POLICY_UNAVAILABLE: {startup_error}")
+        raise typer.Exit(code=2)
+
+    live_builder = None
+    if mode.strip().lower() == "live-provider":
+        def _live_builder(runtime_config: RuntimeConfig):
+            return _build_orchestrator(
+                runtime_config,
+                provider_name=runtime_config.llm_provider,
+                fallback_provider=runtime_config.fallback_provider,
+            )
+
+        live_builder = _live_builder
+
+    try:
+        payload = run_pilot_check(
+            spec=parsed,
+            config=config,
+            mode=mode,
+            root_dir=root_dir,
+            live_orchestrator_builder=live_builder,
+        )
+    except Exception as exc:  # noqa: BLE001
+        error_code = getattr(exc, "error_code", "PILOT_CHECK_FAILED")
+        exit_code = 2 if error_code in {"INVALID_INPUT", "TEAM_SPEC_INVALID"} else 1
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_code": error_code,
+                    "error": str(exc),
+                    "spec": spec,
+                    "mode": mode,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=exit_code) from None
+
+    payload.setdefault("artifacts", {})["report_path"] = write_pilot_report(report, payload)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        counters = payload.get("counters", {})
+        checks = payload.get("checks", {})
+        replay_status = (
+            "ok"
+            if checks.get("replay_integrity", {}).get("status") == "pass"
+            else "fail"
+        )
+        tamper_status = (
+            "fail"
+            if counters.get("tamper_verify_unexpected_pass_count", 0) == 0
+            else "unexpected-pass"
+        )
+        reuse_status = (
+            "blocked"
+            if counters.get("approval_reuse_unexpected_success_count", 0) == 0
+            else "reused"
+        )
+        scope_status = (
+            "blocked"
+            if counters.get("scope_violation_unexpected_success_count", 0) == 0
+            else "bypassed"
+        )
+        bounded_status = payload.get("bounded_concurrency_status", "unknown")
+        typer.echo(
+            f"{payload.get('overall_status', 'fail').upper()} "
+            f"profile={payload.get('profile')} mode={payload.get('mode')} "
+            f"jobs={len(payload.get('job_ids', []))} events={counters.get('total_events', 0)} "
+            f"approvals={counters.get('approvals_created', 0)}/"
+            f"{counters.get('approvals_approved', 0)}/"
+            f"{counters.get('approvals_executed', 0)}/"
+            f"{counters.get('approvals_consumed', 0)} "
+            f"replay={replay_status} tamper={tamper_status} "
+            f"reuse={reuse_status} scope={scope_status} bounded={bounded_status}"
+        )
+    if payload.get("overall_status") != "pass":
+        raise typer.Exit(code=1)
 
 
 @benchmark_app.command("smoke")

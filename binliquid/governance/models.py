@@ -26,6 +26,7 @@ class ApprovalStatus(StrEnum):
     REJECTED = "rejected"
     EXPIRED = "expired"
     EXECUTED = "executed"
+    CONSUMED = "consumed"
     EXECUTION_FAILED = "execution_failed"
     CANCELLED = "cancelled"
 
@@ -89,6 +90,10 @@ class ApprovalTicket(BaseModel):
     approval_id: str
     run_id: str
     status: ApprovalStatus
+    target_kind: str
+    target_ref: str
+    action_hash: str
+    policy_hash: str
     request_hash: str
     snapshot_hash: str
     snapshot: dict[str, Any] = Field(default_factory=dict)
@@ -98,6 +103,12 @@ class ApprovalTicket(BaseModel):
     execution_status: ExecutionStatus = ExecutionStatus.NOT_EXECUTED
     executed_at: datetime | None = None
     execution_error_code: str | None = None
+    execution_contract_hash: str | None = None
+    resume_token_ref: str | None = None
+    resume_claimed_job_id: str | None = None
+    resume_claimed_at: datetime | None = None
+    consumed_by_job_id: str | None = None
+    consumed_at: datetime | None = None
     idempotency_key: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     decided_at: datetime | None = None

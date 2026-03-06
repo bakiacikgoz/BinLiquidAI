@@ -28,6 +28,8 @@ def evaluate_handoff_transfer(
     to_role: str,
     payload: dict[str, Any],
     override_approval_id: str | None = None,
+    execution_contract_hash: str | None = None,
+    resume_token_ref: str | None = None,
 ) -> HandoffDecisionResult:
     payload_hash = _hash_payload(payload)
     if governance_runtime is None:
@@ -49,6 +51,8 @@ def evaluate_handoff_transfer(
         to_role=to_role,
         payload=redacted_payload,
         override_approval_id=override_approval_id,
+        execution_contract_hash=execution_contract_hash,
+        resume_token_ref=resume_token_ref,
     )
 
     if decision.action == GovernanceAction.DENY:
@@ -76,7 +80,7 @@ def evaluate_handoff_transfer(
         allowed=True,
         requires_approval=False,
         reason_code=decision.reason_code,
-        approval_id=None,
+        approval_id=decision.approval_id,
         payload=redacted_payload,
         payload_hash=_hash_payload(redacted_payload),
         redaction_applied=redaction_applied,

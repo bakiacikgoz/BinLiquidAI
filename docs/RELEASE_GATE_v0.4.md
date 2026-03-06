@@ -65,7 +65,7 @@ Expected controls:
 - approval state transitions + replay/idempotency checks
 - redaction regression (no raw sensitive strings in audit artifacts)
 - sandbox governance deny/approval enforcement
-- team resume path only proceeds with approved approvals
+- team resume path only proceeds with executed and not yet consumed approvals
 - SQLite write path remains stable under parallel memory writes
 - checkpoint writes remain stable under concurrent updates
 - when `BINLIQUID_AUDIT_SIGNING_KEY` is set, `audit_envelope.integrity.signature` must be populated

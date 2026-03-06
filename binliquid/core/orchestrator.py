@@ -163,6 +163,8 @@ class Orchestrator:
                 task_type=planner_output.task_type.value,
                 user_input=user_input,
                 override_approval_id=session_context.get("governance_approval_id"),
+                execution_contract_hash=session_context.get("governance_execution_contract_hash"),
+                resume_token_ref=session_context.get("governance_resume_token_ref"),
             )
             self._tracer.emit(
                 request_id,
@@ -577,6 +579,8 @@ class Orchestrator:
                 task_type=TaskType.CHAT.value,
                 user_input=user_input,
                 override_approval_id=session_context.get("governance_approval_id"),
+                execution_contract_hash=session_context.get("governance_execution_contract_hash"),
+                resume_token_ref=session_context.get("governance_resume_token_ref"),
             )
             self._tracer.emit(
                 request_id,

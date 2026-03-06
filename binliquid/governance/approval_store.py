@@ -40,6 +40,10 @@ class ApprovalStore:
                     version INTEGER NOT NULL,
                     run_id TEXT NOT NULL,
                     status TEXT NOT NULL,
+                    target_kind TEXT NOT NULL DEFAULT '',
+                    target_ref TEXT NOT NULL DEFAULT '',
+                    action_hash TEXT NOT NULL DEFAULT '',
+                    policy_hash TEXT NOT NULL DEFAULT '',
                     request_hash TEXT NOT NULL,
                     snapshot_hash TEXT NOT NULL,
                     snapshot_json TEXT NOT NULL,
@@ -49,17 +53,57 @@ class ApprovalStore:
                     execution_status TEXT NOT NULL,
                     executed_at TEXT,
                     execution_error_code TEXT,
+                    execution_contract_hash TEXT,
+                    resume_token_ref TEXT,
+                    resume_claimed_job_id TEXT,
+                    resume_claimed_at TEXT,
+                    consumed_by_job_id TEXT,
+                    consumed_at TEXT,
                     idempotency_key TEXT NOT NULL UNIQUE,
                     created_at TEXT NOT NULL,
                     decided_at TEXT
                 )
                 """
             )
+            existing_cols = {
+                str(row["name"]) for row in conn.execute("PRAGMA table_info(approvals)").fetchall()
+            }
+            migrations = {
+                "target_kind": (
+                    "ALTER TABLE approvals ADD COLUMN target_kind TEXT NOT NULL DEFAULT ''"
+                ),
+                "target_ref": (
+                    "ALTER TABLE approvals ADD COLUMN target_ref TEXT NOT NULL DEFAULT ''"
+                ),
+                "action_hash": (
+                    "ALTER TABLE approvals ADD COLUMN action_hash TEXT NOT NULL DEFAULT ''"
+                ),
+                "policy_hash": (
+                    "ALTER TABLE approvals ADD COLUMN policy_hash TEXT NOT NULL DEFAULT ''"
+                ),
+                "execution_contract_hash": (
+                    "ALTER TABLE approvals ADD COLUMN execution_contract_hash TEXT"
+                ),
+                "resume_token_ref": "ALTER TABLE approvals ADD COLUMN resume_token_ref TEXT",
+                "resume_claimed_job_id": (
+                    "ALTER TABLE approvals ADD COLUMN resume_claimed_job_id TEXT"
+                ),
+                "resume_claimed_at": "ALTER TABLE approvals ADD COLUMN resume_claimed_at TEXT",
+                "consumed_by_job_id": "ALTER TABLE approvals ADD COLUMN consumed_by_job_id TEXT",
+                "consumed_at": "ALTER TABLE approvals ADD COLUMN consumed_at TEXT",
+            }
+            for column, statement in migrations.items():
+                if column not in existing_cols:
+                    conn.execute(statement)
 
     def create_ticket(
         self,
         *,
         run_id: str,
+        target_kind: str,
+        target_ref: str,
+        action_hash: str,
+        policy_hash: str,
         request_hash: str,
         snapshot_hash: str,
         snapshot: dict[str, Any],
@@ -72,6 +116,10 @@ class ApprovalStore:
             approval_id=str(uuid4()),
             run_id=run_id,
             status=ApprovalStatus.PENDING,
+            target_kind=target_kind,
+            target_ref=target_ref,
+            action_hash=action_hash,
+            policy_hash=policy_hash,
             request_hash=request_hash,
             snapshot_hash=snapshot_hash,
             snapshot=snapshot,
@@ -84,16 +132,28 @@ class ApprovalStore:
             conn.execute(
                 """
                 INSERT INTO approvals (
-                    approval_id, version, run_id, status, request_hash, snapshot_hash,
+                    approval_id, version, run_id, status, target_kind, target_ref, action_hash,
+                    policy_hash, request_hash, snapshot_hash,
                     snapshot_json, expires_at, actor, decision_reason, execution_status,
-                    executed_at, execution_error_code, idempotency_key, created_at, decided_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    executed_at, execution_error_code, execution_contract_hash,
+                    resume_token_ref, resume_claimed_job_id, resume_claimed_at,
+                    consumed_by_job_id, consumed_at,
+                    idempotency_key, created_at, decided_at
+                )
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
                 """,
                 (
                     ticket.approval_id,
                     ticket.version,
                     ticket.run_id,
                     ticket.status.value,
+                    ticket.target_kind,
+                    ticket.target_ref,
+                    ticket.action_hash,
+                    ticket.policy_hash,
                     ticket.request_hash,
                     ticket.snapshot_hash,
                     json.dumps(ticket.snapshot, ensure_ascii=False, sort_keys=True),
@@ -103,6 +163,12 @@ class ApprovalStore:
                     ticket.execution_status.value,
                     ticket.executed_at.isoformat() if ticket.executed_at else None,
                     ticket.execution_error_code,
+                    ticket.execution_contract_hash,
+                    ticket.resume_token_ref,
+                    ticket.resume_claimed_job_id,
+                    ticket.resume_claimed_at.isoformat() if ticket.resume_claimed_at else None,
+                    ticket.consumed_by_job_id,
+                    ticket.consumed_at.isoformat() if ticket.consumed_at else None,
                     ticket.idempotency_key,
                     ticket.created_at.isoformat(),
                     ticket.decided_at.isoformat() if ticket.decided_at else None,
@@ -245,6 +311,166 @@ class ApprovalStore:
             )
         return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
 
+    def mark_consumed(
+        self,
+        *,
+        approval_id: str,
+        consumed_by_job_id: str,
+        execution_contract_hash: str | None = None,
+        resume_token_ref: str | None = None,
+    ) -> ApprovalDecisionResult:
+        ticket = self.get(approval_id)
+        if ticket is None:
+            return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
+        if ticket.status != ApprovalStatus.EXECUTED:
+            return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+        if (
+            ticket.execution_contract_hash
+            and execution_contract_hash
+            and ticket.execution_contract_hash != execution_contract_hash
+        ):
+            return ApprovalDecisionResult(ticket=ticket, error_code="STALE_APPROVAL_SNAPSHOT")
+        if ticket.execution_contract_hash and not execution_contract_hash:
+            return ApprovalDecisionResult(ticket=ticket, error_code="STALE_APPROVAL_SNAPSHOT")
+        if ticket.resume_claimed_job_id and ticket.resume_claimed_job_id != consumed_by_job_id:
+            return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+        if (
+            ticket.resume_token_ref
+            and resume_token_ref
+            and ticket.resume_token_ref != resume_token_ref
+        ):
+            return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+
+        now = datetime.now(UTC)
+        with self._conn() as conn:
+            updated = conn.execute(
+                """
+                UPDATE approvals
+                SET status = ?, consumed_by_job_id = ?, consumed_at = ?, version = version + 1
+                WHERE approval_id = ? AND version = ? AND status = ?
+                """,
+                (
+                    ApprovalStatus.CONSUMED.value,
+                    consumed_by_job_id,
+                    now.isoformat(),
+                    approval_id,
+                    ticket.version,
+                    ApprovalStatus.EXECUTED.value,
+                ),
+            ).rowcount
+        if updated == 0:
+            return ApprovalDecisionResult(
+                ticket=self.get(approval_id),
+                error_code="APPROVAL_CONFLICT",
+            )
+        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+
+    def attach_execution_contract(
+        self,
+        *,
+        approval_id: str,
+        execution_contract: dict[str, Any],
+        execution_contract_hash: str,
+        snapshot_hash: str,
+    ) -> ApprovalDecisionResult:
+        ticket = self.get(approval_id)
+        if ticket is None:
+            return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
+        snapshot = dict(ticket.snapshot)
+        snapshot["execution_contract"] = execution_contract
+        with self._conn() as conn:
+            updated = conn.execute(
+                """
+                UPDATE approvals
+                SET snapshot_hash = ?, snapshot_json = ?, execution_contract_hash = ?,
+                    resume_token_ref = NULL, resume_claimed_job_id = NULL, resume_claimed_at = NULL,
+                    version = version + 1
+                WHERE approval_id = ? AND version = ?
+                """,
+                (
+                    snapshot_hash,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    execution_contract_hash,
+                    approval_id,
+                    ticket.version,
+                ),
+            ).rowcount
+        if updated == 0:
+            return ApprovalDecisionResult(
+                ticket=self.get(approval_id), error_code="APPROVAL_CONFLICT"
+            )
+        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+
+    def claim_resume(
+        self,
+        *,
+        approval_id: str,
+        resume_job_id: str,
+        resume_token_ref: str,
+        execution_contract_hash: str,
+    ) -> ApprovalDecisionResult:
+        ticket = self.get(approval_id)
+        if ticket is None:
+            return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
+        if ticket.status != ApprovalStatus.EXECUTED:
+            return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+        if ticket.consumed_at is not None or ticket.consumed_by_job_id is not None:
+            return ApprovalDecisionResult(ticket=ticket, error_code="REPLAY_BLOCKED")
+        if (
+            ticket.execution_contract_hash
+            and ticket.execution_contract_hash != execution_contract_hash
+        ):
+            return ApprovalDecisionResult(ticket=ticket, error_code="STALE_APPROVAL_SNAPSHOT")
+        if (
+            ticket.resume_claimed_job_id == resume_job_id
+            and ticket.resume_token_ref == resume_token_ref
+        ):
+            return ApprovalDecisionResult(ticket=ticket, error_code=None)
+        if (
+            ticket.resume_claimed_job_id is not None
+            and ticket.resume_claimed_job_id != resume_job_id
+        ):
+            return ApprovalDecisionResult(ticket=ticket, error_code="RESUME_DUPLICATE_SUPPRESSED")
+
+        now = datetime.now(UTC)
+        with self._conn() as conn:
+            updated = conn.execute(
+                """
+                UPDATE approvals
+                SET resume_token_ref = ?, resume_claimed_job_id = ?, resume_claimed_at = ?,
+                    version = version + 1
+                WHERE approval_id = ? AND version = ? AND status = ?
+                  AND consumed_at IS NULL
+                  AND (
+                      resume_claimed_job_id IS NULL
+                      OR (
+                          resume_claimed_job_id = ?
+                          AND resume_token_ref = ?
+                      )
+                  )
+                """,
+                (
+                    resume_token_ref,
+                    resume_job_id,
+                    now.isoformat(),
+                    approval_id,
+                    ticket.version,
+                    ApprovalStatus.EXECUTED.value,
+                    resume_job_id,
+                    resume_token_ref,
+                ),
+            ).rowcount
+        if updated == 0:
+            current = self.get(approval_id)
+            if (
+                current is not None
+                and current.resume_claimed_job_id == resume_job_id
+                and current.resume_token_ref == resume_token_ref
+            ):
+                return ApprovalDecisionResult(ticket=current, error_code=None)
+            return ApprovalDecisionResult(ticket=current, error_code="RESUME_DUPLICATE_SUPPRESSED")
+        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+
     @staticmethod
     def _row_to_ticket(row: sqlite3.Row) -> ApprovalTicket:
         return ApprovalTicket(
@@ -252,6 +478,10 @@ class ApprovalStore:
             approval_id=str(row["approval_id"]),
             run_id=str(row["run_id"]),
             status=ApprovalStatus(str(row["status"])),
+            target_kind=str(row["target_kind"]),
+            target_ref=str(row["target_ref"]),
+            action_hash=str(row["action_hash"]),
+            policy_hash=str(row["policy_hash"]),
             request_hash=str(row["request_hash"]),
             snapshot_hash=str(row["snapshot_hash"]),
             snapshot=json.loads(str(row["snapshot_json"])),
@@ -264,6 +494,24 @@ class ApprovalStore:
             ),
             execution_error_code=(
                 str(row["execution_error_code"]) if row["execution_error_code"] else None
+            ),
+            execution_contract_hash=(
+                str(row["execution_contract_hash"]) if row["execution_contract_hash"] else None
+            ),
+            resume_token_ref=(str(row["resume_token_ref"]) if row["resume_token_ref"] else None),
+            resume_claimed_job_id=(
+                str(row["resume_claimed_job_id"]) if row["resume_claimed_job_id"] else None
+            ),
+            resume_claimed_at=(
+                datetime.fromisoformat(str(row["resume_claimed_at"]))
+                if row["resume_claimed_at"]
+                else None
+            ),
+            consumed_by_job_id=(
+                str(row["consumed_by_job_id"]) if row["consumed_by_job_id"] else None
+            ),
+            consumed_at=(
+                datetime.fromisoformat(str(row["consumed_at"])) if row["consumed_at"] else None
             ),
             idempotency_key=str(row["idempotency_key"]),
             created_at=datetime.fromisoformat(str(row["created_at"])),

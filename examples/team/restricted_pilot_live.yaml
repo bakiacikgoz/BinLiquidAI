@@ -1,0 +1,81 @@
+version: "1"
+team:
+  team_id: "aegis-pilot-bounded-live"
+  supervisor_policy: "sequential_then_parallel"
+  agents:
+    - agent_id: "agent-intake"
+      role: "Intake Agent"
+      allowed_task_types: ["chat", "plan"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["session", "case"]
+      tool_policy_profile: "restricted"
+      approval_mode: "auto"
+    - agent_id: "agent-research"
+      role: "Research Analyst Agent"
+      allowed_task_types: ["research", "plan"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "restricted"
+      approval_mode: "auto"
+    - agent_id: "agent-compliance"
+      role: "Policy/Compliance Agent"
+      allowed_task_types: ["plan"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "restricted"
+      approval_mode: "auto"
+    - agent_id: "agent-review"
+      role: "Reviewer/QA Agent"
+      allowed_task_types: ["chat", "plan"]
+      profile_name: "restricted"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "restricted"
+      approval_mode: "auto"
+  handoff_rules:
+    - from_role: "Intake Agent"
+      to_role: "Research Analyst Agent"
+      required: true
+    - from_role: "Intake Agent"
+      to_role: "Policy/Compliance Agent"
+      required: true
+    - from_role: "Research Analyst Agent"
+      to_role: "Reviewer/QA Agent"
+      required: true
+    - from_role: "Policy/Compliance Agent"
+      to_role: "Reviewer/QA Agent"
+      required: true
+  termination_rules:
+    max_tasks: 8
+    max_retries: 1
+    max_handoff_depth: 8
+tasks:
+  - task_id: "task-intake"
+    title: "Intake normalization"
+    task_type: "plan"
+    role: "Intake Agent"
+    depends_on: []
+    input_template: "Normalize request for controlled pilot execution: {{request}}"
+  - task_id: "task-research"
+    title: "Research branch"
+    task_type: "research"
+    role: "Research Analyst Agent"
+    depends_on: ["task-intake"]
+    input_template: "Produce evidence-backed research notes from intake output."
+    memory_target: "shared/research-notes"
+  - task_id: "task-policy"
+    title: "Policy branch"
+    task_type: "plan"
+    role: "Policy/Compliance Agent"
+    depends_on: ["task-intake"]
+    input_template: "Check policy and compliance constraints for the request."
+    memory_target: "shared/policy-notes"
+  - task_id: "task-review"
+    title: "Review synthesis"
+    task_type: "chat"
+    role: "Reviewer/QA Agent"
+    depends_on: ["task-research", "task-policy"]
+    input_template: "Review the branch outputs, combine scoped memory context, and publish the final summary."

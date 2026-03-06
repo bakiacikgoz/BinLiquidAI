@@ -69,3 +69,115 @@ If capabilities contract or command flags are missing, keep UI mutations disable
 - Router drift: inspect `router_shadow_agreement_rate` and disagreement samples.
 - Fast-path quality drift: inspect `fast_path_regret_rate`.
 - Unexpected memory growth: verify `memory_ttl_days`, dedup hits, prune behavior.
+
+## 10. Team Runtime Pilot Runbook
+
+### Preflight
+
+Run the release-blocking gate before any controlled pilot:
+
+```bash
+uv run ruff check .
+uv run pytest -q \
+  tests/test_team_governance.py \
+  tests/test_team_memory_fail_closed.py \
+  tests/test_team_audit_envelope.py \
+  tests/test_team_cli.py \
+  tests/test_team_pilot_gate.py
+uv run binliquid team validate --spec examples/team/restricted_pilot.yaml --json
+uv run binliquid team pilot-check \
+  --spec examples/team/restricted_pilot.yaml \
+  --profile restricted \
+  --mode deterministic \
+  --report artifacts/team_pilot_report.json \
+  --json
+```
+
+Gate outcome requirements:
+
+- `team pilot-check` exits `0`.
+- `artifacts/team_pilot_report.json` exists and reports `overall_status=pass`.
+- clean `team replay --verify` passes for the smoke artifacts.
+- tamper probe fails verification.
+- approval reuse probe is blocked.
+- scope isolation probe fails closed.
+- bounded-concurrency checks report `stale_approval_count=0` and `memory_conflict_count=0`.
+
+Approval lifecycle for Team Runtime is `pending -> approved -> executed -> consumed`.
+`approved` alone is not sufficient for resume or override use.
+Approval-gated resume is bound to a frozen execution contract. If memory view or canonical task input drifts, resume must stop with `STALE_APPROVAL_SNAPSHOT`.
+Shared `memory_target` writes use optimistic version checks and reject on conflict; there is no last-write-wins fallback in restricted pilot mode.
+
+### Live Pilot Rehearsal
+
+Before a real restricted pilot, run one live-provider rehearsal in the target environment:
+
+```bash
+uv run binliquid team pilot-check \
+  --spec examples/team/restricted_pilot_live.yaml \
+  --profile restricted \
+  --mode live-provider \
+  --provider auto \
+  --report artifacts/team_pilot_live_report.json \
+  --json
+```
+
+Use the same spec, profile, and artifact retention path that will be used for the pilot window.
+
+### Artifact Retention
+
+Retain these artifacts for every pilot check and pilot rehearsal:
+
+- `artifacts/team_pilot_report.json`
+- `artifacts/team_pilot_live_report.json` when a live rehearsal is run
+- `.binliquid/team/jobs/<job_id>/status.json`
+- `.binliquid/team/jobs/<job_id>/events.jsonl`
+- `.binliquid/team/jobs/<job_id>/tasks.json`
+- `.binliquid/team/jobs/<job_id>/handoffs.json`
+- `.binliquid/team/jobs/<job_id>/audit_envelope.json`
+- `artifacts/team_summary.json`
+- `uv run binliquid config resolve --profile restricted --json` output
+- approval store snapshot or the approval summary embedded in the pilot report
+
+### Incident Response
+
+- Replay verify fails:
+  - stop the pilot immediately
+  - export the affected job artifacts
+  - preserve the failing `team replay --verify` output
+  - open a root-cause item before any rerun
+- Approval mismatch or approval reuse attempt succeeds:
+  - mark the pilot `No-Go`
+  - invalidate outstanding approvals for the affected run set
+  - do not reuse the blocked source jobs
+- Audit inconsistency or missing causal refs:
+  - stop the pilot
+  - copy artifacts to immutable storage
+  - treat the release candidate as invalid until fixed
+- Scope violation or unexpected memory write succeeds:
+  - disable Team Runtime immediately
+  - revert to the core single-agent path only
+
+### Rollback And Kill-Switch
+
+The supported hard stop for this slice is disabling Team Runtime entirely:
+
+```bash
+BINLIQUID_TEAM_ENABLED=false uv run binliquid team run --spec examples/team/restricted_pilot.yaml --once "pilot disable check" --profile restricted --json
+```
+
+Expected result: the command fails with Team Runtime disabled and no new team delegation starts.
+
+Operational fallback for this slice is the core single-agent runtime, not a degraded team mode.
+`BINLIQUID_TEAM_MAX_PARALLEL_TASKS=1` may help diagnosis, but it is not a rollback mechanism.
+If bounded concurrency repeatedly falls back to serialized execution, treat that as a pilot warning. If drift/conflict repeats in the same workload, force serial diagnosis first; if it persists, disable Team Runtime entirely.
+
+### Stop Conditions
+
+Do not start or continue a pilot if any of the following occur:
+
+- any deterministic `team pilot-check` failure
+- nondeterministic smoke behavior across repeated deterministic runs
+- replay or audit inconsistency
+- approval reuse or consumed-state bypass
+- scope isolation bypass

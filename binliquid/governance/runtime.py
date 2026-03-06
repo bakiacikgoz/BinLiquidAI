@@ -12,6 +12,7 @@ from binliquid.governance.models import (
     ApprovalStatus,
     ApprovalTicket,
     AuditRecord,
+    ExecutionStatus,
     GovernanceAction,
     GovernanceDecision,
     GovernancePhase,
@@ -73,6 +74,12 @@ class GovernanceRuntime:
     def approval_store(self) -> ApprovalStore:
         return self._approval_store
 
+    @property
+    def policy_hash(self) -> str:
+        if self._policy_bundle is None:
+            return "disabled"
+        return self._policy_bundle.policy_hash
+
     def _load_policy(self) -> None:
         if not self._gov.enabled:
             return
@@ -99,6 +106,8 @@ class GovernanceRuntime:
         task_type: str,
         user_input: str,
         override_approval_id: str | None = None,
+        execution_contract_hash: str | None = None,
+        resume_token_ref: str | None = None,
     ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
         if not self._gov.enabled:
             decision = self._default_allow_decision(phase=GovernancePhase.TASK, target=task_type)
@@ -119,13 +128,24 @@ class GovernanceRuntime:
             self._record_decision(run_id, decision)
             return decision, None
 
-        override_ticket = self._approved_override_ticket(override_approval_id)
+        target_ref = task_type
+        action_hash = self._task_action_hash(task_type=task_type, user_input=user_input)
+        override_ticket = self._consume_override_ticket(
+            approval_id=override_approval_id,
+            run_id=run_id,
+            target_kind="task",
+            target_ref=target_ref,
+            action_hash=action_hash,
+            policy_hash=self._policy_bundle.policy_hash,
+            execution_contract_hash=execution_contract_hash,
+            resume_token_ref=resume_token_ref,
+        )
         if override_ticket is not None:
             decision = GovernanceDecision(
                 phase=GovernancePhase.TASK,
                 target=task_type,
                 action=GovernanceAction.ALLOW,
-                reason_code="APPROVAL_PENDING",
+                reason_code="APPROVAL_OVERRIDE",
                 matched_rule_path="approval_override",
                 policy_schema_version=self._policy_bundle.policy.policy_schema_version,
                 policy_version=self._policy_bundle.policy.policy_version,
@@ -133,10 +153,37 @@ class GovernanceRuntime:
                 decision_engine_version=self._gov.decision_engine_version,
                 approval_required=False,
                 approval_id=override_ticket.approval_id,
-                explain="approved override",
+                explain="executed approval override validated",
             )
+            self._set_approval_status(run_id, "validated")
             self._record_decision(run_id, decision)
             return decision, None
+        if override_approval_id:
+            override_error = self._override_error_code(
+                approval_id=override_approval_id,
+                run_id=run_id,
+                target_kind="task",
+                target_ref=target_ref,
+                action_hash=action_hash,
+                policy_hash=self._policy_bundle.policy_hash,
+                execution_contract_hash=execution_contract_hash,
+                resume_token_ref=resume_token_ref,
+            )
+            if override_error is not None:
+                decision = GovernanceDecision(
+                    phase=GovernancePhase.TASK,
+                    target=task_type,
+                    action=GovernanceAction.DENY,
+                    reason_code=override_error,
+                    matched_rule_path="approval_override",
+                    policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+                    policy_version=self._policy_bundle.policy.policy_version,
+                    policy_hash=self._policy_bundle.policy_hash,
+                    decision_engine_version=self._gov.decision_engine_version,
+                    explain="approval override validation failed",
+                )
+                self._record_decision(run_id, decision)
+                return decision, None
 
         match = evaluate_task(self._policy_bundle.policy, task_type=task_type)
         decision = GovernanceDecision(
@@ -158,14 +205,20 @@ class GovernanceRuntime:
             request_hash = self._hash_payload({"task_type": task_type, "user_input": user_input})
             snapshot = {
                 "kind": "task",
+                "target_kind": "task",
+                "target_ref": target_ref,
+                "action_hash": action_hash,
                 "task_type": task_type,
                 "user_input": user_input,
-                "run_id": run_id,
                 "policy_hash": self._policy_bundle.policy_hash,
             }
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
                 run_id=run_id,
+                target_kind="task",
+                target_ref=target_ref,
+                action_hash=action_hash,
+                policy_hash=self._policy_bundle.policy_hash,
                 request_hash=request_hash,
                 snapshot_hash=snapshot_hash,
                 snapshot=snapshot,
@@ -225,17 +278,28 @@ class GovernanceRuntime:
         )
         ticket: ApprovalTicket | None = None
         if match.action == GovernanceAction.REQUIRE_APPROVAL:
+            action_hash = self._tool_action_hash(
+                command_root=command_root,
+                normalized_args=normalized_args,
+                policy_hash=self._policy_bundle.policy_hash,
+            )
             snapshot = {
                 "kind": "tool",
+                "target_kind": "tool",
+                "target_ref": command_root,
+                "action_hash": action_hash,
                 "command": command,
                 "normalized": [command_root, *normalized_args],
-                "run_id": run_id,
                 "policy_hash": self._policy_bundle.policy_hash,
             }
             request_hash = self._hash_payload(snapshot["normalized"])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
                 run_id=run_id,
+                target_kind="tool",
+                target_ref=command_root,
+                action_hash=action_hash,
+                policy_hash=self._policy_bundle.policy_hash,
                 request_hash=request_hash,
                 snapshot_hash=snapshot_hash,
                 snapshot=snapshot,
@@ -266,6 +330,8 @@ class GovernanceRuntime:
         to_role: str,
         payload: dict[str, Any],
         override_approval_id: str | None = None,
+        execution_contract_hash: str | None = None,
+        resume_token_ref: str | None = None,
     ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
         if not self._gov.enabled:
             decision = self._default_allow_decision(
@@ -290,13 +356,29 @@ class GovernanceRuntime:
             return decision, None
 
         payload_hash = self._hash_payload(payload)
-        override_ticket = self._approved_override_ticket(override_approval_id)
+        target_ref = f"{from_role}->{to_role}"
+        action_hash = self._handoff_action_hash(
+            from_role=from_role,
+            to_role=to_role,
+            payload_hash=payload_hash,
+            policy_hash=self._policy_bundle.policy_hash,
+        )
+        override_ticket = self._consume_override_ticket(
+            approval_id=override_approval_id,
+            run_id=run_id,
+            target_kind="handoff",
+            target_ref=target_ref,
+            action_hash=action_hash,
+            policy_hash=self._policy_bundle.policy_hash,
+            execution_contract_hash=execution_contract_hash,
+            resume_token_ref=resume_token_ref,
+        )
         if override_ticket is not None:
             decision = GovernanceDecision(
                 phase=GovernancePhase.HANDOFF,
-                target=f"{from_role}->{to_role}",
+                target=target_ref,
                 action=GovernanceAction.ALLOW,
-                reason_code="APPROVAL_PENDING",
+                reason_code="APPROVAL_OVERRIDE",
                 matched_rule_path="approval_override",
                 policy_schema_version=self._policy_bundle.policy.policy_schema_version,
                 policy_version=self._policy_bundle.policy.policy_version,
@@ -304,7 +386,7 @@ class GovernanceRuntime:
                 decision_engine_version=self._gov.decision_engine_version,
                 approval_required=False,
                 approval_id=override_ticket.approval_id,
-                explain="approved override",
+                explain="executed approval override validated",
             )
             self._record_handoff(
                 run_id,
@@ -316,8 +398,35 @@ class GovernanceRuntime:
                     reason_code=decision.reason_code,
                 ),
             )
+            self._set_approval_status(run_id, "validated")
             self._record_decision(run_id, decision)
             return decision, None
+        if override_approval_id:
+            override_error = self._override_error_code(
+                approval_id=override_approval_id,
+                run_id=run_id,
+                target_kind="handoff",
+                target_ref=target_ref,
+                action_hash=action_hash,
+                policy_hash=self._policy_bundle.policy_hash,
+                execution_contract_hash=execution_contract_hash,
+                resume_token_ref=resume_token_ref,
+            )
+            if override_error is not None:
+                decision = GovernanceDecision(
+                    phase=GovernancePhase.HANDOFF,
+                    target=target_ref,
+                    action=GovernanceAction.DENY,
+                    reason_code=override_error,
+                    matched_rule_path="approval_override",
+                    policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+                    policy_version=self._policy_bundle.policy.policy_version,
+                    policy_hash=self._policy_bundle.policy_hash,
+                    decision_engine_version=self._gov.decision_engine_version,
+                    explain="approval override validation failed",
+                )
+                self._record_decision(run_id, decision)
+                return decision, None
 
         match = evaluate_handoff(
             self._policy_bundle.policy,
@@ -342,16 +451,22 @@ class GovernanceRuntime:
         if match.action == GovernanceAction.REQUIRE_APPROVAL:
             snapshot = {
                 "kind": "handoff",
+                "target_kind": "handoff",
+                "target_ref": target_ref,
+                "action_hash": action_hash,
                 "from_role": from_role,
                 "to_role": to_role,
                 "payload_hash": payload_hash,
-                "run_id": run_id,
                 "policy_hash": self._policy_bundle.policy_hash,
             }
             request_hash = self._hash_payload([from_role, to_role, payload_hash])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
                 run_id=run_id,
+                target_kind="handoff",
+                target_ref=target_ref,
+                action_hash=action_hash,
+                policy_hash=self._policy_bundle.policy_hash,
                 request_hash=request_hash,
                 snapshot_hash=snapshot_hash,
                 snapshot=snapshot,
@@ -382,6 +497,10 @@ class GovernanceRuntime:
         producer_role: str,
         visibility: str,
         override_approval_id: str | None = None,
+        memory_target: str | None = None,
+        expected_state_version: int | None = None,
+        execution_contract_hash: str | None = None,
+        resume_token_ref: str | None = None,
     ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
         if not self._gov.enabled:
             decision = self._default_allow_decision(
@@ -405,13 +524,31 @@ class GovernanceRuntime:
             self._record_decision(run_id, decision)
             return decision, None
 
-        override_ticket = self._approved_override_ticket(override_approval_id)
+        target_ref = f"{scope}:{producer_role}:{visibility}:{memory_target or ''}"
+        action_hash = self._memory_action_hash(
+            scope=scope,
+            producer_role=producer_role,
+            visibility=visibility,
+            memory_target=memory_target,
+            expected_state_version=expected_state_version,
+            policy_hash=self._policy_bundle.policy_hash,
+        )
+        override_ticket = self._consume_override_ticket(
+            approval_id=override_approval_id,
+            run_id=run_id,
+            target_kind="memory_write",
+            target_ref=target_ref,
+            action_hash=action_hash,
+            policy_hash=self._policy_bundle.policy_hash,
+            execution_contract_hash=execution_contract_hash,
+            resume_token_ref=resume_token_ref,
+        )
         if override_ticket is not None:
             decision = GovernanceDecision(
                 phase=GovernancePhase.MEMORY_WRITE,
-                target=f"{scope}:{producer_role}:{visibility}",
+                target=target_ref,
                 action=GovernanceAction.ALLOW,
-                reason_code="APPROVAL_PENDING",
+                reason_code="APPROVAL_OVERRIDE",
                 matched_rule_path="approval_override",
                 policy_schema_version=self._policy_bundle.policy.policy_schema_version,
                 policy_version=self._policy_bundle.policy.policy_version,
@@ -419,7 +556,7 @@ class GovernanceRuntime:
                 decision_engine_version=self._gov.decision_engine_version,
                 approval_required=False,
                 approval_id=override_ticket.approval_id,
-                explain="approved override",
+                explain="executed approval override validated",
             )
             self._record_memory_write(
                 run_id,
@@ -431,8 +568,35 @@ class GovernanceRuntime:
                     reason_code=decision.reason_code,
                 ),
             )
+            self._set_approval_status(run_id, "validated")
             self._record_decision(run_id, decision)
             return decision, None
+        if override_approval_id:
+            override_error = self._override_error_code(
+                approval_id=override_approval_id,
+                run_id=run_id,
+                target_kind="memory_write",
+                target_ref=target_ref,
+                action_hash=action_hash,
+                policy_hash=self._policy_bundle.policy_hash,
+                execution_contract_hash=execution_contract_hash,
+                resume_token_ref=resume_token_ref,
+            )
+            if override_error is not None:
+                decision = GovernanceDecision(
+                    phase=GovernancePhase.MEMORY_WRITE,
+                    target=target_ref,
+                    action=GovernanceAction.DENY,
+                    reason_code=override_error,
+                    matched_rule_path="approval_override",
+                    policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+                    policy_version=self._policy_bundle.policy.policy_version,
+                    policy_hash=self._policy_bundle.policy_hash,
+                    decision_engine_version=self._gov.decision_engine_version,
+                    explain="approval override validation failed",
+                )
+                self._record_decision(run_id, decision)
+                return decision, None
 
         match = evaluate_memory_scope_write(
             self._policy_bundle.policy,
@@ -458,16 +622,24 @@ class GovernanceRuntime:
         if match.action == GovernanceAction.REQUIRE_APPROVAL:
             snapshot = {
                 "kind": "memory_write",
+                "target_kind": "memory_write",
+                "target_ref": target_ref,
+                "action_hash": action_hash,
                 "scope": scope,
                 "producer_role": producer_role,
                 "visibility": visibility,
-                "run_id": run_id,
+                "memory_target": memory_target,
+                "expected_state_version": expected_state_version,
                 "policy_hash": self._policy_bundle.policy_hash,
             }
             request_hash = self._hash_payload([scope, producer_role, visibility])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
                 run_id=run_id,
+                target_kind="memory_write",
+                target_ref=target_ref,
+                action_hash=action_hash,
+                policy_hash=self._policy_bundle.policy_hash,
                 request_hash=request_hash,
                 snapshot_hash=snapshot_hash,
                 snapshot=snapshot,
@@ -517,12 +689,10 @@ class GovernanceRuntime:
         model_metadata = model_metadata or {}
 
         requested_provider = str(
-            model_metadata.get("requested_provider")
-            or self._config.llm_provider
+            model_metadata.get("requested_provider") or self._config.llm_provider
         )
         requested_model_name = str(
-            model_metadata.get("requested_model_name")
-            or self._config.model_name
+            model_metadata.get("requested_model_name") or self._config.model_name
         )
 
         record = AuditRecord(
@@ -533,13 +703,11 @@ class GovernanceRuntime:
             model_name=requested_model_name,
             requested_provider=requested_provider,
             requested_fallback_provider=str(
-                model_metadata.get("requested_fallback_provider")
-                or self._config.fallback_provider
+                model_metadata.get("requested_fallback_provider") or self._config.fallback_provider
             ),
             requested_model_name=requested_model_name,
             requested_hf_model_id=str(
-                model_metadata.get("requested_hf_model_id")
-                or self._config.hf_model_id
+                model_metadata.get("requested_hf_model_id") or self._config.hf_model_id
             ),
             selected_provider=(
                 str(model_metadata["selected_provider"])
@@ -603,6 +771,184 @@ class GovernanceRuntime:
     def execute_approval(self, *, approval_id: str) -> ApprovalDecisionResult:
         return self._approval_store.mark_executed(approval_id=approval_id)
 
+    def request_manual_task_approval(
+        self,
+        *,
+        run_id: str,
+        task_type: str,
+        user_input: str,
+        reason_code: str,
+        explain: str,
+    ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
+        if not self._gov.enabled:
+            decision = self._default_allow_decision(phase=GovernancePhase.TASK, target=task_type)
+            return decision, None
+        if self._policy_bundle is None:
+            decision = GovernanceDecision(
+                phase=GovernancePhase.TASK,
+                target=task_type,
+                action=GovernanceAction.DENY,
+                reason_code="POLICY_UNAVAILABLE",
+                matched_rule_path=None,
+                policy_schema_version="unavailable",
+                policy_version="unavailable",
+                policy_hash="unavailable",
+                decision_engine_version=self._gov.decision_engine_version,
+                explain=self._policy_error,
+            )
+            self._record_decision(run_id, decision)
+            return decision, None
+
+        target_ref = task_type
+        action_hash = self._task_action_hash(task_type=task_type, user_input=user_input)
+        snapshot = {
+            "kind": "task",
+            "target_kind": "task",
+            "target_ref": target_ref,
+            "action_hash": action_hash,
+            "task_type": task_type,
+            "user_input": user_input,
+            "policy_hash": self._policy_bundle.policy_hash,
+            "manual_reason_code": reason_code,
+        }
+        request_hash = self._hash_payload({"task_type": task_type, "user_input": user_input})
+        snapshot_hash = self._hash_payload(snapshot)
+        ticket = self._approval_store.create_ticket(
+            run_id=run_id,
+            target_kind="task",
+            target_ref=target_ref,
+            action_hash=action_hash,
+            policy_hash=self._policy_bundle.policy_hash,
+            request_hash=request_hash,
+            snapshot_hash=snapshot_hash,
+            snapshot=snapshot,
+            ttl_seconds=self._gov.approval_ttl_seconds,
+            idempotency_key=f"task-manual:{run_id}:{snapshot_hash}",
+        )
+        self._set_approval_status(run_id, "pending")
+        decision = GovernanceDecision(
+            phase=GovernancePhase.TASK,
+            target=task_type,
+            action=GovernanceAction.REQUIRE_APPROVAL,
+            reason_code=reason_code,
+            matched_rule_path="manual_approval",
+            policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+            policy_version=self._policy_bundle.policy.policy_version,
+            policy_hash=self._policy_bundle.policy_hash,
+            decision_engine_version=self._gov.decision_engine_version,
+            approval_required=True,
+            approval_id=ticket.approval_id,
+            explain=explain,
+        )
+        self._record_decision(run_id, decision)
+        return decision, ticket
+
+    def consume_approval(
+        self,
+        *,
+        approval_id: str,
+        consumed_by_job_id: str,
+        execution_contract_hash: str | None = None,
+        resume_token_ref: str | None = None,
+    ) -> ApprovalDecisionResult:
+        return self._approval_store.mark_consumed(
+            approval_id=approval_id,
+            consumed_by_job_id=consumed_by_job_id,
+            execution_contract_hash=execution_contract_hash,
+            resume_token_ref=resume_token_ref,
+        )
+
+    def attach_execution_contract(
+        self,
+        *,
+        approval_id: str,
+        execution_contract: dict[str, Any],
+        execution_contract_hash: str,
+    ) -> ApprovalDecisionResult:
+        snapshot_hash = self._hash_payload(
+            {
+                **(
+                    self._approval_store.get(approval_id).snapshot
+                    if self._approval_store.get(approval_id)
+                    else {}
+                ),
+                "execution_contract": execution_contract,
+            }
+        )
+        return self._approval_store.attach_execution_contract(
+            approval_id=approval_id,
+            execution_contract=execution_contract,
+            execution_contract_hash=execution_contract_hash,
+            snapshot_hash=snapshot_hash,
+        )
+
+    def prepare_resume_approval(
+        self,
+        *,
+        approval_id: str,
+        run_id: str,
+        task_run_id: str,
+        target_kind: str,
+        execution_contract_hash: str,
+    ) -> ApprovalDecisionResult:
+        self._approval_store.expire_pending()
+        ticket = self._approval_store.get(approval_id)
+        if ticket is None:
+            return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
+        contract_task_run_id = str(
+            ticket.snapshot.get("execution_contract", {}).get("task_run_id") or task_run_id
+        )
+        resume_token_ref = self._hash_payload(
+            {
+                "source_job_id": ticket.run_id,
+                "task_run_id": contract_task_run_id,
+                "approval_id": approval_id,
+                "snapshot_hash": ticket.snapshot_hash,
+                "target_kind": target_kind,
+            }
+        )
+        return self._approval_store.claim_resume(
+            approval_id=approval_id,
+            resume_job_id=run_id,
+            resume_token_ref=resume_token_ref,
+            execution_contract_hash=execution_contract_hash,
+        )
+
+    def task_action_hash(self, *, task_type: str, user_input: str) -> str:
+        return self._task_action_hash(task_type=task_type, user_input=user_input)
+
+    def handoff_action_hash(
+        self,
+        *,
+        from_role: str,
+        to_role: str,
+        payload_hash: str,
+    ) -> str:
+        return self._handoff_action_hash(
+            from_role=from_role,
+            to_role=to_role,
+            payload_hash=payload_hash,
+            policy_hash=self.policy_hash,
+        )
+
+    def memory_action_hash(
+        self,
+        *,
+        scope: str,
+        producer_role: str,
+        visibility: str,
+        memory_target: str | None,
+        expected_state_version: int | None,
+    ) -> str:
+        return self._memory_action_hash(
+            scope=scope,
+            producer_role=producer_role,
+            visibility=visibility,
+            memory_target=memory_target,
+            expected_state_version=expected_state_version,
+            policy_hash=self.policy_hash,
+        )
+
     def _record_decision(self, run_id: str, decision: GovernanceDecision) -> None:
         state = self._runs.setdefault(run_id, GovernanceRunState())
         state.decisions.append(decision)
@@ -623,16 +969,121 @@ class GovernanceRuntime:
         state = self._runs.setdefault(run_id, GovernanceRunState())
         state.approval_status = status
 
-    def _approved_override_ticket(self, approval_id: str | None) -> ApprovalTicket | None:
+    def _consume_override_ticket(
+        self,
+        *,
+        approval_id: str | None,
+        run_id: str,
+        target_kind: str,
+        target_ref: str,
+        action_hash: str,
+        policy_hash: str,
+        execution_contract_hash: str | None = None,
+        resume_token_ref: str | None = None,
+    ) -> ApprovalTicket | None:
         if not approval_id:
             return None
         self._approval_store.expire_pending()
         ticket = self._approval_store.get(approval_id)
         if ticket is None:
             return None
-        if ticket.status not in {ApprovalStatus.APPROVED, ApprovalStatus.EXECUTED}:
+        if ticket.status != ApprovalStatus.EXECUTED:
             return None
+        if ticket.execution_status != ExecutionStatus.EXECUTED:
+            return None
+        if ticket.consumed_at is not None or ticket.consumed_by_job_id is not None:
+            return None
+        if ticket.target_kind != target_kind:
+            return None
+        if ticket.target_ref != target_ref:
+            return None
+        if ticket.action_hash != action_hash:
+            return None
+        if ticket.policy_hash != policy_hash:
+            return None
+        if (
+            ticket.execution_contract_hash
+            and execution_contract_hash
+            and ticket.execution_contract_hash != execution_contract_hash
+        ):
+            return None
+        if ticket.execution_contract_hash and not execution_contract_hash:
+            return None
+        if ticket.resume_claimed_job_id not in {None, run_id}:
+            return None
+        if (
+            ticket.resume_token_ref
+            and resume_token_ref
+            and ticket.resume_token_ref != resume_token_ref
+        ):
+            return None
+        if ticket.resume_claimed_job_id is None and execution_contract_hash:
+            claim = self.prepare_resume_approval(
+                approval_id=approval_id,
+                run_id=run_id,
+                task_run_id=str(
+                    ticket.snapshot.get("execution_contract", {}).get("task_run_id") or target_ref
+                ),
+                target_kind=target_kind,
+                execution_contract_hash=execution_contract_hash,
+            )
+            if claim.error_code:
+                return None
+            return claim.ticket
         return ticket
+
+    def _override_error_code(
+        self,
+        *,
+        approval_id: str,
+        run_id: str,
+        target_kind: str,
+        target_ref: str,
+        action_hash: str,
+        policy_hash: str,
+        execution_contract_hash: str | None = None,
+        resume_token_ref: str | None = None,
+    ) -> str | None:
+        ticket = self._approval_store.get(approval_id)
+        if ticket is None:
+            return "APPROVAL_NOT_FOUND"
+        if ticket.status in {ApprovalStatus.PENDING, ApprovalStatus.APPROVED}:
+            return None
+        if ticket.execution_status == ExecutionStatus.NOT_EXECUTED:
+            return None
+        if ticket.status != ApprovalStatus.EXECUTED:
+            if ticket.status == ApprovalStatus.CONSUMED:
+                return "REPLAY_BLOCKED"
+            return "APPROVAL_CONFLICT"
+        if ticket.execution_status != ExecutionStatus.EXECUTED:
+            return "APPROVAL_CONFLICT"
+        if ticket.consumed_at is not None or ticket.consumed_by_job_id is not None:
+            return "REPLAY_BLOCKED"
+        if ticket.target_kind != target_kind:
+            return "STALE_APPROVAL_SNAPSHOT"
+        if ticket.target_ref != target_ref:
+            return "STALE_APPROVAL_SNAPSHOT"
+        if ticket.action_hash != action_hash:
+            return "STALE_APPROVAL_SNAPSHOT"
+        if ticket.policy_hash != policy_hash:
+            return "STALE_POLICY_INPUT"
+        if (
+            ticket.execution_contract_hash
+            and execution_contract_hash
+            and ticket.execution_contract_hash != execution_contract_hash
+        ):
+            return "STALE_APPROVAL_SNAPSHOT"
+        if ticket.execution_contract_hash and not execution_contract_hash:
+            return "STALE_APPROVAL_SNAPSHOT"
+        if ticket.resume_claimed_job_id not in {None, run_id}:
+            return "RESUME_DUPLICATE_SUPPRESSED"
+        if (
+            ticket.resume_token_ref
+            and resume_token_ref
+            and ticket.resume_token_ref != resume_token_ref
+        ):
+            return "STALE_RESUME_TOKEN"
+        return None
 
     def _default_allow_decision(self, *, phase: GovernancePhase, target: str) -> GovernanceDecision:
         return GovernanceDecision(
@@ -652,6 +1103,74 @@ class GovernanceRuntime:
     def _hash_payload(payload: Any) -> str:
         raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _task_action_hash(self, *, task_type: str, user_input: str) -> str:
+        return self._hash_payload(
+            {
+                "kind": "task",
+                "task_type": task_type,
+                "user_input": user_input,
+                "policy_hash": (
+                    self._policy_bundle.policy_hash if self._policy_bundle else "disabled"
+                ),
+            }
+        )
+
+    def _handoff_action_hash(
+        self,
+        *,
+        from_role: str,
+        to_role: str,
+        payload_hash: str,
+        policy_hash: str,
+    ) -> str:
+        return self._hash_payload(
+            {
+                "kind": "handoff",
+                "from_role": from_role,
+                "to_role": to_role,
+                "payload_hash": payload_hash,
+                "policy_hash": policy_hash,
+            }
+        )
+
+    def _memory_action_hash(
+        self,
+        *,
+        scope: str,
+        producer_role: str,
+        visibility: str,
+        memory_target: str | None,
+        expected_state_version: int | None,
+        policy_hash: str,
+    ) -> str:
+        return self._hash_payload(
+            {
+                "kind": "memory_write",
+                "scope": scope,
+                "producer_role": producer_role,
+                "visibility": visibility,
+                "memory_target": memory_target,
+                "expected_state_version": expected_state_version,
+                "policy_hash": policy_hash,
+            }
+        )
+
+    def _tool_action_hash(
+        self,
+        *,
+        command_root: str,
+        normalized_args: list[str],
+        policy_hash: str,
+    ) -> str:
+        return self._hash_payload(
+            {
+                "kind": "tool",
+                "command_root": command_root,
+                "normalized_args": normalized_args,
+                "policy_hash": policy_hash,
+            }
+        )
 
 
 def build_governance_runtime(config: RuntimeConfig) -> GovernanceRuntime | None:

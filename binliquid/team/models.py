@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -74,6 +75,7 @@ class TaskDefinition(BaseModel):
     role: str = Field(min_length=1)
     depends_on: list[str] = Field(default_factory=list)
     input_template: str | None = None
+    memory_target: str | None = None
 
 
 class TeamSpec(BaseModel):
@@ -88,9 +90,14 @@ class TaskRun(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     task_id: str
+    task_run_id: str = Field(default_factory=lambda: f"taskrun-{uuid4().hex[:12]}")
     parent_task_id: str | None = None
     assigned_agent_id: str
     role: str
+    task_attempt: int = Field(default=1, ge=1)
+    requested_scope: MemoryScope | None = None
+    requested_visibility: str | None = None
+    memory_target: str | None = None
     input_payload: dict[str, Any] = Field(default_factory=dict)
     status: TaskStatus = TaskStatus.PENDING
     attempt_count: int = Field(default=0, ge=0)
@@ -118,26 +125,61 @@ class JobRun(BaseModel):
 class HandoffRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    schema_version: str = "3"
+    handoff_id: str
+    from_task_id: str
+    to_task_id: str
+    from_role: str
+    to_role: str
     from_agent: str
     to_agent: str
+    source_task_run_id: str
+    dest_task_run_id: str
     payload: dict[str, Any]
     payload_hash: str
     policy_decision: str
+    policy_decision_ref: str | None = None
     redaction_applied: bool
+    approval_state: str = "none"
     approval_id: str | None = None
+    consumed_at: datetime | None = None
 
 
 class TeamEvent(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    schema_version: str = "3"
     event: str
+    event_id: str = Field(default_factory=lambda: f"evt-{uuid4().hex[:12]}")
+    event_seq: int = Field(default=0, ge=0)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     team_id: str
     case_id: str
     job_id: str
     task_id: str | None = None
+    task_run_id: str | None = None
+    task_attempt: int | None = Field(default=None, ge=1)
     agent_id: str | None = None
     role: str | None = None
+    phase: str | None = None
+    status_before: str | None = None
+    status_after: str | None = None
+    trace_id: str | None = None
+    causal_ref: str | None = None
+    approval_id: str | None = None
+    payload_hash: str | None = None
+    branch_id: str | None = None
+    branch_parent: str | None = None
+    snapshot_hash: str | None = None
+    resolved_memory_fingerprint: str | None = None
+    memory_target: str | None = None
+    expected_state_version: int | None = None
+    committed_state_version: int | None = None
+    resume_token_ref: str | None = None
+    conflict_detected: bool | None = None
+    conflict_resolution: str | None = None
+    fallback_mode_applied: str | None = None
+    serialized_due_to_policy: bool | None = None
     data: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -152,7 +194,9 @@ class AuditIntegrity(BaseModel):
 class AuditEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    envelope_version: str = "1"
+    envelope_version: str = "3"
+    event_schema_version: str = "3"
+    handoff_schema_version: str = "3"
     job_id: str
     case_id: str
     team_id: str
@@ -161,6 +205,9 @@ class AuditEnvelope(BaseModel):
     runtime_config_hash: str
     started_at: datetime
     finished_at: datetime
+    event_count: int = 0
+    trace_refs: list[str] = Field(default_factory=list)
+    consistency: dict[str, Any] = Field(default_factory=dict)
     decision_chain: list[dict[str, Any]] = Field(default_factory=list)
     approvals: list[dict[str, Any]] = Field(default_factory=list)
     tool_calls: list[dict[str, Any]] = Field(default_factory=list)
@@ -177,3 +224,4 @@ class TeamRunResult(BaseModel):
     events: list[TeamEvent]
     handoffs: list[HandoffRecord]
     audit_envelope_path: str | None = None
+    resume_outcomes: list[dict[str, Any]] = Field(default_factory=list)

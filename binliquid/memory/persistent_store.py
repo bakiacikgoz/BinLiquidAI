@@ -32,8 +32,12 @@ class MemoryRecord:
 
 @dataclass(slots=True)
 class MemoryWriteStatus:
-    record_id: int
+    record_id: int | None
     dedup_hit: bool
+    conflict_detected: bool = False
+    expected_state_version: int | None = None
+    committed_state_version: int | None = None
+    memory_target: str | None = None
 
 
 class PersistentMemoryStore:
@@ -80,10 +84,21 @@ class PersistentMemoryStore:
                 CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_memories_task_type ON memories(task_type);
                 CREATE INDEX IF NOT EXISTS idx_memories_session_id ON memories(session_id);
+
+                CREATE TABLE IF NOT EXISTS memory_targets (
+                    target_key TEXT PRIMARY KEY,
+                    scope TEXT NOT NULL,
+                    team_id TEXT,
+                    case_id TEXT,
+                    visibility TEXT NOT NULL,
+                    memory_target TEXT NOT NULL,
+                    current_version INTEGER NOT NULL DEFAULT 0,
+                    current_record_id INTEGER,
+                    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                );
                 """
             )
 
-            # Backward-compatible migration for earlier schemas.
             existing_cols = {
                 row["name"]
                 for row in self._conn.execute("PRAGMA table_info(memories)").fetchall()
@@ -100,9 +115,8 @@ class PersistentMemoryStore:
                 "visibility": "ALTER TABLE memories ADD COLUMN visibility TEXT DEFAULT 'private'",
             }
             for column, statement in migrations.items():
-                if column in existing_cols:
-                    continue
-                self._conn.execute(statement)
+                if column not in existing_cols:
+                    self._conn.execute(statement)
 
             if "content_hash" not in existing_cols:
                 self._conn.execute(
@@ -127,6 +141,10 @@ class PersistentMemoryStore:
                 "CREATE INDEX IF NOT EXISTS idx_memories_scope_visibility "
                 "ON memories(scope, visibility)"
             )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memory_targets_team_case "
+                "ON memory_targets(team_id, case_id, memory_target)"
+            )
             self._conn.commit()
 
     def write(
@@ -145,7 +163,9 @@ class PersistentMemoryStore:
         producer_agent_id: str | None = None,
         producer_role: str | None = None,
         visibility: str = "private",
-    ) -> int:
+        memory_target: str | None = None,
+        expected_state_version: int | None = None,
+    ) -> int | None:
         status = self.write_with_status(
             session_id=session_id,
             task_type=task_type,
@@ -160,6 +180,8 @@ class PersistentMemoryStore:
             producer_agent_id=producer_agent_id,
             producer_role=producer_role,
             visibility=visibility,
+            memory_target=memory_target,
+            expected_state_version=expected_state_version,
         )
         return status.record_id
 
@@ -179,12 +201,52 @@ class PersistentMemoryStore:
         producer_agent_id: str | None = None,
         producer_role: str | None = None,
         visibility: str = "private",
+        memory_target: str | None = None,
+        expected_state_version: int | None = None,
     ) -> MemoryWriteStatus:
         with self._lock:
             content_hash = hashlib.sha256(content.strip().encode("utf-8")).hexdigest()
             now = _utc_now_iso()
             expires_at = _expires_at_iso(ttl_days)
             meta_json = json.dumps(metadata or {}, ensure_ascii=False)
+            normalized_target = memory_target.strip() if memory_target else None
+            target_key = (
+                _target_key(
+                    scope=scope,
+                    team_id=team_id,
+                    case_id=case_id,
+                    visibility=visibility,
+                    memory_target=normalized_target,
+                )
+                if normalized_target
+                else None
+            )
+            current_target_version = None
+
+            if target_key is not None:
+                row = self._conn.execute(
+                    "SELECT current_version FROM memory_targets WHERE target_key = ?",
+                    (target_key,),
+                ).fetchone()
+                current_target_version = int(row["current_version"]) if row is not None else 0
+                if expected_state_version is None:
+                    return MemoryWriteStatus(
+                        record_id=None,
+                        dedup_hit=False,
+                        conflict_detected=True,
+                        expected_state_version=None,
+                        committed_state_version=current_target_version,
+                        memory_target=normalized_target,
+                    )
+                if current_target_version != expected_state_version:
+                    return MemoryWriteStatus(
+                        record_id=None,
+                        dedup_hit=False,
+                        conflict_detected=True,
+                        expected_state_version=expected_state_version,
+                        committed_state_version=current_target_version,
+                        memory_target=normalized_target,
+                    )
 
             existing = self._conn.execute(
                 """
@@ -244,8 +306,26 @@ class PersistentMemoryStore:
                         record_id,
                     ),
                 )
+                committed_state_version = self._commit_target_head(
+                    target_key=target_key,
+                    scope=scope,
+                    team_id=team_id,
+                    case_id=case_id,
+                    visibility=visibility,
+                    memory_target=normalized_target,
+                    expected_state_version=expected_state_version,
+                    record_id=record_id,
+                    updated_at=now,
+                )
                 self._conn.commit()
-                return MemoryWriteStatus(record_id=record_id, dedup_hit=True)
+                return MemoryWriteStatus(
+                    record_id=record_id,
+                    dedup_hit=True,
+                    conflict_detected=False,
+                    expected_state_version=expected_state_version,
+                    committed_state_version=committed_state_version,
+                    memory_target=normalized_target,
+                )
 
             cursor = self._conn.execute(
                 """
@@ -286,8 +366,27 @@ class PersistentMemoryStore:
                     expires_at,
                 ),
             )
+            record_id = int(cursor.lastrowid)
+            committed_state_version = self._commit_target_head(
+                target_key=target_key,
+                scope=scope,
+                team_id=team_id,
+                case_id=case_id,
+                visibility=visibility,
+                memory_target=normalized_target,
+                expected_state_version=expected_state_version,
+                record_id=record_id,
+                updated_at=now,
+            )
             self._conn.commit()
-            return MemoryWriteStatus(record_id=int(cursor.lastrowid), dedup_hit=False)
+            return MemoryWriteStatus(
+                record_id=record_id,
+                dedup_hit=False,
+                conflict_detected=False,
+                expected_state_version=expected_state_version,
+                committed_state_version=committed_state_version,
+                memory_target=normalized_target,
+            )
 
     def recent(self, limit: int = 10, include_expired: bool = False) -> list[MemoryRecord]:
         with self._lock:
@@ -409,9 +508,75 @@ class PersistentMemoryStore:
                 ).fetchone()
             return int(row["c"]) if row is not None else 0
 
+    def get_target_version(
+        self,
+        *,
+        scope: str,
+        team_id: str | None,
+        case_id: str | None,
+        visibility: str,
+        memory_target: str,
+    ) -> int:
+        target_key = _target_key(
+            scope=scope,
+            team_id=team_id,
+            case_id=case_id,
+            visibility=visibility,
+            memory_target=memory_target,
+        )
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT current_version FROM memory_targets WHERE target_key = ?",
+                (target_key,),
+            ).fetchone()
+        if row is None:
+            return 0
+        return int(row["current_version"])
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    def _commit_target_head(
+        self,
+        *,
+        target_key: str | None,
+        scope: str,
+        team_id: str | None,
+        case_id: str | None,
+        visibility: str,
+        memory_target: str | None,
+        expected_state_version: int | None,
+        record_id: int,
+        updated_at: str,
+    ) -> int | None:
+        if target_key is None or memory_target is None:
+            return None
+        committed_state_version = int(expected_state_version or 0) + 1
+        self._conn.execute(
+            """
+            INSERT INTO memory_targets (
+                target_key, scope, team_id, case_id, visibility, memory_target,
+                current_version, current_record_id, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(target_key) DO UPDATE SET
+                current_version = excluded.current_version,
+                current_record_id = excluded.current_record_id,
+                updated_at = excluded.updated_at
+            """,
+            (
+                target_key,
+                scope,
+                team_id,
+                case_id,
+                visibility,
+                memory_target,
+                committed_state_version,
+                record_id,
+                updated_at,
+            ),
+        )
+        return committed_state_version
 
     @staticmethod
     def _row_to_record(row: sqlite3.Row) -> MemoryRecord:
@@ -450,3 +615,26 @@ def _expires_at_iso(ttl_days: int | None) -> str | None:
         return None
     expires = datetime.now(UTC) + timedelta(days=ttl_days)
     return expires.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _target_key(
+    *,
+    scope: str,
+    team_id: str | None,
+    case_id: str | None,
+    visibility: str,
+    memory_target: str | None,
+) -> str:
+    raw = json.dumps(
+        {
+            "scope": scope,
+            "team_id": team_id or "",
+            "case_id": case_id or "",
+            "visibility": visibility,
+            "memory_target": memory_target or "",
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()

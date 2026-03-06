@@ -101,6 +101,8 @@ class PolicyBundle(BaseModel):
 
 def load_policy(path: str | Path) -> PolicyBundle:
     policy_path = Path(path)
+    if not policy_path.exists() and not policy_path.is_absolute():
+        policy_path = Path(__file__).resolve().parents[2] / policy_path
     with policy_path.open("rb") as file_obj:
         if policy_path.suffix.lower() == ".json":
             raw_data = json.load(file_obj)

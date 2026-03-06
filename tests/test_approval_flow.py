@@ -55,6 +55,15 @@ def test_approval_lifecycle_and_replay_block(tmp_path) -> None:
     assert executed.ticket is not None
     assert executed.ticket.status.value == "executed"
 
+    consumed = runtime.consume_approval(
+        approval_id=ticket.approval_id,
+        consumed_by_job_id="job-resume-1",
+    )
+    assert consumed.error_code is None
+    assert consumed.ticket is not None
+    assert consumed.ticket.status.value == "consumed"
+    assert consumed.ticket.consumed_by_job_id == "job-resume-1"
+
     replay = runtime.execute_approval(approval_id=ticket.approval_id)
     assert replay.error_code == "APPROVAL_CONFLICT"
 

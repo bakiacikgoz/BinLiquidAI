@@ -1,4 +1,4 @@
-.PHONY: bootstrap install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -31,6 +31,22 @@ benchmark-ablation:
 
 benchmark-energy:
 	uv run binliquid benchmark energy --profile balanced --energy-mode measured
+
+pilot-gate:
+	uv run pytest -q \
+		tests/test_team_bounded_concurrency.py \
+		tests/test_team_governance.py \
+		tests/test_team_memory_fail_closed.py \
+		tests/test_team_audit_envelope.py \
+		tests/test_team_cli.py \
+		tests/test_team_pilot_gate.py
+	uv run binliquid team validate --spec examples/team/restricted_pilot.yaml --json
+	uv run binliquid team pilot-check \
+		--spec examples/team/restricted_pilot.yaml \
+		--profile restricted \
+		--mode deterministic \
+		--report artifacts/team_pilot_report.json \
+		--json
 
 ui-install:
 	cd apps/operator-panel && pnpm install
