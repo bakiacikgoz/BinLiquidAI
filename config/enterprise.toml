@@ -1,0 +1,143 @@
+[app]
+model_name = "lfm2.5-thinking:1.2b"
+profile_name = "enterprise"
+llm_provider = "auto"
+fallback_provider = "transformers"
+fallback_enabled = true
+hf_model_id = "distilgpt2"
+device = "cpu"
+router_mode = "rule"
+shadow_router_enabled = true
+shadow_router_mode = "sltc"
+planner_temperature = 0.0
+answer_temperature = 0.2
+router_confidence_threshold = 0.58
+latency_budget_ms = 4500
+debug_mode = false
+privacy_mode = true
+enable_persistent_memory = true
+memory_ttl_days = 30
+fast_path_regret_window = 2
+fast_path_regret_threshold = 0.2
+env_prefix = "BINLIQUID"
+web_enabled = false
+workspace_root = "."
+trace_dir = ".binliquid/traces"
+router_dataset_path = ".binliquid/research/router_dataset.jsonl"
+
+[limits]
+expert_timeout_ms = 3000
+max_retries = 1
+circuit_breaker_threshold = 3
+circuit_breaker_cooldown_s = 300
+llm_timeout_ms = 45000
+max_tool_calls = 5
+max_recursion_depth = 3
+
+[sltc]
+enabled = true
+router_mode = "shadow"
+decay = 0.85
+spike_threshold = 0.52
+confidence_threshold = 0.58
+failure_penalty_weight = 0.35
+latency_penalty_weight = 0.12
+need_bonus = 0.12
+conf_bonus = 0.2
+task_bias_overrides = {}
+
+[memory]
+db_path = ".binliquid/enterprise/memory.sqlite3"
+salience_threshold = 0.58
+salience_decay = 0.84
+max_rows = 10000
+context_top_k = 5
+expert_bonus = 0.06
+task_bonus = 0.08
+spike_reduction = 0.5
+rank_salience_weight = 0.72
+rank_recency_weight = 0.28
+
+[memory.keyword_weights]
+remember = 0.18
+"hatırla" = 0.18
+plan = 0.12
+"adım" = 0.12
+deadline = 0.1
+todo = 0.1
+bug = 0.12
+hata = 0.12
+important = 0.16
+"önemli" = 0.16
+
+[planner]
+repair_enabled = true
+repair_max_attempts = 1
+prompt_variant = "strict_v2"
+
+[code_verify]
+enabled = true
+lint_enabled = true
+test_collect_enabled = true
+targeted_tests_enabled = true
+timeout_s = 15
+retry_max = 2
+retry_strategy = "failure_aware"
+
+[governance]
+enabled = true
+policy_path = "config/policies/enterprise.toml"
+policy_fail_mode = "fail_closed"
+approval_store_path = ".binliquid/enterprise/governance/approvals.sqlite3"
+audit_dir = ".binliquid/enterprise/audit"
+pii_redaction_enabled = true
+approval_ttl_seconds = 86400
+decision_engine_version = "v0.5-enterprise"
+
+[team]
+enabled = true
+max_parallel_tasks = 2
+max_total_tasks = 64
+max_handoff_depth = 8
+checkpoint_db_path = ".binliquid/enterprise/team/checkpoints.sqlite3"
+artifact_dir = ".binliquid/enterprise/team/jobs"
+
+[security]
+mode = "enterprise"
+require_immutable_audit_export = true
+allow_debug_privacy_override = false
+restricted_vs_admin_boundary = true
+
+[identity]
+enabled = true
+mode = "external_assertion"
+required_for_mutations = true
+assertion_path = ".binliquid/identity/current_assertion.json"
+break_glass_assertion_path = ".binliquid/identity/break_glass_assertion.json"
+trusted_keys_dir = ".binliquid/keys/trusted"
+allow_break_glass = true
+max_clock_skew_seconds = 60
+permission_model_version = "1.0"
+
+[keys]
+provider = "local_file"
+current_key_id = "enterprise-signing-current"
+private_key_path = ".binliquid/keys/private/current_key.json"
+trusted_public_keys_dir = ".binliquid/keys/trusted"
+key_manifest_path = ".binliquid/keys/manifest.json"
+managed_signer_command = []
+allow_env_hmac_compat = false
+
+[observability]
+metrics_dir = ".binliquid/enterprise/metrics"
+file_snapshot_enabled = true
+prometheus_textfile_path = ".binliquid/enterprise/metrics/binliquid.prom"
+http_exporter_enabled = false
+http_bind = "127.0.0.1:9464"
+
+[maintenance]
+maintenance_flag_path = ".binliquid/enterprise/maintenance.lock"
+backup_dir = ".binliquid/enterprise/backups"
+restore_dir = ".binliquid/enterprise/restores"
+migration_dir = ".binliquid/enterprise/migrations"
+support_bundle_dir = ".binliquid/enterprise/support"

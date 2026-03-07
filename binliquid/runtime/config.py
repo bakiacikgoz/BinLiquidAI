@@ -109,6 +109,67 @@ class TeamRuntimeConfig(BaseModel):
     artifact_dir: str = ".binliquid/team/jobs"
 
 
+class SecurityConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    mode: Literal["default", "enterprise"] = "default"
+    require_immutable_audit_export: bool = False
+    allow_debug_privacy_override: bool = False
+    restricted_vs_admin_boundary: bool = False
+
+
+class IdentityConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = False
+    mode: Literal["disabled", "external_assertion", "break_glass_only"] = "disabled"
+    required_for_mutations: bool = False
+    assertion_path: str = ".binliquid/identity/current_assertion.json"
+    break_glass_assertion_path: str = ".binliquid/identity/break_glass_assertion.json"
+    trusted_keys_dir: str = ".binliquid/keys/trusted"
+    allow_break_glass: bool = True
+    max_clock_skew_seconds: int = Field(default=60, ge=0, le=600)
+    permission_model_version: str = "1.0"
+
+
+class KeyManagementConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    provider: Literal[
+        "disabled",
+        "env_hmac",
+        "local_file",
+        "managed_kms",
+        "pkcs11_hsm",
+    ] = "disabled"
+    current_key_id: str | None = None
+    private_key_path: str = ".binliquid/keys/private/current_key.json"
+    trusted_public_keys_dir: str = ".binliquid/keys/trusted"
+    key_manifest_path: str = ".binliquid/keys/manifest.json"
+    managed_signer_command: list[str] = Field(default_factory=list)
+    allow_env_hmac_compat: bool = True
+
+
+class ObservabilityConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    metrics_dir: str = ".binliquid/metrics"
+    file_snapshot_enabled: bool = True
+    prometheus_textfile_path: str = ".binliquid/metrics/binliquid.prom"
+    http_exporter_enabled: bool = False
+    http_bind: str = "127.0.0.1:9464"
+
+
+class MaintenanceConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    maintenance_flag_path: str = ".binliquid/maintenance.lock"
+    backup_dir: str = ".binliquid/backups"
+    restore_dir: str = ".binliquid/restores"
+    migration_dir: str = ".binliquid/migrations"
+    support_bundle_dir: str = ".binliquid/support"
+
+
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -144,6 +205,11 @@ class RuntimeConfig(BaseModel):
     code_verify: CodeVerifyConfig = Field(default_factory=CodeVerifyConfig)
     governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
     team: TeamRuntimeConfig = Field(default_factory=TeamRuntimeConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
+    identity: IdentityConfig = Field(default_factory=IdentityConfig)
+    keys: KeyManagementConfig = Field(default_factory=KeyManagementConfig)
+    observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
+    maintenance: MaintenanceConfig = Field(default_factory=MaintenanceConfig)
 
     @classmethod
     def from_profile(cls, profile: str = "default", root_dir: Path | None = None) -> RuntimeConfig:
@@ -164,6 +230,11 @@ class RuntimeConfig(BaseModel):
         code_verify_data = data.get("code_verify", {})
         governance_data = data.get("governance", {})
         team_data = data.get("team", {})
+        security_data = data.get("security", {})
+        identity_data = data.get("identity", {})
+        keys_data = data.get("keys", {})
+        observability_data = data.get("observability", {})
+        maintenance_data = data.get("maintenance", {})
         return cls(
             model_name=app_data.get("model_name", "lfm2.5-thinking:1.2b"),
             profile_name=app_data.get("profile_name", "default"),
@@ -265,6 +336,72 @@ class RuntimeConfig(BaseModel):
                 ),
                 artifact_dir=team_data.get("artifact_dir", ".binliquid/team/jobs"),
             ),
+            security=SecurityConfig(
+                mode=security_data.get("mode", "default"),
+                require_immutable_audit_export=security_data.get(
+                    "require_immutable_audit_export", False
+                ),
+                allow_debug_privacy_override=security_data.get(
+                    "allow_debug_privacy_override", False
+                ),
+                restricted_vs_admin_boundary=security_data.get(
+                    "restricted_vs_admin_boundary", False
+                ),
+            ),
+            identity=IdentityConfig(
+                enabled=identity_data.get("enabled", False),
+                mode=identity_data.get("mode", "disabled"),
+                required_for_mutations=identity_data.get("required_for_mutations", False),
+                assertion_path=identity_data.get(
+                    "assertion_path", ".binliquid/identity/current_assertion.json"
+                ),
+                break_glass_assertion_path=identity_data.get(
+                    "break_glass_assertion_path",
+                    ".binliquid/identity/break_glass_assertion.json",
+                ),
+                trusted_keys_dir=identity_data.get(
+                    "trusted_keys_dir", ".binliquid/keys/trusted"
+                ),
+                allow_break_glass=identity_data.get("allow_break_glass", True),
+                max_clock_skew_seconds=identity_data.get("max_clock_skew_seconds", 60),
+                permission_model_version=identity_data.get("permission_model_version", "1.0"),
+            ),
+            keys=KeyManagementConfig(
+                provider=keys_data.get("provider", "disabled"),
+                current_key_id=keys_data.get("current_key_id"),
+                private_key_path=keys_data.get(
+                    "private_key_path", ".binliquid/keys/private/current_key.json"
+                ),
+                trusted_public_keys_dir=keys_data.get(
+                    "trusted_public_keys_dir", ".binliquid/keys/trusted"
+                ),
+                key_manifest_path=keys_data.get(
+                    "key_manifest_path", ".binliquid/keys/manifest.json"
+                ),
+                managed_signer_command=keys_data.get("managed_signer_command", []),
+                allow_env_hmac_compat=keys_data.get("allow_env_hmac_compat", True),
+            ),
+            observability=ObservabilityConfig(
+                metrics_dir=observability_data.get("metrics_dir", ".binliquid/metrics"),
+                file_snapshot_enabled=observability_data.get("file_snapshot_enabled", True),
+                prometheus_textfile_path=observability_data.get(
+                    "prometheus_textfile_path",
+                    ".binliquid/metrics/binliquid.prom",
+                ),
+                http_exporter_enabled=observability_data.get("http_exporter_enabled", False),
+                http_bind=observability_data.get("http_bind", "127.0.0.1:9464"),
+            ),
+            maintenance=MaintenanceConfig(
+                maintenance_flag_path=maintenance_data.get(
+                    "maintenance_flag_path", ".binliquid/maintenance.lock"
+                ),
+                backup_dir=maintenance_data.get("backup_dir", ".binliquid/backups"),
+                restore_dir=maintenance_data.get("restore_dir", ".binliquid/restores"),
+                migration_dir=maintenance_data.get("migration_dir", ".binliquid/migrations"),
+                support_bundle_dir=maintenance_data.get(
+                    "support_bundle_dir", ".binliquid/support"
+                ),
+            ),
         )
 
 
@@ -343,6 +480,35 @@ ENV_PATHS: dict[str, str] = {
     "TEAM_MAX_HANDOFF_DEPTH": "team.max_handoff_depth",
     "TEAM_CHECKPOINT_DB_PATH": "team.checkpoint_db_path",
     "TEAM_ARTIFACT_DIR": "team.artifact_dir",
+    "SECURITY_MODE": "security.mode",
+    "SECURITY_REQUIRE_IMMUTABLE_AUDIT_EXPORT": "security.require_immutable_audit_export",
+    "SECURITY_ALLOW_DEBUG_PRIVACY_OVERRIDE": "security.allow_debug_privacy_override",
+    "SECURITY_RESTRICTED_VS_ADMIN_BOUNDARY": "security.restricted_vs_admin_boundary",
+    "IDENTITY_ENABLED": "identity.enabled",
+    "IDENTITY_MODE": "identity.mode",
+    "IDENTITY_REQUIRED_FOR_MUTATIONS": "identity.required_for_mutations",
+    "IDENTITY_ASSERTION_PATH": "identity.assertion_path",
+    "IDENTITY_BREAK_GLASS_ASSERTION_PATH": "identity.break_glass_assertion_path",
+    "IDENTITY_TRUSTED_KEYS_DIR": "identity.trusted_keys_dir",
+    "IDENTITY_ALLOW_BREAK_GLASS": "identity.allow_break_glass",
+    "IDENTITY_MAX_CLOCK_SKEW_SECONDS": "identity.max_clock_skew_seconds",
+    "KEYS_PROVIDER": "keys.provider",
+    "KEYS_CURRENT_KEY_ID": "keys.current_key_id",
+    "KEYS_PRIVATE_KEY_PATH": "keys.private_key_path",
+    "KEYS_TRUSTED_PUBLIC_KEYS_DIR": "keys.trusted_public_keys_dir",
+    "KEYS_KEY_MANIFEST_PATH": "keys.key_manifest_path",
+    "KEYS_MANAGED_SIGNER_COMMAND": "keys.managed_signer_command",
+    "KEYS_ALLOW_ENV_HMAC_COMPAT": "keys.allow_env_hmac_compat",
+    "OBSERVABILITY_METRICS_DIR": "observability.metrics_dir",
+    "OBSERVABILITY_FILE_SNAPSHOT_ENABLED": "observability.file_snapshot_enabled",
+    "OBSERVABILITY_PROMETHEUS_TEXTFILE_PATH": "observability.prometheus_textfile_path",
+    "OBSERVABILITY_HTTP_EXPORTER_ENABLED": "observability.http_exporter_enabled",
+    "OBSERVABILITY_HTTP_BIND": "observability.http_bind",
+    "MAINTENANCE_FLAG_PATH": "maintenance.maintenance_flag_path",
+    "MAINTENANCE_BACKUP_DIR": "maintenance.backup_dir",
+    "MAINTENANCE_RESTORE_DIR": "maintenance.restore_dir",
+    "MAINTENANCE_MIGRATION_DIR": "maintenance.migration_dir",
+    "MAINTENANCE_SUPPORT_BUNDLE_DIR": "maintenance.support_bundle_dir",
 }
 
 
@@ -396,6 +562,11 @@ def _load_profile_payload(*, profile: str, root_dir: Path | None) -> dict[str, A
         "code_verify": dict(data.get("code_verify", {})),
         "governance": dict(data.get("governance", {})),
         "team": dict(data.get("team", {})),
+        "security": dict(data.get("security", {})),
+        "identity": dict(data.get("identity", {})),
+        "keys": dict(data.get("keys", {})),
+        "observability": dict(data.get("observability", {})),
+        "maintenance": dict(data.get("maintenance", {})),
     }
     return payload
 
@@ -497,6 +668,14 @@ def _coerce_value(raw: str, template: Any) -> Any:
         return int(raw.strip())
     if isinstance(template, float):
         return float(raw.strip())
+    if isinstance(template, list):
+        try:
+            parsed = tomllib.loads(f"value = {raw}")["value"]
+            if isinstance(parsed, list):
+                return parsed
+        except Exception:  # noqa: BLE001
+            return [item.strip() for item in raw.split(",") if item.strip()]
+        return template
     return raw
 
 

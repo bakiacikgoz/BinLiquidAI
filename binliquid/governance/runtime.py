@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from binliquid import __version__
+from binliquid.enterprise.signing import build_integrity
 from binliquid.governance.approval_store import ApprovalDecisionResult, ApprovalStore
 from binliquid.governance.models import (
     ApprovalStatus,
@@ -749,6 +750,12 @@ class GovernanceRuntime:
             privacy_mode=self._config.privacy_mode,
         )
         payload = self.audit_redact(record.model_dump(mode="json"))
+        integrity = build_integrity(
+            payload=payload,
+            config=self._config,
+            purpose="governance-audit",
+        )
+        payload["integrity"] = integrity
         path = self._audit_dir / f"{run_id}.json"
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         return str(path)

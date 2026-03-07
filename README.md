@@ -10,7 +10,8 @@ It provides two layers:
 > **Status:**
 > BinLiquid core is production-grade.
 > Team Runtime is pilot-hardened for controlled/restricted profiles, with release-blocking gates, replay verification, approval hardening, and bounded-concurrency safeguards.
-> Broader live-provider rollout still requires target-environment rehearsal and controlled rollout qualification.
+> Enterprise deployment readiness is implemented under defined constraints through secure defaults, verified identity/RBAC gates, asymmetric artifact signing, operational support bundles, and GA readiness reporting.
+> Broader GA claims still require published qualification evidence from the documented deployment envelope.
 
 ## Current Status
 
@@ -45,6 +46,18 @@ Team Runtime should not yet be described as:
 - unrestricted enterprise-wide multi-agent orchestration
 - fully general high-concurrency agent execution
 - universally production-ready across arbitrary live-provider environments
+
+### Enterprise Profile
+
+The `enterprise` profile is the self-hosted secure-default path for single-tenant deployment and adds:
+
+- verified identity assertions plus RBAC checks for mutating operations
+- asymmetric signing for audit and operational artifacts
+- security baseline preflight and startup abort rules
+- backup, restore verification, migration planning, and support bundle export
+- file-based metrics snapshots and GA readiness reporting
+
+This slice formalizes the deployment contract. It does not replace qualification evidence. Enterprise positioning remains bounded by the published qualification matrix and executed drills.
 
 ## Feature Status
 
@@ -81,6 +94,7 @@ uv run binliquid doctor --profile balanced
 | `balanced` (default daily) | rule | sltc | on | on | short |
 | `research` | sltc | rule | on | on | debug-friendly |
 | `restricted` (controlled pilot profile) | rule | sltc | on | on | short |
+| `enterprise` (self-hosted secure default) | rule | sltc | on | on | signed + file metrics |
 
 ## CLI Quickstart
 
@@ -112,6 +126,17 @@ uv run binliquid operator capabilities --json
 
 Approval lifecycle is `pending -> approved -> executed -> consumed`.
 `approved` alone does not authorize override use; team resume and pilot gate only consume `executed` approvals.
+
+Enterprise validation:
+
+```bash
+uv run python scripts/prepare_enterprise_fixture.py --root .
+uv run binliquid auth whoami --profile enterprise --json
+uv run binliquid auth check --profile enterprise --permission runtime.run --json
+uv run binliquid security baseline --profile enterprise --json
+uv run binliquid metrics snapshot --profile enterprise --json
+uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
+```
 
 Operator panel (thin-shell terminal):
 
@@ -253,6 +278,9 @@ Calibration outputs:
 - `research_summary.json`
 - `governance_summary.json`
 - `team_summary.json`
+- `security_posture.json`
+- `metrics_snapshot.json`
+- `ga_readiness_report.json`
 
 ## Privacy and Debug
 
@@ -273,5 +301,19 @@ Calibration outputs:
 - shared `memory_target` writes use optimistic version checks and reject on conflict; there is no last-write-wins path in restricted pilot mode.
 - approval-gated subtrees may serialize themselves under bounded fallback; those decisions are visible in audit/replay artifacts.
 - `team replay --verify` checks event ordering, causal continuity, handoff consistency, and trace integrity; it does not guarantee business correctness or external side-effect validation.
-- Enterprise GA hardening is still in progress (scoped production-readiness pre-check only).
-- Optional envelope signing is available via `BINLIQUID_AUDIT_SIGNING_KEY` (HMAC-SHA256).
+- Enterprise deployment is scoped to self-hosted single-tenant environments; multi-tenant control plane and broad cloud-native integrations remain deferred.
+- Enterprise artifacts require asymmetric signing; `BINLIQUID_AUDIT_SIGNING_KEY` remains compatibility-only and is not acceptable for enterprise mode.
+
+## Documentation
+
+- `docs/RELEASE_GATE_v0.5.md`
+- `docs/RELEASE_CHECKLIST.md`
+- `docs/OPERATIONS_RUNBOOK.md`
+- `SECURITY_BASELINE.md`
+- `KEY_MANAGEMENT.md`
+- `UPGRADE_AND_RECOVERY.md`
+- `OBSERVABILITY_AND_SLO.md`
+- `QUALIFICATION_MATRIX.md`
+- `INSTALL.md`
+- `DEPLOYMENT_GUIDE.md`
+- `SUPPORT_BUNDLE.md`

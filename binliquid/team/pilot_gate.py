@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from binliquid.enterprise.signing import write_signed_json
 from binliquid.governance.runtime import build_governance_runtime
 from binliquid.memory.manager import MemoryManager
 from binliquid.memory.persistent_store import PersistentMemoryStore
@@ -262,17 +263,22 @@ def run_pilot_check(
     }
 
 
-def write_pilot_report(path: str | Path, payload: dict[str, Any]) -> str:
+def write_pilot_report(
+    path: str | Path,
+    payload: dict[str, Any],
+    *,
+    config: RuntimeConfig | None = None,
+) -> str:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    body = {
-        "artifact": "team_pilot_report",
-        "generated_at": _now_iso(),
-        "status": "ok" if payload.get("overall_status") == "pass" else "error",
-        "data": payload,
-    }
-    destination.write_text(json.dumps(body, indent=2, ensure_ascii=False), encoding="utf-8")
-    return str(destination)
+    return write_signed_json(
+        path=destination,
+        artifact="team_pilot_report",
+        data=payload,
+        config=config,
+        purpose="team-pilot-report",
+        status="ok" if payload.get("overall_status") == "pass" else "error",
+    )
 
 
 def _run_positive_smoke(

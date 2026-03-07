@@ -86,3 +86,39 @@ jobs:
             --mode deterministic \
             --report artifacts/team_pilot_report.json \
             --json
+
+  enterprise-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        run: uv sync --python 3.11 --extra dev
+
+      - name: Enterprise CLI tests
+        run: uv run pytest -q tests/test_enterprise_cli.py
+
+      - name: Prepare enterprise fixture
+        run: |
+          rm -rf .binliquid/keys .binliquid/identity
+          uv run python scripts/prepare_enterprise_fixture.py --root .
+
+      - name: Enterprise baseline and GA readiness
+        run: |
+          uv run binliquid security baseline --profile enterprise --json
+          uv run binliquid auth whoami --profile enterprise --json
+          uv run binliquid auth check --profile enterprise --permission runtime.run --json
+          uv run binliquid keys verify --profile enterprise --path artifacts/security_posture.json --json
+          uv run binliquid metrics snapshot --profile enterprise --json
+          uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
+          uv run binliquid keys verify --profile enterprise --path artifacts/ga_readiness_report.json --json
+          uv run binliquid support bundle export --profile enterprise --json

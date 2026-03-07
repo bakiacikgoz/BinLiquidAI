@@ -16,6 +16,29 @@ from binliquid import __version__
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import Planner
+from binliquid.enterprise.baseline import enterprise_startup_abort, security_posture
+from binliquid.enterprise.identity import (
+    IdentityResolutionError,
+    check_permission,
+    describe_actor,
+    require_permission,
+)
+from binliquid.enterprise.maintenance import (
+    create_backup,
+    export_support_bundle,
+    ga_readiness_report,
+    migration_apply,
+    migration_plan,
+    render_ga_readiness_markdown,
+    restore_verify,
+)
+from binliquid.enterprise.observability import collect_metrics_snapshot
+from binliquid.enterprise.signing import (
+    key_status,
+    rotate_plan,
+    verify_signed_artifact,
+    write_signed_json,
+)
 from binliquid.experts.code_expert import CodeExpert
 from binliquid.experts.memory_plan_expert import MemoryPlanExpert
 from binliquid.experts.research_expert import ResearchExpert
@@ -50,6 +73,16 @@ config_app = typer.Typer(help="Config commands")
 approval_app = typer.Typer(help="Governance approval commands")
 operator_app = typer.Typer(help="Operator panel commands")
 team_app = typer.Typer(help="Team runtime commands")
+auth_app = typer.Typer(help="Enterprise identity commands")
+security_app = typer.Typer(help="Enterprise security commands")
+keys_app = typer.Typer(help="Enterprise key management commands")
+migrate_app = typer.Typer(help="Migration commands")
+backup_app = typer.Typer(help="Backup commands")
+restore_app = typer.Typer(help="Restore commands")
+support_app = typer.Typer(help="Support commands")
+support_bundle_app = typer.Typer(help="Support bundle commands")
+metrics_app = typer.Typer(help="Observability commands")
+ga_app = typer.Typer(help="GA readiness commands")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
 app.add_typer(research_app, name="research")
@@ -57,6 +90,16 @@ app.add_typer(config_app, name="config")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
 app.add_typer(team_app, name="team")
+app.add_typer(auth_app, name="auth")
+app.add_typer(security_app, name="security")
+app.add_typer(keys_app, name="keys")
+app.add_typer(migrate_app, name="migrate")
+app.add_typer(backup_app, name="backup")
+app.add_typer(restore_app, name="restore")
+app.add_typer(support_app, name="support")
+support_app.add_typer(support_bundle_app, name="bundle")
+app.add_typer(metrics_app, name="metrics")
+app.add_typer(ga_app, name="ga")
 
 
 def _version_callback(value: bool) -> None:
@@ -336,6 +379,32 @@ def _model_selection_context(
     }
 
 
+def _startup_abort(config: RuntimeConfig, runtime: GovernanceRuntime | None) -> str | None:
+    enterprise_error = enterprise_startup_abort(config)
+    if enterprise_error:
+        return f"ENTERPRISE_PREFLIGHT_FAILED: {enterprise_error}"
+    return governance_startup_abort(config, runtime)
+
+
+def _require_permission_or_exit(config: RuntimeConfig, permission: str):
+    try:
+        return require_permission(config, permission=permission)
+    except IdentityResolutionError as exc:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_code": exc.error_code,
+                    "error": str(exc),
+                    "permission": permission,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=1) from None
+
+
 @config_app.command("resolve")
 def config_resolve(
     profile: str = typer.Option("balanced", help="Config profile"),
@@ -581,6 +650,7 @@ def chat(
         config = config.model_copy(update={"debug_mode": True})
     if privacy_off:
         config = config.model_copy(update={"privacy_mode": False})
+    _require_permission_or_exit(config, "runtime.run")
 
     orchestrator = _build_orchestrator(
         config,
@@ -588,7 +658,7 @@ def chat(
         provider_name=config.llm_provider,
         fallback_provider=config.fallback_provider,
     )
-    startup_error = governance_startup_abort(
+    startup_error = _startup_abort(
         config,
         getattr(orchestrator, "governance_runtime", None),
     )
@@ -965,6 +1035,7 @@ def approval_pending(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "approval.decide")
     runtime = _build_governance_runtime(config)
     if runtime is None:
         typer.echo("Governance disabled.")
@@ -1041,6 +1112,7 @@ def approval_decide(
         raise typer.Exit(code=2)
 
     config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "approval.decide")
     runtime = _build_governance_runtime(config)
     if runtime is None:
         typer.echo("Governance disabled.")
@@ -1070,12 +1142,13 @@ def approval_execute(
 ) -> None:
     ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "approval.execute")
     runtime = _build_governance_runtime(config)
     if runtime is None:
         typer.echo("Governance disabled.")
         raise typer.Exit(code=1)
 
-    startup_error = governance_startup_abort(config, runtime)
+    startup_error = _startup_abort(config, runtime)
     if startup_error:
         typer.echo(f"POLICY_UNAVAILABLE: {startup_error}")
         raise typer.Exit(code=2)
@@ -1183,8 +1256,9 @@ def operator_panel(
 ) -> None:
     _ = stream
     config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "audit.read")
     runtime = _build_governance_runtime(config)
-    startup_error = governance_startup_abort(config, runtime)
+    startup_error = _startup_abort(config, runtime)
     if startup_error:
         typer.echo(f"[blocked-mode] POLICY_UNAVAILABLE: {startup_error}")
         typer.echo("Commands available: /pending, /approve <id>, /reject <id>, /exit")
@@ -1257,7 +1331,7 @@ def operator_capabilities(
 ) -> None:
     payload = {
         "coreVersion": __version__,
-        "contractVersion": "1.0",
+        "contractVersion": "2.0",
         "commands": {
             "teamListJson": True,
             "teamReplayJson": True,
@@ -1265,10 +1339,23 @@ def operator_capabilities(
             "approvalPendingJson": True,
             "approvalDecide": True,
             "approvalExecute": True,
+            "authWhoamiJson": True,
+            "authCheckJson": True,
+            "securityBaselineJson": True,
+            "keysStatusJson": True,
+            "keysVerifyJson": True,
+            "backupCreateJson": True,
+            "backupVerifyJson": True,
+            "restoreVerifyJson": True,
+            "supportBundleExportJson": True,
+            "metricsSnapshotJson": True,
+            "gaReadinessJson": True,
         },
         "artifactSchema": {
-            "auditEnvelope": "1",
-            "events": "1",
+            "auditEnvelope": "3",
+            "events": "3",
+            "gaReadinessReport": "1",
+            "securityPosture": "1",
         },
     }
     if json_output:
@@ -1482,12 +1569,13 @@ def team_run(
             hf_model_id=hf_model_id,
         ),
     )
+    _require_permission_or_exit(config, "runtime.run")
     orchestrator = _build_orchestrator(
         config=config,
         provider_name=config.llm_provider,
         fallback_provider=config.fallback_provider,
     )
-    startup_error = governance_startup_abort(
+    startup_error = _startup_abort(
         config,
         getattr(orchestrator, "governance_runtime", None),
     )
@@ -1577,6 +1665,7 @@ def team_resume(
             hf_model_id=hf_model_id,
         ),
     )
+    _require_permission_or_exit(config, "runtime.resume")
     config = config.model_copy(
         update={"team": config.team.model_copy(update={"artifact_dir": root_dir})}
     )
@@ -1586,7 +1675,7 @@ def team_resume(
         provider_name=config.llm_provider,
         fallback_provider=config.fallback_provider,
     )
-    startup_error = governance_startup_abort(
+    startup_error = _startup_abort(
         config,
         getattr(orchestrator, "governance_runtime", None),
     )
@@ -1792,12 +1881,13 @@ def team_pilot_check(
             hf_model_id=hf_model_id,
         ),
     )
+    _require_permission_or_exit(config, "runtime.run")
     if not config.team.enabled:
         typer.echo("Team runtime disabled in runtime config.")
         raise typer.Exit(code=2)
 
     runtime = _build_governance_runtime(config)
-    startup_error = governance_startup_abort(config, runtime)
+    startup_error = _startup_abort(config, runtime)
     if startup_error:
         typer.echo(f"POLICY_UNAVAILABLE: {startup_error}")
         raise typer.Exit(code=2)
@@ -1839,7 +1929,11 @@ def team_pilot_check(
         )
         raise typer.Exit(code=exit_code) from None
 
-    payload.setdefault("artifacts", {})["report_path"] = write_pilot_report(report, payload)
+    payload.setdefault("artifacts", {})["report_path"] = write_pilot_report(
+        report,
+        payload,
+        config=config,
+    )
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -1878,6 +1972,254 @@ def team_pilot_check(
             f"reuse={reuse_status} scope={scope_status} bounded={bounded_status}"
         )
     if payload.get("overall_status") != "pass":
+        raise typer.Exit(code=1)
+
+
+@auth_app.command("whoami")
+def auth_whoami(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    payload = describe_actor(config)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        actor_id = payload.get("actor", {}).get("actor_id") if payload.get("verified") else None
+        typer.echo(actor_id or "unverified")
+    if not payload.get("verified"):
+        raise typer.Exit(code=1)
+
+
+@auth_app.command("check")
+def auth_check(
+    permission: str = typer.Option(..., "--permission", help="Permission to validate"),
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    payload = check_permission(config, permission=permission)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"allowed={payload['allowed']}")
+    if not payload.get("allowed"):
+        raise typer.Exit(code=1)
+
+
+@security_app.command("baseline")
+def security_baseline(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    payload = security_posture(config)
+    write_signed_json(
+        path="artifacts/security_posture.json",
+        artifact="security_posture",
+        data=payload,
+        config=config,
+        purpose="security-posture",
+        status="ok" if payload.get("overall_status") == "pass" else "error",
+    )
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload.get("overall_status", "fail"))
+    if payload.get("overall_status") != "pass":
+        raise typer.Exit(code=1)
+
+
+@keys_app.command("status")
+def keys_status_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = key_status(RuntimeConfig.from_profile(profile))
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"provider={payload['provider']} current_key_id={payload['current_key_id']}")
+
+
+@keys_app.command("verify")
+def keys_verify_cmd(
+    path: str = typer.Option(..., "--path", help="Signed artifact path"),
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = verify_signed_artifact(path=path, config=RuntimeConfig.from_profile(profile))
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"verified={payload.get('verified')}")
+    if not payload.get("verified"):
+        raise typer.Exit(code=1)
+
+
+@keys_app.command("rotate-plan")
+def keys_rotate_plan_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    next_key_id: str | None = typer.Option(None, "--next-key-id", help="Planned next key id"),
+    activate_at: str | None = typer.Option(None, "--activate-at", help="Planned activation time"),
+    retire_after: str | None = typer.Option(None, "--retire-after", help="Planned retirement time"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = rotate_plan(
+        RuntimeConfig.from_profile(profile),
+        next_key_id=next_key_id,
+        activate_at=activate_at,
+        retire_after=retire_after,
+    )
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"next_key_id={payload['next_key_id']}")
+
+
+@migrate_app.command("plan")
+def migrate_plan_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = migration_plan(RuntimeConfig.from_profile(profile))
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload["compatible_upgrade_path"])
+
+
+@migrate_app.command("apply")
+def migrate_apply_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    dry_run: bool = typer.Option(True, "--dry-run/--no-dry-run", help="Preview only"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "maintenance.enter")
+    payload = migration_apply(config, dry_run=dry_run)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload["status"])
+
+
+@backup_app.command("create")
+def backup_create_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    output_dir: str | None = typer.Option(None, "--output-dir", help="Backup output directory"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "backup.create")
+    payload = create_backup(config, output_dir=output_dir)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload["backup_dir"])
+
+
+@backup_app.command("verify")
+def backup_verify_cmd(
+    backup_dir: str = typer.Option(..., "--backup-dir", help="Backup directory"),
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = restore_verify(RuntimeConfig.from_profile(profile), backup_dir=backup_dir)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"verified={payload['verified']}")
+    if not payload.get("verified"):
+        raise typer.Exit(code=1)
+
+
+@restore_app.command("verify")
+def restore_verify_cmd(
+    backup_dir: str = typer.Option(..., "--backup-dir", help="Backup directory to validate"),
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "restore.verify")
+    payload = restore_verify(config, backup_dir=backup_dir)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"verified={payload['verified']}")
+    if not payload.get("verified"):
+        raise typer.Exit(code=1)
+
+
+@support_bundle_app.command("export")
+def support_bundle_export_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    output: str | None = typer.Option(None, "--output", help="Optional zip output path"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "support.export")
+    payload = export_support_bundle(config, output_path=output)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload["archive_path"])
+
+
+@metrics_app.command("snapshot")
+def metrics_snapshot_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    payload = collect_metrics_snapshot(config)
+    write_signed_json(
+        path="artifacts/metrics_snapshot.json",
+        artifact="metrics_snapshot",
+        data=payload,
+        config=config,
+        purpose="metrics-snapshot",
+    )
+    if config.observability.file_snapshot_enabled:
+        from binliquid.enterprise.observability import write_prometheus_textfile
+
+        write_prometheus_textfile(payload, config.observability.prometheus_textfile_path)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload["generated_at"])
+
+
+@ga_app.command("readiness")
+def ga_readiness_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    report: str = typer.Option(
+        "artifacts/ga_readiness_report.json",
+        "--report",
+        help="GA readiness report output path",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    payload = ga_readiness_report(config)
+    write_signed_json(
+        path=report,
+        artifact="ga_readiness_report",
+        data=payload,
+        config=config,
+        purpose="ga-readiness",
+        status="ok" if payload.get("overall_status") != "red" else "error",
+    )
+    markdown_path = Path(report).with_name("GA_READINESS_REPORT.md")
+    markdown_path.write_text(render_ga_readiness_markdown(payload), encoding="utf-8")
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload["overall_status"])
+    if payload.get("overall_status") == "red":
         raise typer.Exit(code=1)
 
 

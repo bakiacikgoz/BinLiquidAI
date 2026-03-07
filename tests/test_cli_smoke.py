@@ -271,11 +271,13 @@ def test_operator_capabilities_contract() -> None:
     result = runner.invoke(app, ["operator", "capabilities", "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["contractVersion"] == "1.0"
+    assert payload["contractVersion"] == "2.0"
     assert payload["commands"]["teamListJson"] is True
     assert payload["commands"]["approvalShowJson"] is True
-    assert payload["artifactSchema"]["auditEnvelope"] == "1"
-    assert payload["artifactSchema"]["events"] == "1"
+    assert payload["commands"]["securityBaselineJson"] is True
+    assert payload["commands"]["gaReadinessJson"] is True
+    assert payload["artifactSchema"]["auditEnvelope"] == "3"
+    assert payload["artifactSchema"]["events"] == "3"
 
 
 def test_approval_show_redacts_snapshot(monkeypatch, tmp_path) -> None:

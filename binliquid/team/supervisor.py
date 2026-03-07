@@ -1864,6 +1864,7 @@ class TeamSupervisor:
             policy_bundle_id=policy_bundle_id,
             policy_bundle_hash=policy_bundle_hash,
             runtime_config_hash=_runtime_config_hash(self._config),
+            config=self._config,
         )
         status_payload = {
             "job": job.model_dump(mode="json"),

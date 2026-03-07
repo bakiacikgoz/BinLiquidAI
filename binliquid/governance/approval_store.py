@@ -18,6 +18,8 @@ class ApprovalDecisionResult:
 
 
 class ApprovalStore:
+    SCHEMA_VERSION = "2.0"
+
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,6 +67,14 @@ class ApprovalStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS approval_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
             existing_cols = {
                 str(row["name"]) for row in conn.execute("PRAGMA table_info(approvals)").fetchall()
             }
@@ -95,6 +105,14 @@ class ApprovalStore:
             for column, statement in migrations.items():
                 if column not in existing_cols:
                     conn.execute(statement)
+            conn.execute(
+                """
+                INSERT INTO approval_metadata(key, value)
+                VALUES ('schema_version', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (self.SCHEMA_VERSION,),
+            )
 
     def create_ticket(
         self,
@@ -194,6 +212,15 @@ class ApprovalStore:
         if row is None:
             return None
         return self._row_to_ticket(row)
+
+    def schema_version(self) -> str:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT value FROM approval_metadata WHERE key = 'schema_version'"
+            ).fetchone()
+        if row is None:
+            return self.SCHEMA_VERSION
+        return str(row["value"])
 
     def expire_pending(self) -> None:
         now_iso = datetime.now(UTC).isoformat()

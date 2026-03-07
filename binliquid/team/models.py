@@ -188,7 +188,11 @@ class AuditIntegrity(BaseModel):
 
     prev_hash: str | None = None
     hash: str
+    hash_algorithm: str = "sha256"
     signature: str | None = None
+    signature_mode: str = "unsigned"
+    key_id: str | None = None
+    public_key_fingerprint: str | None = None
 
 
 class AuditEnvelope(BaseModel):

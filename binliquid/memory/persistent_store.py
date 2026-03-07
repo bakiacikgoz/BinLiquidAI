@@ -42,6 +42,7 @@ class MemoryWriteStatus:
 
 class PersistentMemoryStore:
     """Local SQLite store for long-term memory candidates."""
+    SCHEMA_VERSION = "2.0"
 
     def __init__(self, db_path: str | Path = ".binliquid/memory.sqlite3"):
         self.db_path = Path(db_path)
@@ -96,6 +97,11 @@ class PersistentMemoryStore:
                     current_record_id INTEGER,
                     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
                 );
+
+                CREATE TABLE IF NOT EXISTS memory_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
                 """
             )
 
@@ -144,6 +150,14 @@ class PersistentMemoryStore:
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_memory_targets_team_case "
                 "ON memory_targets(team_id, case_id, memory_target)"
+            )
+            self._conn.execute(
+                """
+                INSERT INTO memory_metadata(key, value)
+                VALUES ('schema_version', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (self.SCHEMA_VERSION,),
             )
             self._conn.commit()
 
@@ -532,6 +546,15 @@ class PersistentMemoryStore:
         if row is None:
             return 0
         return int(row["current_version"])
+
+    def schema_version(self) -> str:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value FROM memory_metadata WHERE key = 'schema_version'"
+            ).fetchone()
+        if row is None:
+            return self.SCHEMA_VERSION
+        return str(row["value"])
 
     def close(self) -> None:
         with self._lock:

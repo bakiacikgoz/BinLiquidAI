@@ -146,4 +146,5 @@ class AuditRecord(BaseModel):
     approval_status: str = "none"
     redaction_mode: str = "trace"
     privacy_mode: bool = True
+    integrity: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -20,6 +20,8 @@ class CheckpointRecord:
 
 
 class TeamCheckpointStore:
+    SCHEMA_VERSION = "1.0"
+
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -48,6 +50,22 @@ class TeamCheckpointStore:
                     payload_json TEXT NOT NULL
                 )
                 """
+            )
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS checkpoint_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
+            self._conn.execute(
+                """
+                INSERT INTO checkpoint_metadata(key, value)
+                VALUES ('schema_version', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (self.SCHEMA_VERSION,),
             )
             self._conn.commit()
 
@@ -106,3 +124,12 @@ class TeamCheckpointStore:
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    def schema_version(self) -> str:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value FROM checkpoint_metadata WHERE key = 'schema_version'"
+            ).fetchone()
+        if row is None:
+            return self.SCHEMA_VERSION
+        return str(row["value"])

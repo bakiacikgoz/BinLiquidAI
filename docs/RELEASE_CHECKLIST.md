@@ -5,6 +5,7 @@
 - [ ] `uv run ruff check .`
 - [ ] `uv run pytest -q`
 - [ ] `make pilot-gate`
+- [ ] `make enterprise-gate`
 - [ ] `uv run binliquid team validate --spec examples/team/restricted_pilot.yaml --json`
 - [ ] `uv run binliquid team pilot-check --spec examples/team/restricted_pilot.yaml --profile restricted --mode deterministic --report artifacts/team_pilot_report.json --json`
 - [ ] `artifacts/team_pilot_report.json` shows `checks.bounded_concurrency.status=pass`
@@ -17,6 +18,21 @@
 - [ ] `uv run binliquid benchmark energy --profile balanced --energy-mode measured`
 - [ ] `uv run pytest -q tests/test_memory_concurrency.py`
 - [ ] `uv run pytest -q tests/test_team_checkpoint_concurrency.py`
+
+## Enterprise Gates
+
+- [ ] `uv run python scripts/prepare_enterprise_fixture.py --root .`
+- [ ] `uv run binliquid security baseline --profile enterprise --json`
+- [ ] `uv run binliquid auth whoami --profile enterprise --json`
+- [ ] `uv run binliquid auth check --profile enterprise --permission runtime.run --json`
+- [ ] `uv run binliquid metrics snapshot --profile enterprise --json`
+- [ ] `uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json`
+- [ ] `artifacts/security_posture.json` exists and is signed
+- [ ] `artifacts/metrics_snapshot.json` exists and is signed
+- [ ] `artifacts/ga_readiness_report.json` exists and is signed
+- [ ] `artifacts/GA_READINESS_REPORT.md` exists
+- [ ] key status reports asymmetric provider and trusted verification keys
+- [ ] qualification evidence is published before any `enterprise deployment-ready` claim
 
 ## Research Gates
 
@@ -59,6 +75,9 @@
 - [ ] `artifacts/research_summary.json` exists and valid JSON
 - [ ] `artifacts/team_summary.json` exists and valid JSON
 - [ ] `artifacts/team_pilot_report.json` exists and reports `overall_status=pass`
+- [ ] `artifacts/security_posture.json` exists and reports `overall_status=pass`
+- [ ] `artifacts/metrics_snapshot.json` exists and valid JSON
+- [ ] `artifacts/ga_readiness_report.json` exists and reports no `red` blocker before GA review
 - [ ] Benchmark JSON outputs exist under `benchmarks/results/`
 - [ ] Ablation Markdown report exists
 - [ ] Team run artifacts exist under `.binliquid/team/jobs/<job_id>/`

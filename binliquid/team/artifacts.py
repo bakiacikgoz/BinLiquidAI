@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from binliquid.enterprise.signing import build_integrity, canonical_payload_hash
+from binliquid.runtime.config import RuntimeConfig
 from binliquid.team.models import (
     AuditEnvelope,
     AuditIntegrity,
@@ -90,6 +89,7 @@ def write_audit_envelope(
     policy_bundle_id: str,
     policy_bundle_hash: str,
     runtime_config_hash: str,
+    config: RuntimeConfig | None = None,
 ) -> str:
     started_at = min((item.timestamp for item in events), default=job.created_at)
     finished_at = max(
@@ -209,8 +209,12 @@ def write_audit_envelope(
         "handoffs": handoff_payload,
         "redaction_report": redaction_report,
     }
-    current_hash = _sha256_payload(envelope_wo_integrity, prev_hash)
-    signature = _sign_hash_if_configured(current_hash)
+    integrity_payload = build_integrity(
+        payload=envelope_wo_integrity,
+        config=config,
+        purpose="audit-envelope",
+        prev_hash=prev_hash,
+    )
     envelope = AuditEnvelope(
         envelope_version="3",
         event_schema_version="3",
@@ -231,29 +235,18 @@ def write_audit_envelope(
         tool_calls=tool_calls,
         handoffs=handoff_payload,
         redaction_report=redaction_report,
-        integrity=AuditIntegrity(prev_hash=prev_hash, hash=current_hash, signature=signature),
+        integrity=AuditIntegrity.model_validate(integrity_payload),
     )
     paths.envelope_path.write_text(
         json.dumps(envelope.model_dump(mode="json"), indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    _write_chain_hash(paths.root_dir, current_hash)
+    _write_chain_hash(paths.root_dir, envelope.integrity.hash)
     return str(paths.envelope_path)
 
 
 def _sha256_payload(payload: dict[str, Any], prev_hash: str | None) -> str:
-    body = {
-        "prev_hash": prev_hash,
-        "payload": payload,
-    }
-    raw = json.dumps(
-        body,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        default=_json_default,
-    )
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return canonical_payload_hash(payload, prev_hash=prev_hash)
 
 
 def _chain_head_path(root_dir: Path) -> Path:
@@ -272,20 +265,6 @@ def _read_prev_chain_hash(root_dir: Path) -> str | None:
 
 def _write_chain_hash(root_dir: Path, value: str) -> None:
     _chain_head_path(root_dir).write_text(value, encoding="utf-8")
-
-
-def _sign_hash_if_configured(hash_value: str) -> str | None:
-    key = os.getenv("BINLIQUID_AUDIT_SIGNING_KEY", "").strip()
-    if not key:
-        return None
-    digest = hmac.new(
-        key.encode("utf-8"),
-        hash_value.encode("utf-8"),
-        hashlib.sha256,
-    )
-    return digest.hexdigest()
-
-
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 

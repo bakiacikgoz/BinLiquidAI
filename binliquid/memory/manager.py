@@ -332,10 +332,12 @@ class MemoryManager:
             "enabled": self.enabled,
             "total_records": total_records,
             "write_rate": write_rate,
+            "memory_write_rate": write_rate,
             "dedup_hit_rate": dedup_hit_rate,
             "retrieval_hit_rate": retrieval_hit_rate,
             "retrieval_usefulness_rate": retrieval_usefulness_rate,
             "stale_ratio": stale_ratio,
+            "stale_retrieval_ratio": stale_ratio,
         }
 
 

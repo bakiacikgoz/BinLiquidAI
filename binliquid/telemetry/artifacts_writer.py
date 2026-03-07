@@ -14,6 +14,10 @@ ARTIFACT_FILENAMES = {
     "governance_summary": "governance_summary.json",
     "team_summary": "team_summary.json",
     "team_pilot_report": "team_pilot_report.json",
+    "security_posture": "security_posture.json",
+    "metrics_snapshot": "metrics_snapshot.json",
+    "support_bundle_manifest": "support_bundle_manifest.json",
+    "ga_readiness_report": "ga_readiness_report.json",
 }
 
 
