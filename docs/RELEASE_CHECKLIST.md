@@ -6,6 +6,7 @@
 - [ ] `uv run pytest -q`
 - [ ] `make pilot-gate`
 - [ ] `make enterprise-gate`
+- [ ] `make qualification-run`
 - [ ] `uv run binliquid team validate --spec examples/team/restricted_pilot.yaml --json`
 - [ ] `uv run binliquid team pilot-check --spec examples/team/restricted_pilot.yaml --profile restricted --mode deterministic --report artifacts/team_pilot_report.json --json`
 - [ ] `artifacts/team_pilot_report.json` shows `checks.bounded_concurrency.status=pass`
@@ -26,9 +27,12 @@
 - [ ] `uv run binliquid auth whoami --profile enterprise --json`
 - [ ] `uv run binliquid auth check --profile enterprise --permission runtime.run --json`
 - [ ] `uv run binliquid metrics snapshot --profile enterprise --json`
+- [ ] `uv run binliquid qualification run --profile enterprise --mode mixed --soak-hours 6 --output-root artifacts/qualification --json`
 - [ ] `uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json`
 - [ ] `artifacts/security_posture.json` exists and is signed
 - [ ] `artifacts/metrics_snapshot.json` exists and is signed
+- [ ] `artifacts/qualification_report.json` exists, is signed, and contains all required workloads
+- [ ] `artifacts/QUALIFICATION_REPORT.md` exists
 - [ ] `artifacts/ga_readiness_report.json` exists and is signed
 - [ ] `artifacts/GA_READINESS_REPORT.md` exists
 - [ ] key status reports asymmetric provider and trusted verification keys
@@ -77,6 +81,7 @@
 - [ ] `artifacts/team_pilot_report.json` exists and reports `overall_status=pass`
 - [ ] `artifacts/security_posture.json` exists and reports `overall_status=pass`
 - [ ] `artifacts/metrics_snapshot.json` exists and valid JSON
+- [ ] `artifacts/qualification_report.json` exists and reports a support boundary table
 - [ ] `artifacts/ga_readiness_report.json` exists and reports no `red` blocker before GA review
 - [ ] Benchmark JSON outputs exist under `benchmarks/results/`
 - [ ] Ablation Markdown report exists

@@ -56,5 +56,21 @@ At minimum publish:
 
 ## Evidence Artifact
 
-When qualification is executed, publish `artifacts/qualification_report.json` with `status=pass` or `status=fail`.
-Until that artifact exists and passes, GA readiness remains conditional.
+Run qualification through the canonical runner:
+
+```bash
+uv run binliquid qualification run \
+  --profile enterprise \
+  --mode mixed \
+  --soak-hours 6 \
+  --output-root artifacts/qualification \
+  --json
+```
+
+This publishes:
+
+- `artifacts/qualification/<run_id>/qualification_report.json`
+- `artifacts/qualification/<run_id>/QUALIFICATION_REPORT.md`
+- latest pointers at `artifacts/qualification_report.json` and `artifacts/QUALIFICATION_REPORT.md`
+
+The JSON artifact is signed. `ga readiness` must verify that signature, require the mandatory workload set, enforce the `6h` soak threshold for `green/go`, and use the published support-boundary table before any enterprise-ready claim.

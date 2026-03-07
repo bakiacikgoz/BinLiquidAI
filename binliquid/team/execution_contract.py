@@ -50,6 +50,46 @@ def build_execution_contract_hash(
     )
 
 
+def derive_execution_contract_refs(
+    *,
+    source_job_id: str,
+    approval_id: str,
+    snapshot_hash: str,
+    target_kind: str,
+    policy_hash: str,
+    contract: dict[str, Any],
+    fallback_action_hash: str | None = None,
+) -> tuple[str | None, str | None]:
+    contract_task_run_id = str(contract.get("task_run_id") or "").strip()
+    effective_target_kind = str(contract.get("target_kind") or target_kind or "").strip()
+    effective_action_hash = str(
+        contract.get("action_payload_hash") or fallback_action_hash or ""
+    ).strip()
+    if not (
+        source_job_id
+        and approval_id
+        and snapshot_hash
+        and contract_task_run_id
+        and effective_target_kind
+        and effective_action_hash
+    ):
+        return None, None
+    resume_token_ref = build_resume_token_ref(
+        source_job_id=source_job_id,
+        task_run_id=contract_task_run_id,
+        approval_id=approval_id,
+        snapshot_hash=snapshot_hash,
+        target_kind=effective_target_kind,
+    )
+    execution_contract_hash = build_execution_contract_hash(
+        resume_token_ref=resume_token_ref,
+        action_hash=effective_action_hash,
+        policy_hash=policy_hash,
+        contract=contract,
+    )
+    return resume_token_ref, execution_contract_hash
+
+
 def build_memory_fingerprint(refs: list[dict[str, Any]]) -> str:
     normalized = _normalize_memory_refs(refs)
     return payload_hash(normalized)

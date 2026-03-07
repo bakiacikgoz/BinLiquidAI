@@ -48,7 +48,11 @@ class ApprovalAwareFakeTeamOrchestrator:
     ) -> OrchestratorResult:
         del use_router
         session_context = session_context or {}
-        run_id = str(session_context.get("job_id") or "job-test")
+        run_id = str(
+            session_context.get("governance_run_id")
+            or session_context.get("job_id")
+            or "job-test"
+        )
         override_id = session_context.get("governance_approval_id")
         decision, ticket = self.governance_runtime.evaluate_task(
             run_id=run_id,

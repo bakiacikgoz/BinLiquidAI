@@ -10,7 +10,11 @@ from typing import Any
 
 from binliquid.enterprise.baseline import security_posture
 from binliquid.enterprise.observability import collect_metrics_snapshot
-from binliquid.enterprise.signing import write_signed_json
+from binliquid.enterprise.qualification import (
+    MIN_GREEN_SOAK_SECONDS,
+    evaluate_qualification_evidence,
+)
+from binliquid.enterprise.signing import load_signed_artifact, write_signed_json
 from binliquid.governance.approval_store import ApprovalStore
 from binliquid.memory.persistent_store import PersistentMemoryStore
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload
@@ -157,6 +161,7 @@ def export_support_bundle(
     for src in [
         Path("artifacts") / "status.json",
         Path("artifacts") / "team_pilot_report.json",
+        Path("artifacts") / "qualification_report.json",
         Path("artifacts") / "ga_readiness_report.json",
     ]:
         if src.exists():
@@ -197,18 +202,41 @@ def export_support_bundle(
     }
 
 
-def ga_readiness_report(config: RuntimeConfig) -> dict[str, Any]:
+def ga_readiness_report(
+    config: RuntimeConfig,
+    *,
+    qualification_report_path: str | Path = "artifacts/qualification_report.json",
+) -> dict[str, Any]:
     posture = security_posture(config)
     metrics = collect_metrics_snapshot(config)
     migration = migration_plan(config)
-    qualification_artifact = Path("artifacts/qualification_report.json")
+    qualification_artifact = Path(qualification_report_path)
+    qualification_bundle = load_signed_artifact(path=qualification_artifact, config=config)
+    qualification_payload = qualification_bundle.get("data")
+    qualification_evaluation: dict[str, Any] | None = None
     qualification_status = None
-    if qualification_artifact.exists():
-        try:
-            qualification_payload = json.loads(qualification_artifact.read_text(encoding="utf-8"))
-            qualification_status = str(qualification_payload.get("status") or "unknown")
-        except Exception:  # noqa: BLE001
+    qualification_recommended = None
+    if qualification_bundle.get("present") and qualification_bundle.get("verified"):
+        if isinstance(qualification_payload, dict):
+            qualification_evaluation = evaluate_qualification_evidence(
+                qualification_payload=qualification_payload
+            )
+            qualification_status = str(
+                qualification_payload.get("qualification_status")
+                or qualification_evaluation.get("qualification_status")
+                or "unknown"
+            )
+            qualification_recommended = str(
+                qualification_payload.get("recommended_status")
+                or qualification_evaluation.get("recommended_status")
+                or "unknown"
+            )
+        else:
             qualification_status = "invalid"
+            qualification_recommended = "red"
+    elif qualification_bundle.get("present"):
+        qualification_status = "invalid"
+        qualification_recommended = "red"
     docs = {
         "SECURITY_BASELINE.md": Path("SECURITY_BASELINE.md").exists(),
         "KEY_MANAGEMENT.md": Path("KEY_MANAGEMENT.md").exists(),
@@ -242,7 +270,7 @@ def ga_readiness_report(config: RuntimeConfig) -> dict[str, Any]:
             docs["OBSERVABILITY_AND_SLO.md"] and bool(config.observability.file_snapshot_enabled),
         ),
         "qualification_soak": _section_status(
-            docs["QUALIFICATION_MATRIX.md"] and qualification_status == "pass",
+            docs["QUALIFICATION_MATRIX.md"] and qualification_recommended == "green",
             fallback="yellow",
         ),
         "packaging_installability": _section_status(
@@ -268,10 +296,26 @@ def ga_readiness_report(config: RuntimeConfig) -> dict[str, Any]:
         blocking_findings.append("upgrade/backup/rollback contract is incomplete")
     if sections["observability_slo"] == "red":
         blocking_findings.append("observability/SLO baseline is incomplete")
+    if qualification_bundle.get("present") and not qualification_bundle.get("verified"):
+        blocking_findings.append(
+            f"qualification report signature invalid: {qualification_bundle.get('error_code')}"
+        )
+    if qualification_status == "invalid":
+        blocking_findings.append("qualification report payload is invalid")
+    if qualification_evaluation and qualification_evaluation.get("recommended_status") == "red":
+        blocking_findings.extend(
+            str(item) for item in qualification_evaluation.get("blocking_findings", [])
+        )
     if sections["qualification_soak"] != "green":
         pending_evidence.append("qualification/soak evidence is not yet published")
     if sections["packaging_installability"] != "green":
         pending_evidence.append("install/deployment/support bundle docs are incomplete")
+    if (
+        qualification_bundle.get("present")
+        and qualification_evaluation is None
+        and qualification_status != "invalid"
+    ):
+        pending_evidence.append("qualification evidence could not be evaluated")
 
     overall = "green" if all(value == "green" for value in sections.values()) else "yellow"
     if blocking_findings:
@@ -287,8 +331,27 @@ def ga_readiness_report(config: RuntimeConfig) -> dict[str, Any]:
         "docs": docs,
         "qualification_report": {
             "path": str(qualification_artifact),
-            "present": qualification_artifact.exists(),
+            "present": bool(qualification_bundle.get("present")),
+            "verified": bool(qualification_bundle.get("verified")),
             "status": qualification_status,
+            "recommended_status": qualification_recommended,
+            "minimum_green_soak_seconds": MIN_GREEN_SOAK_SECONDS,
+            "error_code": qualification_bundle.get("error_code"),
+            "supported_profiles": (
+                qualification_evaluation.get("supported_profiles", [])
+                if qualification_evaluation is not None
+                else []
+            ),
+            "conditional_profiles": (
+                qualification_evaluation.get("conditional_profiles", [])
+                if qualification_evaluation is not None
+                else []
+            ),
+            "unsupported_profiles": (
+                qualification_evaluation.get("unsupported_profiles", [])
+                if qualification_evaluation is not None
+                else []
+            ),
         },
         "blocking_findings": blocking_findings,
         "pending_evidence": pending_evidence,
@@ -328,6 +391,28 @@ def render_ga_readiness_markdown(payload: dict[str, Any]) -> str:
         lines.extend(f"- {item}" for item in pending)
     else:
         lines.append("- none")
+    lines.extend(["", "## Qualification Evidence", ""])
+    qualification = payload.get("qualification_report") or {}
+    lines.append(f"- Path: `{qualification.get('path')}`")
+    lines.append(f"- Present: `{qualification.get('present')}`")
+    lines.append(f"- Verified: `{qualification.get('verified')}`")
+    lines.append(f"- Qualification status: `{qualification.get('status')}`")
+    lines.append(f"- Recommended status: `{qualification.get('recommended_status')}`")
+    lines.append(
+        f"- Minimum green soak seconds: `{qualification.get('minimum_green_soak_seconds')}`"
+    )
+    if qualification.get("error_code"):
+        lines.append(f"- Error code: `{qualification.get('error_code')}`")
+    supported = qualification.get("supported_profiles") or []
+    conditional = qualification.get("conditional_profiles") or []
+    unsupported = qualification.get("unsupported_profiles") or []
+    if supported or conditional or unsupported:
+        lines.extend(["", "| Support Boundary | Status | Notes |", "| --- | --- | --- |"])
+        for group in (supported, conditional, unsupported):
+            for item in group:
+                lines.append(
+                    f"| {item.get('scenario')} | {item.get('status')} | {item.get('notes')} |"
+                )
     lines.extend(["", "## Residual Risks", ""])
     lines.extend(f"- {item}" for item in (payload.get("residual_risks") or []))
     return "\n".join(lines) + "\n"

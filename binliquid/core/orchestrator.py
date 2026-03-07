@@ -114,6 +114,7 @@ class Orchestrator:
         started_total = time.perf_counter()
         request_id = str(uuid4())
         session_context = session_context or {}
+        governance_run_id = str(session_context.get("governance_run_id") or request_id)
         requested_model_metadata = self._requested_model_metadata(session_context)
         fallback_events: list[str] = []
         expert_latency_ms = 0
@@ -159,7 +160,7 @@ class Orchestrator:
         governance_decision: GovernanceDecision | None = None
         if self._governance_runtime is not None:
             governance_decision, approval_ticket = self._governance_runtime.evaluate_task(
-                run_id=request_id,
+                run_id=governance_run_id,
                 task_type=planner_output.task_type.value,
                 user_input=user_input,
                 override_approval_id=session_context.get("governance_approval_id"),
@@ -180,6 +181,7 @@ class Orchestrator:
                     reason_code=governance_decision.reason_code,
                     fallback_events=fallback_events,
                     governance_decision=governance_decision,
+                    governance_run_id=governance_run_id,
                     requested_model_metadata=requested_model_metadata,
                 )
             if governance_decision.action == GovernanceAction.REQUIRE_APPROVAL:
@@ -200,6 +202,7 @@ class Orchestrator:
                     fallback_events=fallback_events,
                     governance_decision=governance_decision,
                     approval_id=approval_ticket.approval_id if approval_ticket else None,
+                    governance_run_id=governance_run_id,
                     requested_model_metadata=requested_model_metadata,
                 )
 
@@ -558,6 +561,7 @@ class Orchestrator:
         started_total = time.perf_counter()
         request_id = str(uuid4())
         session_context = session_context or {}
+        governance_run_id = str(session_context.get("governance_run_id") or request_id)
         requested_model_metadata = self._requested_model_metadata(session_context)
         session_id = str(session_context.get("session_id", request_id))
         session_state = self._ensure_session_state(session_id)
@@ -575,7 +579,7 @@ class Orchestrator:
         governance_decision: GovernanceDecision | None = None
         if self._governance_runtime is not None:
             governance_decision, approval_ticket = self._governance_runtime.evaluate_task(
-                run_id=request_id,
+                run_id=governance_run_id,
                 task_type=TaskType.CHAT.value,
                 user_input=user_input,
                 override_approval_id=session_context.get("governance_approval_id"),
@@ -596,6 +600,7 @@ class Orchestrator:
                     reason_code=governance_decision.reason_code,
                     fallback_events=fallback_events,
                     governance_decision=governance_decision,
+                    governance_run_id=governance_run_id,
                     requested_model_metadata=requested_model_metadata,
                 )
             if governance_decision.action == GovernanceAction.REQUIRE_APPROVAL:
@@ -605,7 +610,7 @@ class Orchestrator:
                     "approval_pending",
                     {
                         "approval_id": approval_ticket.approval_id if approval_ticket else None,
-                        "run_id": request_id,
+                        "run_id": governance_run_id,
                         "task_type": TaskType.CHAT.value,
                     },
                 )
@@ -616,6 +621,7 @@ class Orchestrator:
                     fallback_events=fallback_events,
                     governance_decision=governance_decision,
                     approval_id=approval_ticket.approval_id if approval_ticket else None,
+                    governance_run_id=governance_run_id,
                     requested_model_metadata=requested_model_metadata,
                 )
 
@@ -717,7 +723,7 @@ class Orchestrator:
         audit_artifact_path = None
         if self._governance_runtime is not None:
             audit_artifact_path = self._governance_runtime.finalize_run(
-                run_id=request_id,
+                run_id=governance_run_id,
                 router_reason_code=ReasonCode.BASELINE_A.value,
                 model_metadata=run_model_metadata,
             )
@@ -1130,6 +1136,7 @@ class Orchestrator:
         reason_code: str,
         fallback_events: list[str],
         governance_decision: GovernanceDecision,
+        governance_run_id: str,
         requested_model_metadata: dict[str, str] | None = None,
     ) -> OrchestratorResult:
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
@@ -1147,6 +1154,7 @@ class Orchestrator:
             "router_reason_code": reason_code,
             "governance_action": governance_decision.action.value,
             "governance_reason_code": governance_decision.reason_code,
+            "governance_target": governance_decision.target,
             "policy_hash": governance_decision.policy_hash,
             "requested_provider": run_model_metadata["requested_provider"],
             "requested_fallback_provider": run_model_metadata["requested_fallback_provider"],
@@ -1164,7 +1172,7 @@ class Orchestrator:
         }
         if self._governance_runtime is not None:
             audit_artifact = self._governance_runtime.finalize_run(
-                run_id=request_id,
+                run_id=governance_run_id,
                 router_reason_code=reason_code,
                 model_metadata=run_model_metadata,
             )
@@ -1188,6 +1196,7 @@ class Orchestrator:
         fallback_events: list[str],
         governance_decision: GovernanceDecision,
         approval_id: str | None,
+        governance_run_id: str,
         requested_model_metadata: dict[str, str] | None = None,
     ) -> OrchestratorResult:
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
@@ -1205,6 +1214,7 @@ class Orchestrator:
             "router_reason_code": ReasonCode.APPROVAL_PENDING.value,
             "governance_action": governance_decision.action.value,
             "governance_reason_code": governance_decision.reason_code,
+            "governance_target": governance_decision.target,
             "policy_hash": governance_decision.policy_hash,
             "approval_id": approval_id,
             "requested_provider": run_model_metadata["requested_provider"],
@@ -1223,7 +1233,7 @@ class Orchestrator:
         }
         if self._governance_runtime is not None:
             audit_artifact = self._governance_runtime.finalize_run(
-                run_id=request_id,
+                run_id=governance_run_id,
                 router_reason_code=ReasonCode.APPROVAL_PENDING.value,
                 model_metadata=run_model_metadata,
             )

@@ -105,11 +105,12 @@ jobs:
         run: uv sync --python 3.11 --extra dev
 
       - name: Enterprise CLI tests
-        run: uv run pytest -q tests/test_enterprise_cli.py
+        run: uv run pytest -q tests/test_enterprise_cli.py tests/test_enterprise_qualification.py
 
       - name: Prepare enterprise fixture
         run: |
           rm -rf .binliquid/keys .binliquid/identity
+          rm -f artifacts/qualification_report.json artifacts/QUALIFICATION_REPORT.md
           uv run python scripts/prepare_enterprise_fixture.py --root .
 
       - name: Enterprise baseline and GA readiness

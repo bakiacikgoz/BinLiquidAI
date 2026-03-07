@@ -1,0 +1,61 @@
+version: "1"
+team:
+  team_id: "aegis-enterprise-conflict"
+  supervisor_policy: "sequential_then_parallel"
+  agents:
+    - agent_id: "agent-intake"
+      role: "Intake Agent"
+      allowed_task_types: ["plan"]
+      profile_name: "enterprise"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "enterprise"
+      approval_mode: "auto"
+    - agent_id: "agent-policy-a"
+      role: "Policy/Compliance Agent"
+      allowed_task_types: ["plan"]
+      profile_name: "enterprise"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "enterprise"
+      approval_mode: "auto"
+    - agent_id: "agent-research-b"
+      role: "Research Analyst Agent"
+      allowed_task_types: ["plan"]
+      profile_name: "enterprise"
+      model_overrides: {}
+      memory_scope_access: ["case"]
+      tool_policy_profile: "enterprise"
+      approval_mode: "auto"
+  handoff_rules:
+    - from_role: "Intake Agent"
+      to_role: "Policy/Compliance Agent"
+      required: true
+    - from_role: "Intake Agent"
+      to_role: "Research Analyst Agent"
+      required: true
+  termination_rules:
+    max_tasks: 6
+    max_retries: 1
+    max_handoff_depth: 4
+tasks:
+  - task_id: "task-intake"
+    title: "Intake"
+    task_type: "plan"
+    role: "Intake Agent"
+    depends_on: []
+    input_template: "Prepare bounded concurrency conflict test context: {{request}}"
+  - task_id: "task-branch-a"
+    title: "Shared state writer A"
+    task_type: "plan"
+    role: "Policy/Compliance Agent"
+    depends_on: ["task-intake"]
+    input_template: "Write compliance summary branch A."
+    memory_target: "shared/summary"
+  - task_id: "task-branch-b"
+    title: "Shared state writer B"
+    task_type: "plan"
+    role: "Research Analyst Agent"
+    depends_on: ["task-intake"]
+    input_template: "Write compliance summary branch B."
+    memory_target: "shared/summary"

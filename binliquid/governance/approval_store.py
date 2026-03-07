@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from dataclasses import dataclass
@@ -351,16 +352,15 @@ class ApprovalStore:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         if ticket.status != ApprovalStatus.EXECUTED:
             return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+        effective_contract_hash = self._effective_execution_contract_hash(ticket)
         if (
-            ticket.execution_contract_hash
+            effective_contract_hash
             and execution_contract_hash
-            and ticket.execution_contract_hash != execution_contract_hash
+            and effective_contract_hash != execution_contract_hash
         ):
             return ApprovalDecisionResult(ticket=ticket, error_code="STALE_APPROVAL_SNAPSHOT")
-        if ticket.execution_contract_hash and not execution_contract_hash:
+        if effective_contract_hash and not execution_contract_hash:
             return ApprovalDecisionResult(ticket=ticket, error_code="STALE_APPROVAL_SNAPSHOT")
-        if ticket.resume_claimed_job_id and ticket.resume_claimed_job_id != consumed_by_job_id:
-            return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
         if (
             ticket.resume_token_ref
             and resume_token_ref
@@ -405,6 +405,16 @@ class ApprovalStore:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         snapshot = dict(ticket.snapshot)
         snapshot["execution_contract"] = execution_contract
+        effective_snapshot_hash = _payload_hash(snapshot)
+        _resume_token_ref, effective_contract_hash = derive_execution_contract_refs(
+            source_job_id=ticket.run_id,
+            approval_id=ticket.approval_id,
+            snapshot_hash=effective_snapshot_hash,
+            target_kind=ticket.target_kind,
+            policy_hash=ticket.policy_hash,
+            contract=execution_contract,
+            fallback_action_hash=ticket.action_hash,
+        )
         with self._conn() as conn:
             updated = conn.execute(
                 """
@@ -415,9 +425,9 @@ class ApprovalStore:
                 WHERE approval_id = ? AND version = ?
                 """,
                 (
-                    snapshot_hash,
+                    effective_snapshot_hash,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
-                    execution_contract_hash,
+                    effective_contract_hash or execution_contract_hash,
                     approval_id,
                     ticket.version,
                 ),
@@ -443,9 +453,10 @@ class ApprovalStore:
             return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
         if ticket.consumed_at is not None or ticket.consumed_by_job_id is not None:
             return ApprovalDecisionResult(ticket=ticket, error_code="REPLAY_BLOCKED")
+        effective_contract_hash = self._effective_execution_contract_hash(ticket)
         if (
-            ticket.execution_contract_hash
-            and ticket.execution_contract_hash != execution_contract_hash
+            effective_contract_hash
+            and effective_contract_hash != execution_contract_hash
         ):
             return ApprovalDecisionResult(ticket=ticket, error_code="STALE_APPROVAL_SNAPSHOT")
         if (
@@ -500,7 +511,8 @@ class ApprovalStore:
 
     @staticmethod
     def _row_to_ticket(row: sqlite3.Row) -> ApprovalTicket:
-        return ApprovalTicket(
+        snapshot = json.loads(str(row["snapshot_json"]))
+        ticket = ApprovalTicket(
             version=int(row["version"]),
             approval_id=str(row["approval_id"]),
             run_id=str(row["run_id"]),
@@ -511,7 +523,7 @@ class ApprovalStore:
             policy_hash=str(row["policy_hash"]),
             request_hash=str(row["request_hash"]),
             snapshot_hash=str(row["snapshot_hash"]),
-            snapshot=json.loads(str(row["snapshot_json"])),
+            snapshot=snapshot,
             expires_at=datetime.fromisoformat(str(row["expires_at"])),
             actor=str(row["actor"]) if row["actor"] else None,
             decision_reason=str(row["decision_reason"]) if row["decision_reason"] else None,
@@ -546,3 +558,104 @@ class ApprovalStore:
                 datetime.fromisoformat(str(row["decided_at"])) if row["decided_at"] else None
             ),
         )
+        effective_contract_hash = ApprovalStore._effective_execution_contract_hash(ticket)
+        if effective_contract_hash is not None:
+            ticket.execution_contract_hash = effective_contract_hash
+        return ticket
+
+    @staticmethod
+    def _effective_execution_contract_hash(ticket: ApprovalTicket) -> str | None:
+        contract = ticket.snapshot.get("execution_contract", {})
+        if not isinstance(contract, dict) or not contract:
+            return ticket.execution_contract_hash
+        _resume_token_ref, effective_contract_hash = derive_execution_contract_refs(
+            source_job_id=ticket.run_id,
+            approval_id=ticket.approval_id,
+            snapshot_hash=ticket.snapshot_hash,
+            target_kind=ticket.target_kind,
+            policy_hash=ticket.policy_hash,
+            contract=contract,
+            fallback_action_hash=ticket.action_hash,
+        )
+        return effective_contract_hash or ticket.execution_contract_hash
+
+
+def _payload_hash(payload: Any) -> str:
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _build_resume_token_ref(
+    *,
+    source_job_id: str,
+    task_run_id: str,
+    approval_id: str,
+    snapshot_hash: str,
+    target_kind: str,
+) -> str:
+    return _payload_hash(
+        {
+            "source_job_id": source_job_id,
+            "task_run_id": task_run_id,
+            "approval_id": approval_id,
+            "snapshot_hash": snapshot_hash,
+            "target_kind": target_kind,
+        }
+    )
+
+
+def _build_execution_contract_hash(
+    *,
+    resume_token_ref: str,
+    action_hash: str,
+    policy_hash: str,
+    contract: dict[str, Any],
+) -> str:
+    return _payload_hash(
+        {
+            "resume_token_ref": resume_token_ref,
+            "action_hash": action_hash,
+            "policy_hash": policy_hash,
+            "contract": json.loads(json.dumps(contract, sort_keys=True, ensure_ascii=False)),
+        }
+    )
+
+
+def derive_execution_contract_refs(
+    *,
+    source_job_id: str,
+    approval_id: str,
+    snapshot_hash: str,
+    target_kind: str,
+    policy_hash: str,
+    contract: dict[str, Any],
+    fallback_action_hash: str | None = None,
+) -> tuple[str | None, str | None]:
+    contract_task_run_id = str(contract.get("task_run_id") or "").strip()
+    effective_target_kind = str(contract.get("target_kind") or target_kind or "").strip()
+    effective_action_hash = str(
+        contract.get("action_payload_hash") or fallback_action_hash or ""
+    ).strip()
+    if not (
+        source_job_id
+        and approval_id
+        and snapshot_hash
+        and contract_task_run_id
+        and effective_target_kind
+        and effective_action_hash
+    ):
+        return None, None
+    resume_token_ref = _build_resume_token_ref(
+        source_job_id=source_job_id,
+        task_run_id=contract_task_run_id,
+        approval_id=approval_id,
+        snapshot_hash=snapshot_hash,
+        target_kind=effective_target_kind,
+    )
+    execution_contract_hash = _build_execution_contract_hash(
+        resume_token_ref=resume_token_ref,
+        action_hash=effective_action_hash,
+        policy_hash=policy_hash,
+        contract=contract,
+    )
+    return resume_token_ref, execution_contract_hash

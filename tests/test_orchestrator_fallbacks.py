@@ -1,9 +1,17 @@
 import time
+from datetime import UTC, datetime, timedelta
 
 from binliquid.core.llm_ollama import StubLLM
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import PlannerRun
 from binliquid.experts.base import ExpertBase
+from binliquid.governance.models import (
+    ApprovalStatus,
+    ApprovalTicket,
+    GovernanceAction,
+    GovernanceDecision,
+    GovernancePhase,
+)
 from binliquid.router.rule_router import RuleRouter
 from binliquid.runtime.config import RuntimeConfig, RuntimeLimits
 from binliquid.schemas.models import (
@@ -124,6 +132,71 @@ class MixedPlanExpert(ExpertBase):
         )
 
 
+class GovernanceRuntimeStub:
+    def __init__(self, action: GovernanceAction):
+        self._action = action
+        self.finalize_calls: list[str] = []
+
+    def evaluate_task(  # noqa: PLR0913
+        self,
+        *,
+        run_id: str,
+        task_type: str,
+        user_input: str,
+        override_approval_id: str | None = None,
+        execution_contract_hash: str | None = None,
+        resume_token_ref: str | None = None,
+    ):
+        del user_input, override_approval_id, execution_contract_hash, resume_token_ref
+        decision = GovernanceDecision(
+            phase=GovernancePhase.TASK,
+            target=task_type,
+            action=self._action,
+            reason_code=(
+                "APPROVAL_REQUIRED"
+                if self._action == GovernanceAction.REQUIRE_APPROVAL
+                else "POLICY_DENY"
+            ),
+            matched_rule_path="rules.test",
+            policy_schema_version="1",
+            policy_version="test",
+            policy_hash="policy-hash",
+            decision_engine_version="test",
+            approval_required=self._action == GovernanceAction.REQUIRE_APPROVAL,
+            approval_id="approval-1" if self._action == GovernanceAction.REQUIRE_APPROVAL else None,
+            explain="test decision",
+        )
+        if self._action == GovernanceAction.REQUIRE_APPROVAL:
+            ticket = ApprovalTicket(
+                version=1,
+                approval_id="approval-1",
+                run_id=run_id,
+                status=ApprovalStatus.PENDING,
+                target_kind="task",
+                target_ref=task_type,
+                action_hash="action-hash",
+                policy_hash="policy-hash",
+                request_hash="request-hash",
+                snapshot_hash="snapshot-hash",
+                snapshot={},
+                expires_at=datetime.now(UTC) + timedelta(minutes=10),
+                idempotency_key="approval-1",
+            )
+            return decision, ticket
+        return decision, None
+
+    def finalize_run(
+        self,
+        *,
+        run_id: str,
+        router_reason_code: str,
+        model_metadata: dict[str, object],
+    ):
+        del router_reason_code, model_metadata
+        self.finalize_calls.append(run_id)
+        return "audit.json"
+
+
 def _config(timeout_ms: int = 10, threshold: int = 3, cooldown_s: int = 300) -> RuntimeConfig:
     limits = RuntimeLimits(
         expert_timeout_ms=timeout_ms,
@@ -241,3 +314,69 @@ def test_orchestrator_adjudicates_mixed_expert_outputs() -> None:
     assert result.final_text == "adjudicated-final"
     assert result.used_path == "expert_adjudicated:research_expert+plan_expert"
     assert "expert_adjudication" in result.fallback_events
+
+
+def test_governance_pending_uses_governance_run_id_without_name_error() -> None:
+    planner_output = PlannerOutput(
+        task_type=TaskType.RESEARCH,
+        intent="research",
+        needs_expert=True,
+        expert_candidates=[ExpertName.RESEARCH],
+        confidence=0.95,
+        latency_budget_ms=1000,
+        can_fallback=True,
+        response_mode=ResponseMode.TOOL_FIRST,
+    )
+    governance = GovernanceRuntimeStub(GovernanceAction.REQUIRE_APPROVAL)
+    orchestrator = Orchestrator(
+        planner=StaticPlanner(planner_output),
+        llm=StubLLM(responses=["x"]),
+        router=RuleRouter(confidence_threshold=0.6),
+        experts={ExpertName.RESEARCH.value: MixedResearchExpert()},
+        tracer=Tracer(),
+        config=_config(timeout_ms=100),
+        governance_runtime=governance,
+    )
+
+    result = orchestrator.process(
+        "needs approval",
+        session_context={"governance_run_id": "task-run-1"},
+        use_router=True,
+    )
+
+    assert result.used_path == "governance_pending"
+    assert governance.finalize_calls == ["task-run-1"]
+    assert result.metrics["approval_id"] == "approval-1"
+
+
+def test_governance_blocked_uses_governance_run_id_without_name_error() -> None:
+    planner_output = PlannerOutput(
+        task_type=TaskType.RESEARCH,
+        intent="research",
+        needs_expert=True,
+        expert_candidates=[ExpertName.RESEARCH],
+        confidence=0.95,
+        latency_budget_ms=1000,
+        can_fallback=True,
+        response_mode=ResponseMode.TOOL_FIRST,
+    )
+    governance = GovernanceRuntimeStub(GovernanceAction.DENY)
+    orchestrator = Orchestrator(
+        planner=StaticPlanner(planner_output),
+        llm=StubLLM(responses=["x"]),
+        router=RuleRouter(confidence_threshold=0.6),
+        experts={ExpertName.RESEARCH.value: MixedResearchExpert()},
+        tracer=Tracer(),
+        config=_config(timeout_ms=100),
+        governance_runtime=governance,
+    )
+
+    result = orchestrator.process(
+        "denied request",
+        session_context={"governance_run_id": "task-run-2"},
+        use_router=True,
+    )
+
+    assert result.used_path == "governance_blocked"
+    assert governance.finalize_calls == ["task-run-2"]
+    assert result.metrics["governance_reason_code"] == "POLICY_DENY"

@@ -201,6 +201,50 @@ def verify_signed_artifact(
     }
 
 
+def load_signed_artifact(
+    *,
+    path: str | Path,
+    config: RuntimeConfig | None = None,
+    trusted_keys_dir: str | Path | None = None,
+    key_manifest_path: str | Path | None = None,
+) -> dict[str, Any]:
+    source = Path(path)
+    if not source.exists():
+        return {
+            "path": str(source),
+            "present": False,
+            "verified": False,
+            "error_code": "ARTIFACT_NOT_FOUND",
+        }
+    try:
+        payload = json.loads(source.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "path": str(source),
+            "present": True,
+            "verified": False,
+            "error_code": "INVALID_JSON",
+            "error": str(exc),
+        }
+
+    verification = verify_signed_artifact(
+        path=source,
+        config=config,
+        trusted_keys_dir=trusted_keys_dir,
+        key_manifest_path=key_manifest_path,
+    )
+    if not isinstance(payload, dict):
+        payload = {}
+    return {
+        **verification,
+        "present": True,
+        "artifact": payload.get("artifact"),
+        "status": payload.get("status"),
+        "generated_at": payload.get("generated_at"),
+        "data": payload.get("data"),
+    }
+
+
 def key_status(config: RuntimeConfig) -> dict[str, Any]:
     trusted = _load_trusted_keys(config=config)
     current_key_id = str(config.keys.current_key_id or "").strip() or None

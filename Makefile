@@ -1,4 +1,4 @@
-.PHONY: bootstrap install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap:
 	bash scripts/bootstrap_macos.sh
@@ -49,8 +49,9 @@ pilot-gate:
 		--json
 
 enterprise-gate:
-	uv run pytest -q tests/test_enterprise_cli.py
+	uv run pytest -q tests/test_enterprise_cli.py tests/test_enterprise_qualification.py
 	rm -rf .binliquid/keys .binliquid/identity
+	rm -f artifacts/qualification_report.json artifacts/QUALIFICATION_REPORT.md
 	uv run python scripts/prepare_enterprise_fixture.py --root .
 	uv run binliquid security baseline --profile enterprise --json
 	uv run binliquid auth whoami --profile enterprise --json
@@ -60,6 +61,14 @@ enterprise-gate:
 	uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
 	uv run binliquid keys verify --profile enterprise --path artifacts/ga_readiness_report.json --json
 	uv run binliquid support bundle export --profile enterprise --json
+
+qualification-run:
+	uv run binliquid qualification run \
+		--profile enterprise \
+		--mode mixed \
+		--soak-hours 6 \
+		--output-root artifacts/qualification \
+		--json
 
 ui-install:
 	cd apps/operator-panel && pnpm install

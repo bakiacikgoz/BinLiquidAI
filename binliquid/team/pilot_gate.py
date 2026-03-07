@@ -42,7 +42,11 @@ class DeterministicPilotOrchestrator:
     ) -> OrchestratorResult:
         del use_router
         session_context = session_context or {}
-        run_id = str(session_context.get("job_id") or "pilot-job")
+        run_id = str(
+            session_context.get("governance_run_id")
+            or session_context.get("job_id")
+            or "pilot-job"
+        )
         task_type = str(session_context.get("task_type") or "chat")
         override_id = session_context.get("governance_approval_id")
         trace_seed = _short_hash({"task_type": task_type, "input": user_input})

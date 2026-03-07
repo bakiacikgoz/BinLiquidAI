@@ -33,6 +33,7 @@ from binliquid.enterprise.maintenance import (
     restore_verify,
 )
 from binliquid.enterprise.observability import collect_metrics_snapshot
+from binliquid.enterprise.qualification import run_qualification, write_qualification_report
 from binliquid.enterprise.signing import (
     key_status,
     rotate_plan,
@@ -83,6 +84,7 @@ support_app = typer.Typer(help="Support commands")
 support_bundle_app = typer.Typer(help="Support bundle commands")
 metrics_app = typer.Typer(help="Observability commands")
 ga_app = typer.Typer(help="GA readiness commands")
+qualification_app = typer.Typer(help="Qualification evidence commands")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
 app.add_typer(research_app, name="research")
@@ -100,6 +102,7 @@ app.add_typer(support_app, name="support")
 support_app.add_typer(support_bundle_app, name="bundle")
 app.add_typer(metrics_app, name="metrics")
 app.add_typer(ga_app, name="ga")
+app.add_typer(qualification_app, name="qualification")
 
 
 def _version_callback(value: bool) -> None:
@@ -2200,11 +2203,16 @@ def ga_readiness_cmd(
         "--report",
         help="GA readiness report output path",
     ),
+    qualification_report: str = typer.Option(
+        "artifacts/qualification_report.json",
+        "--qualification-report",
+        help="Qualification evidence report path",
+    ),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
-    payload = ga_readiness_report(config)
+    payload = ga_readiness_report(config, qualification_report_path=qualification_report)
     write_signed_json(
         path=report,
         artifact="ga_readiness_report",
@@ -2220,6 +2228,95 @@ def ga_readiness_cmd(
     else:
         typer.echo(payload["overall_status"])
     if payload.get("overall_status") == "red":
+        raise typer.Exit(code=1)
+
+
+@qualification_app.command("run")
+def qualification_run_cmd(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    mode: str = typer.Option("mixed", help="Qualification evidence mode"),
+    soak_hours: float = typer.Option(
+        6.0,
+        "--soak-hours",
+        help="Requested soak duration in hours for the 6h qualification workload.",
+    ),
+    output_root: str = typer.Option(
+        "artifacts/qualification",
+        "--output-root",
+        help="Qualification output root directory",
+    ),
+    provider: str | None = typer.Option(None, help="Override provider"),
+    fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model name"),
+    hf_model_id: str | None = typer.Option(
+        None,
+        "--hf-model-id",
+        help="Override transformers model id",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    resolved, _source_map = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    validation_error = _validate_model_override_combo(
+        effective_provider=resolved.llm_provider,
+        model_override=model,
+        hf_model_id_override=hf_model_id,
+    )
+    if validation_error is not None:
+        _code, message = validation_error
+        typer.echo(message)
+        raise typer.Exit(code=1)
+
+    for permission in (
+        "runtime.run",
+        "approval.decide",
+        "approval.execute",
+        "support.export",
+        "backup.create",
+        "restore.verify",
+    ):
+        _require_permission_or_exit(resolved, permission)
+
+    try:
+        payload = run_qualification(
+            config=resolved,
+            mode=mode,
+            soak_hours=soak_hours,
+            output_root=output_root,
+            live_orchestrator_builder=lambda runtime_config: _build_orchestrator(
+                runtime_config,
+                provider_name=resolved.llm_provider,
+                fallback_provider=resolved.fallback_provider,
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        error_code = getattr(exc, "error_code", "QUALIFICATION_FAILED")
+        payload = {
+            "status": "error",
+            "error_code": error_code,
+            "error": str(exc),
+        }
+        if json_output:
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            typer.echo(f"{error_code}: {exc}")
+        raise typer.Exit(code=2) from None
+
+    paths = write_qualification_report(payload=payload, config=resolved, output_root=output_root)
+    payload.setdefault("artifacts", {})
+    payload["artifacts"].update(paths)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload.get("go_no_go", "conditional"))
+    if payload.get("go_no_go") == "no-go":
         raise typer.Exit(code=1)
 
 

@@ -20,11 +20,10 @@ from binliquid.team.artifacts import (
 from binliquid.team.checkpoint_store import TeamCheckpointStore
 from binliquid.team.event_recorder import EventRecorder
 from binliquid.team.execution_contract import (
-    build_execution_contract_hash,
     build_handoff_execution_contract,
     build_memory_write_execution_contract,
-    build_resume_token_ref,
     build_task_execution_contract,
+    derive_execution_contract_refs,
     payload_hash,
 )
 from binliquid.team.handoff import evaluate_handoff_transfer
@@ -730,28 +729,35 @@ class TeamSupervisor:
                 or dependency_events
                 or [task_last_event.get(task_run_id, "")]
             )
-            task_action_hash = (
-                self._governance_runtime.task_action_hash(
-                    task_type=task_def.task_type, user_input=task_input
+            governed_task_type = str(task_override_contract.get("target_ref") or task_def.task_type)
+
+            def _build_task_contract(governed_target: str) -> dict[str, Any]:
+                action_hash_value = (
+                    self._governance_runtime.task_action_hash(
+                        task_type=governed_target,
+                        user_input=task_input,
+                    )
+                    if self._governance_runtime is not None
+                    else payload_hash({"task_type": governed_target, "user_input": task_input})
                 )
-                if self._governance_runtime is not None
-                else payload_hash({"task_type": task_def.task_type, "user_input": task_input})
-            )
-            task_contract = build_task_execution_contract(
-                task_run_id=contract_task_run_id,
-                task_attempt=contract_task_attempt,
-                task_type=task_def.task_type,
-                target_ref=task_def.task_type,
-                canonical_task_input=task_input,
-                action_payload_hash=task_action_hash,
-                policy_input_hash=payload_hash(
-                    {"task_type": task_def.task_type, "user_input": task_input}
-                ),
-                resolved_memory_refs=list(memory_context.get("records", [])),
-                causal_ancestry=contract_causal_ancestry,
-                branch_id=contract_branch_id,
-                branch_parent=contract_branch_parent,
-            )
+                return build_task_execution_contract(
+                    task_run_id=contract_task_run_id,
+                    task_attempt=contract_task_attempt,
+                    task_type=governed_target,
+                    target_ref=governed_target,
+                    canonical_task_input=task_input,
+                    action_payload_hash=action_hash_value,
+                    policy_input_hash=payload_hash(
+                        {"task_type": governed_target, "user_input": task_input}
+                    ),
+                    resolved_memory_refs=list(memory_context.get("records", [])),
+                    causal_ancestry=contract_causal_ancestry,
+                    branch_id=contract_branch_id,
+                    branch_parent=contract_branch_parent,
+                )
+
+            task_contract = _build_task_contract(governed_task_type)
+            task_action_hash = str(task_contract.get("action_payload_hash") or "")
             task_resume_token_ref, task_contract_hash, task_snapshot_hash = _override_contract_refs(
                 governance_runtime=self._governance_runtime,
                 approval_id=task_override,
@@ -822,7 +828,7 @@ class TeamSupervisor:
             if task_override and self._governance_runtime is not None:
                 prepared = self._governance_runtime.prepare_resume_approval(
                     approval_id=task_override,
-                    run_id=resolved_job_id,
+                    run_id=task_run_id,
                     task_run_id=task_run_id,
                     target_kind="task",
                     execution_contract_hash=task_contract_hash or payload_hash(task_contract),
@@ -900,7 +906,7 @@ class TeamSupervisor:
                     replacement_decision, replacement_ticket = (
                         self._governance_runtime.evaluate_task(
                             run_id=resolved_job_id,
-                            task_type=task_def.task_type,
+                            task_type=governed_task_type,
                             user_input=task_input,
                         )
                     )
@@ -981,6 +987,7 @@ class TeamSupervisor:
             }
             if task_override:
                 session_context["governance_approval_id"] = task_override
+                session_context["governance_run_id"] = task_run_id
                 if task_contract_hash:
                     session_context["governance_execution_contract_hash"] = task_contract_hash
                 if task_resume_token_ref:
@@ -1191,14 +1198,27 @@ class TeamSupervisor:
                     approval_state = "pending"
                     approval_id = str(result.metrics.get("approval_id") or "").strip() or None
                     if approval_id and self._governance_runtime is not None:
+                        approval_target = str(
+                            result.metrics.get("governance_target")
+                            or task_contract.get("target_ref")
+                            or governed_task_type
+                        )
+                        approval_task_contract = (
+                            task_contract
+                            if approval_target == str(task_contract.get("target_ref") or "")
+                            else _build_task_contract(approval_target)
+                        )
+                        approval_action_hash = str(
+                            approval_task_contract.get("action_payload_hash") or task_action_hash
+                        )
                         _attach_contract(
                             governance_runtime=self._governance_runtime,
                             approval_id=approval_id,
                             source_job_id=resolved_job_id,
                             task_run_id=task_run_id,
                             target_kind="task",
-                            action_hash=task_action_hash,
-                            contract=task_contract,
+                            action_hash=approval_action_hash,
+                            contract=approval_task_contract,
                         )
                         ticket = self._governance_runtime.approval_store.get(approval_id)
                         approval_requested = emit(
@@ -1215,7 +1235,7 @@ class TeamSupervisor:
                             approval_id=approval_id,
                             trace_id=result.trace_id,
                             snapshot_hash=ticket.snapshot_hash if ticket else None,
-                            resolved_memory_fingerprint=task_contract.get(
+                            resolved_memory_fingerprint=approval_task_contract.get(
                                 "resolved_memory_fingerprint"
                             ),
                             data={
@@ -2186,23 +2206,19 @@ def _attach_contract(
             "execution_contract": contract,
         }
     )
-    resume_token_ref = build_resume_token_ref(
+    resume_token_ref, execution_contract_hash = derive_execution_contract_refs(
         source_job_id=source_job_id,
-        task_run_id=task_run_id,
         approval_id=approval_id,
         snapshot_hash=new_snapshot_hash,
         target_kind=target_kind,
-    )
-    execution_contract_hash = build_execution_contract_hash(
-        resume_token_ref=resume_token_ref,
-        action_hash=action_hash,
         policy_hash=_policy_hash(governance_runtime),
         contract=contract,
+        fallback_action_hash=action_hash,
     )
     governance_runtime.attach_execution_contract(
         approval_id=approval_id,
         execution_contract=contract,
-        execution_contract_hash=execution_contract_hash,
+        execution_contract_hash=execution_contract_hash or "",
     )
     return resume_token_ref, execution_contract_hash
 
@@ -2222,21 +2238,14 @@ def _override_contract_refs(
     ticket = governance_runtime.approval_store.get(approval_id)
     if ticket is None:
         return None, None, None
-    source_task_run_id = str(
-        ticket.snapshot.get("execution_contract", {}).get("task_run_id") or task_run_id
-    )
-    resume_token_ref = build_resume_token_ref(
+    resume_token_ref, execution_contract_hash = derive_execution_contract_refs(
         source_job_id=ticket.run_id,
-        task_run_id=source_task_run_id,
         approval_id=approval_id,
         snapshot_hash=ticket.snapshot_hash,
         target_kind=target_kind,
-    )
-    execution_contract_hash = build_execution_contract_hash(
-        resume_token_ref=resume_token_ref,
-        action_hash=action_hash,
         policy_hash=policy_hash,
         contract=contract,
+        fallback_action_hash=action_hash,
     )
     return resume_token_ref, execution_contract_hash, ticket.snapshot_hash
 

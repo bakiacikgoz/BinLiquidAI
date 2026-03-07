@@ -11,7 +11,7 @@ It provides two layers:
 > BinLiquid core is production-grade.
 > Team Runtime is pilot-hardened for controlled/restricted profiles, with release-blocking gates, replay verification, approval hardening, and bounded-concurrency safeguards.
 > Enterprise deployment readiness is implemented under defined constraints through secure defaults, verified identity/RBAC gates, asymmetric artifact signing, operational support bundles, and GA readiness reporting.
-> Broader GA claims still require published qualification evidence from the documented deployment envelope.
+> Broader GA claims still require signed qualification evidence from the documented deployment envelope.
 
 ## Current Status
 
@@ -135,8 +135,12 @@ uv run binliquid auth whoami --profile enterprise --json
 uv run binliquid auth check --profile enterprise --permission runtime.run --json
 uv run binliquid security baseline --profile enterprise --json
 uv run binliquid metrics snapshot --profile enterprise --json
+uv run binliquid qualification run --profile enterprise --mode mixed --soak-hours 6 --output-root artifacts/qualification --json
 uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
 ```
+
+`ga readiness` now evaluates signed qualification evidence from `artifacts/qualification_report.json`.
+Without the required workload set and the `6h` soak threshold, the result should remain `yellow/conditional`.
 
 Operator panel (thin-shell terminal):
 
