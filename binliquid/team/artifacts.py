@@ -132,6 +132,13 @@ def write_audit_envelope(
             "task_escalated",
             "approval_consumed",
             "resume_duplicate_suppressed",
+            "team.resume.frontier_loaded",
+            "team.resume.continuation_selected",
+            "team.resume.lineage_mismatch",
+            "team.resume.snapshot_drift",
+            "team.resume.approval_carry_forwarded",
+            "team.resume.invalid_frontier",
+            "team.resume.completed",
             "fallback_mode_applied",
             "fallback_mode_released",
             "safe_abort",
@@ -292,10 +299,14 @@ def _consistency_report(
 
     missing_causal_ref_count = 0
     seen_event_ids: set[str] = set()
+    allowed_external_causal_refs = _external_causal_refs(events)
     for event in events:
         if _event_requires_causal_ref(event.event):
             causal_ref = str(event.causal_ref or "").strip()
-            if not causal_ref or causal_ref not in seen_event_ids:
+            if not causal_ref or (
+                causal_ref not in seen_event_ids
+                and causal_ref not in allowed_external_causal_refs
+            ):
                 errors.append(
                     f"event '{event.event_id}' missing valid causal_ref for '{event.event}'"
                 )
@@ -349,6 +360,23 @@ def _consistency_report(
         "resume_duplicate_suppressed_count": sum(
             1 for item in events if item.event == "resume_duplicate_suppressed"
         ),
+        "resume_frontier_count": sum(
+            1 for item in events if item.event == "team.resume.frontier_loaded"
+        ),
+        "resume_root_restart_count": sum(
+            int(item.data.get("resume_root_restart_count") or 0)
+            for item in events
+            if item.event == "team.resume.continuation_selected"
+        ),
+        "approval_carry_forward_count": sum(
+            1 for item in events if item.event == "team.resume.approval_carry_forwarded"
+        ),
+        "resume_lineage_mismatch_count": sum(
+            1 for item in events if item.event == "team.resume.lineage_mismatch"
+        ),
+        "invalid_frontier_count": sum(
+            1 for item in events if item.event == "team.resume.invalid_frontier"
+        ),
         "memory_conflict_count": sum(
             1 for item in events if item.event == "memory_conflict_rejected"
         ),
@@ -365,6 +393,10 @@ def _event_requires_causal_ref(event_name: str) -> bool:
     return event_name in {
         "task_assigned",
         "handoff",
+        "team.resume.continuation_selected",
+        "team.resume.lineage_mismatch",
+        "team.resume.snapshot_drift",
+        "team.resume.approval_carry_forwarded",
         "approval_requested",
         "approval_consumed",
         "memory_read_attempt",
@@ -381,3 +413,20 @@ def _event_requires_causal_ref(event_name: str) -> bool:
         "task_escalated",
         "safe_abort",
     }
+
+
+def _external_causal_refs(events: list[TeamEvent]) -> set[str]:
+    refs: set[str] = set()
+    for event in events:
+        if event.event != "team.resume.continuation_selected":
+            continue
+        upstream_nodes = (event.data or {}).get("upstream_completed_nodes") or []
+        if not isinstance(upstream_nodes, list):
+            continue
+        for item in upstream_nodes:
+            if not isinstance(item, dict):
+                continue
+            terminal_event_id = str(item.get("terminal_event_id") or "").strip()
+            if terminal_event_id:
+                refs.add(terminal_event_id)
+    return refs

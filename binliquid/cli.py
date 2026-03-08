@@ -56,6 +56,10 @@ from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
 from binliquid.schemas.models import ExpertName
+from binliquid.team.continuation import (
+    ResumeContinuationError,
+    derive_resume_continuation_state,
+)
 from binliquid.team.models import TeamSpec
 from binliquid.team.pilot_gate import run_pilot_check, write_pilot_report
 from binliquid.team.replay import load_events, load_job_status, replay_job
@@ -1708,6 +1712,29 @@ def team_resume(
         )
         raise typer.Exit(code=1)
 
+    try:
+        continuation_state = derive_resume_continuation_state(
+            spec=parsed,
+            source_job_id=job_id,
+            root_dir=root_dir,
+            source_status=source_status,
+            source_events=source_events,
+        )
+    except ResumeContinuationError as exc:
+        typer.echo(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_code": exc.code,
+                    "error": str(exc),
+                    "job_id": job_id,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=1) from None
+
     generated_resume_job_id = resume_job_id or (
         f"{job_id}-resume-{datetime.now(UTC).strftime('%H%M%S')}"
     )
@@ -1718,6 +1745,7 @@ def team_resume(
         case_id=source_case_id,
         job_id=generated_resume_job_id,
         approval_overrides=overrides,
+        continuation_state=continuation_state,
     )
 
     payload = {
@@ -2245,6 +2273,16 @@ def qualification_run_cmd(
         "--output-root",
         help="Qualification output root directory",
     ),
+    workloads: str | None = typer.Option(
+        None,
+        "--workloads",
+        help="Comma-separated qualification workloads to run",
+    ),
+    merge_from_report: str | None = typer.Option(
+        None,
+        "--merge-from-report",
+        help="Existing signed qualification report to merge subset reruns into",
+    ),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
     model: str | None = typer.Option(None, "--model", help="Override model name"),
@@ -2285,11 +2323,20 @@ def qualification_run_cmd(
         _require_permission_or_exit(resolved, permission)
 
     try:
+        selected_workloads = None
+        if workloads is not None:
+            selected_workloads = [
+                item.strip()
+                for item in workloads.split(",")
+                if item.strip()
+            ]
         payload = run_qualification(
             config=resolved,
             mode=mode,
             soak_hours=soak_hours,
             output_root=output_root,
+            workloads=selected_workloads,
+            merge_from_report=merge_from_report,
             live_orchestrator_builder=lambda runtime_config: _build_orchestrator(
                 runtime_config,
                 provider_name=resolved.llm_provider,

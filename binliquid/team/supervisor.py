@@ -68,6 +68,7 @@ class TeamSupervisor:
         case_id: str | None = None,
         job_id: str | None = None,
         approval_overrides: dict[str, dict[str, str]] | None = None,
+        continuation_state: dict[str, Any] | None = None,
     ) -> TeamRunResult:
         created_at = datetime.now(UTC)
         resolved_case_id = case_id or f"case-{uuid4().hex[:12]}"
@@ -101,17 +102,46 @@ class TeamSupervisor:
             lock=lock,
         )
 
-        tasks = _resolve_tasks(spec, request)
-        resolved_spec = spec.model_copy(update={"tasks": tasks})
+        all_tasks = _resolve_tasks(spec, request)
+        resolved_spec = spec.model_copy(update={"tasks": all_tasks})
         validation_errors = validate_team_spec(
             resolved_spec,
             active_policy_profile=_active_policy_profile(self._config),
         )
         branch_cache: dict[str, tuple[str, str | None]] = {}
-        tasks_by_id = {item.task_id: item for item in tasks}
-        task_run_ids = {
-            item.task_id: _task_run_id(resolved_job_id, item.task_id, 1) for item in tasks
+        tasks_by_id = {item.task_id: item for item in all_tasks}
+        continuation = continuation_state or {}
+        root_run_id = str(continuation.get("root_run_id") or resolved_job_id)
+        checkpoint_generation = int(continuation.get("checkpoint_generation") or 0)
+        continuation_index = int(continuation.get("continuation_index") or 0)
+        scheduled_task_ids = set(
+            str(item)
+            for item in (
+                continuation.get("continuation_task_ids")
+                or [task.task_id for task in all_tasks]
+            )
+        )
+        tasks = [item for item in all_tasks if item.task_id in scheduled_task_ids]
+        inherited_completed_task_ids = {
+            str(item) for item in continuation.get("completed_task_ids", [])
         }
+        inherited_completed_outputs = {
+            str(task_id): dict(value)
+            for task_id, value in dict(continuation.get("completed_outputs") or {}).items()
+        }
+        inherited_task_lineage = {
+            str(task_id): dict(value)
+            for task_id, value in dict(continuation.get("task_lineage") or {}).items()
+        }
+        blocked_task_ids = [
+            str(item) for item in list(continuation.get("blocked_task_ids") or [])
+        ]
+        task_run_ids = {}
+        for item in all_tasks:
+            lineage = inherited_task_lineage.get(item.task_id) or {}
+            task_run_ids[item.task_id] = str(
+                lineage.get("task_run_id") or _task_run_id(resolved_job_id, item.task_id, 1)
+            )
         resume_outcomes: list[dict[str, Any]] = []
 
         def task_branch(task_id: str | None) -> tuple[str | None, str | None]:
@@ -185,6 +215,41 @@ class TeamSupervisor:
                 task_last_event[task_run_id] = entry.event_id
             return entry
 
+        def lineage_meta(task_id: str) -> dict[str, Any]:
+            branch_id, branch_parent = task_branch(task_id)
+            inherited = inherited_task_lineage.get(task_id) or {}
+            lineage_hash = str(
+                inherited.get("lineage_hash")
+                or payload_hash(
+                    {
+                        "root_run_id": root_run_id,
+                        "logical_task_id": task_id,
+                        "branch_id": branch_id,
+                        "branch_parent": branch_parent,
+                    }
+                )
+            )
+            return {
+                "root_run_id": str(inherited.get("root_run_id") or root_run_id),
+                "logical_task_id": str(inherited.get("logical_task_id") or task_id),
+                "task_run_id": str(inherited.get("task_run_id") or task_run_ids[task_id]),
+                "branch_id": str(inherited.get("branch_id") or branch_id or f"branch:{task_id}"),
+                "branch_parent": (
+                    str(inherited.get("branch_parent"))
+                    if inherited.get("branch_parent") is not None
+                    else branch_parent
+                ),
+                "lineage_hash": lineage_hash,
+                "continuation_index": int(
+                    inherited.get("continuation_index") or continuation_index or 0
+                ),
+                "checkpoint_generation": int(
+                    inherited.get("checkpoint_generation") or checkpoint_generation or 0
+                ),
+                "terminal_event_id": inherited.get("terminal_event_id"),
+                "task_attempt": int(inherited.get("task_attempt") or 1),
+            }
+
         emit(
             "team_start",
             phase="team",
@@ -192,12 +257,58 @@ class TeamSupervisor:
             status_after="running",
             data={"request": request},
         )
+        for task_id, output in inherited_completed_outputs.items():
+            if task_id in tasks_by_id:
+                task_outputs[task_id] = dict(output)
+        for _task_id, lineage in inherited_task_lineage.items():
+            task_run_id = str(lineage.get("task_run_id") or "").strip()
+            terminal_event_id = str(lineage.get("terminal_event_id") or "").strip()
+            if task_run_id and terminal_event_id:
+                task_last_event[task_run_id] = terminal_event_id
+        if continuation:
+            frontier_loaded = emit(
+                "team.resume.frontier_loaded",
+                phase="team",
+                status_before="blocked",
+                status_after="frontier_loaded",
+                data={
+                    "resume_source_job_id": continuation.get("resume_source_job_id"),
+                    "root_run_id": root_run_id,
+                    "checkpoint_generation": checkpoint_generation,
+                    "continuation_index": continuation_index,
+                    "blocked_task_ids": blocked_task_ids,
+                    "continuation_token": continuation.get("continuation_token"),
+                },
+            )
+            emit(
+                "team.resume.continuation_selected",
+                phase="team",
+                status_before="frontier_loaded",
+                status_after="continuing",
+                causal_ref=frontier_loaded.event_id,
+                data={
+                    "scheduled_task_ids": [item.task_id for item in tasks],
+                    "upstream_completed_nodes": list(
+                        continuation.get("upstream_completed_nodes") or []
+                    ),
+                    "resume_root_restart_count": 0,
+                },
+            )
         checkpoint_store.upsert(
             job_id=resolved_job_id,
             case_id=resolved_case_id,
             team_id=spec.team.team_id,
             status=job.status.value,
-            payload={"phase": "started"},
+            payload={
+                "phase": "started",
+                "continuation": {
+                    "root_run_id": root_run_id,
+                    "checkpoint_generation": checkpoint_generation,
+                    "continuation_index": continuation_index,
+                    "blocked_task_ids": blocked_task_ids,
+                    "continuation_task_ids": [item.task_id for item in tasks],
+                },
+            },
         )
 
         if len(tasks) > spec.team.termination_rules.max_tasks:
@@ -223,6 +334,18 @@ class TeamSupervisor:
                 reason_code="TEAM_SPEC_INVALID",
                 message="Team spec validation failed.",
                 extra={"errors": validation_errors},
+            )
+
+        if continuation and not tasks:
+            return _finalize_early(
+                paths=paths,
+                checkpoint_store=checkpoint_store,
+                job=job,
+                events=events,
+                handoffs=handoffs,
+                emit=emit,
+                reason_code="INVALID_CONTINUATION_FRONTIER",
+                message="Continuation frontier contained no runnable tasks.",
             )
 
         for item in tasks:
@@ -278,6 +401,7 @@ class TeamSupervisor:
         def execute_task(task_def: TaskDefinition) -> TaskRun:
             task_run_id = task_run_ids[task_def.task_id]
             branch_id, branch_parent = task_branch(task_def.task_id)
+            lineage = lineage_meta(task_def.task_id)
             try:
                 agent = _select_agent(spec, task_def.role)
             except ValueError:
@@ -353,6 +477,11 @@ class TeamSupervisor:
                     task_id=task_def.task_id,
                     target="handoff",
                 )
+                handoff_override_ticket = (
+                    self._governance_runtime.approval_store.get(handoff_override)
+                    if self._governance_runtime is not None and handoff_override
+                    else None
+                )
                 redacted_dep_output = (
                     self._governance_runtime.trace_redact(dep_output)
                     if self._governance_runtime is not None
@@ -368,6 +497,35 @@ class TeamSupervisor:
                     if self._governance_runtime is not None
                     else handoff_payload_hash
                 )
+                handoff_context = _contract_context(
+                    approval_ticket=handoff_override_ticket,
+                    default_task_run_id=task_run_id,
+                    default_task_attempt=1,
+                    default_branch_id=lineage["branch_id"],
+                    default_branch_parent=lineage["branch_parent"],
+                    default_causal_ancestry=[task_last_event.get(dep_task_run_id, "")],
+                    default_root_run_id=lineage["root_run_id"],
+                    default_logical_task_id=lineage["logical_task_id"],
+                    default_lineage_hash=lineage["lineage_hash"],
+                    default_continuation_index=lineage["continuation_index"],
+                    default_checkpoint_generation=lineage["checkpoint_generation"],
+                )
+                handoff_contract = build_handoff_execution_contract(
+                    task_run_id=handoff_context["task_run_id"],
+                    task_attempt=handoff_context["task_attempt"],
+                    target_ref=f"{dep_task.role}->{task_def.role}",
+                    payload_hash_value=handoff_payload_hash,
+                    action_payload_hash=handoff_payload_hash,
+                    policy_input_hash=handoff_payload_hash,
+                    causal_ancestry=handoff_context["causal_ancestry"],
+                    branch_id=handoff_context["branch_id"],
+                    branch_parent=handoff_context["branch_parent"],
+                    root_run_id=handoff_context["root_run_id"],
+                    logical_task_id=handoff_context["logical_task_id"],
+                    lineage_hash=handoff_context["lineage_hash"],
+                    continuation_index=handoff_context["continuation_index"],
+                    checkpoint_generation=handoff_context["checkpoint_generation"],
+                )
                 handoff_resume_token_ref, handoff_contract_hash, handoff_snapshot_hash = (
                     _override_contract_refs(
                         governance_runtime=self._governance_runtime,
@@ -376,17 +534,7 @@ class TeamSupervisor:
                         target_kind="handoff",
                         action_hash=handoff_action_hash,
                         policy_hash=_policy_hash(self._governance_runtime),
-                        contract=build_handoff_execution_contract(
-                            task_run_id=task_run_id,
-                            task_attempt=1,
-                            target_ref=f"{dep_task.role}->{task_def.role}",
-                            payload_hash_value=handoff_payload_hash,
-                            action_payload_hash=handoff_payload_hash,
-                            policy_input_hash=handoff_payload_hash,
-                            causal_ancestry=[task_last_event.get(dep_task_run_id, "")],
-                            branch_id=branch_id or f"branch:{task_def.task_id}",
-                            branch_parent=branch_parent,
-                        ),
+                        contract=handoff_contract,
                     )
                 )
                 handoff = evaluate_handoff_transfer(
@@ -467,15 +615,20 @@ class TeamSupervisor:
                 if handoff.requires_approval:
                     if handoff.approval_id and self._governance_runtime is not None:
                         contract = build_handoff_execution_contract(
-                            task_run_id=task_run_id,
-                            task_attempt=1,
+                            task_run_id=handoff_context["task_run_id"],
+                            task_attempt=handoff_context["task_attempt"],
                             target_ref=f"{dep_task.role}->{task_def.role}",
                             payload_hash_value=handoff.payload_hash,
                             action_payload_hash=handoff.payload_hash,
                             policy_input_hash=handoff.payload_hash,
-                            causal_ancestry=[task_last_event.get(dep_task_run_id, "")],
-                            branch_id=branch_id or f"branch:{task_def.task_id}",
-                            branch_parent=branch_parent,
+                            causal_ancestry=handoff_context["causal_ancestry"],
+                            branch_id=handoff_context["branch_id"],
+                            branch_parent=handoff_context["branch_parent"],
+                            root_run_id=handoff_context["root_run_id"],
+                            logical_task_id=handoff_context["logical_task_id"],
+                            lineage_hash=handoff_context["lineage_hash"],
+                            continuation_index=handoff_context["continuation_index"],
+                            checkpoint_generation=handoff_context["checkpoint_generation"],
                         )
                         _attach_contract(
                             governance_runtime=self._governance_runtime,
@@ -581,14 +734,97 @@ class TeamSupervisor:
                 dependency_events.append(handoff_event.event_id)
 
             requested_scope, requested_visibility = _requested_memory_target(agent)
+            task_override = _task_override(
+                approval_overrides, task_id=task_def.task_id, target="task"
+            )
+            task_override_ticket = (
+                self._governance_runtime.approval_store.get(task_override)
+                if self._governance_runtime is not None and task_override
+                else None
+            )
+            task_override_contract = (
+                task_override_ticket.snapshot.get("execution_contract", {})
+                if task_override_ticket is not None
+                else {}
+            )
+            frozen_task_input = str(
+                task_override_contract.get("canonical_task_input") or ""
+            ).strip()
+            frozen_memory_records = list(task_override_contract.get("resolved_memory_refs") or [])
+            frozen_memory_fingerprint = str(
+                task_override_contract.get("resolved_memory_fingerprint") or ""
+            ).strip()
             task_input = _build_task_input(
                 request=request,
                 task=task_def,
                 dependency_snippets=dependency_snippets,
             )
-            memory_context: dict[str, Any] = {"snippets": [], "refs": [], "fingerprint": None}
+            memory_context: dict[str, Any] = {
+                "snippets": [],
+                "refs": [],
+                "fingerprint": None,
+                "records": [],
+                "count": 0,
+                "reason": "empty",
+            }
             if task_def.depends_on:
-                if requested_scope is None or requested_visibility is None:
+                if (
+                    continuation
+                    and task_override_ticket is not None
+                    and task_override_ticket.target_kind == "task"
+                    and frozen_task_input
+                ):
+                    memory_attempt = emit(
+                        "memory_read_attempt",
+                        task_id=task_def.task_id,
+                        task_run_id=task_run_id,
+                        task_attempt=1,
+                        agent_id=agent.agent_id,
+                        role=task_def.role,
+                        phase="memory",
+                        status_before="ready",
+                        status_after="allowed",
+                        causal_ref=task_last_event.get(task_run_id),
+                        data={
+                            "scope": requested_scope,
+                            "visibility": requested_visibility,
+                            "source": "approval_snapshot",
+                        },
+                    )
+                    memory_context = {
+                        "snippets": [],
+                        "refs": [
+                            item.get("id")
+                            for item in frozen_memory_records
+                            if isinstance(item, dict) and item.get("id") is not None
+                        ],
+                        "fingerprint": frozen_memory_fingerprint or None,
+                        "records": frozen_memory_records,
+                        "count": len(frozen_memory_records),
+                        "reason": "frozen_snapshot",
+                    }
+                    emit(
+                        "memory_read_succeeded",
+                        task_id=task_def.task_id,
+                        task_run_id=task_run_id,
+                        task_attempt=1,
+                        agent_id=agent.agent_id,
+                        role=task_def.role,
+                        phase="memory",
+                        status_before="allowed",
+                        status_after="read",
+                        causal_ref=memory_attempt.event_id,
+                        resolved_memory_fingerprint=frozen_memory_fingerprint or None,
+                        data={
+                            "scope": requested_scope,
+                            "visibility": requested_visibility,
+                            "count": len(frozen_memory_records),
+                            "reason": "frozen_snapshot",
+                            "refs": list(memory_context.get("refs", [])),
+                        },
+                    )
+                    task_input = frozen_task_input
+                elif requested_scope is None or requested_visibility is None:
                     emit(
                         "memory_read_blocked",
                         task_id=task_def.task_id,
@@ -686,48 +922,18 @@ class TeamSupervisor:
                 "requested_visibility": requested_visibility,
                 "memory_target": task_def.memory_target,
             }
-
-            task_override = _task_override(
-                approval_overrides, task_id=task_def.task_id, target="task"
-            )
-            task_override_ticket = (
-                self._governance_runtime.approval_store.get(task_override)
-                if self._governance_runtime is not None and task_override
-                else None
-            )
-            task_override_contract = (
-                task_override_ticket.snapshot.get("execution_contract", {})
-                if task_override_ticket is not None
-                else {}
-            )
-            contract_task_run_id = str(
-                (
-                    task_override_contract.get("task_run_id")
-                    if task_override_ticket is not None
-                    else task_run_id
-                )
-                or task_run_id
-            )
-            contract_task_attempt = int(
-                (
-                    task_override_contract.get("task_attempt")
-                    if task_override_ticket is not None
-                    else 1
-                )
-                or 1
-            )
-            contract_branch_id = str(
-                task_override_contract.get("branch_id") or branch_id or f"branch:{task_def.task_id}"
-            )
-            contract_branch_parent = (
-                str(task_override_contract.get("branch_parent"))
-                if task_override_contract.get("branch_parent") is not None
-                else branch_parent
-            )
-            contract_causal_ancestry = list(
-                task_override_contract.get("causal_ancestry")
-                or dependency_events
-                or [task_last_event.get(task_run_id, "")]
+            contract_context = _contract_context(
+                approval_ticket=task_override_ticket,
+                default_task_run_id=task_run_id,
+                default_task_attempt=1,
+                default_branch_id=lineage["branch_id"],
+                default_branch_parent=lineage["branch_parent"],
+                default_causal_ancestry=dependency_events or [task_last_event.get(task_run_id, "")],
+                default_root_run_id=lineage["root_run_id"],
+                default_logical_task_id=lineage["logical_task_id"],
+                default_lineage_hash=lineage["lineage_hash"],
+                default_continuation_index=lineage["continuation_index"],
+                default_checkpoint_generation=lineage["checkpoint_generation"],
             )
             governed_task_type = str(task_override_contract.get("target_ref") or task_def.task_type)
 
@@ -741,8 +947,8 @@ class TeamSupervisor:
                     else payload_hash({"task_type": governed_target, "user_input": task_input})
                 )
                 return build_task_execution_contract(
-                    task_run_id=contract_task_run_id,
-                    task_attempt=contract_task_attempt,
+                    task_run_id=contract_context["task_run_id"],
+                    task_attempt=contract_context["task_attempt"],
                     task_type=governed_target,
                     target_ref=governed_target,
                     canonical_task_input=task_input,
@@ -751,9 +957,14 @@ class TeamSupervisor:
                         {"task_type": governed_target, "user_input": task_input}
                     ),
                     resolved_memory_refs=list(memory_context.get("records", [])),
-                    causal_ancestry=contract_causal_ancestry,
-                    branch_id=contract_branch_id,
-                    branch_parent=contract_branch_parent,
+                    causal_ancestry=contract_context["causal_ancestry"],
+                    branch_id=contract_context["branch_id"],
+                    branch_parent=contract_context["branch_parent"],
+                    root_run_id=contract_context["root_run_id"],
+                    logical_task_id=contract_context["logical_task_id"],
+                    lineage_hash=contract_context["lineage_hash"],
+                    continuation_index=contract_context["continuation_index"],
+                    checkpoint_generation=contract_context["checkpoint_generation"],
                 )
 
             task_contract = _build_task_contract(governed_task_type)
@@ -826,6 +1037,45 @@ class TeamSupervisor:
                     )
 
             if task_override and self._governance_runtime is not None:
+                if (
+                    continuation
+                    and task_override_contract.get("lineage_hash")
+                    and str(task_override_contract.get("lineage_hash")) != lineage["lineage_hash"]
+                ):
+                    mismatch = emit(
+                        "team.resume.lineage_mismatch",
+                        task_id=task_def.task_id,
+                        task_run_id=task_run_id,
+                        task_attempt=1,
+                        agent_id=agent.agent_id,
+                        role=task_def.role,
+                        phase="approval",
+                        status_before="executed",
+                        status_after="blocked",
+                        approval_id=task_override,
+                        causal_ref=task_last_event.get(task_run_id),
+                        snapshot_hash=task_snapshot_hash,
+                        resolved_memory_fingerprint=task_contract.get(
+                            "resolved_memory_fingerprint"
+                        ),
+                        resume_token_ref=task_resume_token_ref,
+                        data={
+                            "reason_code": "RESUME_LINEAGE_MISMATCH",
+                            "expected_lineage_hash": task_override_contract.get("lineage_hash"),
+                            "observed_lineage_hash": lineage["lineage_hash"],
+                        },
+                    )
+                    return _blocked_task_run(
+                        task_def=task_def,
+                        task_run_id=task_run_id,
+                        agent_id=agent.agent_id,
+                        reason_code="RESUME_LINEAGE_MISMATCH",
+                        emit=emit,
+                        causal_ref=mismatch.event_id,
+                        input_payload=input_payload,
+                        resume_status="stale",
+                        stale_reason="RESUME_LINEAGE_MISMATCH",
+                    )
                 prepared = self._governance_runtime.prepare_resume_approval(
                     approval_id=task_override,
                     run_id=task_run_id,
@@ -903,6 +1153,25 @@ class TeamSupervisor:
                         resume_token_ref=resume_token_ref,
                         data={"reason_code": prepared.error_code},
                     )
+                    emit(
+                        "team.resume.snapshot_drift",
+                        task_id=task_def.task_id,
+                        task_run_id=task_run_id,
+                        task_attempt=1,
+                        agent_id=agent.agent_id,
+                        role=task_def.role,
+                        phase="approval",
+                        status_before="executed",
+                        status_after="stale",
+                        approval_id=task_override,
+                        causal_ref=stale_event.event_id,
+                        snapshot_hash=task_snapshot_hash,
+                        resolved_memory_fingerprint=task_contract.get(
+                            "resolved_memory_fingerprint"
+                        ),
+                        resume_token_ref=resume_token_ref,
+                        data={"reason_code": prepared.error_code},
+                    )
                     replacement_decision, replacement_ticket = (
                         self._governance_runtime.evaluate_task(
                             run_id=resolved_job_id,
@@ -973,6 +1242,30 @@ class TeamSupervisor:
                         prepared.ticket.resume_token_ref or task_resume_token_ref
                     )
                     task_snapshot_hash = prepared.ticket.snapshot_hash
+                    emit(
+                        "team.resume.approval_carry_forwarded",
+                        task_id=task_def.task_id,
+                        task_run_id=task_run_id,
+                        task_attempt=1,
+                        agent_id=agent.agent_id,
+                        role=task_def.role,
+                        phase="approval",
+                        status_before="executed",
+                        status_after="carry_forwarded",
+                        approval_id=task_override,
+                        causal_ref=task_last_event.get(task_run_id),
+                        snapshot_hash=task_snapshot_hash,
+                        resolved_memory_fingerprint=task_contract.get(
+                            "resolved_memory_fingerprint"
+                        ),
+                        resume_token_ref=task_resume_token_ref,
+                        data={
+                            "lineage_hash": contract_context["lineage_hash"],
+                            "logical_task_id": contract_context["logical_task_id"],
+                            "continuation_index": contract_context["continuation_index"],
+                            "checkpoint_generation": contract_context["checkpoint_generation"],
+                        },
+                    )
 
             session_context = {
                 "session_id": resolved_job_id,
@@ -1301,6 +1594,11 @@ class TeamSupervisor:
                 task_id=task_def.task_id,
                 target="memory_write",
             )
+            memory_write_override_ticket = (
+                self._governance_runtime.approval_store.get(memory_write_override)
+                if self._governance_runtime is not None and memory_write_override
+                else None
+            )
             expected_state_version = None
             if (
                 status == TaskStatus.COMPLETED
@@ -1385,9 +1683,23 @@ class TeamSupervisor:
                         f"{requested_scope}:{task_def.role}:{requested_visibility}:"
                         f"{task_def.memory_target or ''}"
                     )
+                    memory_contract_context = _contract_context(
+                        approval_ticket=memory_write_override_ticket,
+                        default_task_run_id=task_run_id,
+                        default_task_attempt=attempt_used,
+                        default_branch_id=lineage["branch_id"],
+                        default_branch_parent=lineage["branch_parent"],
+                        default_causal_ancestry=dependency_events
+                        or [task_last_event.get(task_run_id, "")],
+                        default_root_run_id=lineage["root_run_id"],
+                        default_logical_task_id=lineage["logical_task_id"],
+                        default_lineage_hash=lineage["lineage_hash"],
+                        default_continuation_index=lineage["continuation_index"],
+                        default_checkpoint_generation=lineage["checkpoint_generation"],
+                    )
                     memory_contract = build_memory_write_execution_contract(
-                        task_run_id=task_run_id,
-                        task_attempt=attempt_used,
+                        task_run_id=memory_contract_context["task_run_id"],
+                        task_attempt=memory_contract_context["task_attempt"],
                         target_ref=memory_target_ref,
                         canonical_task_input=task_input,
                         action_payload_hash=memory_action_hash,
@@ -1401,11 +1713,16 @@ class TeamSupervisor:
                             }
                         ),
                         resolved_memory_refs=list(memory_context.get("records", [])),
-                        causal_ancestry=dependency_events or [task_last_event.get(task_run_id, "")],
-                        branch_id=branch_id or f"branch:{task_def.task_id}",
-                        branch_parent=branch_parent,
+                        causal_ancestry=memory_contract_context["causal_ancestry"],
+                        branch_id=memory_contract_context["branch_id"],
+                        branch_parent=memory_contract_context["branch_parent"],
                         memory_target=task_def.memory_target,
                         expected_state_version=expected_state_version,
+                        root_run_id=memory_contract_context["root_run_id"],
+                        logical_task_id=memory_contract_context["logical_task_id"],
+                        lineage_hash=memory_contract_context["lineage_hash"],
+                        continuation_index=memory_contract_context["continuation_index"],
+                        checkpoint_generation=memory_contract_context["checkpoint_generation"],
                     )
                     memory_resume_token_ref, memory_contract_hash, _memory_snapshot_hash = (
                         _override_contract_refs(
@@ -1766,9 +2083,25 @@ class TeamSupervisor:
                     }
             return run
 
-        scheduler_result = scheduler.run(tasks=tasks, execute_task=execute_task)
+        scheduler_result = scheduler.run(
+            tasks=tasks,
+            execute_task=execute_task,
+            initially_completed=inherited_completed_task_ids,
+        )
         ordered_runs = scheduler_result.tasks
         for item in ordered_runs:
+            item_lineage = lineage_meta(item.task_id)
+            item.result_payload.setdefault("branch_id", item_lineage["branch_id"])
+            item.result_payload.setdefault("branch_parent", item_lineage["branch_parent"])
+            item.result_payload.setdefault("lineage_hash", item_lineage["lineage_hash"])
+            item.result_payload.setdefault("root_run_id", item_lineage["root_run_id"])
+            item.result_payload.setdefault("logical_task_id", item_lineage["logical_task_id"])
+            item.result_payload.setdefault(
+                "continuation_index", item_lineage["continuation_index"]
+            )
+            item.result_payload.setdefault(
+                "checkpoint_generation", item_lineage["checkpoint_generation"]
+            )
             expected_task_run_id = task_run_ids.get(item.task_id)
             if expected_task_run_id and item.task_run_id != expected_task_run_id:
                 item.task_run_id = expected_task_run_id
@@ -1851,7 +2184,36 @@ class TeamSupervisor:
             "failed_count": failed_count,
             "reason_code": scheduler_result.reason_code,
             "resume_outcome_count": len(resume_outcomes),
+            "root_run_id": root_run_id,
+            "checkpoint_generation": checkpoint_generation,
+            "continuation_index": continuation_index,
         }
+
+        continuation_payload = _build_continuation_payload(
+            spec_tasks=all_tasks,
+            root_run_id=root_run_id,
+            checkpoint_generation=checkpoint_generation,
+            continuation_index=continuation_index,
+            source_job_id=str(continuation.get("resume_source_job_id") or ""),
+            inherited_task_lineage=inherited_task_lineage,
+            inherited_completed_outputs=inherited_completed_outputs,
+            scheduled_runs=ordered_runs,
+        )
+
+        if continuation:
+            emit(
+                "team.resume.completed",
+                phase="team",
+                status_before="continuing",
+                status_after=job.status.value,
+                data={
+                    "root_run_id": root_run_id,
+                    "checkpoint_generation": checkpoint_generation,
+                    "continuation_index": continuation_index,
+                    "resume_source_job_id": continuation.get("resume_source_job_id"),
+                    "terminal_status": job.status.value,
+                },
+            )
 
         emit(
             "team_final",
@@ -1892,6 +2254,7 @@ class TeamSupervisor:
             "audit_envelope_path": envelope_path,
             "job_dir": str(paths.job_dir),
             "resume_outcomes": resume_outcomes,
+            "continuation": continuation_payload,
         }
         write_status(paths, status_payload)
         checkpoint_store.upsert(
@@ -1903,6 +2266,7 @@ class TeamSupervisor:
                 "reason_code": scheduler_result.reason_code,
                 "task_count": len(ordered_runs),
                 "audit_envelope_path": envelope_path,
+                "continuation": continuation_payload,
             },
         )
         checkpoint_store.close()
@@ -2248,6 +2612,196 @@ def _override_contract_refs(
         fallback_action_hash=action_hash,
     )
     return resume_token_ref, execution_contract_hash, ticket.snapshot_hash
+
+
+def _contract_context(
+    *,
+    approval_ticket,
+    default_task_run_id: str,
+    default_task_attempt: int,
+    default_branch_id: str,
+    default_branch_parent: str | None,
+    default_causal_ancestry: list[str],
+    default_root_run_id: str,
+    default_logical_task_id: str,
+    default_lineage_hash: str,
+    default_continuation_index: int,
+    default_checkpoint_generation: int,
+) -> dict[str, Any]:
+    contract = (
+        approval_ticket.snapshot.get("execution_contract", {})
+        if approval_ticket is not None
+        else {}
+    )
+    continuation_value = contract.get("continuation_index")
+    checkpoint_value = contract.get("checkpoint_generation")
+    return {
+        "task_run_id": str(contract.get("task_run_id") or default_task_run_id),
+        "task_attempt": int(contract.get("task_attempt") or default_task_attempt or 1),
+        "branch_id": str(contract.get("branch_id") or default_branch_id),
+        "branch_parent": (
+            str(contract.get("branch_parent"))
+            if contract.get("branch_parent") is not None
+            else default_branch_parent
+        ),
+        "causal_ancestry": list(contract.get("causal_ancestry") or default_causal_ancestry),
+        "root_run_id": str(contract.get("root_run_id") or default_root_run_id),
+        "logical_task_id": str(contract.get("logical_task_id") or default_logical_task_id),
+        "lineage_hash": str(contract.get("lineage_hash") or default_lineage_hash),
+        "continuation_index": int(
+            continuation_value
+            if continuation_value is not None
+            else default_continuation_index or 0
+        ),
+        "checkpoint_generation": int(
+            checkpoint_value
+            if checkpoint_value is not None
+            else default_checkpoint_generation or 0
+        ),
+    }
+
+
+def _build_continuation_payload(
+    *,
+    spec_tasks: list[TaskDefinition],
+    root_run_id: str,
+    checkpoint_generation: int,
+    continuation_index: int,
+    source_job_id: str,
+    inherited_task_lineage: dict[str, dict[str, Any]],
+    inherited_completed_outputs: dict[str, dict[str, Any]],
+    scheduled_runs: list[TaskRun],
+) -> dict[str, Any]:
+    children: dict[str, list[str]] = {}
+    for task in spec_tasks:
+        for dependency in task.depends_on:
+            children.setdefault(dependency, []).append(task.task_id)
+
+    lineage = {task_id: dict(value) for task_id, value in inherited_task_lineage.items()}
+    completed_outputs = {
+        task_id: dict(value) for task_id, value in inherited_completed_outputs.items()
+    }
+    completed_ids = {
+        task_id
+        for task_id, value in lineage.items()
+        if str(value.get("terminal_status") or "").lower() == "completed"
+    }
+    blocked_ids = {
+        task_id
+        for task_id, value in lineage.items()
+        if str(value.get("terminal_status") or "").lower() in {"blocked", "escalated"}
+    }
+
+    for run in scheduled_runs:
+        result_payload = dict(run.result_payload or {})
+        entry = dict(lineage.get(run.task_id) or {})
+        entry.update(
+            {
+                "root_run_id": root_run_id,
+                "logical_task_id": run.task_id,
+                "task_run_id": run.task_run_id,
+                "branch_id": result_payload.get("branch_id"),
+                "branch_parent": result_payload.get("branch_parent"),
+                "lineage_hash": result_payload.get("lineage_hash")
+                or entry.get("lineage_hash")
+                or payload_hash(
+                    {
+                        "root_run_id": root_run_id,
+                        "logical_task_id": run.task_id,
+                        "branch_id": result_payload.get("branch_id"),
+                        "branch_parent": result_payload.get("branch_parent"),
+                    }
+                ),
+                "continuation_index": continuation_index,
+                "checkpoint_generation": checkpoint_generation,
+                "terminal_event_id": result_payload.get("terminal_event_id"),
+                "task_attempt": run.task_attempt,
+                "terminal_status": run.status.value,
+                "reason_code": run.reason_code,
+            }
+        )
+        lineage[run.task_id] = entry
+        if run.status == TaskStatus.COMPLETED:
+            completed_ids.add(run.task_id)
+            blocked_ids.discard(run.task_id)
+            if result_payload.get("output"):
+                completed_outputs[run.task_id] = {
+                    "output": result_payload.get("output"),
+                    "trace_id": result_payload.get("trace_id"),
+                    "agent_id": result_payload.get("agent_id"),
+                    "task_run_id": run.task_run_id,
+                }
+        elif run.status in {TaskStatus.BLOCKED, TaskStatus.ESCALATED}:
+            blocked_ids.add(run.task_id)
+            completed_ids.discard(run.task_id)
+            completed_outputs.pop(run.task_id, None)
+        else:
+            blocked_ids.discard(run.task_id)
+            completed_ids.discard(run.task_id)
+            completed_outputs.pop(run.task_id, None)
+
+    continuation_task_ids: set[str] = set()
+    stack = list(blocked_ids)
+    while stack:
+        current = stack.pop()
+        if current in continuation_task_ids or current in completed_ids:
+            continue
+        continuation_task_ids.add(current)
+        stack.extend(children.get(current, []))
+
+    blocked_nodes = []
+    for task_id in sorted(blocked_ids):
+        entry = dict(lineage.get(task_id) or {})
+        blocked_nodes.append(
+            {
+                "job_id": source_job_id or None,
+                "root_run_id": root_run_id,
+                "task_id": task_id,
+                "task_run_id": entry.get("task_run_id"),
+                "blocked_reason": entry.get("reason_code"),
+                "lineage_path": {
+                    "logical_task_id": task_id,
+                    "branch_id": entry.get("branch_id"),
+                    "parent_branch_id": entry.get("branch_parent"),
+                    "lineage_hash": entry.get("lineage_hash"),
+                    "continuation_index": continuation_index,
+                    "checkpoint_generation": checkpoint_generation,
+                },
+                "continuation_token": payload_hash(
+                    {
+                        "root_run_id": root_run_id,
+                        "task_id": task_id,
+                        "task_run_id": entry.get("task_run_id"),
+                        "continuation_index": continuation_index,
+                        "checkpoint_generation": checkpoint_generation,
+                    }
+                ),
+            }
+        )
+
+    return {
+        "root_run_id": root_run_id,
+        "checkpoint_generation": checkpoint_generation,
+        "continuation_index": continuation_index,
+        "resume_source_job_id": source_job_id or None,
+        "blocked_task_ids": sorted(blocked_ids),
+        "blocked_nodes": blocked_nodes,
+        "completed_task_ids": sorted(completed_ids),
+        "upstream_completed_nodes": [
+            {
+                "task_id": task_id,
+                "task_run_id": (lineage.get(task_id) or {}).get("task_run_id"),
+                "lineage_hash": (lineage.get(task_id) or {}).get("lineage_hash"),
+                "terminal_event_id": (lineage.get(task_id) or {}).get("terminal_event_id"),
+            }
+            for task_id in sorted(completed_ids)
+        ],
+        "continuation_task_ids": [
+            task.task_id for task in spec_tasks if task.task_id in continuation_task_ids
+        ],
+        "completed_outputs": completed_outputs,
+        "task_lineage": lineage,
+    }
 
 
 def _blocked_task_run(

@@ -191,13 +191,14 @@ def read_scoped_memory(
         }
 
     bundle_reader = getattr(memory_manager, "context_bundle_scoped", None)
+    effective_job_id = job_id if scope.strip().lower() == "session" else None
     if callable(bundle_reader):
         bundle = bundle_reader(
             query,
             scope=scope,
             team_id=team_id,
             case_id=case_id,
-            job_id=job_id,
+            job_id=effective_job_id,
             visibility=visibility,
             limit=limit,
         )
@@ -219,7 +220,7 @@ def read_scoped_memory(
             scope=scope,
             team_id=team_id,
             case_id=case_id,
-            job_id=job_id,
+            job_id=effective_job_id,
             visibility=visibility,
             limit=limit,
         )

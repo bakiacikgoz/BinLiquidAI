@@ -122,6 +122,11 @@ def build_task_execution_contract(
     causal_ancestry: list[str],
     branch_id: str,
     branch_parent: str | None,
+    root_run_id: str | None = None,
+    logical_task_id: str | None = None,
+    lineage_hash: str | None = None,
+    continuation_index: int | None = None,
+    checkpoint_generation: int | None = None,
 ) -> dict[str, Any]:
     refs = _normalize_memory_refs(
         canonicalize_payload({"refs": resolved_memory_refs}).get("refs", [])
@@ -139,6 +144,11 @@ def build_task_execution_contract(
         "causal_ancestry": sorted(causal_ancestry),
         "branch_id": branch_id,
         "branch_parent": branch_parent,
+        "root_run_id": root_run_id,
+        "logical_task_id": logical_task_id,
+        "lineage_hash": lineage_hash,
+        "continuation_index": continuation_index,
+        "checkpoint_generation": checkpoint_generation,
     }
 
 
@@ -153,6 +163,11 @@ def build_handoff_execution_contract(
     causal_ancestry: list[str],
     branch_id: str,
     branch_parent: str | None,
+    root_run_id: str | None = None,
+    logical_task_id: str | None = None,
+    lineage_hash: str | None = None,
+    continuation_index: int | None = None,
+    checkpoint_generation: int | None = None,
 ) -> dict[str, Any]:
     return {
         "task_run_id": task_run_id,
@@ -168,6 +183,11 @@ def build_handoff_execution_contract(
         "causal_ancestry": sorted(causal_ancestry),
         "branch_id": branch_id,
         "branch_parent": branch_parent,
+        "root_run_id": root_run_id,
+        "logical_task_id": logical_task_id,
+        "lineage_hash": lineage_hash,
+        "continuation_index": continuation_index,
+        "checkpoint_generation": checkpoint_generation,
     }
 
 
@@ -185,6 +205,11 @@ def build_memory_write_execution_contract(
     branch_parent: str | None,
     memory_target: str | None,
     expected_state_version: int | None,
+    root_run_id: str | None = None,
+    logical_task_id: str | None = None,
+    lineage_hash: str | None = None,
+    continuation_index: int | None = None,
+    checkpoint_generation: int | None = None,
 ) -> dict[str, Any]:
     refs = _normalize_memory_refs(
         canonicalize_payload({"refs": resolved_memory_refs}).get("refs", [])
@@ -204,4 +229,9 @@ def build_memory_write_execution_contract(
         "branch_parent": branch_parent,
         "memory_target": memory_target,
         "expected_state_version": expected_state_version,
+        "root_run_id": root_run_id,
+        "logical_task_id": logical_task_id,
+        "lineage_hash": lineage_hash,
+        "continuation_index": continuation_index,
+        "checkpoint_generation": checkpoint_generation,
     }

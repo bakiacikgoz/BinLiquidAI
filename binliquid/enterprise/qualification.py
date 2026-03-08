@@ -14,17 +14,20 @@ from binliquid import __version__
 from binliquid.enterprise.observability import collect_metrics_snapshot
 from binliquid.enterprise.signing import load_signed_artifact, write_signed_json
 from binliquid.runtime.config import RuntimeConfig
+from binliquid.team.continuation import derive_resume_continuation_state
 from binliquid.team.models import TeamSpec
 from binliquid.team.pilot_gate import (
     _build_counters,
+    _collect_resume_overrides,
+    _consumed_approval_ids,
     _graph_digest,
     _pilot_runtime_config,
     _requested_approval_ids,
-    _run_positive_smoke,
+    _resume_from_source_job,
     _run_reuse_probe,
     build_deterministic_pilot_orchestrator,
 )
-from binliquid.team.replay import load_events, load_task_runs, replay_job
+from binliquid.team.replay import load_events, load_job_status, load_task_runs, replay_job
 from binliquid.team.supervisor import TeamSupervisor
 from binliquid.team.validation import validate_team_spec
 
@@ -38,6 +41,7 @@ REQUIRED_WORKLOADS = (
     "failure_injection_flow",
 )
 OPTIONAL_WORKLOADS = ("24h_soak_flow",)
+ALL_WORKLOADS = REQUIRED_WORKLOADS + OPTIONAL_WORKLOADS
 
 
 class QualificationFailure(RuntimeError):
@@ -98,6 +102,10 @@ def _run_workload_capture(
             "operational_followups": [
                 f"{name} failed before evidence completion; inspect {workload_root}"
             ],
+            "terminal_status": "failed",
+            "terminal_job_id": None,
+            "resume_round_count": 0,
+            "approval_rounds": [],
             "artifacts": {"workload_root": str(workload_root)},
             "blocking_findings": [error_code],
             "residual_risks": [str(exc)],
@@ -113,6 +121,7 @@ class _DelegatingOrchestrator:
         sleep_for_tasks: set[str] | None = None,
         delay_seconds: float = 0.0,
         fail_once_tasks: dict[str, str] | None = None,
+        shared_failures: set[str] | None = None,
         barrier_tasks: set[str] | None = None,
         barrier_size: int = 0,
     ):
@@ -122,7 +131,7 @@ class _DelegatingOrchestrator:
         self._sleep_for_tasks = sleep_for_tasks or set()
         self._delay_seconds = max(delay_seconds, 0.0)
         self._fail_once_tasks = dict(fail_once_tasks or {})
-        self._seen_failures: set[str] = set()
+        self._seen_failures = shared_failures if shared_failures is not None else set()
         self._barrier_tasks = barrier_tasks or set()
         self._barrier = (
             threading.Barrier(barrier_size)
@@ -206,6 +215,8 @@ def run_qualification(
     deterministic_orchestrator_builder: Callable[[RuntimeConfig], Any] | None = None,
     baseline_spec_path: str | Path = "examples/team/enterprise_qualification.yaml",
     conflict_spec_path: str | Path = "examples/team/enterprise_conflict.yaml",
+    workloads: list[str] | None = None,
+    merge_from_report: str | Path | None = None,
 ) -> dict[str, Any]:
     normalized_mode = mode.strip().lower()
     if normalized_mode != "mixed":
@@ -230,6 +241,19 @@ def run_qualification(
             "qualification runner requires a live orchestrator builder for mixed mode",
         )
 
+    selected_workloads = _normalize_workloads(workloads)
+    is_subset_run = selected_workloads != list(ALL_WORKLOADS)
+    if is_subset_run and merge_from_report is None:
+        raise QualificationFailure(
+            "QUALIFICATION_MERGE_REQUIRED",
+            "subset qualification runs require --merge-from-report",
+        )
+    resolved_merge_from_report = (
+        _resolve_merge_from_report_path(merge_from_report, config=config)
+        if merge_from_report is not None
+        else None
+    )
+
     run_id = f"qualification-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
     run_root = Path(output_root) / run_id
     run_root.mkdir(parents=True, exist_ok=True)
@@ -239,106 +263,29 @@ def run_qualification(
     _validate_spec(baseline_spec, config=config)
     _validate_spec(conflict_spec, config=config)
 
-    workloads: list[dict[str, Any]] = []
-    workloads.append(
-        _run_workload_capture(
-            name="baseline_enterprise_flow",
-            purpose=(
-                "Validate the low-risk enterprise path with approval, replay, "
-                "signing, metrics, and support artifacts."
-            ),
-            execution_mode="live_provider",
-            required_for_green=True,
-            support_classification="supported",
-            workload_root=run_root / "baseline_enterprise_flow",
-            runner=lambda: _run_baseline_enterprise_flow(
-                spec=baseline_spec,
-                base_config=config,
-                run_root=run_root,
-                live_orchestrator_builder=live_orchestrator_builder,
-            ),
-        )
+    workloads_payload: list[dict[str, Any]] = []
+    registry = _qualification_workload_registry(
+        baseline_spec=baseline_spec,
+        conflict_spec=conflict_spec,
+        config=config,
+        run_root=run_root,
+        live_orchestrator_builder=live_orchestrator_builder,
+        deterministic_builder=deterministic_builder,
+        soak_hours=soak_hours,
     )
-    workloads.append(
-        _run_workload_capture(
-            name="approval_heavy_flow",
-            purpose=(
-                "Stress the approval lifecycle, duplicate suppression, and stale snapshot "
-                "handling."
-            ),
-            execution_mode="deterministic_controlled",
-            required_for_green=True,
-            support_classification="conditional",
-            workload_root=run_root / "approval_heavy_flow",
-            runner=lambda: _run_approval_heavy_flow(
-                spec=baseline_spec,
-                base_config=config,
-                run_root=run_root,
-                deterministic_orchestrator_builder=deterministic_builder,
-            ),
+    for workload_name in selected_workloads:
+        runner_meta = registry[workload_name]
+        workloads_payload.append(
+            _run_workload_capture(
+                name=workload_name,
+                purpose=runner_meta["purpose"],
+                execution_mode=runner_meta["execution_mode"],
+                required_for_green=bool(runner_meta["required_for_green"]),
+                support_classification=str(runner_meta["support_classification"]),
+                workload_root=run_root / workload_name,
+                runner=runner_meta["runner"],
+            )
         )
-    )
-    workloads.append(
-        _run_workload_capture(
-            name="conflict_heavy_flow",
-            purpose="Validate shared-state conflict rejection and replayable conflict handling.",
-            execution_mode="deterministic_controlled",
-            required_for_green=True,
-            support_classification="conditional",
-            workload_root=run_root / "conflict_heavy_flow",
-            runner=lambda: _run_conflict_heavy_flow(
-                spec=conflict_spec,
-                base_config=config,
-                run_root=run_root,
-                deterministic_orchestrator_builder=deterministic_builder,
-            ),
-        )
-    )
-    workloads.append(
-        _run_workload_capture(
-            name="soak_6h_flow",
-            purpose=(
-                "Validate replay, signing, and bounded-concurrency stability over "
-                "sustained runtime."
-            ),
-            required_for_green=True,
-            support_classification="supported",
-            execution_mode="deterministic_controlled",
-            workload_root=run_root / "soak_6h_flow",
-            runner=lambda: _run_soak_flow(
-                spec=baseline_spec,
-                base_config=config,
-                run_root=run_root,
-                deterministic_orchestrator_builder=deterministic_builder,
-                soak_hours=soak_hours,
-                name="soak_6h_flow",
-                purpose=(
-                    "Validate replay, signing, and bounded-concurrency "
-                    "stability over sustained runtime."
-                ),
-                required_for_green=True,
-                support_classification="supported",
-            ),
-        )
-    )
-    workloads.append(
-        _run_workload_capture(
-            name="failure_injection_flow",
-            purpose="Validate fail-closed behavior and failure classification across controlled faults.",
-            execution_mode="mixed",
-            required_for_green=True,
-            support_classification="conditional",
-            workload_root=run_root / "failure_injection_flow",
-            runner=lambda: _run_failure_injection_flow(
-                spec=baseline_spec,
-                base_config=config,
-                run_root=run_root,
-                live_orchestrator_builder=live_orchestrator_builder,
-                deterministic_orchestrator_builder=deterministic_builder,
-            ),
-        )
-    )
-    workloads.append(_skipped_extended_soak(run_root=run_root))
 
     environment_summary = {
         "platform": platform.platform(),
@@ -352,11 +299,10 @@ def run_qualification(
     evaluation = evaluate_qualification_evidence(
         qualification_payload={
             "profile": config.profile_name,
-            "workloads": workloads,
+            "workloads": workloads_payload,
             "minimum_green_soak_seconds": MIN_GREEN_SOAK_SECONDS,
         }
     )
-
     report = {
         "version": QUALIFICATION_REPORT_VERSION,
         "generated_at": _now_iso(),
@@ -368,7 +314,7 @@ def run_qualification(
         "qualification_evidence_mode": normalized_mode,
         "minimum_green_soak_seconds": MIN_GREEN_SOAK_SECONDS,
         "qualification_status": evaluation["qualification_status"],
-        "workloads": workloads,
+        "workloads": workloads_payload,
         "supported_profiles": evaluation["supported_profiles"],
         "conditional_profiles": evaluation["conditional_profiles"],
         "unsupported_profiles": evaluation["unsupported_profiles"],
@@ -381,7 +327,268 @@ def run_qualification(
             "run_root": str(run_root),
         },
     }
+    if resolved_merge_from_report is not None:
+        report = _merge_qualification_report(
+            existing_report_path=resolved_merge_from_report,
+            rerun_payload=report,
+            rerun_names=selected_workloads,
+            config=config,
+        )
+        report.setdefault("artifacts", {})
+        report["artifacts"]["run_root"] = str(run_root)
+        report["artifacts"]["merged_from_report"] = str(resolved_merge_from_report)
     return report
+
+
+def _qualification_workload_registry(
+    *,
+    baseline_spec: TeamSpec,
+    conflict_spec: TeamSpec,
+    config: RuntimeConfig,
+    run_root: Path,
+    live_orchestrator_builder: Callable[[RuntimeConfig], Any],
+    deterministic_builder: Callable[[RuntimeConfig], Any],
+    soak_hours: float,
+) -> dict[str, dict[str, Any]]:
+    return {
+        "baseline_enterprise_flow": {
+            "purpose": (
+                "Validate the low-risk enterprise path with approval, replay, "
+                "signing, metrics, and support artifacts."
+            ),
+            "execution_mode": "live_provider",
+            "required_for_green": True,
+            "support_classification": "supported",
+            "runner": lambda: _run_baseline_enterprise_flow(
+                spec=baseline_spec,
+                base_config=config,
+                run_root=run_root,
+                live_orchestrator_builder=live_orchestrator_builder,
+            ),
+        },
+        "approval_heavy_flow": {
+            "purpose": (
+                "Stress the approval lifecycle, duplicate suppression, and stale snapshot "
+                "handling."
+            ),
+            "execution_mode": "deterministic_controlled",
+            "required_for_green": True,
+            "support_classification": "conditional",
+            "runner": lambda: _run_approval_heavy_flow(
+                spec=baseline_spec,
+                base_config=config,
+                run_root=run_root,
+                deterministic_orchestrator_builder=deterministic_builder,
+            ),
+        },
+        "conflict_heavy_flow": {
+            "purpose": "Validate shared-state conflict rejection and replayable conflict handling.",
+            "execution_mode": "deterministic_controlled",
+            "required_for_green": True,
+            "support_classification": "conditional",
+            "runner": lambda: _run_conflict_heavy_flow(
+                spec=conflict_spec,
+                base_config=config,
+                run_root=run_root,
+                deterministic_orchestrator_builder=deterministic_builder,
+            ),
+        },
+        "soak_6h_flow": {
+            "purpose": (
+                "Validate replay, signing, and bounded-concurrency stability over "
+                "sustained runtime."
+            ),
+            "execution_mode": "deterministic_controlled",
+            "required_for_green": True,
+            "support_classification": "supported",
+            "runner": lambda: _run_soak_flow(
+                spec=baseline_spec,
+                base_config=config,
+                run_root=run_root,
+                deterministic_orchestrator_builder=deterministic_builder,
+                soak_hours=soak_hours,
+                name="soak_6h_flow",
+                purpose=(
+                    "Validate replay, signing, and bounded-concurrency "
+                    "stability over sustained runtime."
+                ),
+                required_for_green=True,
+                support_classification="supported",
+            ),
+        },
+        "failure_injection_flow": {
+            "purpose": (
+                "Validate fail-closed behavior and failure classification across controlled faults."
+            ),
+            "execution_mode": "mixed",
+            "required_for_green": True,
+            "support_classification": "conditional",
+            "runner": lambda: _run_failure_injection_flow(
+                spec=baseline_spec,
+                base_config=config,
+                run_root=run_root,
+                live_orchestrator_builder=live_orchestrator_builder,
+                deterministic_orchestrator_builder=deterministic_builder,
+            ),
+        },
+        "24h_soak_flow": {
+            "purpose": "Extended soak evidence for GA RC sign-off.",
+            "execution_mode": "deterministic_controlled",
+            "required_for_green": False,
+            "support_classification": "conditional",
+            "runner": lambda: _skipped_extended_soak(run_root=run_root),
+        },
+    }
+
+
+def _normalize_workloads(workloads: list[str] | None) -> list[str]:
+    if workloads is None:
+        return list(ALL_WORKLOADS)
+    names = [str(item).strip() for item in workloads if str(item).strip()]
+    if not names:
+        raise QualificationFailure("INVALID_INPUT", "workloads list cannot be empty")
+    invalid = [name for name in names if name not in ALL_WORKLOADS]
+    if invalid:
+        raise QualificationFailure(
+            "INVALID_INPUT",
+            f"unknown workload names: {', '.join(sorted(set(invalid)))}",
+        )
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
+        ordered.append(name)
+    return ordered
+
+
+def _resolve_merge_from_report_path(
+    existing_report_path: str | Path | None,
+    *,
+    config: RuntimeConfig,
+) -> Path:
+    if existing_report_path is None:
+        raise QualificationFailure(
+            "QUALIFICATION_MERGE_REQUIRED",
+            "subset qualification runs require --merge-from-report",
+        )
+
+    requested_path = Path(existing_report_path)
+    if requested_path.exists():
+        return requested_path
+
+    latest_candidates = sorted(
+        Path("artifacts").glob("qualification/qualification-*/qualification_report.json")
+    )
+    for candidate in reversed(latest_candidates):
+        bundle = load_signed_artifact(path=candidate, config=config)
+        payload = bundle.get("data") if isinstance(bundle, dict) else None
+        if (
+            bundle.get("present")
+            and bundle.get("verified")
+            and isinstance(payload, dict)
+            and str(payload.get("profile") or "") == str(config.profile_name)
+        ):
+            return candidate
+
+    raise QualificationFailure(
+        "QUALIFICATION_SOURCE_REPORT_NOT_FOUND",
+        f"qualification source report not found: {existing_report_path}",
+    )
+
+
+def _merge_qualification_report(
+    *,
+    existing_report_path: str | Path,
+    rerun_payload: dict[str, Any],
+    rerun_names: list[str],
+    config: RuntimeConfig,
+) -> dict[str, Any]:
+    existing_bundle = load_signed_artifact(path=existing_report_path, config=config)
+    if not existing_bundle.get("present"):
+        raise QualificationFailure(
+            "QUALIFICATION_SOURCE_REPORT_NOT_FOUND",
+            f"qualification source report not found: {existing_report_path}",
+        )
+    if not existing_bundle.get("verified"):
+        raise QualificationFailure(
+            "QUALIFICATION_SOURCE_REPORT_UNVERIFIED",
+            f"qualification source report signature invalid: {existing_bundle.get('error_code')}",
+        )
+    existing_payload = existing_bundle.get("data")
+    if not isinstance(existing_payload, dict):
+        raise QualificationFailure(
+            "QUALIFICATION_SOURCE_REPORT_INVALID",
+            "qualification source report payload is invalid",
+        )
+
+    for field_name in (
+        "profile",
+        "signing_mode",
+        "identity_mode",
+        "qualification_evidence_mode",
+        "runtime_version",
+    ):
+        if str(existing_payload.get(field_name)) != str(rerun_payload.get(field_name)):
+            raise QualificationFailure(
+                "QUALIFICATION_SOURCE_REPORT_MISMATCH",
+                f"qualification source report mismatch for {field_name}",
+            )
+
+    existing_workloads = existing_payload.get("workloads")
+    rerun_workloads = rerun_payload.get("workloads")
+    if not isinstance(existing_workloads, list) or not isinstance(rerun_workloads, list):
+        raise QualificationFailure(
+            "QUALIFICATION_SOURCE_REPORT_INVALID",
+            "qualification source report workloads are invalid",
+        )
+
+    workload_map: dict[str, dict[str, Any]] = {}
+    for item in existing_workloads:
+        if isinstance(item, dict) and item.get("name"):
+            workload_map[str(item["name"])] = item
+    for item in rerun_workloads:
+        if isinstance(item, dict) and item.get("name"):
+            workload_map[str(item["name"])] = item
+
+    merged_workloads = [workload_map[name] for name in ALL_WORKLOADS if name in workload_map]
+    evaluation = evaluate_qualification_evidence(
+        qualification_payload={
+            "profile": rerun_payload.get("profile"),
+            "workloads": merged_workloads,
+            "minimum_green_soak_seconds": rerun_payload.get("minimum_green_soak_seconds"),
+        }
+    )
+
+    merged = dict(existing_payload)
+    merged.update(
+        {
+            "generated_at": rerun_payload.get("generated_at", _now_iso()),
+            "environment_summary": rerun_payload.get(
+                "environment_summary", existing_payload.get("environment_summary")
+            ),
+            "minimum_green_soak_seconds": rerun_payload.get(
+                "minimum_green_soak_seconds", existing_payload.get("minimum_green_soak_seconds")
+            ),
+            "qualification_status": evaluation["qualification_status"],
+            "workloads": merged_workloads,
+            "supported_profiles": evaluation["supported_profiles"],
+            "conditional_profiles": evaluation["conditional_profiles"],
+            "unsupported_profiles": evaluation["unsupported_profiles"],
+            "blocking_findings": evaluation["blocking_findings"],
+            "residual_risks": evaluation["residual_risks"],
+            "recommended_status": evaluation["recommended_status"],
+            "go_no_go": evaluation["go_no_go"],
+            "operational_findings": evaluation["operational_findings"],
+            "artifacts": {
+                **(existing_payload.get("artifacts") or {}),
+                **(rerun_payload.get("artifacts") or {}),
+                "merged_workloads": rerun_names,
+            },
+        }
+    )
+    return merged
 
 
 def write_qualification_report(
@@ -484,6 +691,16 @@ def render_qualification_markdown(payload: dict[str, Any]) -> str:
 
     lines.extend(["", "## Operational Findings", ""])
     operational_findings = payload.get("operational_findings") or []
+    has_multi_round = any(
+        int((item or {}).get("resume_round_count") or 0) > 1
+        for item in payload.get("workloads", [])
+    )
+    if has_multi_round:
+        lines.append(
+            "- live-provider workloads may require multiple approval rounds before "
+            "terminal completion; "
+            "single-resume completion is not assumed for enterprise mixed mode"
+        )
     if operational_findings:
         lines.extend(f"- {item}" for item in operational_findings)
     else:
@@ -729,11 +946,12 @@ def _run_baseline_enterprise_flow(
     support_bundle_path = None
     metrics_path = None
     approval_ids: list[str] = []
-    positive = _run_positive_smoke(
+    positive = _run_terminal_positive_smoke(
         name=name,
         spec=spec,
         config=config,
         orchestrator_builder=live_orchestrator_builder,
+        actor="qualification-runner",
     )
     summary = positive["summary"]
     clean_replays = positive["clean_replays"]
@@ -813,9 +1031,14 @@ def _run_baseline_enterprise_flow(
         "runbook_gaps": [],
         "notes": notes,
         "operational_followups": operational_followups,
+        "terminal_status": summary.get("terminal_status"),
+        "terminal_job_id": summary.get("terminal_job_id"),
+        "resume_round_count": summary.get("resume_round_count", 0),
+        "approval_rounds": summary.get("approval_rounds", []),
         "artifacts": {
             "workload_root": str(workload_root),
             "job_dirs": summary.get("artifacts", {}),
+            "round_job_dirs": summary.get("artifacts", {}).get("round_job_dirs", []),
             "metrics_snapshot": str(metrics_path),
             "support_bundle_archive": str(support_bundle_path or ""),
             "support_bundle_manifest": str(support_bundle.get("manifest_path") or ""),
@@ -851,11 +1074,12 @@ def _run_approval_heavy_flow(
 
     positive_runs: list[dict[str, Any]] = []
     for index in range(1, 4):
-        positive = _run_positive_smoke(
+        positive = _run_terminal_positive_smoke(
             name=f"{name}-{index}",
             spec=spec,
             config=config,
             orchestrator_builder=deterministic_orchestrator_builder,
+            actor="qualification-runner",
         )
         positive_runs.append(positive)
         clean_replays.extend(positive["clean_replays"])
@@ -943,6 +1167,10 @@ def _run_approval_heavy_flow(
         "runbook_gaps": [],
         "notes": [],
         "operational_followups": [],
+        "terminal_status": None,
+        "terminal_job_id": None,
+        "resume_round_count": 0,
+        "approval_rounds": [],
         "artifacts": {
             "workload_root": str(workload_root),
             "job_ids": [job_id for run in scenario_runs for job_id in run.get("job_ids", [])],
@@ -1084,6 +1312,10 @@ def _run_conflict_heavy_flow(
         "runbook_gaps": [],
         "notes": [f"final_state_version={target_version}"],
         "operational_followups": [],
+        "terminal_status": result.job.status.value,
+        "terminal_job_id": result.job.job_id,
+        "resume_round_count": 0,
+        "approval_rounds": [],
         "artifacts": {
             "workload_root": str(workload_root),
             "job_dir": str(Path(config.team.artifact_dir) / result.job.job_id),
@@ -1130,11 +1362,12 @@ def _run_soak_flow(
 
     while True:
         iteration += 1
-        positive = _run_positive_smoke(
+        positive = _run_terminal_positive_smoke(
             name=f"{name}-{iteration}",
             spec=spec,
             config=config,
             orchestrator_builder=deterministic_orchestrator_builder,
+            actor="qualification-runner",
         )
         scenario_runs.append(positive["summary"])
         clean_replays.extend(positive["clean_replays"])
@@ -1235,6 +1468,14 @@ def _run_soak_flow(
             f"artifact_growth_bytes={max(total_bytes_after - total_bytes_before, 0)}",
         ],
         "operational_followups": [],
+        "terminal_status": "completed" if not blocking_findings else "failed",
+        "terminal_job_id": (
+            scenario_runs[-1].get("job_ids", [])[-1]
+            if scenario_runs and scenario_runs[-1].get("job_ids")
+            else None
+        ),
+        "resume_round_count": 0,
+        "approval_rounds": [],
         "artifacts": {
             "workload_root": str(workload_root),
             "metrics_snapshots": metrics_paths,
@@ -1264,18 +1505,21 @@ def _run_failure_injection_flow(
     started = datetime.now(UTC)
     blocking_findings: list[str] = []
     failure_class_breakdown: Counter[str] = Counter()
+    shared_failures: set[str] = set()
 
     def flaky_builder(runtime_config: RuntimeConfig):
         return _DelegatingOrchestrator(
             live_orchestrator_builder(runtime_config),
             fail_once_tasks={"task-policy": "PROVIDER_TRANSIENT_FAILURE"},
+            shared_failures=shared_failures,
         )
 
-    positive = _run_positive_smoke(
+    positive = _run_terminal_positive_smoke(
         name=name,
         spec=spec,
         config=config,
         orchestrator_builder=flaky_builder,
+        actor="qualification-runner",
     )
     summary = positive["summary"]
     clean_replays = list(positive["clean_replays"])
@@ -1369,10 +1613,15 @@ def _run_failure_injection_flow(
         "runbook_gaps": [],
         "notes": [],
         "operational_followups": [],
+        "terminal_status": summary.get("terminal_status"),
+        "terminal_job_id": summary.get("terminal_job_id"),
+        "resume_round_count": summary.get("resume_round_count", 0),
+        "approval_rounds": summary.get("approval_rounds", []),
         "artifacts": {
             "workload_root": str(workload_root),
             "backup_manifest": str(backup["manifest_path"]),
             "backup_dir": str(backup["backup_dir"]),
+            "round_job_dirs": summary.get("artifacts", {}).get("round_job_dirs", []),
         },
         "blocking_findings": blocking_findings,
         "residual_risks": [],
@@ -1412,11 +1661,275 @@ def _skipped_extended_soak(*, run_root: Path) -> dict[str, Any]:
         "runbook_gaps": [],
         "notes": ["Optional extended soak was not executed in this run."],
         "operational_followups": ["run a signed 24h soak before broader GA sign-off"],
+        "terminal_status": None,
+        "terminal_job_id": None,
+        "resume_round_count": 0,
+        "approval_rounds": [],
         "artifacts": {"workload_root": str(run_root / "24h_soak_flow")},
         "blocking_findings": [],
         "residual_risks": ["24h soak evidence not yet published"],
         "evidence_verified": False,
     }
+
+
+def _run_terminal_positive_smoke(
+    *,
+    name: str,
+    spec: TeamSpec,
+    config: RuntimeConfig,
+    orchestrator_builder: Callable[[RuntimeConfig], Any],
+    actor: str,
+) -> dict[str, Any]:
+    request = (
+        "Qualification request: build a controlled enterprise summary with research evidence, "
+        "policy constraints, and a final reviewer synthesis."
+    )
+    case_id = f"{name}-case"
+    max_rounds = max(1, int(spec.team.termination_rules.max_tasks or 1))
+    initial_job_id = f"{name}-blocked"
+
+    current_result = TeamSupervisor(
+        orchestrator=orchestrator_builder(config),
+        config=config,
+    ).run(
+        spec=spec,
+        request=request,
+        case_id=case_id,
+        job_id=initial_job_id,
+    )
+    current_job_id = initial_job_id
+    blocked_job_id = initial_job_id
+    all_job_ids: list[str] = [current_job_id]
+    all_event_groups: list[list[dict[str, Any]]] = []
+    clean_replays: list[dict[str, Any]] = []
+    approval_rounds: list[dict[str, Any]] = []
+    observed_error_codes: list[str] = []
+    all_requested_ids: set[str] = set()
+    all_approved_ids: set[str] = set()
+    all_executed_ids: set[str] = set()
+    all_consumed_ids: set[str] = set()
+    seen_approval_sets: set[tuple[str, ...]] = set()
+    round_job_dirs: list[str] = []
+    resume_round_count = 0
+
+    while True:
+        current_status = current_result.job.status.value
+        current_events = load_events(current_job_id, root_dir=config.team.artifact_dir)
+        current_replay = replay_job(current_job_id, root_dir=config.team.artifact_dir, verify=True)
+        all_event_groups.append(current_events)
+        clean_replays.append(current_replay)
+
+        if current_status == "completed":
+            break
+        if current_status == "failed":
+            raise QualificationFailure(
+                "QUALIFICATION_TERMINAL_FAILED",
+                f"{name} reached failed terminal state in job {current_job_id}",
+            )
+        if current_status != "blocked":
+            raise QualificationFailure(
+                "QUALIFICATION_UNEXPECTED_TERMINAL_STATUS",
+                f"{name} reached unexpected status={current_status} in job {current_job_id}",
+            )
+
+        blocked_job_id = blocked_job_id or current_job_id
+        governance_runtime = getattr(orchestrator_builder(config), "governance_runtime", None)
+        if governance_runtime is None:
+            raise QualificationFailure(
+                "GOVERNANCE_UNAVAILABLE",
+                "enterprise qualification requires governance runtime",
+            )
+
+        requested_ids = _requested_approval_ids(current_events)
+        all_requested_ids.update(requested_ids)
+        approved_ids: list[str] = []
+        executed_ids: list[str] = []
+        for approval_id in requested_ids:
+            decision = governance_runtime.decide_approval(
+                approval_id=approval_id,
+                approve=True,
+                actor=actor,
+                reason=f"approved during {name}",
+            )
+            if decision.error_code is not None:
+                observed_error_codes.append(decision.error_code)
+                continue
+            approved_ids.append(approval_id)
+            all_approved_ids.add(approval_id)
+            execution = governance_runtime.execute_approval(approval_id=approval_id)
+            if execution.error_code is not None:
+                observed_error_codes.append(execution.error_code)
+                continue
+            executed_ids.append(approval_id)
+            all_executed_ids.add(approval_id)
+
+        overrides, resolved = _collect_resume_overrides(
+            events=current_events,
+            governance_runtime=governance_runtime,
+        )
+        approval_signature = tuple(
+            sorted(f"{item['task_id']}::{item['target']}" for item in resolved)
+        )
+        if not approval_signature:
+            raise QualificationFailure(
+                "QUALIFICATION_RESUME_NO_PROGRESS",
+                f"{name} blocked job {current_job_id} produced no executed approvals for resume",
+            )
+        if approval_signature in seen_approval_sets:
+            raise QualificationFailure(
+                "QUALIFICATION_APPROVAL_LOOP",
+                f"{name} repeated the same approval set while blocked at job {current_job_id}",
+            )
+        seen_approval_sets.add(approval_signature)
+
+        resume_round_count += 1
+        if resume_round_count > max_rounds:
+            raise QualificationFailure(
+                "QUALIFICATION_MAX_RESUME_ROUNDS_EXCEEDED",
+                f"{name} exceeded max resume rounds ({max_rounds})",
+            )
+
+        resume_job_id = (
+            f"{name}-resume"
+            if resume_round_count == 1
+            else f"{name}-resume-{resume_round_count}"
+        )
+        resume_payload = _resume_from_source_job(
+            spec=spec,
+            config=config,
+            orchestrator_builder=orchestrator_builder,
+            source_job_id=current_job_id,
+            resume_job_id=resume_job_id,
+            source_events=current_events,
+            request=request,
+            case_id=case_id,
+        )
+        resumed_result = resume_payload["result"]
+        resumed_events = load_events(resume_job_id, root_dir=config.team.artifact_dir)
+        try:
+            resumed_status = load_job_status(resume_job_id, root_dir=config.team.artifact_dir)
+        except FileNotFoundError:
+            resumed_status = {}
+        consumed_ids = _consumed_approval_ids(resumed_events)
+        all_consumed_ids.update(consumed_ids)
+        round_job_dirs.extend(
+            [
+                str(Path(config.team.artifact_dir) / current_job_id),
+                str(Path(config.team.artifact_dir) / resume_job_id),
+            ]
+        )
+        approval_rounds.append(
+            {
+                "round": resume_round_count,
+                "source_job_id": current_job_id,
+                "resume_job_id": resume_job_id,
+                "requested_approval_ids": requested_ids,
+                "approved_approval_ids": approved_ids,
+                "executed_approval_ids": executed_ids,
+                "consumed_approval_ids": consumed_ids,
+                "resolved_overrides": resolved,
+                "resume_task_ids": list(
+                    (
+                        resumed_status.get("continuation", {}) or {}
+                    ).get("continuation_task_ids", [])
+                ),
+                "source_status": current_status,
+                "resume_status": resumed_result.job.status.value,
+                "replay_verified": bool(current_replay.get("verified")),
+                "audit_envelope_paths": {
+                    "source": str(
+                        Path(config.team.artifact_dir)
+                        / current_job_id
+                        / "audit_envelope.json"
+                    ),
+                    "resume": resumed_result.audit_envelope_path,
+                },
+            }
+        )
+        current_job_id = resume_job_id
+        all_job_ids.append(current_job_id)
+        current_result = resumed_result
+
+    graph_digest = _graph_digest(all_event_groups)
+    terminal_job_id = current_job_id
+    return {
+        "graph_digest": graph_digest,
+        "blocked_job_id": blocked_job_id,
+        "terminal_job_id": terminal_job_id,
+        "clean_replays": clean_replays,
+        "summary": {
+            "name": name,
+            "status": "pass",
+            "job_ids": all_job_ids,
+            "graph_digest": graph_digest,
+            "expected_failure": False,
+            "observed_error_codes": observed_error_codes,
+            "replay_verified": all(bool(item.get("verified")) for item in clean_replays),
+            "approvals_requested": len(all_requested_ids),
+            "approvals_approved": len(all_approved_ids),
+            "approvals_executed": len(all_executed_ids),
+            "approvals_consumed": len(all_consumed_ids),
+            "terminal_status": current_result.job.status.value,
+            "terminal_job_id": terminal_job_id,
+            "resume_round_count": resume_round_count,
+            "approval_rounds": approval_rounds,
+            "artifacts": {
+                "blocked_job_dir": str(Path(config.team.artifact_dir) / blocked_job_id),
+                "resume_job_dir": str(Path(config.team.artifact_dir) / terminal_job_id),
+                "blocked_audit_envelope": str(
+                    Path(config.team.artifact_dir) / blocked_job_id / "audit_envelope.json"
+                ),
+                "resume_audit_envelope": str(
+                    Path(config.team.artifact_dir) / terminal_job_id / "audit_envelope.json"
+                ),
+                "initial_job_dir": str(Path(config.team.artifact_dir) / initial_job_id),
+                "terminal_job_dir": str(Path(config.team.artifact_dir) / terminal_job_id),
+                "round_job_dirs": _unique_strings(round_job_dirs),
+                "audit_envelopes": [
+                    str(Path(config.team.artifact_dir) / job_id / "audit_envelope.json")
+                    for job_id in all_job_ids
+                ],
+            },
+        },
+    }
+
+
+def _derive_resume_spec(
+    *,
+    spec: TeamSpec,
+    source_job_id: str,
+    jobs_root: str | Path,
+) -> TeamSpec:
+    try:
+        task_runs = load_task_runs(source_job_id, root_dir=jobs_root).get("tasks", [])
+    except FileNotFoundError:
+        return spec
+    completed_task_ids = {
+        str(item.get("task_id") or "")
+        for item in task_runs
+        if str(item.get("status") or "") == "completed"
+    }
+    if not completed_task_ids:
+        return spec
+
+    payload = spec.model_dump(mode="python")
+    remaining_tasks = [
+        task
+        for task in payload.get("tasks", [])
+        if str(task.get("task_id") or "") not in completed_task_ids
+    ]
+    if not remaining_tasks:
+        return spec
+
+    remaining_ids = {str(task.get("task_id") or "") for task in remaining_tasks}
+    for task in remaining_tasks:
+        task["depends_on"] = [
+            dependency
+            for dependency in list(task.get("depends_on") or [])
+            if dependency in remaining_ids
+        ]
+    payload["tasks"] = remaining_tasks
+    return TeamSpec.model_validate(payload)
 
 
 def _run_stale_snapshot_probe(
@@ -1490,20 +2003,37 @@ def _run_stale_snapshot_probe(
             visibility="team",
         )
 
+    continuation_state = derive_resume_continuation_state(
+        spec=probe_spec,
+        source_job_id=blocked_job_id,
+        root_dir=config.team.artifact_dir,
+        source_events=blocked_events,
+    )
+    task_lineage = dict(continuation_state.get("task_lineage") or {})
+    research_lineage = dict(task_lineage.get("task-research") or {})
+    if research_lineage:
+        research_lineage["lineage_hash"] = "tampered-lineage-hash"
+        task_lineage["task-research"] = research_lineage
+        continuation_state["task_lineage"] = task_lineage
     resume_result = TeamSupervisor(orchestrator=orchestrator_builder(config), config=config).run(
         spec=probe_spec,
         request=request,
         case_id=case_id,
         job_id=resume_job_id,
         approval_overrides={"task-research": {"task": approval_ids[0]}},
+        continuation_state=continuation_state,
     )
     resume_events = load_events(resume_job_id, root_dir=config.team.artifact_dir)
     replay = replay_job(resume_job_id, root_dir=config.team.artifact_dir, verify=True)
-    stale_detected = any(str(item.get("event") or "") == "approval_stale" for item in resume_events)
+    stale_detected = any(
+        str(item.get("event") or "") in {"approval_stale", "team.resume.lineage_mismatch"}
+        for item in resume_events
+    )
     reason_codes = [
         str(item.get("data", {}).get("reason_code") or "")
         for item in resume_events
-        if str(item.get("event") or "") == "approval_stale"
+        if str(item.get("event") or "")
+        in {"approval_stale", "team.resume.lineage_mismatch"}
     ]
     return {
         "name": name,
@@ -1671,6 +2201,11 @@ def _collect_audit_paths(summary: dict[str, Any]) -> list[str]:
         value = artifacts.get(key)
         if value:
             paths.append(str(value))
+    audit_envelopes = artifacts.get("audit_envelopes")
+    if isinstance(audit_envelopes, list):
+        for value in audit_envelopes:
+            if value:
+                paths.append(str(value))
     return paths
 
 

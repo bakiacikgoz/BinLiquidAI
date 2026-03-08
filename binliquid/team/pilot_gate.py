@@ -15,6 +15,10 @@ from binliquid.memory.persistent_store import PersistentMemoryStore
 from binliquid.memory.salience_gate import SalienceGate
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.schemas.models import OrchestratorResult
+from binliquid.team.continuation import (
+    ResumeContinuationError,
+    derive_resume_continuation_state,
+)
 from binliquid.team.memory_scope import validate_memory_access
 from binliquid.team.models import TeamSpec
 from binliquid.team.replay import load_events, replay_job
@@ -423,6 +427,15 @@ def _resume_from_source_job(
             "NO_EXECUTED_APPROVALS",
             f"no executed approvals found for resume source job {source_job_id}",
         )
+    try:
+        continuation_state = derive_resume_continuation_state(
+            spec=spec,
+            source_job_id=source_job_id,
+            root_dir=config.team.artifact_dir,
+            source_events=source_events,
+        )
+    except ResumeContinuationError as exc:
+        raise PilotGateFailure(exc.code, str(exc)) from exc
 
     result = TeamSupervisor(orchestrator=orchestrator, config=config).run(
         spec=spec,
@@ -430,6 +443,7 @@ def _resume_from_source_job(
         case_id=case_id,
         job_id=resume_job_id,
         approval_overrides=overrides,
+        continuation_state=continuation_state,
     )
     return {"result": result, "resolved": resolved}
 
@@ -685,6 +699,25 @@ def _build_counters(
     fallback_mode_count = sum(
         1 for item in all_events if str(item.get("event") or "") == "fallback_mode_applied"
     )
+    resume_frontier_count = sum(
+        1 for item in all_events if str(item.get("event") or "") == "team.resume.frontier_loaded"
+    )
+    resume_root_restart_count = sum(
+        int((item.get("data") or {}).get("resume_root_restart_count") or 0)
+        for item in all_events
+        if str(item.get("event") or "") == "team.resume.continuation_selected"
+    )
+    approval_carry_forward_count = sum(
+        1
+        for item in all_events
+        if str(item.get("event") or "") == "team.resume.approval_carry_forwarded"
+    )
+    resume_lineage_mismatch_count = sum(
+        1 for item in all_events if str(item.get("event") or "") == "team.resume.lineage_mismatch"
+    )
+    invalid_frontier_count = sum(
+        1 for item in all_events if str(item.get("event") or "") == "team.resume.invalid_frontier"
+    )
 
     return {
         "total_events": total_events,
@@ -716,6 +749,11 @@ def _build_counters(
         "memory_conflict_count": memory_conflict_count,
         "serialized_due_to_policy_count": serialized_due_to_policy_count,
         "fallback_mode_count": fallback_mode_count,
+        "resume_frontier_count": resume_frontier_count,
+        "resume_root_restart_count": resume_root_restart_count,
+        "approval_carry_forward_count": approval_carry_forward_count,
+        "resume_lineage_mismatch_count": resume_lineage_mismatch_count,
+        "invalid_frontier_count": invalid_frontier_count,
     }
 
 

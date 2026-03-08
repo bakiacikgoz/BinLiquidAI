@@ -65,6 +65,9 @@ def replay_job(
             "task_blocked",
             "task_failed",
             "task_escalated",
+            "team.resume.frontier_loaded",
+            "team.resume.continuation_selected",
+            "team.resume.completed",
         }
     ]
     handoff_events = [item for item in events if item.get("event") == "handoff"]
@@ -78,6 +81,9 @@ def replay_job(
             "approval_consumed",
             "approval_stale",
             "resume_duplicate_suppressed",
+            "team.resume.lineage_mismatch",
+            "team.resume.snapshot_drift",
+            "team.resume.approval_carry_forwarded",
         }
     ]
     verification = _verify_replay(events=events, envelope=envelope, tasks=tasks, handoffs=handoffs)
@@ -130,6 +136,7 @@ def _verify_replay(
 
     missing_causal_ref_count = 0
     seen_event_ids: set[str] = set()
+    allowed_external_causal_refs = _external_causal_refs(events)
     handoff_hash_by_id: dict[str, str] = {
         str(item.get("handoff_id")): str(item.get("payload_hash") or "")
         for item in handoffs
@@ -149,7 +156,11 @@ def _verify_replay(
         event_id = str(item.get("event_id") or "")
         causal_ref = str(item.get("causal_ref") or "").strip()
         if _event_requires_causal_ref(event_name) and (
-            not causal_ref or causal_ref not in seen_event_ids
+            not causal_ref
+            or (
+                causal_ref not in seen_event_ids
+                and causal_ref not in allowed_external_causal_refs
+            )
         ):
             errors.append(f"missing causal_ref for event_id={event_id}")
             missing_causal_ref_count += 1
@@ -235,6 +246,31 @@ def _verify_replay(
             "payload_hash_mismatch_count": payload_hash_mismatch_count,
             "memory_version_conflict_count": memory_version_conflict_count,
             "resume_token_count": len(resume_token_use_count),
+            "resume_frontier_count": sum(
+                1
+                for item in events
+                if str(item.get("event") or "") == "team.resume.frontier_loaded"
+            ),
+            "resume_root_restart_count": sum(
+                int((item.get("data") or {}).get("resume_root_restart_count") or 0)
+                for item in events
+                if str(item.get("event") or "") == "team.resume.continuation_selected"
+            ),
+            "approval_carry_forward_count": sum(
+                1
+                for item in events
+                if str(item.get("event") or "") == "team.resume.approval_carry_forwarded"
+            ),
+            "resume_lineage_mismatch_count": sum(
+                1
+                for item in events
+                if str(item.get("event") or "") == "team.resume.lineage_mismatch"
+            ),
+            "invalid_frontier_count": sum(
+                1
+                for item in events
+                if str(item.get("event") or "") == "team.resume.invalid_frontier"
+            ),
         },
     }
 
@@ -243,6 +279,10 @@ def _event_requires_causal_ref(event_name: str) -> bool:
     return event_name in {
         "task_assigned",
         "handoff",
+        "team.resume.continuation_selected",
+        "team.resume.lineage_mismatch",
+        "team.resume.snapshot_drift",
+        "team.resume.approval_carry_forwarded",
         "approval_requested",
         "approval_stale",
         "resume_duplicate_suppressed",
@@ -270,3 +310,23 @@ def _event_requires_causal_ref(event_name: str) -> bool:
 def _payload_hash(payload: dict[str, Any]) -> str:
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _external_causal_refs(events: list[dict[str, Any]]) -> set[str]:
+    refs: set[str] = set()
+    for item in events:
+        if str(item.get("event") or "") != "team.resume.continuation_selected":
+            continue
+        data = item.get("data")
+        if not isinstance(data, dict):
+            continue
+        upstream_nodes = data.get("upstream_completed_nodes") or []
+        if not isinstance(upstream_nodes, list):
+            continue
+        for upstream in upstream_nodes:
+            if not isinstance(upstream, dict):
+                continue
+            terminal_event_id = str(upstream.get("terminal_event_id") or "").strip()
+            if terminal_event_id:
+                refs.add(terminal_event_id)
+    return refs

@@ -30,6 +30,7 @@ class ParallelScheduler:
         *,
         tasks: list[TaskDefinition],
         execute_task: TaskExecutor,
+        initially_completed: set[str] | None = None,
     ) -> SchedulerResult:
         if len(tasks) > self._max_total_tasks:
             blocked = [
@@ -62,7 +63,7 @@ class ParallelScheduler:
             return SchedulerResult(tasks=blocked, reason_code="TEAM_DEADLOCK")
 
         pending = set(by_id.keys())
-        completed: set[str] = set()
+        completed: set[str] = set(initially_completed or set())
         done_or_failed: set[str] = set()
         task_runs: dict[str, TaskRun] = {}
         running: dict[Future[TaskRun], str] = {}
