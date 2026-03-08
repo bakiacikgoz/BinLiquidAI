@@ -10,12 +10,14 @@ import {
   getRunReplay,
   getRunStatus,
   handshake,
+  isBridgePreviewMode,
   listRuns,
   readArtifact,
   showApproval,
   tailEvents,
 } from './bridge';
 import { hasContractMismatch } from './capabilities';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { dictionaries } from './i18n';
 import { actorForOperator, canMutateWithOperatorId } from './operator';
 import {
@@ -36,7 +38,38 @@ type Toast = {
   text: string;
 };
 
+type AppContentProps = {
+  settings: PanelSettings;
+  updateSettings: (next: Partial<PanelSettings>) => void;
+};
+
 const ARTIFACT_NAMES = ['status.json', 'tasks.json', 'handoffs.json', 'audit_envelope.json'] as const;
+const THEME_MODES = ['light', 'dark', 'system'] as const;
+
+function SunIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3.6" />
+      <path d="M12 2.75v2.1M12 19.15v2.1M21.25 12h-2.1M4.85 12H2.75M18.54 5.46l-1.48 1.48M6.94 17.06l-1.48 1.48M18.54 18.54l-1.48-1.48M6.94 6.94L5.46 5.46" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M14.5 3.25a8.75 8.75 0 1 0 6.25 15.2A9.5 9.5 0 0 1 14.5 3.25Z" />
+    </svg>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
@@ -59,9 +92,12 @@ function getErrorPayload(error: unknown): BridgeErrorPayload | null {
   return null;
 }
 
-function App() {
-  const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
+function AppContent({ settings, updateSettings }: AppContentProps) {
+  const { resolvedTheme } = useTheme();
+  const previewMode = isBridgePreviewMode();
+
   const [activeView, setActiveView] = useState<ViewKey>('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [runTab, setRunTab] = useState<RunTabKey>('overview');
 
   const [handshakeData, setHandshakeData] = useState<unknown>(null);
@@ -106,14 +142,6 @@ function App() {
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((item) => item.id !== id));
     }, 4200);
-  }
-
-  function updateSettings(next: Partial<PanelSettings>) {
-    setSettings((prev) => {
-      const merged = { ...prev, ...next };
-      saveSettings(merged);
-      return merged;
-    });
   }
 
   async function refreshHandshake() {
@@ -383,54 +411,205 @@ function App() {
   const parsedArtifact = asRecord(selectedArtifactPayload);
   const artifactValue = parsedArtifact.payload;
 
-  const views: Array<{ key: ViewKey; label: string }> = [
-    { key: 'dashboard', label: t.dashboard },
-    { key: 'approvals', label: t.approvals },
-    { key: 'runs', label: t.runs },
-    { key: 'diagnostics', label: t.diagnostics },
-    { key: 'settings', label: t.settings },
+  const themeLabel = resolvedTheme === 'dark' ? t.themeDark : t.themeLight;
+
+  const pageMeta: Record<ViewKey, { eyebrow: string; title: string; description: string }> = {
+    dashboard: {
+      eyebrow: t.operationsEyebrow,
+      title: t.dashboard,
+      description: t.dashboardLead,
+    },
+    approvals: {
+      eyebrow: t.reviewEyebrow,
+      title: t.approvals,
+      description: t.approvalsLead,
+    },
+    runs: {
+      eyebrow: t.executionEyebrow,
+      title: t.runs,
+      description: t.runsLead,
+    },
+    diagnostics: {
+      eyebrow: t.integrityEyebrow,
+      title: t.diagnostics,
+      description: t.diagnosticsLead,
+    },
+    settings: {
+      eyebrow: t.preferencesEyebrow,
+      title: t.settings,
+      description: t.settingsLead,
+    },
+  };
+
+  const views: Array<{ key: ViewKey; label: string; summary: string; badge: string }> = [
+    {
+      key: 'dashboard',
+      label: t.dashboard,
+      summary: t.dashboardMeta,
+      badge: readString(handshakeRecord, 'coreVersion', '-'),
+    },
+    {
+      key: 'approvals',
+      label: t.approvals,
+      summary: t.approvalsMeta,
+      badge: String(pendingApprovals.length),
+    },
+    {
+      key: 'runs',
+      label: t.runs,
+      summary: t.runsMeta,
+      badge: String(runItems.length),
+    },
+    {
+      key: 'diagnostics',
+      label: t.diagnostics,
+      summary: t.diagnosticsMeta,
+      badge: readString(handshakeRecord, 'contractVersion', '-'),
+    },
+    {
+      key: 'settings',
+      label: t.settings,
+      summary: t.settingsMeta,
+      badge: themeLabel,
+    },
   ];
 
+  const activePage = pageMeta[activeView];
+
   return (
-    <div className="shell">
-      <aside className="sidebar">
+    <div className={mobileNavOpen ? 'shell shell-nav-open' : 'shell'}>
+      <button
+        type="button"
+        className={mobileNavOpen ? 'sidebar-backdrop sidebar-backdrop-open' : 'sidebar-backdrop'}
+        aria-label={t.navigation}
+        onClick={() => setMobileNavOpen(false)}
+      />
+
+      <aside className={mobileNavOpen ? 'sidebar sidebar-open' : 'sidebar'}>
         <div className="brand">
           <div className="brand-chip">v0.5 beta</div>
-          <h1>{t.appTitle}</h1>
-          <p>{t.appSubtitle}</p>
+          <div className="brand-copy">
+            <h1>{t.appTitle}</h1>
+            <p>{t.appSubtitle}</p>
+          </div>
         </div>
 
-        <nav className="nav-list">
-          {views.map((view) => (
-            <button
-              key={view.key}
-              className={view.key === activeView ? 'nav-item nav-item-active' : 'nav-item'}
-              onClick={() => setActiveView(view.key)}
-              type="button"
-            >
-              {view.label}
-            </button>
-          ))}
-        </nav>
+        <div className="sidebar-group">
+          <span className="sidebar-label">{t.navigation}</span>
+          <nav className="nav-list">
+            {views.map((view) => (
+              <button
+                key={view.key}
+                className={view.key === activeView ? 'nav-item nav-item-active' : 'nav-item'}
+                onClick={() => {
+                  setActiveView(view.key);
+                  setMobileNavOpen(false);
+                }}
+                type="button"
+              >
+                <span className="nav-item-copy">
+                  <span className="nav-item-label">{view.label}</span>
+                  <span className="nav-item-meta">{view.summary}</span>
+                </span>
+                <span className="nav-item-badge">{view.badge}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
 
         <div className="sidebar-foot">
-          <span>{t.operatorId}</span>
-          <strong>{settings.operatorId.trim() || '-'}</strong>
+          <div className="sidebar-meta">
+            <span>{t.operatorId}</span>
+            <strong>{settings.operatorId.trim() || '-'}</strong>
+          </div>
+          <div className="sidebar-meta">
+            <span>{t.profile}</span>
+            <strong>{settings.profile}</strong>
+          </div>
         </div>
       </aside>
 
       <main className="content">
         <header className="topbar">
           <div className="status-strip">
+            <button
+              type="button"
+              className="nav-toggle-btn"
+              aria-label={t.navigation}
+              title={t.navigation}
+              onClick={() => setMobileNavOpen((value) => !value)}
+            >
+              <MenuIcon />
+            </button>
+            {previewMode ? <span className="pill pill-preview">{t.previewMode}</span> : null}
             <span className="pill">{topPill}</span>
-            <span className="pill pill-muted">{t.live}: {eventsCursor}</span>
+            <span className="pill pill-muted">
+              {t.live}: {eventsCursor}
+            </span>
+            <span className="pill pill-muted">
+              {t.theme}: {themeLabel}
+            </span>
+          </div>
+
+          <div className="topbar-actions">
+            {!operatorIdValid ? (
+              <div className="warning-inline">{t.setOperatorId}</div>
+            ) : (
+              <div className="topbar-note">
+                {t.operatorId}: <strong>{settings.operatorId.trim()}</strong>
+              </div>
+            )}
+            <div className="theme-quick-switch">
+              <button
+                type="button"
+                className={resolvedTheme === 'light' ? 'theme-icon-btn theme-icon-btn-active' : 'theme-icon-btn'}
+                onClick={() => updateSettings({ theme: 'light' })}
+                aria-label={t.themeLight ?? 'Light'}
+                title={t.themeLight ?? 'Light'}
+              >
+                <SunIcon />
+              </button>
+              <button
+                type="button"
+                className={resolvedTheme === 'dark' ? 'theme-icon-btn theme-icon-btn-active' : 'theme-icon-btn'}
+                onClick={() => updateSettings({ theme: 'dark' })}
+                aria-label={t.themeDark ?? 'Dark'}
+                title={t.themeDark ?? 'Dark'}
+              >
+                <MoonIcon />
+              </button>
+            </div>
             <button className="ghost-btn" type="button" onClick={() => void refreshHandshake()}>
               {t.refresh}
             </button>
           </div>
-
-          {!operatorIdValid ? <div className="warning-inline">{t.setOperatorId}</div> : null}
         </header>
+
+        <section className="page-header">
+          <div className="page-copy">
+            <span className="page-kicker">{activePage.eyebrow}</span>
+            <h2>{activePage.title}</h2>
+            <p>{activePage.description}</p>
+            {previewMode ? <p className="preview-note">{t.previewModeLead}</p> : null}
+          </div>
+
+          <div className="page-context">
+            <article className="context-card">
+              <span>{t.profile}</span>
+              <strong>{settings.profile}</strong>
+              <p>
+                {t.mode}: {settings.mode}
+              </p>
+            </article>
+            <article className="context-card">
+              <span>{t.operatorId}</span>
+              <strong>{settings.operatorId.trim() || '-'}</strong>
+              <p>
+                {t.theme}: {themeLabel}
+              </p>
+            </article>
+          </div>
+        </section>
 
         {contractMismatch ? <div className="error-banner">{t.contractMismatch}</div> : null}
 
@@ -443,13 +622,25 @@ function App() {
 
         {activeView === 'dashboard' ? (
           <section className="panel-grid">
-            <article className="panel-card">
+            <article className="panel-card metric-card">
               <h3>{t.pendingApprovals}</h3>
               <p className="metric">{pendingApprovals.length}</p>
+              <p className="card-note">{t.pendingApprovalsCaption}</p>
             </article>
-            <article className="panel-card">
+            <article className="panel-card metric-card">
               <h3>{t.recentRuns}</h3>
               <p className="metric">{runItems.length}</p>
+              <p className="card-note">{t.recentRunsCaption}</p>
+            </article>
+            <article className="panel-card metric-card">
+              <h3>{t.contractVersion}</h3>
+              <p className="metric metric-text mono">{readString(handshakeRecord, 'contractVersion', '-')}</p>
+              <p className="card-note">{t.contractVersionCaption}</p>
+            </article>
+            <article className="panel-card metric-card">
+              <h3>{t.mode}</h3>
+              <p className="metric metric-text">{settings.mode}</p>
+              <p className="card-note">{t.runtimeModeCaption}</p>
             </article>
             <article className="panel-card wide">
               <h3>{t.capabilities}</h3>
@@ -471,8 +662,9 @@ function App() {
                   {t.refresh}
                 </button>
               </div>
+
               <div className="list-scroll">
-                {pendingApprovals.length === 0 ? <p>{t.noData}</p> : null}
+                {pendingApprovals.length === 0 ? <p className="supporting">{t.noData}</p> : null}
                 {pendingApprovals.map((item) => {
                   const row = asRecord(item);
                   const approvalId = readString(row, 'approval_id');
@@ -497,18 +689,37 @@ function App() {
               </div>
 
               <div className="action-row">
-                <button className="action-btn" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onApprove(true)}>
+                <button
+                  className="action-btn"
+                  type="button"
+                  disabled={!canMutate || !selectedApprovalId}
+                  onClick={() => void onApprove(true)}
+                >
                   {t.approve}
                 </button>
-                <button className="action-btn" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onApprove(false)}>
+                <button
+                  className="action-btn"
+                  type="button"
+                  disabled={!canMutate || !selectedApprovalId}
+                  onClick={() => void onApprove(false)}
+                >
                   {t.reject}
                 </button>
-                <button className="action-btn action-danger" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onExecute()}>
+                <button
+                  className="action-btn action-danger"
+                  type="button"
+                  disabled={!canMutate || !selectedApprovalId}
+                  onClick={() => void onExecute()}
+                >
                   {t.execute}
                 </button>
               </div>
 
-              <pre>{JSON.stringify(selectedApproval, null, 2)}</pre>
+              {selectedApprovalId ? (
+                <pre>{JSON.stringify(selectedApproval, null, 2)}</pre>
+              ) : (
+                <p className="supporting">{t.noSelection}</p>
+              )}
             </div>
           </section>
         ) : null}
@@ -524,7 +735,7 @@ function App() {
               </div>
 
               <div className="list-scroll">
-                {runItems.length === 0 ? <p>{t.noData}</p> : null}
+                {runItems.length === 0 ? <p className="supporting">{t.noData}</p> : null}
                 {runItems.map((item) => {
                   const row = asRecord(item);
                   const jobId = readString(row, 'job_id');
@@ -551,7 +762,7 @@ function App() {
                 </button>
               </div>
 
-              {!selectedRunId ? <p>{t.selectRun}</p> : null}
+              {!selectedRunId ? <p className="supporting">{t.selectRun}</p> : null}
 
               {selectedRunId ? (
                 <>
@@ -579,7 +790,7 @@ function App() {
                   {runTab === 'timeline' ? (
                     <div className="timeline-pane">
                       {eventsWarning ? <div className="warning-inline">{eventsWarning}</div> : null}
-                      {events.length === 0 ? <p>{t.noData}</p> : null}
+                      {events.length === 0 ? <p className="supporting">{t.noData}</p> : null}
                       {events.map((item, index) => {
                         const row = asRecord(item);
                         return (
@@ -641,17 +852,17 @@ function App() {
 
         {activeView === 'diagnostics' ? (
           <section className="panel-grid">
-            <article className="panel-card">
+            <article className="panel-card metric-card">
               <h3>{t.uiVersion}</h3>
-              <p className="mono">{readString(handshakeRecord, 'uiVersion', '-')}</p>
+              <p className="metric metric-text mono">{readString(handshakeRecord, 'uiVersion', '-')}</p>
             </article>
-            <article className="panel-card">
+            <article className="panel-card metric-card">
               <h3>{t.coreVersion}</h3>
-              <p className="mono">{readString(handshakeRecord, 'coreVersion', '-')}</p>
+              <p className="metric metric-text mono">{readString(handshakeRecord, 'coreVersion', '-')}</p>
             </article>
-            <article className="panel-card">
+            <article className="panel-card metric-card">
               <h3>{t.contractVersion}</h3>
-              <p className="mono">{readString(handshakeRecord, 'contractVersion', '-')}</p>
+              <p className="metric metric-text mono">{readString(handshakeRecord, 'contractVersion', '-')}</p>
             </article>
             <article className="panel-card wide">
               <h3>{t.capabilities}</h3>
@@ -665,122 +876,175 @@ function App() {
         ) : null}
 
         {activeView === 'settings' ? (
-          <section className="settings-form">
-            <div className="form-row">
-              <label htmlFor="operator-id">{t.operatorId}</label>
-              <input
-                id="operator-id"
-                value={settings.operatorId}
-                onChange={(event) => updateSettings({ operatorId: event.target.value })}
-                placeholder="ops-team-01"
-              />
+          <section className="settings-layout">
+            <div className="settings-section">
+              <div className="settings-section-head">
+                <h3>{t.runtimeSection}</h3>
+                <p>{t.runtimeSectionLead}</p>
+              </div>
+
+              <div className="settings-section-body">
+                <div className="form-row">
+                  <label htmlFor="operator-id">{t.operatorId}</label>
+                  <input
+                    id="operator-id"
+                    value={settings.operatorId}
+                    onChange={(event) => updateSettings({ operatorId: event.target.value })}
+                    placeholder={t.operatorIdPlaceholder ?? 'ops-team-01'}
+                  />
+                </div>
+
+                <div className="form-row">
+                  <label htmlFor="profile">{t.profile}</label>
+                  <input
+                    id="profile"
+                    value={settings.profile}
+                    onChange={(event) => updateSettings({ profile: event.target.value })}
+                  />
+                </div>
+
+                <div className="form-row">
+                  <label htmlFor="root-dir">{t.rootDir}</label>
+                  <input
+                    id="root-dir"
+                    value={settings.rootDir}
+                    onChange={(event) => updateSettings({ rootDir: event.target.value })}
+                  />
+                </div>
+
+                <div className="form-row">
+                  <label htmlFor="mode">{t.mode}</label>
+                  <select
+                    id="mode"
+                    value={settings.mode}
+                    onChange={(event) => updateSettings({ mode: event.target.value as PanelSettings['mode'] })}
+                  >
+                    <option value="auto">auto</option>
+                    <option value="external">external</option>
+                    <option value="bundled">bundled</option>
+                  </select>
+                </div>
+
+                <div className="form-row">
+                  <label htmlFor="cli-path">{t.cliPath}</label>
+                  <input
+                    id="cli-path"
+                    value={settings.cliPath}
+                    onChange={(event) => updateSettings({ cliPath: event.target.value })}
+                    placeholder="/usr/local/bin/binliquid"
+                  />
+                </div>
+
+                <div className="form-row">
+                  <label htmlFor="bundled-python-path">{t.bundledPythonPath}</label>
+                  <input
+                    id="bundled-python-path"
+                    value={settings.bundledPythonPath}
+                    onChange={(event) => updateSettings({ bundledPythonPath: event.target.value })}
+                    placeholder=".../Contents/Resources/binliquid-runtime/python/bin/python"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="form-row">
-              <label htmlFor="profile">{t.profile}</label>
-              <input
-                id="profile"
-                value={settings.profile}
-                onChange={(event) => updateSettings({ profile: event.target.value })}
-              />
+            <div className="settings-section">
+              <div className="settings-section-head">
+                <h3>{t.interfaceSection}</h3>
+                <p>{t.interfaceSectionLead}</p>
+              </div>
+
+              <div className="settings-section-body">
+                <div className="form-row">
+                  <label htmlFor="locale">{t.locale}</label>
+                  <select
+                    id="locale"
+                    value={settings.locale}
+                    onChange={(event) => updateSettings({ locale: event.target.value as LocaleMode })}
+                  >
+                    <option value="auto">auto</option>
+                    <option value="en">English</option>
+                    <option value="tr">Türkçe</option>
+                  </select>
+                </div>
+
+                <div className="form-row">
+                  <label>{t.theme}</label>
+                  <div className="theme-toggle">
+                    {THEME_MODES.map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={settings.theme === mode ? 'theme-toggle-btn theme-toggle-btn-active' : 'theme-toggle-btn'}
+                        onClick={() => updateSettings({ theme: mode })}
+                      >
+                        {mode === 'light'
+                          ? (t.themeLight ?? 'Light')
+                          : mode === 'dark'
+                            ? (t.themeDark ?? 'Dark')
+                            : (t.themeSystem ?? 'System')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <label htmlFor="updater-mode">{t.updaterMode}</label>
+                  <select
+                    id="updater-mode"
+                    value={settings.updaterMode}
+                    onChange={(event) =>
+                      updateSettings({ updaterMode: event.target.value as PanelSettings['updaterMode'] })
+                    }
+                  >
+                    <option value="off">off</option>
+                    <option value="manual">manual</option>
+                    <option value="auto">auto</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
-            <div className="form-row">
-              <label htmlFor="root-dir">{t.rootDir}</label>
-              <input
-                id="root-dir"
-                value={settings.rootDir}
-                onChange={(event) => updateSettings({ rootDir: event.target.value })}
-              />
+            <div className="settings-section">
+              <div className="settings-section-head">
+                <h3>{t.safetySection}</h3>
+                <p>{t.safetySectionLead}</p>
+              </div>
+
+              <div className="settings-section-body">
+                <div className="form-row form-row-inline">
+                  <label htmlFor="remote-telemetry">{t.remoteTelemetry}</label>
+                  <input
+                    id="remote-telemetry"
+                    type="checkbox"
+                    checked={settings.remoteTelemetry}
+                    onChange={(event) => updateSettings({ remoteTelemetry: event.target.checked })}
+                  />
+                </div>
+
+                <div className="form-row form-row-inline">
+                  <label htmlFor="debug-raw">{t.debugRaw}</label>
+                  <input
+                    id="debug-raw"
+                    type="checkbox"
+                    checked={settings.debugRaw}
+                    onChange={(event) => updateSettings({ debugRaw: event.target.checked })}
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="form-row">
-              <label htmlFor="mode">{t.mode}</label>
-              <select id="mode" value={settings.mode} onChange={(event) => updateSettings({ mode: event.target.value as PanelSettings['mode'] })}>
-                <option value="auto">auto</option>
-                <option value="external">external</option>
-                <option value="bundled">bundled</option>
-              </select>
-            </div>
-
-            <div className="form-row">
-              <label htmlFor="cli-path">{t.cliPath}</label>
-              <input
-                id="cli-path"
-                value={settings.cliPath}
-                onChange={(event) => updateSettings({ cliPath: event.target.value })}
-                placeholder="/usr/local/bin/binliquid"
-              />
-            </div>
-
-            <div className="form-row">
-              <label htmlFor="bundled-python-path">{t.bundledPythonPath}</label>
-              <input
-                id="bundled-python-path"
-                value={settings.bundledPythonPath}
-                onChange={(event) => updateSettings({ bundledPythonPath: event.target.value })}
-                placeholder=".../Contents/Resources/binliquid-runtime/python/bin/python"
-              />
-            </div>
-
-            <div className="form-row">
-              <label htmlFor="locale">{t.locale}</label>
-              <select
-                id="locale"
-                value={settings.locale}
-                onChange={(event) => updateSettings({ locale: event.target.value as LocaleMode })}
+            <div className="settings-action-row">
+              <button
+                type="button"
+                className="action-btn"
+                onClick={() => {
+                  saveSettings(settings);
+                  pushToast('ok', t.saved);
+                }}
               >
-                <option value="auto">auto</option>
-                <option value="en">English</option>
-                <option value="tr">Türkçe</option>
-              </select>
+                {t.save}
+              </button>
             </div>
-
-            <div className="form-row">
-              <label htmlFor="updater-mode">{t.updaterMode}</label>
-              <select
-                id="updater-mode"
-                value={settings.updaterMode}
-                onChange={(event) =>
-                  updateSettings({ updaterMode: event.target.value as PanelSettings['updaterMode'] })
-                }
-              >
-                <option value="off">off</option>
-                <option value="manual">manual</option>
-                <option value="auto">auto</option>
-              </select>
-            </div>
-
-            <div className="form-row form-row-inline">
-              <label htmlFor="remote-telemetry">{t.remoteTelemetry}</label>
-              <input
-                id="remote-telemetry"
-                type="checkbox"
-                checked={settings.remoteTelemetry}
-                onChange={(event) => updateSettings({ remoteTelemetry: event.target.checked })}
-              />
-            </div>
-
-            <div className="form-row form-row-inline">
-              <label htmlFor="debug-raw">{t.debugRaw}</label>
-              <input
-                id="debug-raw"
-                type="checkbox"
-                checked={settings.debugRaw}
-                onChange={(event) => updateSettings({ debugRaw: event.target.checked })}
-              />
-            </div>
-
-            <button
-              type="button"
-              className="action-btn"
-              onClick={() => {
-                saveSettings(settings);
-                pushToast('ok', t.saved);
-              }}
-            >
-              {t.save}
-            </button>
           </section>
         ) : null}
       </main>
@@ -793,6 +1057,24 @@ function App() {
         ))}
       </div>
     </div>
+  );
+}
+
+function App() {
+  const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
+
+  function updateSettings(next: Partial<PanelSettings>) {
+    setSettings((prev) => {
+      const merged = { ...prev, ...next };
+      saveSettings(merged);
+      return merged;
+    });
+  }
+
+  return (
+    <ThemeProvider mode={settings.theme}>
+      <AppContent settings={settings} updateSettings={updateSettings} />
+    </ThemeProvider>
   );
 }
 

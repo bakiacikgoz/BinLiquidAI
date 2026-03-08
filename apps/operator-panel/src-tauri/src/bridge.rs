@@ -8,7 +8,7 @@ use std::process::Stdio;
 use std::time::Duration;
 use tokio::process::Command;
 
-const CONTRACT_VERSION: &str = "1.0";
+const CONTRACT_VERSION: &str = "2.0";
 const DEFAULT_TIMEOUT_MS: u64 = 15_000;
 const DEFAULT_MAX_BYTES: usize = 256 * 1024;
 const DEFAULT_MAX_LINES: usize = 500;

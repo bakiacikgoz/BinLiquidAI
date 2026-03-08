@@ -16,7 +16,7 @@ describe('capability handshake validation', () => {
     expect(
       hasContractMismatch({
         capabilities: {
-          contractVersion: '1.0',
+          contractVersion: '2.0',
           commands: baseCommands,
         },
       }),
@@ -27,7 +27,7 @@ describe('capability handshake validation', () => {
     expect(
       hasContractMismatch({
         capabilities: {
-          contractVersion: '2.0',
+          contractVersion: '1.0',
           commands: baseCommands,
         },
       }),
@@ -38,7 +38,7 @@ describe('capability handshake validation', () => {
     expect(
       hasContractMismatch({
         capabilities: {
-          contractVersion: '1.0',
+          contractVersion: '2.0',
           commands: {
             ...baseCommands,
             approvalExecute: false,

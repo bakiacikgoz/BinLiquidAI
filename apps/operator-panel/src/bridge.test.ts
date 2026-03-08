@@ -1,22 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { BridgeError, handshake } from './bridge';
+import { handshake, isBridgePreviewMode } from './bridge';
 import { DEFAULT_SETTINGS } from './settings';
 
-describe('bridge runtime guard', () => {
-  it('fails fast when tauri runtime is unavailable', async () => {
-    try {
-      await handshake({ ...DEFAULT_SETTINGS });
-      throw new Error('expected handshake to fail outside tauri runtime');
-    } catch (error) {
-      expect(error).toBeInstanceOf(BridgeError);
-      if (!(error instanceof BridgeError)) {
-        return;
-      }
-      expect(error.payload.code).toBe('CLI_FAILED');
-      expect(error.payload.message).toBe('Tauri runtime not available');
-      expect(error.payload.command).toBe('bridge_handshake');
-      expect(error.payload.retryable).toBe(false);
-    }
+describe('bridge preview fallback', () => {
+  it('returns preview handshake data when tauri runtime is unavailable', async () => {
+    expect(isBridgePreviewMode()).toBe(true);
+
+    const payload = await handshake({ ...DEFAULT_SETTINGS });
+    const record = payload as Record<string, unknown>;
+    const capabilities = record.capabilities as Record<string, unknown>;
+
+    expect(record.coreVersion).toBe('0.5.0-preview');
+    expect(record.contractVersion).toBe('2.0');
+    expect(capabilities.previewMode).toBe(true);
   });
 });

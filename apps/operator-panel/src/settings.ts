@@ -1,6 +1,7 @@
 export type CoreMode = 'auto' | 'external' | 'bundled';
 export type LocaleMode = 'auto' | 'en' | 'tr';
 export type UpdaterMode = 'off' | 'manual' | 'auto';
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface PanelSettings {
   mode: CoreMode;
@@ -13,6 +14,7 @@ export interface PanelSettings {
   remoteTelemetry: boolean;
   updaterMode: UpdaterMode;
   debugRaw: boolean;
+  theme: ThemeMode;
 }
 
 export const SETTINGS_KEY = 'aegisos.operator.settings.v1';
@@ -28,6 +30,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   remoteTelemetry: false,
   updaterMode: 'off',
   debugRaw: false,
+  theme: 'system',
 };
 
 export function loadSettings(): PanelSettings {
@@ -57,6 +60,13 @@ export function resolveLocale(locale: LocaleMode): 'en' | 'tr' {
   }
   const browserLocale = (globalThis.navigator?.language ?? 'en').toLowerCase();
   return browserLocale.startsWith('tr') ? 'tr' : 'en';
+}
+
+export function resolveThemeMode(theme: ThemeMode): 'light' | 'dark' {
+  if (theme === 'light' || theme === 'dark') {
+    return theme;
+  }
+  return globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 export const OPERATOR_ID_PATTERN = /^[a-zA-Z0-9._-]{3,64}$/;

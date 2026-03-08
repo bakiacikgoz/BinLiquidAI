@@ -1,0 +1,54 @@
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --app-bg-top: #171b21;
+  --app-bg-bottom: #13161b;
+  --accent-wash: rgba(139, 162, 200, 0.18);
+
+  --surface-canvas: rgba(23, 27, 33, 0.82);
+  --surface-sidebar: rgba(23, 27, 33, 0.8);
+  --surface-panel: rgba(30, 35, 42, 0.82);
+  --surface-panel-strong: rgba(36, 42, 50, 0.94);
+  --surface-field: rgba(25, 29, 35, 0.96);
+  --surface-selected: rgba(139, 162, 200, 0.14);
+  --surface-selected-strong: rgba(139, 162, 200, 0.2);
+  --surface-code: rgba(20, 24, 29, 0.98);
+
+  --fg-primary: #edf1f7;
+  --fg-secondary: #a3adbc;
+  --fg-muted: #7f8897;
+
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --line-default: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  --accent-primary: #8ba2c8;
+  --accent-primary-hover: #a5b7d6;
+  --accent-soft: rgba(139, 162, 200, 0.16);
+  --accent-outline: rgba(139, 162, 200, 0.3);
+
+  --color-success: #8eb296;
+  --color-warning: #c39b67;
+  --color-error: #c48b84;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-sm: 0 18px 36px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 28px 64px rgba(0, 0, 0, 0.34);
+  --shadow-focus: 0 0 0 4px rgba(139, 162, 200, 0.18);
+
+  --bg-primary: var(--surface-canvas);
+  --bg-secondary: var(--surface-field);
+  --bg-tertiary: var(--surface-panel);
+  --bg-elevated: var(--surface-panel-strong);
+  --border-subtle: var(--line-soft);
+  --border-default: var(--line-default);
+  --sidebar-bg: var(--surface-sidebar);
+  --card-bg: var(--surface-panel);
+  --card-shadow: var(--shadow-sm);
+  --fg-0: var(--fg-primary);
+  --line: var(--line-default);
+  --accent: var(--accent-primary);
+  --accent-soft-legacy: var(--accent-soft);
+  --radius: var(--radius-lg);
+  --shadow: var(--shadow-sm);
+}
