@@ -1,0 +1,84 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "2.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "provider": {
+      "title": "Provider",
+      "type": "string"
+    },
+    "current_key_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Key Id"
+    },
+    "private_key_path": {
+      "title": "Private Key Path",
+      "type": "string"
+    },
+    "private_key_present": {
+      "title": "Private Key Present",
+      "type": "boolean"
+    },
+    "trusted_keys_dir": {
+      "title": "Trusted Keys Dir",
+      "type": "string"
+    },
+    "trusted_key_count": {
+      "title": "Trusted Key Count",
+      "type": "integer"
+    },
+    "trusted_keys": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Trusted Keys",
+      "type": "array"
+    },
+    "key_manifest_path": {
+      "title": "Key Manifest Path",
+      "type": "string"
+    },
+    "key_manifest_present": {
+      "title": "Key Manifest Present",
+      "type": "boolean"
+    },
+    "compat_env_hmac_enabled": {
+      "title": "Compat Env Hmac Enabled",
+      "type": "boolean"
+    },
+    "enterprise_compatible": {
+      "title": "Enterprise Compatible",
+      "type": "boolean"
+    },
+    "pkcs11_status": {
+      "title": "Pkcs11 Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contract_version",
+    "provider",
+    "private_key_path",
+    "private_key_present",
+    "trusted_keys_dir",
+    "trusted_key_count",
+    "key_manifest_path",
+    "key_manifest_present",
+    "compat_env_hmac_enabled",
+    "enterprise_compatible",
+    "pkcs11_status"
+  ],
+  "title": "KeyStatusPayloadContract",
+  "type": "object"
+}

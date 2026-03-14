@@ -1,0 +1,291 @@
+{
+  "$defs": {
+    "ComputerUseCapabilityContract": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "executionModes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Executionmodes",
+          "type": "array"
+        },
+        "replayable": {
+          "title": "Replayable",
+          "type": "boolean"
+        },
+        "failClosed": {
+          "title": "Failclosed",
+          "type": "boolean"
+        },
+        "adapterStatus": {
+          "title": "Adapterstatus",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "stage",
+        "platform",
+        "scope",
+        "executionModes",
+        "replayable",
+        "failClosed",
+        "adapterStatus"
+      ],
+      "title": "ComputerUseCapabilityContract",
+      "type": "object"
+    },
+    "OperatorCommandCapabilitiesContract": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalPendingJson": {
+          "title": "Approvalpendingjson",
+          "type": "boolean"
+        },
+        "approvalShowJson": {
+          "title": "Approvalshowjson",
+          "type": "boolean"
+        },
+        "approvalDecide": {
+          "title": "Approvaldecide",
+          "type": "boolean"
+        },
+        "approvalExecute": {
+          "title": "Approvalexecute",
+          "type": "boolean"
+        },
+        "computerUseSubmit": {
+          "title": "Computerusesubmit",
+          "type": "boolean"
+        },
+        "computerUsePause": {
+          "title": "Computerusepause",
+          "type": "boolean"
+        },
+        "computerUseResume": {
+          "title": "Computeruseresume",
+          "type": "boolean"
+        },
+        "computerUseStop": {
+          "title": "Computerusestop",
+          "type": "boolean"
+        },
+        "computerUseStateJson": {
+          "title": "Computerusestatefuljson",
+          "type": "boolean"
+        },
+        "teamSubmit": {
+          "title": "Teamsubmit",
+          "type": "boolean"
+        },
+        "teamResumeSubmit": {
+          "title": "Teamresumesubmit",
+          "type": "boolean"
+        },
+        "teamListJson": {
+          "title": "Teamlistjson",
+          "type": "boolean"
+        },
+        "teamStatusJson": {
+          "title": "Teamstatusjson",
+          "type": "boolean"
+        },
+        "teamReplayJson": {
+          "title": "Teamreplayjson",
+          "type": "boolean"
+        },
+        "configResolveJson": {
+          "title": "Configresolvejson",
+          "type": "boolean"
+        },
+        "authWhoamiJson": {
+          "title": "Authwhoamijson",
+          "type": "boolean"
+        },
+        "authCheckJson": {
+          "title": "Authcheckjson",
+          "type": "boolean"
+        },
+        "securityBaselineJson": {
+          "title": "Securitybaselinejson",
+          "type": "boolean"
+        },
+        "keysStatusJson": {
+          "title": "Keysstatusjson",
+          "type": "boolean"
+        },
+        "keysVerifyJson": {
+          "title": "Keysverifyjson",
+          "type": "boolean"
+        },
+        "keysRotatePlanJson": {
+          "title": "Keysrotateplanjson",
+          "type": "boolean"
+        },
+        "supportBundleExportJson": {
+          "title": "Supportbundleexportjson",
+          "type": "boolean"
+        },
+        "metricsSnapshotJson": {
+          "title": "Metricssnapshotjson",
+          "type": "boolean"
+        },
+        "gaReadinessJson": {
+          "title": "Gareadinessjson",
+          "type": "boolean"
+        },
+        "qualificationRunJson": {
+          "title": "Qualificationrunjson",
+          "type": "boolean"
+        },
+        "backupCreateJson": {
+          "title": "Backupcreatejson",
+          "type": "boolean"
+        },
+        "backupVerifyJson": {
+          "title": "Backupverifyjson",
+          "type": "boolean"
+        },
+        "restoreVerifyJson": {
+          "title": "Restoreverifyjson",
+          "type": "boolean"
+        },
+        "migratePlanJson": {
+          "title": "Migrateplanjson",
+          "type": "boolean"
+        },
+        "migrateApplyDryRunJson": {
+          "title": "Migrateapplydryrunjson",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "approvalPendingJson",
+        "approvalShowJson",
+        "approvalDecide",
+        "approvalExecute",
+        "computerUseSubmit",
+        "computerUsePause",
+        "computerUseResume",
+        "computerUseStop",
+        "computerUseStateJson",
+        "teamSubmit",
+        "teamResumeSubmit",
+        "teamListJson",
+        "teamStatusJson",
+        "teamReplayJson",
+        "configResolveJson",
+        "authWhoamiJson",
+        "authCheckJson",
+        "securityBaselineJson",
+        "keysStatusJson",
+        "keysVerifyJson",
+        "keysRotatePlanJson",
+        "supportBundleExportJson",
+        "metricsSnapshotJson",
+        "gaReadinessJson",
+        "qualificationRunJson",
+        "backupCreateJson",
+        "backupVerifyJson",
+        "restoreVerifyJson",
+        "migratePlanJson",
+        "migrateApplyDryRunJson"
+      ],
+      "title": "OperatorCommandCapabilitiesContract",
+      "type": "object"
+    },
+    "OperatorFeatureFlagsContract": {
+      "additionalProperties": false,
+      "properties": {
+        "operatorWorkflowParity": {
+          "title": "Operatorworkflowparity",
+          "type": "boolean"
+        },
+        "enterpriseOpsParity": {
+          "title": "Enterpriseopsparity",
+          "type": "boolean"
+        },
+        "computerUsePilot": {
+          "$ref": "#/$defs/ComputerUseCapabilityContract"
+        }
+      },
+      "required": [
+        "operatorWorkflowParity",
+        "enterpriseOpsParity",
+        "computerUsePilot"
+      ],
+      "title": "OperatorFeatureFlagsContract",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "coreVersion": {
+      "title": "Coreversion",
+      "type": "string"
+    },
+    "contractVersion": {
+      "const": "2.0",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "profiles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Profiles",
+      "type": "array"
+    },
+    "previewMode": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previewmode"
+    },
+    "features": {
+      "$ref": "#/$defs/OperatorFeatureFlagsContract"
+    },
+    "commands": {
+      "$ref": "#/$defs/OperatorCommandCapabilitiesContract"
+    },
+    "artifactSchema": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Artifactschema",
+      "type": "object"
+    }
+  },
+  "required": [
+    "coreVersion",
+    "contractVersion",
+    "profiles",
+    "features",
+    "commands"
+  ],
+  "title": "OperatorCapabilitiesPayload",
+  "type": "object"
+}

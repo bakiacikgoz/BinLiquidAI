@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "RunSummaryItemContract": {
+      "additionalProperties": false,
+      "properties": {
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "team_id": {
+          "title": "Team Id",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "request": {
+          "title": "Request",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "finished_at": {
+          "title": "Finished At",
+          "type": "string"
+        },
+        "audit_envelope_path": {
+          "title": "Audit Envelope Path",
+          "type": "string"
+        },
+        "job_dir": {
+          "title": "Job Dir",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "case_id",
+        "team_id",
+        "status",
+        "request",
+        "created_at",
+        "finished_at",
+        "audit_envelope_path",
+        "job_dir"
+      ],
+      "title": "RunSummaryItemContract",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "2.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "root_dir": {
+      "title": "Root Dir",
+      "type": "string"
+    },
+    "count": {
+      "title": "Count",
+      "type": "integer"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/RunSummaryItemContract"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Errors",
+      "type": "array"
+    }
+  },
+  "required": [
+    "contract_version",
+    "status",
+    "root_dir",
+    "count"
+  ],
+  "title": "RunSummaryPayloadContract",
+  "type": "object"
+}

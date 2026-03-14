@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "2.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "resolved": {
+      "additionalProperties": true,
+      "title": "Resolved",
+      "type": "object"
+    },
+    "source_map": {
+      "additionalProperties": true,
+      "title": "Source Map",
+      "type": "object"
+    }
+  },
+  "required": [
+    "contract_version",
+    "profile",
+    "status"
+  ],
+  "title": "ConfigResolvePayloadContract",
+  "type": "object"
+}

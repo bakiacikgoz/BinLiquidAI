@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "contractVersion": {
+      "const": "2.0",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "artifactName": {
+      "title": "Artifactname",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "bytesRead": {
+      "title": "Bytesread",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "contractVersion",
+    "artifactName",
+    "truncated",
+    "bytesRead"
+  ],
+  "title": "ReadArtifactPayloadContract",
+  "type": "object"
+}

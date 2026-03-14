@@ -1,0 +1,770 @@
+{
+  "contractVersion": "2.0",
+  "handshake": {
+    "uiVersion": "0.6.0-preview",
+    "coreVersion": "0.6.0-preview",
+    "contractVersion": "2.0",
+    "profile": "balanced",
+    "rootDir": ".binliquid/team/jobs",
+    "mode": "auto",
+    "capabilities": {
+      "coreVersion": "0.6.0-preview",
+      "contractVersion": "2.0",
+      "previewMode": true,
+      "profiles": ["balanced", "restricted", "enterprise", "research", "lite", "default"],
+      "features": {
+        "operatorWorkflowParity": true,
+        "enterpriseOpsParity": true,
+        "computerUsePilot": {
+          "enabled": true,
+          "stage": "execution_slice",
+          "platform": "macos",
+          "scope": "browser+desktop+file",
+          "executionModes": ["dry_run", "step_approval", "execute"],
+          "replayable": true,
+          "failClosed": true,
+          "adapterStatus": "safari_applescript"
+        }
+      },
+      "commands": {
+        "approvalPendingJson": true,
+        "approvalShowJson": true,
+        "approvalDecide": true,
+        "approvalExecute": true,
+        "computerUseSubmit": true,
+        "computerUsePause": true,
+        "computerUseResume": true,
+        "computerUseStop": true,
+        "computerUseStateJson": true,
+        "teamSubmit": true,
+        "teamResumeSubmit": true,
+        "teamListJson": true,
+        "teamStatusJson": true,
+        "teamReplayJson": true,
+        "configResolveJson": true,
+        "authWhoamiJson": true,
+        "authCheckJson": true,
+        "securityBaselineJson": true,
+        "keysStatusJson": true,
+        "keysVerifyJson": true,
+        "keysRotatePlanJson": true,
+        "supportBundleExportJson": true,
+        "metricsSnapshotJson": true,
+        "gaReadinessJson": true,
+        "qualificationRunJson": true,
+        "backupCreateJson": true,
+        "backupVerifyJson": true,
+        "restoreVerifyJson": true,
+        "migratePlanJson": true,
+        "migrateApplyDryRunJson": true
+      },
+      "artifactSchema": {
+        "auditEnvelope": "3",
+        "events": "3",
+        "gaReadinessReport": "1",
+        "securityPosture": "1"
+      }
+    },
+    "doctor": {
+      "runtime": "browser-preview",
+      "profile": "balanced",
+      "status": "ok",
+      "note": "Mock bridge data is active because the Tauri runtime is not attached."
+    }
+  },
+  "submitTeamRun": {
+    "contractVersion": "2.0",
+    "jobId": "job-ui-preview-1",
+    "profile": "balanced",
+    "rootDir": ".binliquid/team/jobs",
+    "processId": 4242
+  },
+  "approvalPending": {
+    "contract_version": "2.0",
+    "pending": [
+      {
+        "version": 1,
+        "approval_id": "apr_20260308_device_action",
+        "run_id": "run_20260308_0910",
+        "status": "pending",
+        "target_kind": "device_action",
+        "target_ref": "queue-row-17",
+        "action_hash": "action-hash-preview",
+        "policy_hash": "policy-hash-preview",
+        "request_hash": "request-hash-preview",
+        "snapshot_hash": "snapshot-hash-preview",
+        "snapshot": {
+          "kind": "device_action",
+          "target_kind": "device_action",
+          "target_ref": "queue-row-17",
+          "action_hash": "action-hash-preview",
+          "policy_hash": "policy-hash-preview",
+          "action_id": "inspect_element",
+          "category": "read_only",
+          "risk_class": "low",
+          "window_or_tab_identity": "tab-17",
+          "window_identity": "tab-17",
+          "app_identity": "browser:safari",
+          "selector_source": "dom",
+          "selector_context": {
+            "selector": "[data-row-id='17']",
+            "selector_source": "dom",
+            "selector_trace": ["queue-table", "queue-row-17"]
+          },
+          "perception_fingerprint": "perception-fingerprint-preview",
+          "action_plan": {
+            "expected_effect": "Inspect the selected queue row.",
+            "dry_run_preview": "Inspect allowlisted page state without mutating the surface."
+          },
+          "execution_contract": {
+            "action_hash": "action-hash-preview",
+            "window_identity": "tab-17",
+            "app_identity": "browser:safari",
+            "selector_context": {
+              "selector": "[data-row-id='17']",
+              "selector_source": "dom",
+              "selector_trace": ["queue-table", "queue-row-17"]
+            },
+            "perception_fingerprint": "perception-fingerprint-preview",
+            "policy_hash": "policy-hash-preview"
+          }
+        },
+        "expires_at": "2026-03-08T10:31:00Z",
+        "actor": "router:policy",
+        "decision_reason": "POLICY_REQUIRE_APPROVAL",
+        "execution_status": "not_executed",
+        "executed_at": null,
+        "execution_error_code": null,
+        "execution_contract_hash": "execution-contract-preview",
+        "resume_token_ref": null,
+        "resume_claimed_job_id": null,
+        "resume_claimed_at": null,
+        "consumed_by_job_id": null,
+        "consumed_at": null,
+        "idempotency_key": "device_action:run_20260308_0910:snapshot-hash-preview",
+        "created_at": "2026-03-08T09:31:00Z",
+        "decided_at": null
+      }
+    ]
+  },
+  "approvalDetail": {
+    "contract_version": "2.0",
+    "approval_id": "apr_20260308_device_action",
+    "status": "pending",
+    "execution_status": "not_executed",
+    "ticket": {
+      "version": 1,
+      "approval_id": "apr_20260308_device_action",
+      "run_id": "run_20260308_0910",
+      "status": "pending",
+      "target_kind": "device_action",
+      "target_ref": "queue-row-17",
+      "action_hash": "action-hash-preview",
+      "policy_hash": "policy-hash-preview",
+      "request_hash": "request-hash-preview",
+      "snapshot_hash": "snapshot-hash-preview",
+      "snapshot": {
+        "kind": "device_action",
+        "target_kind": "device_action",
+        "target_ref": "queue-row-17",
+        "action_hash": "action-hash-preview",
+        "policy_hash": "policy-hash-preview",
+        "action_id": "inspect_element",
+        "category": "read_only",
+        "risk_class": "low",
+        "window_or_tab_identity": "tab-17",
+        "window_identity": "tab-17",
+        "app_identity": "browser:safari",
+        "selector_source": "dom",
+        "selector_context": {
+          "selector": "[data-row-id='17']",
+          "selector_source": "dom",
+          "selector_trace": ["queue-table", "queue-row-17"]
+        },
+        "perception_fingerprint": "perception-fingerprint-preview",
+        "action_plan": {
+          "expected_effect": "Inspect the selected queue row.",
+          "dry_run_preview": "Inspect allowlisted page state without mutating the surface."
+        },
+        "execution_contract": {
+          "action_hash": "action-hash-preview",
+          "window_identity": "tab-17",
+          "app_identity": "browser:safari",
+          "selector_context": {
+            "selector": "[data-row-id='17']",
+            "selector_source": "dom",
+            "selector_trace": ["queue-table", "queue-row-17"]
+          },
+          "perception_fingerprint": "perception-fingerprint-preview",
+          "policy_hash": "policy-hash-preview"
+        }
+      },
+      "expires_at": "2026-03-08T10:31:00Z",
+      "actor": "router:policy",
+      "decision_reason": "POLICY_REQUIRE_APPROVAL",
+      "execution_status": "not_executed",
+      "executed_at": null,
+      "execution_error_code": null,
+      "execution_contract_hash": "execution-contract-preview",
+      "resume_token_ref": null,
+      "resume_claimed_job_id": null,
+      "resume_claimed_at": null,
+      "consumed_by_job_id": null,
+      "consumed_at": null,
+      "idempotency_key": "device_action:run_20260308_0910:snapshot-hash-preview",
+      "created_at": "2026-03-08T09:31:00Z",
+      "decided_at": null
+    }
+  },
+  "runSummary": {
+    "contract_version": "2.0",
+    "status": "ok",
+    "root_dir": ".binliquid/team/jobs",
+    "count": 3,
+    "items": [
+      {
+        "job_id": "run_20260308_0910",
+        "case_id": "case-preview",
+        "team_id": "aegis-team",
+        "status": "running",
+        "request": "Inspect operator queue health",
+        "created_at": "2026-03-08T09:10:00Z",
+        "finished_at": "",
+        "audit_envelope_path": ".binliquid/team/jobs/run_20260308_0910/audit_envelope.json",
+        "job_dir": ".binliquid/team/jobs/run_20260308_0910"
+      },
+      {
+        "job_id": "run_20260308_0838",
+        "case_id": "case-preview",
+        "team_id": "aegis-team",
+        "status": "blocked",
+        "request": "Resume a privileged replay path",
+        "created_at": "2026-03-08T08:38:00Z",
+        "finished_at": "",
+        "audit_envelope_path": ".binliquid/team/jobs/run_20260308_0838/audit_envelope.json",
+        "job_dir": ".binliquid/team/jobs/run_20260308_0838"
+      },
+      {
+        "job_id": "run_20260307_2214",
+        "case_id": "case-preview",
+        "team_id": "aegis-team",
+        "status": "completed",
+        "request": "Export previous audit envelope",
+        "created_at": "2026-03-07T22:14:00Z",
+        "finished_at": "2026-03-07T22:26:00Z",
+        "audit_envelope_path": ".binliquid/team/jobs/run_20260307_2214/audit_envelope.json",
+        "job_dir": ".binliquid/team/jobs/run_20260307_2214"
+      }
+    ],
+    "errors": []
+  },
+  "runDetail": {
+    "contract_version": "2.0",
+    "job": {
+      "job_id": "run_20260308_0910",
+      "case_id": "case-preview",
+      "team_id": "aegis-team",
+      "request": "Inspect operator queue health",
+      "status": "running",
+      "created_at": "2026-03-08T09:10:00Z",
+      "finished_at": null,
+      "final_output": null,
+      "metrics": {
+        "router_reason_code": "RULE_ROUTE"
+      }
+    },
+    "tasks": [
+      {
+        "task_id": "task-02",
+        "task_run_id": "taskrun-preview-02",
+        "assigned_agent_id": "agent-intake",
+        "role": "Intake Agent",
+        "status": "running",
+        "approval_state": "pending",
+        "input_payload": {
+          "request": "Inspect operator queue health"
+        },
+        "result_payload": {
+          "trace_id": "trace-preview-02"
+        },
+        "started_at": "2026-03-08T09:10:15Z",
+        "finished_at": null
+      }
+    ],
+    "audit_envelope_path": ".binliquid/team/jobs/run_20260308_0910/audit_envelope.json",
+    "job_dir": ".binliquid/team/jobs/run_20260308_0910",
+    "resume_outcomes": [],
+    "continuation": {}
+  },
+  "runReplay": {
+    "contract_version": "2.0",
+    "job_id": "run_20260308_0910",
+    "status": "running",
+    "team_id": "aegis-team",
+    "case_id": "case-preview",
+    "final_output": null,
+    "event_count": 4,
+    "task_event_count": 2,
+    "handoff_event_count": 0,
+    "approval_event_count": 1,
+    "decision_count": 4,
+    "integrity": {
+      "hash": "audit-hash-preview",
+      "hash_algorithm": "sha256",
+      "signature_mode": "unsigned"
+    },
+    "trace_refs": ["trace-preview-02"],
+    "approvals": [
+      {
+        "event": "approval_requested",
+        "approval_id": "apr_20260308_device_action",
+        "timestamp": "2026-03-08T09:11:05Z"
+      }
+    ],
+    "tasks": [
+      {
+        "task_id": "task-02",
+        "task_run_id": "taskrun-preview-02",
+        "status": "running"
+      }
+    ],
+    "handoffs": [],
+    "verified": true,
+    "errors": [],
+    "checks": {
+      "event_count": 4,
+      "task_count": 1,
+      "handoff_count": 0
+    },
+    "consistency": {
+      "duplicate_event_seq_count": 0,
+      "non_contiguous_event_seq_count": 0,
+      "missing_causal_ref_count": 0,
+      "missing_terminal_task_count": 0,
+      "payload_hash_mismatch_count": 0,
+      "memory_version_conflict_count": 0,
+      "resume_token_count": 0,
+      "resume_frontier_count": 0,
+      "resume_root_restart_count": 0,
+      "approval_carry_forward_count": 0,
+      "resume_lineage_mismatch_count": 0,
+      "invalid_frontier_count": 0
+    }
+  },
+  "readArtifact": {
+    "status": {
+      "contract_version": "2.0",
+      "job": {
+        "job_id": "run_20260308_0910",
+        "case_id": "case-preview",
+        "team_id": "aegis-team",
+        "request": "Inspect operator queue health",
+        "status": "running",
+        "created_at": "2026-03-08T09:10:00Z",
+        "finished_at": null,
+        "final_output": null,
+        "metrics": {
+          "router_reason_code": "RULE_ROUTE"
+        }
+      },
+      "tasks": [
+        {
+          "task_id": "task-02",
+          "task_run_id": "taskrun-preview-02",
+          "assigned_agent_id": "agent-intake",
+          "role": "Intake Agent",
+          "status": "running",
+          "approval_state": "pending",
+          "input_payload": {
+            "request": "Inspect operator queue health"
+          },
+          "result_payload": {
+            "trace_id": "trace-preview-02"
+          },
+          "started_at": "2026-03-08T09:10:15Z",
+          "finished_at": null
+        }
+      ],
+      "audit_envelope_path": ".binliquid/team/jobs/run_20260308_0910/audit_envelope.json",
+      "job_dir": ".binliquid/team/jobs/run_20260308_0910",
+      "resume_outcomes": [],
+      "continuation": {}
+    },
+    "tasks": {
+      "contract_version": "2.0",
+      "generated_at": "2026-03-08T09:35:00Z",
+      "tasks": [
+        {
+          "task_id": "task-01",
+          "task_run_id": "taskrun-preview-01",
+          "assigned_agent_id": "agent-intake",
+          "role": "Intake Agent",
+          "status": "completed",
+          "approval_state": "none",
+          "input_payload": {
+            "request": "Inspect operator queue health"
+          },
+          "result_payload": {
+            "trace_id": "trace-preview-01"
+          },
+          "started_at": "2026-03-08T09:10:05Z",
+          "finished_at": "2026-03-08T09:10:10Z"
+        }
+      ]
+    },
+    "handoffs": {
+      "contract_version": "2.0",
+      "generated_at": "2026-03-08T09:35:00Z",
+      "handoffs": []
+    },
+    "auditEnvelope": {
+      "contract_version": "2.0",
+      "envelope_version": "3",
+      "event_schema_version": "3",
+      "handoff_schema_version": "3",
+      "job_id": "run_20260308_0910",
+      "case_id": "case-preview",
+      "team_id": "aegis-team",
+      "policy_bundle_id": "preview-policy",
+      "policy_bundle_hash": "policy-hash-preview",
+      "runtime_config_hash": "runtime-config-hash-preview",
+      "started_at": "2026-03-08T09:10:00Z",
+      "finished_at": "2026-03-08T09:35:00Z",
+      "event_count": 4,
+      "trace_refs": ["trace-preview-02"],
+      "consistency": {
+        "verified": true,
+        "errors": []
+      },
+      "decision_chain": [],
+      "approvals": [],
+      "tool_calls": [],
+      "handoffs": [],
+      "redaction_report": {
+        "handoff_redacted_count": 0,
+        "task_count": 1
+      },
+      "integrity": {
+        "hash": "audit-hash-preview",
+        "hash_algorithm": "sha256",
+        "signature_mode": "unsigned"
+      }
+    }
+  },
+  "tailEvents": {
+    "contractVersion": "2.0",
+    "events": [
+      {
+        "schema_version": "3",
+        "event": "team_start",
+        "event_id": "evt-preview-1",
+        "event_seq": 1,
+        "timestamp": "2026-03-08T09:10:00Z",
+        "team_id": "aegis-team",
+        "case_id": "case-preview",
+        "job_id": "run_20260308_0910",
+        "phase": "team",
+        "status_before": "pending",
+        "status_after": "running",
+        "data": {
+          "request": "Inspect operator queue health"
+        }
+      },
+      {
+        "schema_version": "3",
+        "event": "task_started",
+        "event_id": "evt-preview-2",
+        "event_seq": 2,
+        "timestamp": "2026-03-08T09:10:15Z",
+        "team_id": "aegis-team",
+        "case_id": "case-preview",
+        "job_id": "run_20260308_0910",
+        "task_id": "task-02",
+        "task_run_id": "taskrun-preview-02",
+        "phase": "task",
+        "status_before": "pending",
+        "status_after": "running",
+        "data": {}
+      },
+      {
+        "schema_version": "3",
+        "event": "approval_requested",
+        "event_id": "evt-preview-3",
+        "event_seq": 3,
+        "timestamp": "2026-03-08T09:11:05Z",
+        "team_id": "aegis-team",
+        "case_id": "case-preview",
+        "job_id": "run_20260308_0910",
+        "task_id": "task-02",
+        "task_run_id": "taskrun-preview-02",
+        "phase": "approval",
+        "status_before": "running",
+        "status_after": "blocked",
+        "approval_id": "apr_20260308_device_action",
+        "data": {
+          "approval_id": "apr_20260308_device_action",
+          "status": "pending",
+          "target": "device_action"
+        }
+      },
+      {
+        "schema_version": "3",
+        "event": "team.resume.snapshot_drift",
+        "event_id": "evt-preview-4",
+        "event_seq": 4,
+        "timestamp": "2026-03-08T09:13:09Z",
+        "team_id": "aegis-team",
+        "case_id": "case-preview",
+        "job_id": "run_20260308_0910",
+        "phase": "team",
+        "status_before": "blocked",
+        "status_after": "blocked",
+        "data": {
+          "reason_code": "STALE_APPROVAL_SNAPSHOT"
+        }
+      }
+    ],
+    "nextCursor": 1872,
+    "reset": false,
+    "truncated": false,
+    "badLineCount": 0
+  },
+  "configResolve": {
+    "contract_version": "2.0",
+    "profile": "balanced",
+    "status": "ok",
+    "resolved": {
+      "profile_name": "balanced",
+      "llm_provider": "auto",
+      "fallback_provider": "transformers",
+      "model_name": "qwen3.5:4b",
+      "hf_model_id": "Qwen/Qwen3.5-4B-Instruct",
+      "team": {
+        "artifact_dir": ".binliquid/team/jobs"
+      }
+    },
+    "source_map": {
+      "llm_provider": "profile",
+      "model_name": "profile",
+      "hf_model_id": "profile",
+      "team_artifact_dir": "env"
+    }
+  },
+  "operations": {
+    "identity": {
+      "contract_version": "2.0",
+      "identity_enabled": true,
+      "verified": true,
+      "actor": {
+        "actor_id": "ops-preview",
+        "subject": "ops-preview@example.internal",
+        "issuer": "idp.preview.internal",
+        "roles": ["platform_admin"],
+        "permissions": ["runtime.run", "runtime.resume", "support.export"],
+        "auth_mode": "external_assertion",
+        "assertion_path": ".binliquid/identity/current_assertion.json",
+        "key_id": "enterprise-signing-current",
+        "expires_at": "2026-03-08T10:35:00Z",
+        "is_break_glass": false
+      }
+    },
+    "permissionCheck": {
+      "contract_version": "2.0",
+      "permission": "runtime.run",
+      "allowed": true,
+      "actor": {
+        "actor_id": "ops-preview",
+        "roles": ["platform_admin"]
+      },
+      "error_code": null,
+      "error": null
+    },
+    "security": {
+      "contract_version": "2.0",
+      "profile": "enterprise",
+      "overall_status": "pass",
+      "checks": {
+        "identity_enabled": {
+          "status": "pass",
+          "detail": "verified identity must gate mutating operations"
+        },
+        "governance_fail_closed": {
+          "status": "pass",
+          "detail": "governance must be enabled and fail-closed"
+        }
+      },
+      "errors": [],
+      "warnings": [],
+      "roots": {
+        "memory_db": "/tmp/preview-memory.sqlite3",
+        "approval_store": "/tmp/preview-approvals.sqlite3",
+        "checkpoint_store": "/tmp/preview-checkpoints.sqlite3",
+        "audit_dir": "/tmp/preview-audit",
+        "team_artifacts": "/tmp/preview-jobs",
+        "backup_dir": "/tmp/preview-backups"
+      },
+      "key_status": {
+        "provider": "local_file"
+      },
+      "misconfiguration_risks": [
+        "identity disabled under enterprise profile"
+      ]
+    },
+    "keys": {
+      "contract_version": "2.0",
+      "provider": "local_file",
+      "current_key_id": "enterprise-signing-current",
+      "private_key_path": "/tmp/preview/current_key.json",
+      "private_key_present": true,
+      "trusted_keys_dir": "/tmp/preview/trusted",
+      "trusted_key_count": 1,
+      "trusted_keys": ["enterprise-signing-current"],
+      "key_manifest_path": "/tmp/preview/manifest.json",
+      "key_manifest_present": true,
+      "compat_env_hmac_enabled": false,
+      "enterprise_compatible": true,
+      "pkcs11_status": "n/a"
+    },
+    "support": {
+      "contract_version": "2.0",
+      "bundle_dir": "./support/support-20260308093500",
+      "archive_path": "./support/aegisos-support.zip",
+      "manifest_path": "./support/support-20260308093500/support_bundle_manifest.json",
+      "file_count": 4
+    },
+    "metrics": {
+      "contract_version": "2.0",
+      "generated_at": "2026-03-08T09:35:00Z",
+      "profile": "enterprise",
+      "job_counts": {
+        "completed": 3,
+        "failed": 0,
+        "blocked": 1,
+        "running": 1,
+        "pending": 0
+      },
+      "approval_queue": {
+        "pending": 1,
+        "oldest_pending_age_s": 240
+      }
+    },
+    "gaReadiness": {
+      "contract_version": "2.0",
+      "generated_at": "2026-03-08T09:35:00Z",
+      "profile": "enterprise",
+      "overall_status": "yellow",
+      "sections": {
+        "security_baseline": "green",
+        "qualification_evidence": "yellow"
+      },
+      "blocking_findings": [],
+      "pending_evidence": ["qualification soak incomplete"],
+      "residual_risks": ["computer use pilot remains scaffold only"],
+      "go_no_go": "conditional"
+    },
+    "qualification": {
+      "contract_version": "2.0",
+      "version": "1",
+      "generated_at": "2026-03-08T09:35:00Z",
+      "profile": "enterprise",
+      "qualification_status": "conditional",
+      "recommended_status": "yellow",
+      "go_no_go": "conditional",
+      "blocking_findings": [],
+      "operational_findings": ["subset qualification requires merge evidence"],
+      "artifacts": {
+        "run_root": "artifacts/qualification/qualification-20260308093500"
+      }
+    },
+    "backupCreate": {
+      "contract_version": "2.0",
+      "generated_at": "2026-03-08T09:35:00Z",
+      "profile": "enterprise",
+      "backup_dir": "./backups/backup-preview",
+      "items": [],
+      "verified": true,
+      "verification": {
+        "backup_dir": "./backups/backup-preview",
+        "verified": true,
+        "checks": {},
+        "errors": []
+      },
+      "manifest_path": "./backups/backup-preview/manifest.json"
+    },
+    "backupVerify": {
+      "contract_version": "2.0",
+      "backup_dir": "./backups/backup-preview",
+      "verified": true,
+      "checks": {},
+      "errors": []
+    },
+    "restoreVerify": {
+      "contract_version": "2.0",
+      "backup_dir": "./backups/backup-preview",
+      "verified": true,
+      "checks": {},
+      "errors": []
+    },
+    "migratePlan": {
+      "contract_version": "2.0",
+      "generated_at": "2026-03-08T09:35:00Z",
+      "profile": "enterprise",
+      "compatible_upgrade_path": "N->N+1 only",
+      "reverse_migration_supported": false,
+      "stores": {
+        "memory": {
+          "path": "/tmp/preview-memory.sqlite3",
+          "schema_version": "1",
+          "exists": true
+        }
+      },
+      "actions": ["validate profile and manifests", "enter maintenance mode"]
+    },
+    "migrateApplyDryRun": {
+      "contract_version": "2.0",
+      "generated_at": "2026-03-08T09:35:00Z",
+      "profile": "enterprise",
+      "compatible_upgrade_path": "N->N+1 only",
+      "reverse_migration_supported": false,
+      "stores": {},
+      "actions": ["validate profile and manifests"],
+      "status": "dry_run"
+    }
+  },
+  "deviceActionSnapshot": {
+    "kind": "device_action",
+    "target_kind": "device_action",
+    "target_ref": "queue-row-17",
+    "action_hash": "action-hash-preview",
+    "policy_hash": "policy-hash-preview",
+    "action_id": "inspect_element",
+    "category": "read_only",
+    "risk_class": "low",
+    "window_or_tab_identity": "tab-17",
+    "window_identity": "tab-17",
+    "app_identity": "browser:safari",
+    "selector_source": "dom",
+    "selector_context": {
+      "selector": "[data-row-id='17']",
+      "selector_source": "dom",
+      "selector_trace": ["queue-table", "queue-row-17"]
+    },
+    "perception_fingerprint": "perception-fingerprint-preview",
+    "action_plan": {
+      "expected_effect": "Inspect the selected queue row.",
+      "dry_run_preview": "Inspect allowlisted page state without mutating the surface."
+    },
+    "execution_contract": {
+      "action_hash": "action-hash-preview",
+      "window_identity": "tab-17",
+      "app_identity": "browser:safari",
+      "selector_context": {
+        "selector": "[data-row-id='17']",
+        "selector_source": "dom",
+        "selector_trace": ["queue-table", "queue-row-17"]
+      },
+      "perception_fingerprint": "perception-fingerprint-preview",
+      "policy_hash": "policy-hash-preview"
+    }
+  }
+}

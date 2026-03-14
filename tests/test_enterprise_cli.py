@@ -173,6 +173,7 @@ def test_enterprise_auth_and_security_baseline(monkeypatch, tmp_path: Path) -> N
     whoami = runner.invoke(app, ["auth", "whoami", "--profile", "enterprise", "--json"])
     assert whoami.exit_code == 0
     whoami_payload = json.loads(whoami.stdout)
+    assert whoami_payload["contract_version"] == "2.0"
     assert whoami_payload["verified"] is True
     assert whoami_payload["actor"]["actor_id"] == "alice"
 
@@ -181,11 +182,14 @@ def test_enterprise_auth_and_security_baseline(monkeypatch, tmp_path: Path) -> N
         ["auth", "check", "--profile", "enterprise", "--permission", "runtime.run", "--json"],
     )
     assert allowed.exit_code == 0
-    assert json.loads(allowed.stdout)["allowed"] is True
+    allowed_payload = json.loads(allowed.stdout)
+    assert allowed_payload["contract_version"] == "2.0"
+    assert allowed_payload["allowed"] is True
 
     baseline = runner.invoke(app, ["security", "baseline", "--profile", "enterprise", "--json"])
     assert baseline.exit_code == 0
     baseline_payload = json.loads(baseline.stdout)
+    assert baseline_payload["contract_version"] == "2.0"
     assert baseline_payload["overall_status"] == "pass"
     assert (tmp_path / "artifacts" / "security_posture.json").exists()
 
@@ -288,7 +292,9 @@ def test_enterprise_metrics_support_bundle_and_ga_report(monkeypatch, tmp_path: 
         ],
     )
     assert baseline_verify.exit_code == 0
-    assert json.loads(baseline_verify.stdout)["verified"] is True
+    baseline_verify_payload = json.loads(baseline_verify.stdout)
+    assert baseline_verify_payload["contract_version"] == "2.0"
+    assert baseline_verify_payload["verified"] is True
 
     metrics = runner.invoke(app, ["metrics", "snapshot", "--profile", "enterprise", "--json"])
     assert metrics.exit_code == 0
@@ -300,6 +306,7 @@ def test_enterprise_metrics_support_bundle_and_ga_report(monkeypatch, tmp_path: 
     )
     assert bundle.exit_code == 0
     bundle_payload = json.loads(bundle.stdout)
+    assert bundle_payload["contract_version"] == "2.0"
     assert Path(bundle_payload["archive_path"]).exists()
     bundle_verify = verify_signed_artifact(path=bundle_payload["manifest_path"])
     assert bundle_verify["verified"] is True
@@ -318,6 +325,7 @@ def test_enterprise_metrics_support_bundle_and_ga_report(monkeypatch, tmp_path: 
     )
     assert readiness.exit_code == 0
     readiness_payload = json.loads(readiness.stdout)
+    assert readiness_payload["contract_version"] == "2.0"
     assert readiness_payload["overall_status"] == "yellow"
     assert readiness_payload["go_no_go"] == "conditional"
     assert (tmp_path / "artifacts" / "GA_READINESS_REPORT.md").exists()

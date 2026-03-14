@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "contractVersion": {
+      "const": "2.0",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "jobId": {
+      "title": "Jobid",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rootDir": {
+      "title": "Rootdir",
+      "type": "string"
+    },
+    "processId": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Processid"
+    }
+  },
+  "required": [
+    "contractVersion",
+    "jobId",
+    "profile",
+    "rootDir",
+    "processId"
+  ],
+  "title": "SpawnedRunPayloadContract",
+  "type": "object"
+}
