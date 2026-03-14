@@ -18,6 +18,47 @@ from binliquid.runtime.config import RuntimeConfig
 REAL_COMPUTER_USE_ENABLED = os.getenv("AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS") == "1"
 
 
+def _real_computer_use_skip_reason() -> str | None:
+    if sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED:
+        return (
+            "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
+            "with Safari automation permissions."
+        )
+    try:
+        subprocess.run(
+            ["open", "-a", "Safari", "about:blank"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        time.sleep(0.5)
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'tell application "Safari" to do JavaScript "document.readyState" '
+                "in current tab of front window",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        message = ""
+        if isinstance(exc, subprocess.CalledProcessError):
+            message = exc.stderr.strip() or exc.stdout.strip()
+        if "Allow JavaScript from Apple Events" in message:
+            return (
+                "Safari Developer setting 'Allow JavaScript from Apple Events' must "
+                "be enabled for real computer-use acceptance tests."
+            )
+        return f"Real Safari acceptance preflight failed: {message or exc}"
+    return None
+
+
+REAL_COMPUTER_USE_SKIP_REASON = _real_computer_use_skip_reason()
+
+
 def _wait_for_event_count(
     events_path: Path,
     *,
@@ -90,11 +131,8 @@ def _start_site_server(site_dir: Path) -> tuple[ThreadingHTTPServer, threading.T
 
 
 @pytest.mark.skipif(
-    sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED,
-    reason=(
-        "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
-        "with Safari automation permissions."
-    ),
+    REAL_COMPUTER_USE_SKIP_REASON is not None,
+    reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_upload_acceptance(tmp_path: Path) -> None:
     site_dir = tmp_path / "site"
@@ -146,11 +184,8 @@ def test_real_safari_upload_acceptance(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED,
-    reason=(
-        "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
-        "with Safari automation permissions."
-    ),
+    REAL_COMPUTER_USE_SKIP_REASON is not None,
+    reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_surface_drift_acceptance(tmp_path: Path) -> None:
     site_dir = tmp_path / "surface-site"
@@ -246,11 +281,8 @@ def test_real_safari_surface_drift_acceptance(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED,
-    reason=(
-        "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
-        "with Safari automation permissions."
-    ),
+    REAL_COMPUTER_USE_SKIP_REASON is not None,
+    reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_download_acceptance(tmp_path: Path) -> None:
     site_dir = tmp_path / "download-site"
@@ -301,11 +333,8 @@ def test_real_safari_download_acceptance(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED,
-    reason=(
-        "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
-        "with Safari automation permissions."
-    ),
+    REAL_COMPUTER_USE_SKIP_REASON is not None,
+    reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_pause_resume_acceptance(tmp_path: Path) -> None:
     site_dir = tmp_path / "pause-site"
@@ -364,11 +393,8 @@ def test_real_safari_pause_resume_acceptance(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED,
-    reason=(
-        "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
-        "with Safari automation permissions."
-    ),
+    REAL_COMPUTER_USE_SKIP_REASON is not None,
+    reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_stop_acceptance(tmp_path: Path) -> None:
     site_dir = tmp_path / "stop-site"

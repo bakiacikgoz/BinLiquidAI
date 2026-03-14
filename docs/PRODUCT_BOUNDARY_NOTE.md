@@ -40,5 +40,8 @@ Computer use remains a supervised execution subsystem with:
 - bounded allowlists
 - replay and evidence
 - fail-closed defaults
+- opt-in real Safari execution that depends on local macOS automation permissions
 
 The current codebase still ships a bounded browser-first foundation. The product target is a broader desktop/browser/file runtime, but it must remain observable, interruptible, and fail-closed.
+
+Real Safari qualification is not zero-config. Local validation still requires Safari automation permissions, System Events / Accessibility access, and Safari's manual Developer setting `Allow JavaScript from Apple Events`.

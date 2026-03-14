@@ -383,6 +383,38 @@ def test_computer_use_runner_executes_a_real_runtime_slice_with_fake_adapters(
     assert "session_completed" in event_names
 
 
+def test_computer_use_runner_allows_launch_app_to_change_foreground_surface(
+    tmp_path: Path,
+) -> None:
+    root_dir = tmp_path / "jobs"
+    config = RuntimeConfig.from_profile("default")
+    desktop = _FakeDesktopAdapter()
+    desktop.set_frontmost("Notes")
+    browser = _FakeBrowserAdapter(desktop=desktop)
+    runner = ComputerUseRunner(
+        config=config,
+        root_dir=root_dir,
+        adapters=RuntimeAdapters(
+            browser=browser,
+            desktop=desktop,
+            dialog=FileDialogAdapter(allowed_roots=[tmp_path]),
+        ),
+    )
+
+    payload = runner.run(
+        prompt='launch "Safari"\nopen "https://ops.example.internal/queue"',
+        job_id="job-runtime-launch-app",
+        mode=ComputerUseMode.EXECUTE,
+    )
+
+    assert payload["job"]["status"] == "completed"
+    status_payload = json.loads(
+        (root_dir / "job-runtime-launch-app" / "status.json").read_text(encoding="utf-8")
+    )
+    assert status_payload["computer_use"]["surface_mismatch"] is None
+    assert status_payload["computer_use"]["last_verification_result"]["verified"] is True
+
+
 def test_computer_use_runner_fails_closed_on_wrong_tab_drift(tmp_path: Path) -> None:
     root_dir = tmp_path / "jobs"
     config = RuntimeConfig.from_profile("default")

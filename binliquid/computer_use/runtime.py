@@ -794,10 +794,24 @@ class ComputerUseRunner:
                     events=events,
                     actions=actions,
                 )
-                surface_verification = self._verify_surface(
-                    expected_surface=expected_surface,
-                    observed_surface=observed_surface,
-                )
+                if self._skip_pre_action_surface_verification(action=action):
+                    surface_verification = VerificationResult(
+                        verified=True,
+                        kind="expected_surface",
+                        summary=(
+                            "Skipping pre-action surface verification for a "
+                            "surface-changing desktop action."
+                        ),
+                        expected=expected_surface.model_dump(mode="json"),
+                        observed=observed_surface.model_dump(mode="json"),
+                        expected_surface=expected_surface,
+                        observed_surface=observed_surface,
+                    )
+                else:
+                    surface_verification = self._verify_surface(
+                        expected_surface=expected_surface,
+                        observed_surface=observed_surface,
+                    )
                 if not surface_verification.verified:
                     state["actions"][-1]["status"] = "surface_mismatch"
                     state["actions"][-1]["verification"] = surface_verification.model_dump(
@@ -878,7 +892,8 @@ class ComputerUseRunner:
                         ComputerUseStopReason.UNEXPECTED_MODAL
                         if perception.unexpected_modal
                         else ComputerUseStopReason.FOCUS_DRIFT
-                        if not perception.focused and action.action_id != "launch_app"
+                        if not perception.focused
+                        and action.action_id not in {"launch_app", "focus_window"}
                         else None
                     )
                 )
@@ -1350,9 +1365,12 @@ class ComputerUseRunner:
             allow_modal=False,
         )
         current_title = str(state.get("focused_window_title") or "")
-        if action.action_id != "launch_app" and current_title:
+        if action.action_id not in {"launch_app", "focus_window"} and current_title:
             expected.window_title_contains = current_title
         return expected
+
+    def _skip_pre_action_surface_verification(self, *, action: ProposedAction) -> bool:
+        return action.action_id in {"launch_app", "focus_window"}
 
     def _derive_expected_file_operation(
         self,
