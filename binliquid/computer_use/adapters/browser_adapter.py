@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from binliquid.computer_use.adapters._macos import applescript_quote, run_applescript
 from binliquid.computer_use.adapters.desktop_adapter import DesktopAdapter
@@ -281,8 +282,10 @@ class SafariBrowserAdapter(BrowserAdapter):
 """,
                 selector=action.target_descriptor.selector,
             )
-            time.sleep(0.35)
+            self._wait_for_dialog_state(open_expected=True)
             selected = self._dialog.choose_file(app_name=self._app_name, path=path)
+            self._wait_for_dialog_state(open_expected=False)
+            time.sleep(0.35)
             self._wait_for_file_input(
                 selector=action.target_descriptor.selector,
                 expected_name=Path(selected).name,
@@ -295,6 +298,12 @@ class SafariBrowserAdapter(BrowserAdapter):
             }
 
         if action.action_id == "download_file":
+            output_path = action.parameters.get("output_path")
+            if output_path and self._dialog is not None:
+                return self._download_via_dom(
+                    selector=action.target_descriptor.selector,
+                    output_path=str(output_path),
+                )
             known = {
                 item.name
                 for item in self._download_dir.glob("*")
@@ -326,7 +335,6 @@ class SafariBrowserAdapter(BrowserAdapter):
                     timeout_s=self._wait_timeout_s,
                 )
             )
-            output_path = action.parameters.get("output_path")
             if output_path and self._dialog is not None:
                 moved = self._dialog.move_file_scoped(
                     source=downloaded,
@@ -622,6 +630,58 @@ end tell
                 return
             time.sleep(0.2)
         raise TimeoutError(f"file input did not update for {selector}")
+
+    def _wait_for_dialog_state(
+        self,
+        *,
+        open_expected: bool,
+        timeout_s: float | None = None,
+    ) -> None:
+        deadline = time.time() + (timeout_s or min(self._wait_timeout_s, 5.0))
+        while time.time() < deadline:
+            if self._desktop.detect_dialog(self._app_name) is open_expected:
+                return
+            time.sleep(0.1)
+
+    def _download_via_dom(self, *, selector: str, output_path: str) -> dict[str, Any]:
+        if self._dialog is None:
+            raise RuntimeError("file dialog adapter unavailable")
+        target_path = self._dialog.ensure_scoped_path(output_path)
+        payload = json.loads(
+            self._eval_js(
+                """
+(() => {
+  const el = document.querySelector(SELECTOR);
+  if (!el) throw new Error("selector_not_found");
+  const href = el.href || el.getAttribute("href") || "";
+  if (!href) throw new Error("download_href_missing");
+  const suggestedName = el.getAttribute("download") || href.split("/").pop() || "download";
+  return JSON.stringify({
+    href,
+    fileName: suggestedName
+  });
+})()
+""",
+                selector=selector,
+            )
+        )
+        request = Request(
+            str(payload.get("href") or ""),
+            headers={"User-Agent": "AegisOS/real-acceptance"},
+        )
+        with urlopen(request, timeout=self._wait_timeout_s) as response:
+            content = response.read()
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_bytes(content)
+        return {
+            "status": "executed",
+            "download_path": str(target_path),
+            "download_triggered": True,
+            "dialog_interacted": False,
+            "download_source_url": str(payload.get("href") or ""),
+            "download_size_bytes": len(content),
+            "download_mode": "direct_request",
+        }
 
     def _safe_page_state(self, *, selector: str) -> dict[str, Any]:
         try:

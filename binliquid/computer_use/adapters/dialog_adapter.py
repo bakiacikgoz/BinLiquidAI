@@ -44,12 +44,15 @@ class FileDialogAdapter:
         script = f"""
 tell application "System Events"
   tell process {quoted_app}
+    delay 0.4
     keystroke "G" using {{command down, shift down}}
-    delay 0.2
+    delay 0.4
     keystroke {quoted_path}
+    delay 0.2
     key code 36
-    delay 0.25
+    delay 0.5
     key code 36
+    delay 0.3
   end tell
 end tell
 """

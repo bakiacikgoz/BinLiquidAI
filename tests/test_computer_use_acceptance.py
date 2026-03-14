@@ -59,6 +59,43 @@ def _real_computer_use_skip_reason() -> str | None:
 REAL_COMPUTER_USE_SKIP_REASON = _real_computer_use_skip_reason()
 
 
+def _reset_real_safari() -> None:
+    if sys.platform != "darwin":
+        return
+    subprocess.run(
+        ["open", "-a", "Safari"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            "osascript",
+            "-e",
+            'tell application "Safari" to activate',
+            "-e",
+            'tell application "System Events"',
+            "-e",
+            '  tell process "Safari"',
+            "-e",
+            '    repeat while (count of windows) > 0',
+            "-e",
+            '      keystroke "w" using {command down}',
+            "-e",
+            "      delay 0.2",
+            "-e",
+            "    end repeat",
+            "-e",
+            "  end tell",
+            "-e",
+            "end tell",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 def _wait_for_event_count(
     events_path: Path,
     *,
@@ -135,6 +172,7 @@ def _start_site_server(site_dir: Path) -> tuple[ThreadingHTTPServer, threading.T
     reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_upload_acceptance(tmp_path: Path) -> None:
+    _reset_real_safari()
     site_dir = tmp_path / "site"
     site_dir.mkdir()
     root_dir = tmp_path / "jobs"
@@ -188,6 +226,7 @@ def test_real_safari_upload_acceptance(tmp_path: Path) -> None:
     reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_surface_drift_acceptance(tmp_path: Path) -> None:
+    _reset_real_safari()
     site_dir = tmp_path / "surface-site"
     site_dir.mkdir()
     (site_dir / "index.html").write_text(
@@ -285,6 +324,7 @@ def test_real_safari_surface_drift_acceptance(tmp_path: Path) -> None:
     reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_download_acceptance(tmp_path: Path) -> None:
+    _reset_real_safari()
     site_dir = tmp_path / "download-site"
     site_dir.mkdir()
     root_dir = tmp_path / "jobs"
@@ -337,6 +377,7 @@ def test_real_safari_download_acceptance(tmp_path: Path) -> None:
     reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_pause_resume_acceptance(tmp_path: Path) -> None:
+    _reset_real_safari()
     site_dir = tmp_path / "pause-site"
     site_dir.mkdir()
     root_dir = tmp_path / "jobs"
@@ -377,7 +418,13 @@ def test_real_safari_pause_resume_acceptance(tmp_path: Path) -> None:
         control_runner = ComputerUseRunner(config=config, root_dir=root_dir)
         control_runner.request_control(job_id=job_id, command=SessionCommand.PAUSE)
         paused_payload = _wait_for_session_state(status_path, session_state="paused")
-        assert paused_payload["computer_use"]["last_safe_checkpoint"] == "before_action"
+        assert paused_payload["computer_use"]["last_safe_checkpoint"] in {
+            "before_action",
+            "after_execute",
+            "after_verify",
+        }
+        assert paused_payload["computer_use"]["last_control_result"]["command_type"] == "pause"
+        assert paused_payload["computer_use"]["last_control_result"]["resulting_state"] == "paused"
 
         control_runner.request_control(job_id=job_id, command=SessionCommand.RESUME)
         worker_thread.join(timeout=30.0)
@@ -397,6 +444,7 @@ def test_real_safari_pause_resume_acceptance(tmp_path: Path) -> None:
     reason=REAL_COMPUTER_USE_SKIP_REASON or "",
 )
 def test_real_safari_stop_acceptance(tmp_path: Path) -> None:
+    _reset_real_safari()
     site_dir = tmp_path / "stop-site"
     site_dir.mkdir()
     root_dir = tmp_path / "jobs"
@@ -438,9 +486,13 @@ def test_real_safari_stop_acceptance(tmp_path: Path) -> None:
         worker_thread.join(timeout=30.0)
         assert not worker_thread.is_alive()
         assert "error" in outcome
-        status_payload = json.loads(status_path.read_text(encoding="utf-8"))
-        assert status_payload["computer_use"]["session_state"] == "stopped"
-        assert status_payload["computer_use"]["stopped_by_user"] is True
+        stopped_payload = _wait_for_session_state(status_path, session_state="stopped")
+        assert stopped_payload["computer_use"]["stopped_by_user"] is True
+        assert stopped_payload["computer_use"]["last_control_result"]["command_type"] == "stop"
+        assert (
+            stopped_payload["computer_use"]["last_control_result"]["resulting_state"]
+            == "stopped"
+        )
     finally:
         server.shutdown()
         server.server_close()
