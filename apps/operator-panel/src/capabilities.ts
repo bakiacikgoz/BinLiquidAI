@@ -1,10 +1,19 @@
 const REQUIRED_COMMAND_KEYS = [
+  'computerUseSubmit',
+  'computerUsePause',
+  'computerUseResume',
+  'computerUseStop',
+  'computerUseStateJson',
+  'teamSubmit',
+  'teamResumeSubmit',
   'teamListJson',
+  'teamStatusJson',
   'teamReplayJson',
   'approvalShowJson',
   'approvalPendingJson',
   'approvalDecide',
   'approvalExecute',
+  'configResolveJson',
 ] as const;
 
 function asRecord(value: unknown): Record<string, unknown> {

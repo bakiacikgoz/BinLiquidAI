@@ -1,20 +1,43 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   type BridgeErrorPayload,
   BridgeError,
+  checkPermission,
+  createBackup,
   decideApproval,
+  dryRunMigration,
   executeApproval,
   exportRunArtifacts,
+  exportSupportBundle,
   fetchApprovals,
+  getComputerUseSessionState,
+  fetchGaReadiness,
+  fetchIdentity,
+  fetchKeysStatus,
+  fetchSecurityBaseline,
   getRunReplay,
   getRunStatus,
   handshake,
   isBridgePreviewMode,
   listRuns,
+  pauseComputerUseSession,
+  planMigration,
   readArtifact,
-  showApproval,
+  resolveConfig,
+  resumeComputerUseSession,
+  resumeTeamRun,
+  rotateKeyPlan,
+  runQualification,
+  snapshotMetrics,
+  stopComputerUseSession,
+  submitComputerUseRun,
+  submitTeamRun,
   tailEvents,
+  verifyBackup,
+  verifyRestore,
+  verifySignedArtifact,
+  showApproval,
 } from './bridge';
 import { hasContractMismatch } from './capabilities';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -28,9 +51,19 @@ import {
   resolveLocale,
   saveSettings,
 } from './settings';
+import {
+  buildWorkspaceSnapshot,
+  listAttachmentLabels,
+  readWorkspaceProgress,
+  selectRecentRuns,
+  type WorkspaceStageKey,
+  type WorkspaceRuntimeStateKey,
+} from './workspace';
 
-type ViewKey = 'dashboard' | 'approvals' | 'runs' | 'diagnostics' | 'settings';
-type RunTabKey = 'overview' | 'timeline' | 'artifacts' | 'replay';
+type ViewKey = 'workspace' | 'tasks' | 'approvals' | 'runs' | 'system' | 'operations' | 'settings';
+type RunTabKey = 'overview' | 'stream' | 'approvals' | 'artifacts' | 'replay' | 'diagnostics';
+type OperationTabKey = 'identity' | 'qualification' | 'security' | 'keys' | 'support' | 'maintenance';
+type AutomationMode = 'assisted' | 'supervised';
 
 type Toast = {
   id: number;
@@ -43,33 +76,38 @@ type AppContentProps = {
   updateSettings: (next: Partial<PanelSettings>) => void;
 };
 
+type TaskFormState = {
+  request: string;
+  specPath: string;
+  caseId: string;
+  jobId: string;
+  provider: string;
+  fallbackProvider: string;
+  model: string;
+  hfModelId: string;
+};
+
+type OperationsFormState = {
+  permission: string;
+  verifyPath: string;
+  supportOutput: string;
+  backupOutputDir: string;
+  backupVerifyDir: string;
+  restoreVerifyDir: string;
+  readinessReport: string;
+  readinessQualificationReport: string;
+  qualificationMode: string;
+  qualificationOutputRoot: string;
+  qualificationWorkloads: string;
+  qualificationMergeFromReport: string;
+  qualificationSoakHours: string;
+  keyNextKeyId: string;
+  keyActivateAt: string;
+  keyRetireAfter: string;
+};
+
 const ARTIFACT_NAMES = ['status.json', 'tasks.json', 'handoffs.json', 'audit_envelope.json'] as const;
 const THEME_MODES = ['light', 'dark', 'system'] as const;
-
-function SunIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="3.6" />
-      <path d="M12 2.75v2.1M12 19.15v2.1M21.25 12h-2.1M4.85 12H2.75M18.54 5.46l-1.48 1.48M6.94 17.06l-1.48 1.48M18.54 18.54l-1.48-1.48M6.94 6.94L5.46 5.46" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M14.5 3.25a8.75 8.75 0 1 0 6.25 15.2A9.5 9.5 0 0 1 14.5 3.25Z" />
-    </svg>
-  );
-}
-
-function MenuIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M4 7h16M4 12h16M4 17h16" />
-    </svg>
-  );
-}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
@@ -85,6 +123,23 @@ function readArray(source: Record<string, unknown>, key: string): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function readBool(source: Record<string, unknown>, key: string): boolean {
+  return source[key] === true;
+}
+
+function humanizeCode(value: string): string {
+  return value
+    .replaceAll('.', ' ')
+    .replaceAll('_', ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function extractJobId(payload: unknown): string {
+  const record = asRecord(payload);
+  return readString(record, 'jobId') || readString(record, 'job_id');
+}
+
 function getErrorPayload(error: unknown): BridgeErrorPayload | null {
   if (error instanceof BridgeError) {
     return error.payload;
@@ -92,34 +147,100 @@ function getErrorPayload(error: unknown): BridgeErrorPayload | null {
   return null;
 }
 
+function JsonPanel({ value }: { value: unknown }) {
+  return <pre className="json-panel">{JSON.stringify(value ?? {}, null, 2)}</pre>;
+}
+
+function mergeRunStatusWithSessionState(runStatusPayload: unknown, sessionStatePayload: unknown): unknown {
+  const runRecord = asRecord(runStatusPayload);
+  const sessionRecord = asRecord(sessionStatePayload);
+  const next: Record<string, unknown> = { ...runRecord };
+  const sessionJob = asRecord(sessionRecord.job);
+  const sessionComputerUse = asRecord(sessionRecord.computer_use);
+
+  if (Object.keys(sessionJob).length > 0) {
+    next.job = { ...asRecord(runRecord.job), ...sessionJob };
+  }
+  if (Object.keys(sessionComputerUse).length > 0) {
+    next.computer_use = { ...asRecord(runRecord.computer_use), ...sessionComputerUse };
+  }
+
+  return next;
+}
+
 function AppContent({ settings, updateSettings }: AppContentProps) {
   const { resolvedTheme } = useTheme();
   const previewMode = isBridgePreviewMode();
 
-  const [activeView, setActiveView] = useState<ViewKey>('dashboard');
+  const [activeView, setActiveView] = useState<ViewKey>('workspace');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [runTab, setRunTab] = useState<RunTabKey>('overview');
+  const [operationTab, setOperationTab] = useState<OperationTabKey>('identity');
+  const [automationMode, setAutomationMode] = useState<AutomationMode>('assisted');
+  const [stepMode, setStepMode] = useState(true);
+  const [askBeforeExternal, setAskBeforeExternal] = useState(true);
+  const [askBeforeDeletion, setAskBeforeDeletion] = useState(true);
+  const [askBeforeSend, setAskBeforeSend] = useState(true);
 
   const [handshakeData, setHandshakeData] = useState<unknown>(null);
+  const [configData, setConfigData] = useState<unknown>(null);
   const [handshakeError, setHandshakeError] = useState<BridgeErrorPayload | null>(null);
 
   const [approvalsData, setApprovalsData] = useState<unknown>({ pending: [] });
-  const [selectedApprovalId, setSelectedApprovalId] = useState<string>('');
+  const [selectedApprovalId, setSelectedApprovalId] = useState('');
   const [approvalDetail, setApprovalDetail] = useState<unknown>(null);
 
   const [runsData, setRunsData] = useState<unknown>({ items: [] });
-  const [selectedRunId, setSelectedRunId] = useState<string>('');
+  const [selectedRunId, setSelectedRunId] = useState('');
   const [runStatus, setRunStatus] = useState<unknown>(null);
+  const [computerUseState, setComputerUseState] = useState<unknown>(null);
   const [runReplay, setRunReplay] = useState<unknown>(null);
   const [artifactsByName, setArtifactsByName] = useState<Record<string, unknown>>({});
   const [selectedArtifactName, setSelectedArtifactName] = useState<string>('status.json');
+  const [showRawArtifact, setShowRawArtifact] = useState(false);
 
   const [events, setEvents] = useState<unknown[]>([]);
-  const [eventsCursor, setEventsCursor] = useState<number>(0);
-  const [eventsWarning, setEventsWarning] = useState<string>('');
-  const cursorRef = useRef<number>(0);
+  const [eventsCursor, setEventsCursor] = useState(0);
+  const [eventsWarning, setEventsWarning] = useState('');
+  const cursorRef = useRef(0);
 
-  const [showRawArtifact, setShowRawArtifact] = useState(false);
+  const [taskForm, setTaskForm] = useState<TaskFormState>({
+    request: '',
+    specPath: '',
+    caseId: '',
+    jobId: '',
+    provider: '',
+    fallbackProvider: '',
+    model: '',
+    hfModelId: '',
+  });
+  const [resumeForm, setResumeForm] = useState({
+    specPath: '',
+    resumeJobId: '',
+    provider: '',
+    fallbackProvider: '',
+    model: '',
+    hfModelId: '',
+  });
+  const [operationsForm, setOperationsForm] = useState<OperationsFormState>({
+    permission: 'runtime.run',
+    verifyPath: '',
+    supportOutput: '',
+    backupOutputDir: '',
+    backupVerifyDir: '',
+    restoreVerifyDir: '',
+    readinessReport: 'artifacts/ga_readiness_report.json',
+    readinessQualificationReport: 'artifacts/qualification_report.json',
+    qualificationMode: 'mixed',
+    qualificationOutputRoot: 'artifacts/qualification',
+    qualificationWorkloads: '',
+    qualificationMergeFromReport: '',
+    qualificationSoakHours: '6',
+    keyNextKeyId: '',
+    keyActivateAt: '',
+    keyRetireAfter: '',
+  });
+  const [operationOutputs, setOperationOutputs] = useState<Record<string, unknown>>({});
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const locale = resolveLocale(settings.locale);
@@ -127,14 +248,32 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
   const handshakeRecord = asRecord(handshakeData);
   const capabilities = asRecord(handshakeRecord.capabilities);
-
-  const contractMismatch = useMemo(() => hasContractMismatch(handshakeData), [handshakeData]);
-
+  const features = asRecord(capabilities.features);
+  const doctor = asRecord(handshakeRecord.doctor);
+  const supportedProfiles = readArray(capabilities, 'profiles');
+  const contractMismatch = hasContractMismatch(handshakeData);
   const operatorIdValid = isOperatorIdValid(settings.operatorId);
   const canMutate = canMutateWithOperatorId(settings.operatorId, contractMismatch);
 
   const pendingApprovals = readArray(asRecord(approvalsData), 'pending');
   const runItems = readArray(asRecord(runsData), 'items');
+  const selectedApproval = asRecord(approvalDetail);
+  const runStatusRecord = asRecord(runStatus);
+  const runJob = asRecord(runStatusRecord.job);
+  const runComputerUse = asRecord(runStatusRecord.computer_use);
+  const controlRegistry = asRecord(asRecord(computerUseState).registry);
+  const runStatusValue = readString(runJob, 'status');
+  const isComputerUseRun =
+    Object.keys(runComputerUse).length > 0 || readString(runJob, 'team_id') === 'aegis-computer-use';
+  const linkedApprovals = pendingApprovals.filter(
+    (item) => readString(asRecord(item), 'run_id') === selectedRunId,
+  );
+  const driftEvents = events.filter((item) => {
+    const name = readString(asRecord(item), 'event').toLowerCase();
+    return name.includes('snapshot_drift') || name.includes('approval_stale') || name.includes('stale_');
+  });
+  const configRecord = asRecord(configData);
+  const statusArtifact = asRecord(asRecord(artifactsByName['status.json']).payload);
 
   function pushToast(kind: Toast['kind'], text: string) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -154,10 +293,26 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
+  async function refreshConfig() {
+    try {
+      const payload = await resolveConfig(settings);
+      setConfigData(payload);
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
   async function refreshApprovals() {
     try {
       const payload = await fetchApprovals(settings);
       setApprovalsData(payload);
+      const pending = readArray(asRecord(payload), 'pending');
+      if (!selectedApprovalId && pending.length > 0) {
+        setSelectedApprovalId(readString(asRecord(pending[0]), 'approval_id'));
+      }
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
@@ -170,12 +325,20 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     try {
       const payload = await listRuns(settings);
       setRunsData(payload);
+      const items = readArray(asRecord(payload), 'items');
+      if (!selectedRunId && items.length > 0) {
+        setSelectedRunId(readString(asRecord(items[0]), 'job_id'));
+      }
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
         pushToast('error', `${parsed.code}: ${parsed.message}`);
       }
     }
+  }
+
+  async function refreshCore() {
+    await Promise.all([refreshHandshake(), refreshConfig(), refreshApprovals(), refreshRuns()]);
   }
 
   async function loadApprovalDetail(approvalId: string) {
@@ -194,31 +357,36 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
-  async function loadRunContext(runId: string) {
+  async function loadRunContext(runId: string, notifyErrors = true) {
     if (!runId) {
       return;
     }
+
     try {
-      const [status, replay] = await Promise.all([
+      const [statusPayload, replayPayload, sessionStatePayload] = await Promise.all([
         getRunStatus(settings, runId),
         getRunReplay(settings, runId),
+        getComputerUseSessionState(settings, runId).catch(() => null),
       ]);
-      setRunStatus(status);
-      setRunReplay(replay);
-
-      const artifactReads = await Promise.all(
-        ARTIFACT_NAMES.map(async (name) => {
-          const payload = await readArtifact(settings, runId, name);
-          return [name, payload] as const;
-        }),
-      );
+      setRunStatus(mergeRunStatusWithSessionState(statusPayload, sessionStatePayload));
+      setComputerUseState(sessionStatePayload);
+      setRunReplay(replayPayload);
 
       const nextArtifacts: Record<string, unknown> = {};
-      for (const [name, payload] of artifactReads) {
-        nextArtifacts[name] = payload;
-      }
+      await Promise.all(
+        ARTIFACT_NAMES.map(async (name) => {
+          try {
+            nextArtifacts[name] = await readArtifact(settings, runId, name);
+          } catch {
+            nextArtifacts[name] = { artifactName: name, payload: {} };
+          }
+        }),
+      );
       setArtifactsByName(nextArtifacts);
     } catch (error) {
+      if (!notifyErrors) {
+        return;
+      }
       const parsed = getErrorPayload(error);
       if (parsed) {
         pushToast('error', `${parsed.code}: ${parsed.message}`);
@@ -227,10 +395,14 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   }
 
   useEffect(() => {
-    void refreshHandshake();
-    void refreshApprovals();
-    void refreshRuns();
+    void refreshCore();
   }, [settings.mode, settings.cliPath, settings.bundledPythonPath, settings.profile, settings.rootDir]);
+
+  useEffect(() => {
+    if (!resumeForm.specPath && taskForm.specPath) {
+      setResumeForm((prev) => ({ ...prev, specPath: taskForm.specPath }));
+    }
+  }, [resumeForm.specPath, taskForm.specPath]);
 
   useEffect(() => {
     void loadApprovalDetail(selectedApprovalId);
@@ -240,11 +412,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     if (!selectedRunId) {
       return;
     }
-
     setEvents([]);
     setEventsCursor(0);
     cursorRef.current = 0;
     setEventsWarning('');
+    setComputerUseState(null);
     void loadRunContext(selectedRunId);
   }, [selectedRunId, settings.profile, settings.rootDir]);
 
@@ -262,12 +434,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       }
 
       try {
-        const statusPayload = await getRunStatus(settings, selectedRunId);
-        setRunStatus(statusPayload);
-
-        const statusJob = asRecord(asRecord(statusPayload).job);
-        const runStatusValue = readString(statusJob, 'status');
-        const cadence = runStatusValue === 'running' ? 1500 : runStatusValue === 'blocked' ? 3500 : 6000;
+        const [statusPayload, sessionStatePayload] = await Promise.all([
+          getRunStatus(settings, selectedRunId),
+          getComputerUseSessionState(settings, selectedRunId).catch(() => null),
+        ]);
+        setRunStatus(mergeRunStatusWithSessionState(statusPayload, sessionStatePayload));
+        setComputerUseState(sessionStatePayload);
 
         const stream = await tailEvents(settings, selectedRunId, cursorRef.current, 96 * 1024, 200);
         if (stream.reset) {
@@ -278,7 +450,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         cursorRef.current = stream.nextCursor;
         setEventsCursor(stream.nextCursor);
-
         if (stream.badLineCount > 0 || stream.truncated) {
           setEventsWarning(
             `events tail warning: badLineCount=${stream.badLineCount}, truncated=${String(stream.truncated)}`,
@@ -287,6 +458,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           setEventsWarning('');
         }
 
+        const liveStatus = readString(asRecord(asRecord(statusPayload).job), 'status');
+        const cadence = liveStatus === 'running' ? 1500 : liveStatus === 'blocked' ? 3500 : 6000;
         timer = window.setTimeout(() => {
           void poll();
         }, cadence);
@@ -311,29 +484,25 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     };
   }, [selectedRunId, settings.profile, settings.rootDir]);
 
-  async function onApprove(approve: boolean) {
-    if (!selectedApprovalId) {
-      return;
-    }
-    if (!canMutate) {
+  async function onDecideApproval(approve: boolean) {
+    if (!selectedApprovalId || !canMutate) {
       pushToast('error', t.setOperatorId);
       return;
     }
 
-    const action = approve ? t.approve : t.reject;
     const actor = actorForOperator(settings.operatorId);
-    const confirmed = window.confirm(`${action}\napproval: ${selectedApprovalId}\nactor: ${actor}`);
+    const label = approve ? t.approve : t.reject;
+    const confirmed = window.confirm(`${label}\n${selectedApprovalId}\n${actor}`);
     if (!confirmed) {
       return;
     }
 
     try {
-      await decideApproval(settings, selectedApprovalId, approve, settings.operatorId, 'operator panel action');
-      pushToast('ok', `${action} OK`);
-      await refreshApprovals();
-      await refreshRuns();
+      await decideApproval(settings, selectedApprovalId, approve, settings.operatorId, 'operator workspace action');
+      pushToast('ok', `${label} OK`);
+      await Promise.all([refreshApprovals(), refreshRuns()]);
       if (selectedRunId) {
-        await loadRunContext(selectedRunId);
+        await loadRunContext(selectedRunId, false);
       }
     } catch (error) {
       const parsed = getErrorPayload(error);
@@ -343,17 +512,14 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
-  async function onExecute() {
-    if (!selectedApprovalId) {
-      return;
-    }
-    if (!canMutate) {
+  async function onExecuteApproval() {
+    if (!selectedApprovalId || !canMutate) {
       pushToast('error', t.setOperatorId);
       return;
     }
 
     const actor = actorForOperator(settings.operatorId);
-    const confirmed = window.confirm(`${t.execute}\napproval: ${selectedApprovalId}\nactor: ${actor}`);
+    const confirmed = window.confirm(`${t.execute}\n${selectedApprovalId}\n${actor}`);
     if (!confirmed) {
       return;
     }
@@ -361,8 +527,178 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     try {
       await executeApproval(settings, selectedApprovalId, settings.operatorId);
       pushToast('ok', `${t.execute} OK`);
-      await refreshApprovals();
-      await refreshRuns();
+      await Promise.all([refreshApprovals(), refreshRuns()]);
+      if (selectedRunId) {
+        await loadRunContext(selectedRunId, false);
+      }
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
+  async function onSubmitTask() {
+    if (!taskForm.specPath.trim() || !taskForm.request.trim()) {
+      pushToast('error', t.submitValidation);
+      return;
+    }
+
+    try {
+      const payload = await submitTeamRun(settings, {
+        specPath: taskForm.specPath,
+        request: taskForm.request,
+        caseId: taskForm.caseId || undefined,
+        jobId: taskForm.jobId || undefined,
+        provider: taskForm.provider || undefined,
+        fallbackProvider: taskForm.fallbackProvider || undefined,
+        model: taskForm.model || undefined,
+        hfModelId: taskForm.hfModelId || undefined,
+      });
+      const jobId = extractJobId(payload);
+      if (jobId) {
+        setSelectedRunId(jobId);
+        setRunStatus({ job: { job_id: jobId, status: 'pending' } });
+      }
+      setActiveView('workspace');
+      pushToast('ok', `${t.submitRun} OK`);
+      void refreshRuns();
+      window.setTimeout(() => {
+        void refreshRuns();
+      }, 1200);
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
+  async function onSubmitComputerUseSession() {
+    if (!taskForm.request.trim()) {
+      pushToast('error', t.sessionValidation);
+      return;
+    }
+
+    const mode: 'dry_run' | 'step_approval' | 'execute' =
+      automationMode === 'assisted' || stepMode ? 'step_approval' : 'execute';
+
+    try {
+      const payload = await submitComputerUseRun(settings, {
+        request: taskForm.request,
+        caseId: taskForm.caseId || undefined,
+        jobId: taskForm.jobId || undefined,
+        mode,
+        provider: taskForm.provider || undefined,
+        fallbackProvider: taskForm.fallbackProvider || undefined,
+        model: taskForm.model || undefined,
+        hfModelId: taskForm.hfModelId || undefined,
+      });
+      const jobId = extractJobId(payload);
+      if (jobId) {
+        setSelectedRunId(jobId);
+        setRunStatus({
+          job: {
+            job_id: jobId,
+            request: taskForm.request,
+            status: 'running',
+            team_id: 'aegis-computer-use',
+          },
+          computer_use: {
+            mode,
+            lifecycle_state: 'running',
+            stage: 'plan',
+            paused: false,
+            stopped: false,
+          },
+        });
+      }
+      setActiveView('workspace');
+      pushToast('ok', `${t.startSession} OK`);
+      void refreshRuns();
+      window.setTimeout(() => {
+        void refreshRuns();
+        if (jobId) {
+          void loadRunContext(jobId, false);
+        }
+      }, 1200);
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
+  async function onResumeRun() {
+    if (!selectedRunId || !resumeForm.specPath.trim()) {
+      pushToast('error', t.resumeValidation);
+      return;
+    }
+
+    try {
+      const payload = await resumeTeamRun(settings, {
+        specPath: resumeForm.specPath,
+        sourceJobId: selectedRunId,
+        resumeJobId: resumeForm.resumeJobId || undefined,
+        provider: resumeForm.provider || undefined,
+        fallbackProvider: resumeForm.fallbackProvider || undefined,
+        model: resumeForm.model || undefined,
+        hfModelId: resumeForm.hfModelId || undefined,
+      });
+      const jobId = extractJobId(payload);
+      if (jobId) {
+        setSelectedRunId(jobId);
+      }
+      pushToast('ok', `${t.resumeRun} OK`);
+      void refreshRuns();
+      window.setTimeout(() => {
+        void refreshRuns();
+      }, 1200);
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
+  async function onControlSession(command: 'pause' | 'resume' | 'stop') {
+    if (!selectedRunId || !isComputerUseRun) {
+      return;
+    }
+
+    try {
+      const label = command === 'pause' ? t.pause : command === 'resume' ? t.resumeRun : t.stopNow;
+      let controlPayload: unknown;
+      if (command === 'pause') {
+        controlPayload = await pauseComputerUseSession(settings, selectedRunId);
+      } else if (command === 'resume') {
+        controlPayload = await resumeComputerUseSession(settings, selectedRunId);
+      } else {
+        const confirmed = window.confirm(`${t.stopNow}\n${selectedRunId}`);
+        if (!confirmed) {
+          return;
+        }
+        controlPayload = await stopComputerUseSession(settings, selectedRunId);
+      }
+
+      const statePayload = await getComputerUseSessionState(settings, selectedRunId).catch(() => null);
+      setComputerUseState(statePayload);
+      const controlRecord = asRecord(controlPayload);
+      const outcome = readString(controlRecord, 'outcome', 'accepted');
+      const reason = readString(controlRecord, 'reason');
+      const outcomeLabel = humanizeCode(outcome);
+      if (outcome === 'rejected') {
+        pushToast('error', `${label}: ${outcomeLabel}${reason ? ` (${humanizeCode(reason)})` : ''}`);
+      } else {
+        pushToast('ok', `${label}: ${outcomeLabel}${reason ? ` (${humanizeCode(reason)})` : ''}`);
+      }
+      window.setTimeout(() => {
+        void loadRunContext(selectedRunId, false);
+        void refreshRuns();
+      }, 500);
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
@@ -375,15 +711,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     if (!selectedRunId) {
       return;
     }
-    const defaultPath = `./exports/${selectedRunId}`;
-    const target = window.prompt('Export directory', defaultPath);
+
+    const target = window.prompt(t.exportPrompt, `./exports/${selectedRunId}`);
     if (!target) {
       return;
     }
 
     try {
       await exportRunArtifacts(settings, selectedRunId, target);
-      pushToast('ok', 'Export completed');
+      pushToast('ok', t.exportDone);
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
@@ -392,89 +728,112 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
-  const runStatusRecord = asRecord(runStatus);
-  const runJob = asRecord(runStatusRecord.job);
-  const runStatusValue = readString(runJob, 'status', '');
-
-  const topPill =
-    runStatusValue === 'running'
-      ? t.working
-      : runStatusValue === 'blocked'
-        ? t.blockedApproval
-        : runStatusValue
-          ? t.idle
-          : t.statusUnknown;
-
-  const selectedApproval = asRecord(approvalDetail);
+  async function runOperation(key: string, task: () => Promise<unknown>) {
+    try {
+      const payload = await task();
+      setOperationOutputs((prev) => ({ ...prev, [key]: payload }));
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        setOperationOutputs((prev) => ({ ...prev, [key]: parsed }));
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
 
   const selectedArtifactPayload = artifactsByName[selectedArtifactName];
   const parsedArtifact = asRecord(selectedArtifactPayload);
   const artifactValue = parsedArtifact.payload;
-
   const themeLabel = resolvedTheme === 'dark' ? t.themeDark : t.themeLight;
 
-  const pageMeta: Record<ViewKey, { eyebrow: string; title: string; description: string }> = {
-    dashboard: {
-      eyebrow: t.operationsEyebrow,
-      title: t.dashboard,
-      description: t.dashboardLead,
-    },
-    approvals: {
-      eyebrow: t.reviewEyebrow,
-      title: t.approvals,
-      description: t.approvalsLead,
-    },
-    runs: {
-      eyebrow: t.executionEyebrow,
-      title: t.runs,
-      description: t.runsLead,
-    },
-    diagnostics: {
-      eyebrow: t.integrityEyebrow,
-      title: t.diagnostics,
-      description: t.diagnosticsLead,
-    },
-    settings: {
-      eyebrow: t.preferencesEyebrow,
-      title: t.settings,
-      description: t.settingsLead,
-    },
-  };
-
-  const views: Array<{ key: ViewKey; label: string; summary: string; badge: string }> = [
+  const views: Array<{ key: ViewKey; label: string; meta: string; badge: string }> = [
+    { key: 'workspace', label: t.workspace, meta: t.workspaceMeta, badge: t.chatFirst },
+    { key: 'tasks', label: t.tasks, meta: t.tasksMeta, badge: settings.profile },
+    { key: 'approvals', label: t.approvals, meta: t.approvalsMeta, badge: String(pendingApprovals.length) },
+    { key: 'runs', label: t.runs, meta: t.runsMeta, badge: String(runItems.length) },
     {
-      key: 'dashboard',
-      label: t.dashboard,
-      summary: t.dashboardMeta,
-      badge: readString(handshakeRecord, 'coreVersion', '-'),
-    },
-    {
-      key: 'approvals',
-      label: t.approvals,
-      summary: t.approvalsMeta,
-      badge: String(pendingApprovals.length),
-    },
-    {
-      key: 'runs',
-      label: t.runs,
-      summary: t.runsMeta,
-      badge: String(runItems.length),
-    },
-    {
-      key: 'diagnostics',
-      label: t.diagnostics,
-      summary: t.diagnosticsMeta,
+      key: 'system',
+      label: t.system,
+      meta: t.systemMeta,
       badge: readString(handshakeRecord, 'contractVersion', '-'),
     },
-    {
-      key: 'settings',
-      label: t.settings,
-      summary: t.settingsMeta,
-      badge: themeLabel,
-    },
+    { key: 'operations', label: t.operations, meta: t.operationsMeta, badge: settings.profile },
+    { key: 'settings', label: t.settings, meta: t.settingsMeta, badge: themeLabel },
   ];
 
-  const activePage = pageMeta[activeView];
+  const operationOutput = operationOutputs[operationTab] ?? {};
+  const workspaceSnapshot = buildWorkspaceSnapshot({
+    runStatus,
+    sessionState: computerUseState,
+    events,
+    pendingApprovals,
+    linkedApprovals,
+    artifactsByName,
+  });
+  const workspaceProgress = readWorkspaceProgress(workspaceSnapshot);
+  const attachmentLabels = listAttachmentLabels(selectedRunId, taskForm.specPath, settings.rootDir);
+  const recentRuns = selectRecentRuns(runItems);
+  const topStatus = selectedRunId
+    ? workspaceSnapshot.currentStatus || runStatusValue || t.statusUnknown
+    : readString(doctor, 'status', t.statusUnknown);
+  const controlStateLabel =
+    workspaceSnapshot.runtimeState.rawState || readString(controlRegistry, 'state') || t.statusUnknown;
+  const canPauseSession = Boolean(selectedRunId) && isComputerUseRun && workspaceSnapshot.runtimeState.canPause;
+  const canResumeSession = Boolean(selectedRunId) && isComputerUseRun && workspaceSnapshot.runtimeState.canResume;
+  const canStopSession = Boolean(selectedRunId) && isComputerUseRun && workspaceSnapshot.runtimeState.canStop;
+
+  function workspaceStageLabel(stage: WorkspaceStageKey): string {
+    return {
+      planning: t.stagePlanning,
+      reading_screen: t.stageReadingScreen,
+      waiting_approval: t.stageWaitingApproval,
+      executing: t.stageExecuting,
+      verifying: t.stageVerifying,
+      blocked: t.stageBlocked,
+      done: t.stageDone,
+    }[stage];
+  }
+
+  function workspaceStageClass(stage: WorkspaceStageKey): string {
+    return [
+      'stage-pill',
+      stage === 'blocked'
+        ? 'stage-pill-warning'
+        : stage === 'done'
+          ? 'stage-pill-success'
+          : 'stage-pill-live',
+    ].join(' ');
+  }
+
+  function runtimeStateLabel(state: WorkspaceRuntimeStateKey): string {
+    return {
+      running: t.runtimeStateRunning,
+      awaiting_approval: t.runtimeStateAwaitingApproval,
+      paused: t.runtimeStatePaused,
+      resuming: t.runtimeStateResuming,
+      stopping: t.runtimeStateStopping,
+      stopped: t.runtimeStateStopped,
+      completed: t.runtimeStateCompleted,
+      failed: t.runtimeStateFailed,
+      recovered: t.runtimeStateRecovered,
+      non_resumable: t.runtimeStateNonResumable,
+    }[state];
+  }
+
+  function runtimeStateClass(state: WorkspaceRuntimeStateKey): string {
+    return [
+      'stage-pill',
+      ['stopped', 'failed', 'non_resumable', 'awaiting_approval', 'paused', 'stopping'].includes(state)
+        ? 'stage-pill-warning'
+        : ['completed', 'recovered'].includes(state)
+          ? 'stage-pill-success'
+          : 'stage-pill-live',
+    ].join(' ');
+  }
+
+  function boolLabel(value: boolean): string {
+    return value ? t.yes : t.no;
+  }
 
   return (
     <div className={mobileNavOpen ? 'shell shell-nav-open' : 'shell'}>
@@ -487,7 +846,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
       <aside className={mobileNavOpen ? 'sidebar sidebar-open' : 'sidebar'}>
         <div className="brand">
-          <div className="brand-chip">v0.5 beta</div>
+          <div className="brand-chip">{t.brandChip}</div>
           <div className="brand-copy">
             <h1>{t.appTitle}</h1>
             <p>{t.appSubtitle}</p>
@@ -500,16 +859,16 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             {views.map((view) => (
               <button
                 key={view.key}
+                type="button"
                 className={view.key === activeView ? 'nav-item nav-item-active' : 'nav-item'}
                 onClick={() => {
                   setActiveView(view.key);
                   setMobileNavOpen(false);
                 }}
-                type="button"
               >
                 <span className="nav-item-copy">
                   <span className="nav-item-label">{view.label}</span>
-                  <span className="nav-item-meta">{view.summary}</span>
+                  <span className="nav-item-meta">{view.meta}</span>
                 </span>
                 <span className="nav-item-badge">{view.badge}</span>
               </button>
@@ -526,93 +885,49 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <span>{t.profile}</span>
             <strong>{settings.profile}</strong>
           </div>
+          <div className="sidebar-meta">
+            <span>{t.positioning}</span>
+            <strong>{t.positioningValue}</strong>
+          </div>
         </div>
       </aside>
 
-      <main className="content">
-        <header className="topbar">
-          <div className="status-strip">
-            <button
-              type="button"
-              className="nav-toggle-btn"
-              aria-label={t.navigation}
-              title={t.navigation}
-              onClick={() => setMobileNavOpen((value) => !value)}
-            >
-              <MenuIcon />
+      <main className="main-panel">
+        <header className="workspace-topbar">
+          <div className="status-row">
+            <button type="button" className="nav-toggle-btn" onClick={() => setMobileNavOpen((value) => !value)}>
+              {t.navigation}
             </button>
             {previewMode ? <span className="pill pill-preview">{t.previewMode}</span> : null}
-            <span className="pill">{topPill}</span>
+            <span className="pill">{topStatus}</span>
+            <span className="pill pill-muted">
+              {t.mode}: {settings.mode}
+            </span>
             <span className="pill pill-muted">
               {t.live}: {eventsCursor}
             </span>
-            <span className="pill pill-muted">
-              {t.theme}: {themeLabel}
-            </span>
           </div>
-
           <div className="topbar-actions">
-            {!operatorIdValid ? (
-              <div className="warning-inline">{t.setOperatorId}</div>
-            ) : (
-              <div className="topbar-note">
-                {t.operatorId}: <strong>{settings.operatorId.trim()}</strong>
-              </div>
-            )}
+            {!operatorIdValid ? <div className="warning-inline">{t.setOperatorId}</div> : null}
             <div className="theme-quick-switch">
-              <button
-                type="button"
-                className={resolvedTheme === 'light' ? 'theme-icon-btn theme-icon-btn-active' : 'theme-icon-btn'}
-                onClick={() => updateSettings({ theme: 'light' })}
-                aria-label={t.themeLight ?? 'Light'}
-                title={t.themeLight ?? 'Light'}
-              >
-                <SunIcon />
-              </button>
-              <button
-                type="button"
-                className={resolvedTheme === 'dark' ? 'theme-icon-btn theme-icon-btn-active' : 'theme-icon-btn'}
-                onClick={() => updateSettings({ theme: 'dark' })}
-                aria-label={t.themeDark ?? 'Dark'}
-                title={t.themeDark ?? 'Dark'}
-              >
-                <MoonIcon />
-              </button>
+              {THEME_MODES.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={settings.theme === mode ? 'theme-toggle-btn theme-toggle-btn-active' : 'theme-toggle-btn'}
+                  onClick={() => updateSettings({ theme: mode as PanelSettings['theme'] })}
+                >
+                  {mode === 'light' ? t.themeLight : mode === 'dark' ? t.themeDark : t.themeSystem}
+                </button>
+              ))}
             </div>
-            <button className="ghost-btn" type="button" onClick={() => void refreshHandshake()}>
-              {t.refresh}
+            <button className="ghost-btn" type="button" onClick={() => void refreshCore()}>
+              {t.refreshAll}
             </button>
           </div>
         </header>
 
-        <section className="page-header">
-          <div className="page-copy">
-            <span className="page-kicker">{activePage.eyebrow}</span>
-            <h2>{activePage.title}</h2>
-            <p>{activePage.description}</p>
-            {previewMode ? <p className="preview-note">{t.previewModeLead}</p> : null}
-          </div>
-
-          <div className="page-context">
-            <article className="context-card">
-              <span>{t.profile}</span>
-              <strong>{settings.profile}</strong>
-              <p>
-                {t.mode}: {settings.mode}
-              </p>
-            </article>
-            <article className="context-card">
-              <span>{t.operatorId}</span>
-              <strong>{settings.operatorId.trim() || '-'}</strong>
-              <p>
-                {t.theme}: {themeLabel}
-              </p>
-            </article>
-          </div>
-        </section>
-
         {contractMismatch ? <div className="error-banner">{t.contractMismatch}</div> : null}
-
         {handshakeError ? (
           <div className="error-banner">
             <div>{`${handshakeError.code}: ${handshakeError.message}`}</div>
@@ -620,434 +935,1375 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           </div>
         ) : null}
 
-        {activeView === 'dashboard' ? (
-          <section className="panel-grid">
-            <article className="panel-card metric-card">
-              <h3>{t.pendingApprovals}</h3>
-              <p className="metric">{pendingApprovals.length}</p>
-              <p className="card-note">{t.pendingApprovalsCaption}</p>
-            </article>
-            <article className="panel-card metric-card">
-              <h3>{t.recentRuns}</h3>
-              <p className="metric">{runItems.length}</p>
-              <p className="card-note">{t.recentRunsCaption}</p>
-            </article>
-            <article className="panel-card metric-card">
-              <h3>{t.contractVersion}</h3>
-              <p className="metric metric-text mono">{readString(handshakeRecord, 'contractVersion', '-')}</p>
-              <p className="card-note">{t.contractVersionCaption}</p>
-            </article>
-            <article className="panel-card metric-card">
-              <h3>{t.mode}</h3>
-              <p className="metric metric-text">{settings.mode}</p>
-              <p className="card-note">{t.runtimeModeCaption}</p>
-            </article>
-            <article className="panel-card wide">
-              <h3>{t.capabilities}</h3>
-              <pre>{JSON.stringify(capabilities, null, 2)}</pre>
-            </article>
-            <article className="panel-card wide">
-              <h3>{t.doctor}</h3>
-              <pre>{JSON.stringify(handshakeRecord.doctor ?? {}, null, 2)}</pre>
-            </article>
+        {activeView === 'workspace' ? (
+          <section className="workspace">
+            <div className="workspace-header">
+              <div>
+                <p className="workspace-kicker">{t.workspaceKicker}</p>
+                <h2>{t.workspace}</h2>
+                <p className="workspace-lead">{t.workspaceLead}</p>
+              </div>
+              <div className="workspace-actions">
+                <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
+                  {t.refreshRuns}
+                </button>
+                <button
+                  className="ghost-btn"
+                  type="button"
+                  disabled={!selectedRunId}
+                  onClick={() => void loadRunContext(selectedRunId)}
+                >
+                  {t.refreshContext}
+                </button>
+                <button className="action-btn" type="button" onClick={() => void onSubmitComputerUseSession()}>
+                  {t.startSession}
+                </button>
+              </div>
+            </div>
+
+            <div className="workspace-stage-grid">
+              <article className="metric-card stage-card">
+                <span className="card-label">{t.currentObjective}</span>
+                <p className="stage-metric">{workspaceSnapshot.objective || t.requestPlaceholder}</p>
+                <p className="supporting">
+                  {selectedRunId ? `${t.activeRun}: ${selectedRunId}` : t.noSessionSelected}
+                </p>
+              </article>
+
+              <article className="metric-card stage-card">
+                <span className="card-label">{t.stageProgress}</span>
+                <div className="status-row">
+                  <span className={workspaceStageClass(workspaceSnapshot.stage)}>
+                    {workspaceStageLabel(workspaceSnapshot.stage)}
+                  </span>
+                  <span className="pill pill-muted">
+                    {t.status}: {workspaceSnapshot.currentStatus || t.statusUnknown}
+                  </span>
+                </div>
+                <div className="progress-meter" aria-hidden="true">
+                  <span style={{ width: `${workspaceProgress}%` }} />
+                </div>
+                <p className="supporting">
+                  {workspaceSnapshot.blockedReason
+                    ? `${t.blockedReasonLabel}: ${workspaceSnapshot.blockedReason}`
+                    : t.stageProgressHint}
+                </p>
+              </article>
+
+              <article className="metric-card stage-card">
+                <span className="card-label">{t.liveSurface}</span>
+                {workspaceSnapshot.liveSurface ? (
+                  <div className="surface-metadata">
+                    <div className="metric-row">
+                      <span>{t.activeApp}</span>
+                      <strong>{workspaceSnapshot.liveSurface.appIdentity}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.activeWindow}</span>
+                      <strong>{workspaceSnapshot.liveSurface.windowIdentity}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.riskClass}</span>
+                      <strong>{workspaceSnapshot.liveSurface.riskClass}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.targetRef}</span>
+                      <strong>{workspaceSnapshot.liveSurface.targetRef}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.expectedEffect}</span>
+                      <strong>{workspaceSnapshot.liveSurface.expectedEffect}</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="supporting">{t.noLiveSurface}</p>
+                )}
+              </article>
+            </div>
+
+            <div className="workspace-hybrid-grid">
+              <article className="page-card transcript-card">
+                <div className="transcript-header">
+                  <div>
+                    <h3>{t.chatTranscript}</h3>
+                    <p className="supporting">{t.chatTranscriptLead}</p>
+                  </div>
+                  <span className={workspaceStageClass(workspaceSnapshot.stage)}>
+                    {workspaceStageLabel(workspaceSnapshot.stage)}
+                  </span>
+                </div>
+
+                <div className="recent-session-row">
+                  <span className="card-label">{t.recentSessions}</span>
+                  <div className="toolbar-row">
+                    {recentRuns.length > 0 ? (
+                      recentRuns.map((item) => {
+                        const runId = readString(item, 'job_id');
+                        return (
+                          <button
+                            key={runId}
+                            type="button"
+                            className={runId === selectedRunId ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                            onClick={() => setSelectedRunId(runId)}
+                          >
+                            {runId}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <span className="supporting">{t.noRecentSessions}</span>
+                    )}
+                  </div>
+                </div>
+
+                {attachmentLabels.length > 0 ? (
+                  <div className="context-chip-row">
+                    {attachmentLabels.map((label) => (
+                      <span className="context-chip" key={label}>
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="transcript-list">
+                  {workspaceSnapshot.transcript.map((entry) => (
+                    <div
+                      className={[
+                        'message-card',
+                        `message-${entry.role}`,
+                        entry.pending ? 'message-pending' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      key={entry.id}
+                    >
+                      <span className="card-label">{entry.title}</span>
+                      <strong>{entry.role === 'user' ? t.you : t.agent}</strong>
+                      <p>{entry.body}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="composer-shell">
+                  <div className="composer-toolbar">
+                    <label className="field">
+                      <span>{t.profile}</span>
+                      <select
+                        value={settings.profile}
+                        onChange={(event) => updateSettings({ profile: event.target.value })}
+                      >
+                        {(supportedProfiles.length > 0 ? supportedProfiles : [settings.profile]).map((item) => (
+                          <option value={String(item)} key={String(item)}>
+                            {String(item)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="field">
+                      <span>{t.taskMode}</span>
+                      <div className="toolbar-row">
+                        <button
+                          className={automationMode === 'assisted' ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                          type="button"
+                          onClick={() => {
+                            setAutomationMode('assisted');
+                            setStepMode(true);
+                          }}
+                        >
+                          {t.assistedMode}
+                        </button>
+                        <button
+                          className={automationMode === 'supervised' ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                          type="button"
+                          onClick={() => {
+                            setAutomationMode('supervised');
+                            setStepMode(false);
+                          }}
+                        >
+                          {t.supervisedMode}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-grid">
+                    <label className="field field-span">
+                      <span>{t.specPath}</span>
+                      <input
+                        value={taskForm.specPath}
+                        onChange={(event) => setTaskForm((prev) => ({ ...prev, specPath: event.target.value }))}
+                        placeholder="examples/team/restricted_pilot.yaml"
+                      />
+                    </label>
+                    <label className="field field-span">
+                      <span>{t.request}</span>
+                      <textarea
+                        rows={6}
+                        value={taskForm.request}
+                        onChange={(event) => setTaskForm((prev) => ({ ...prev, request: event.target.value }))}
+                        placeholder={t.requestPlaceholder}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="toolbar-row">
+                    <button className="action-btn" type="button" onClick={() => void onSubmitComputerUseSession()}>
+                      {t.startSession}
+                    </button>
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      disabled={!selectedRunId}
+                      onClick={() => setActiveView('runs')}
+                    >
+                      {t.continueSession}
+                    </button>
+                    <button className="ghost-btn" type="button" onClick={() => setActiveView('tasks')}>
+                      {t.openTaskWorkspace}
+                    </button>
+                  </div>
+                </div>
+              </article>
+
+              <div className="workspace-side-stack">
+                <article className="page-card">
+                  <div className="transcript-header">
+                    <div>
+                      <h3>{t.runtimeTruth}</h3>
+                      <p className="supporting">{t.runtimeTruthLead}</p>
+                    </div>
+                    <span className={runtimeStateClass(workspaceSnapshot.runtimeState.displayState)}>
+                      {runtimeStateLabel(workspaceSnapshot.runtimeState.displayState)}
+                    </span>
+                  </div>
+                  <div className="surface-metadata">
+                    <div className="metric-row">
+                      <span>{t.sessionState}</span>
+                      <strong>{humanizeCode(workspaceSnapshot.runtimeState.rawState || t.statusUnknown)}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.lastSafeCheckpoint}</span>
+                      <strong>{workspaceSnapshot.runtimeState.lastSafeCheckpoint || t.noData}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.pendingApproval}</span>
+                      <strong>{workspaceSnapshot.runtimeState.pendingApprovalId || t.noData}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.pendingCommand}</span>
+                      <strong>
+                        {workspaceSnapshot.runtimeState.pendingCommand
+                          ? humanizeCode(workspaceSnapshot.runtimeState.pendingCommand)
+                          : t.noData}
+                      </strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.lastControlCommand}</span>
+                      <strong>
+                        {workspaceSnapshot.runtimeState.lastControlCommand
+                          ? humanizeCode(workspaceSnapshot.runtimeState.lastControlCommand)
+                          : t.noData}
+                      </strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.lastControlResult}</span>
+                      <strong>
+                        {workspaceSnapshot.runtimeState.lastControlOutcome
+                          ? humanizeCode(workspaceSnapshot.runtimeState.lastControlOutcome)
+                          : t.noData}
+                      </strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.resumeAllowed}</span>
+                      <strong>{boolLabel(workspaceSnapshot.runtimeState.resumeAllowed)}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.stoppedByUser}</span>
+                      <strong>{boolLabel(workspaceSnapshot.runtimeState.stoppedByUser)}</strong>
+                    </div>
+                    <div className="metric-row">
+                      <span>{t.controlHistory}</span>
+                      <strong>{String(workspaceSnapshot.runtimeState.controlHistoryCount)}</strong>
+                    </div>
+                  </div>
+                  {workspaceSnapshot.runtimeState.lastControlReason ? (
+                    <p className="supporting">
+                      {t.controlReason}: {humanizeCode(workspaceSnapshot.runtimeState.lastControlReason)}
+                    </p>
+                  ) : null}
+                  {workspaceSnapshot.runtimeState.recoverySummary ? (
+                    <p className="supporting">
+                      {t.recoveryStatus}: {workspaceSnapshot.runtimeState.recoverySummary}
+                    </p>
+                  ) : null}
+                  {workspaceSnapshot.runtimeState.lastVerificationSummary ? (
+                    <p className="supporting">
+                      {t.lastVerification}: {workspaceSnapshot.runtimeState.lastVerificationSummary}
+                    </p>
+                  ) : null}
+                </article>
+
+                <article className="page-card">
+                  <h3>{t.operatorControls}</h3>
+                  <div className="toolbar-row">
+                    <button
+                      className={stepMode ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                      type="button"
+                      onClick={() => setStepMode(true)}
+                    >
+                      {t.stepMode}
+                    </button>
+                    <button
+                      className={!stepMode ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                      type="button"
+                      onClick={() => setStepMode(false)}
+                    >
+                      {t.autoMode}
+                    </button>
+                  </div>
+                  <div className="control-switches">
+                    <label className="field field-inline">
+                      <span>{t.askBeforeExternalAction}</span>
+                      <input
+                        type="checkbox"
+                        checked={askBeforeExternal}
+                        onChange={(event) => setAskBeforeExternal(event.target.checked)}
+                      />
+                    </label>
+                    <label className="field field-inline">
+                      <span>{t.askBeforeDeletion}</span>
+                      <input
+                        type="checkbox"
+                        checked={askBeforeDeletion}
+                        onChange={(event) => setAskBeforeDeletion(event.target.checked)}
+                      />
+                    </label>
+                    <label className="field field-inline">
+                      <span>{t.askBeforeSend}</span>
+                      <input type="checkbox" checked={askBeforeSend} onChange={(event) => setAskBeforeSend(event.target.checked)} />
+                    </label>
+                  </div>
+                  <div className="toolbar-row">
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      disabled={!canPauseSession}
+                      onClick={() => void onControlSession('pause')}
+                    >
+                      {t.pause}
+                    </button>
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      disabled={!canStopSession}
+                      onClick={() => void onControlSession('stop')}
+                    >
+                      {t.stopNow}
+                    </button>
+                    <button
+                      className="action-btn"
+                      type="button"
+                      disabled={!canResumeSession}
+                      onClick={() => void onControlSession('resume')}
+                    >
+                      {t.resumeRun}
+                    </button>
+                  </div>
+                  <p className="supporting">
+                    {t.controlHooksPending} {t.status}: {controlStateLabel}
+                  </p>
+                  {workspaceSnapshot.runtimeState.recoveryState === 'non_resumable' ? (
+                    <p className="supporting">{t.recoveryNonResumable}</p>
+                  ) : null}
+                </article>
+
+                <article className="page-card">
+                  <div className="transcript-header">
+                    <div>
+                      <h3>{t.liveTimeline}</h3>
+                      <p className="supporting">{t.liveTimelineLead}</p>
+                    </div>
+                    <span className="pill pill-muted">{workspaceSnapshot.timeline.length}</span>
+                  </div>
+                  <div className="timeline-panel">
+                    {workspaceSnapshot.timeline.length === 0 ? <p className="supporting">{t.noTimeline}</p> : null}
+                    {workspaceSnapshot.timeline.map((item) => (
+                      <div className={`timeline-event timeline-event-${item.tone}`} key={item.id}>
+                        <strong>{item.summary}</strong>
+                        <span>
+                          {item.phase || t.noData} · {item.timestamp || '-'}
+                        </span>
+                        <small>{item.event}</small>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="page-card">
+                  <h3>{t.approvalsAndArtifacts}</h3>
+                  <div className="workspace-side-grid">
+                    <div>
+                      <span className="card-label">{t.approvals}</span>
+                      <div className="artifact-list">
+                        {pendingApprovals.length > 0 ? (
+                          pendingApprovals.slice(0, 3).map((item) => {
+                            const row = asRecord(item);
+                            const approvalId = readString(row, 'approval_id');
+                            return (
+                              <button
+                                key={approvalId}
+                                type="button"
+                                className="rail-row"
+                                onClick={() => {
+                                  setSelectedApprovalId(approvalId);
+                                  setActiveView('approvals');
+                                }}
+                              >
+                                <span>{approvalId}</span>
+                                <small>{readString(row, 'status')}</small>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <p className="supporting">{t.noLinkedApprovals}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="card-label">{t.artifacts}</span>
+                      <div className="artifact-list">
+                        {workspaceSnapshot.artifacts.map((artifact) => (
+                          <button
+                            key={artifact.name}
+                            type="button"
+                            className={artifact.available ? 'rail-row' : 'rail-row artifact-row-muted'}
+                            onClick={() => {
+                              setSelectedArtifactName(artifact.name);
+                              setRunTab('artifacts');
+                              setActiveView('runs');
+                            }}
+                          >
+                            <span>{artifact.name}</span>
+                            <small>{artifact.summary}</small>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeView === 'tasks' ? (
+          <section className="workspace">
+            <div className="workspace-header">
+              <div>
+                <p className="workspace-kicker">{t.tasksKicker}</p>
+                <h2>{t.tasks}</h2>
+                <p className="workspace-lead">{t.tasksLead}</p>
+              </div>
+              <div className="workspace-actions">
+                <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
+                  {t.refreshRuns}
+                </button>
+                <button className="action-btn" type="button" onClick={() => void onSubmitTask()}>
+                  {t.submitRun}
+                </button>
+              </div>
+            </div>
+
+            <div className="section-grid two-up">
+              <article className="page-card">
+                <h3>{t.taskWorkspace}</h3>
+                <div className="form-grid">
+                  <label className="field">
+                    <span>{t.profile}</span>
+                    <select value={settings.profile} onChange={(event) => updateSettings({ profile: event.target.value })}>
+                      {(supportedProfiles.length > 0 ? supportedProfiles : [settings.profile]).map((item) => (
+                        <option value={String(item)} key={String(item)}>
+                          {String(item)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="field field-span">
+                    <span>{t.specPath}</span>
+                    <input
+                      value={taskForm.specPath}
+                      onChange={(event) => setTaskForm((prev) => ({ ...prev, specPath: event.target.value }))}
+                      placeholder="examples/team/restricted_pilot.yaml"
+                    />
+                  </label>
+
+                  <label className="field field-span">
+                    <span>{t.request}</span>
+                    <textarea
+                      rows={6}
+                      value={taskForm.request}
+                      onChange={(event) => setTaskForm((prev) => ({ ...prev, request: event.target.value }))}
+                      placeholder={t.requestPlaceholder}
+                    />
+                  </label>
+                </div>
+
+                <details className="details-panel">
+                  <summary>{t.advancedOptions}</summary>
+                  <div className="form-grid compact-grid">
+                    <label className="field">
+                      <span>{t.caseId}</span>
+                      <input
+                        value={taskForm.caseId}
+                        onChange={(event) => setTaskForm((prev) => ({ ...prev, caseId: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.jobId}</span>
+                      <input
+                        value={taskForm.jobId}
+                        onChange={(event) => setTaskForm((prev) => ({ ...prev, jobId: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.provider}</span>
+                      <input
+                        value={taskForm.provider}
+                        onChange={(event) => setTaskForm((prev) => ({ ...prev, provider: event.target.value }))}
+                        placeholder="auto"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.fallbackProvider}</span>
+                      <input
+                        value={taskForm.fallbackProvider}
+                        onChange={(event) =>
+                          setTaskForm((prev) => ({ ...prev, fallbackProvider: event.target.value }))
+                        }
+                        placeholder="transformers"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.model}</span>
+                      <input
+                        value={taskForm.model}
+                        onChange={(event) => setTaskForm((prev) => ({ ...prev, model: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.hfModelId}</span>
+                      <input
+                        value={taskForm.hfModelId}
+                        onChange={(event) => setTaskForm((prev) => ({ ...prev, hfModelId: event.target.value }))}
+                      />
+                    </label>
+                  </div>
+                </details>
+              </article>
+
+              <article className="page-card">
+                <h3>{t.submitReadiness}</h3>
+                <div className="metric-list">
+                  <div className="metric-row">
+                    <span>{t.operatorId}</span>
+                    <strong>{settings.operatorId.trim() || '-'}</strong>
+                  </div>
+                  <div className="metric-row">
+                    <span>{t.rootDir}</span>
+                    <strong>{settings.rootDir}</strong>
+                  </div>
+                  <div className="metric-row">
+                    <span>{t.profile}</span>
+                    <strong>{settings.profile}</strong>
+                  </div>
+                  <div className="metric-row">
+                    <span>{t.workflowParity}</span>
+                    <strong>{readBool(features, 'operatorWorkflowParity') ? t.enabled : t.disabled}</strong>
+                  </div>
+                </div>
+                <div className="stack-actions">
+                  <button className="action-btn" type="button" onClick={() => void onSubmitTask()}>
+                    {t.submitRun}
+                  </button>
+                  <button
+                    className="ghost-btn"
+                    type="button"
+                    onClick={() => {
+                      setActiveView('runs');
+                    }}
+                  >
+                    {t.openRuns}
+                  </button>
+                </div>
+              </article>
+            </div>
           </section>
         ) : null}
 
         {activeView === 'approvals' ? (
-          <section className="split-view">
-            <div className="list-pane">
-              <div className="pane-head">
-                <h3>{t.pendingApprovals}</h3>
+          <section className="workspace">
+            <div className="workspace-header">
+              <div>
+                <p className="workspace-kicker">{t.approvalsKicker}</p>
+                <h2>{t.approvals}</h2>
+                <p className="workspace-lead">{t.approvalsLead}</p>
+              </div>
+              <div className="workspace-actions">
                 <button className="ghost-btn" type="button" onClick={() => void refreshApprovals()}>
                   {t.refresh}
                 </button>
-              </div>
-
-              <div className="list-scroll">
-                {pendingApprovals.length === 0 ? <p className="supporting">{t.noData}</p> : null}
-                {pendingApprovals.map((item) => {
-                  const row = asRecord(item);
-                  const approvalId = readString(row, 'approval_id');
-                  return (
-                    <button
-                      key={approvalId}
-                      type="button"
-                      className={approvalId === selectedApprovalId ? 'row row-active' : 'row'}
-                      onClick={() => setSelectedApprovalId(approvalId)}
-                    >
-                      <strong>{approvalId}</strong>
-                      <span>{readString(row, 'status')}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="detail-pane">
-              <div className="pane-head">
-                <h3>{t.selectedApproval}</h3>
-              </div>
-
-              <div className="action-row">
-                <button
-                  className="action-btn"
-                  type="button"
-                  disabled={!canMutate || !selectedApprovalId}
-                  onClick={() => void onApprove(true)}
-                >
+                <button className="action-btn" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onDecideApproval(true)}>
                   {t.approve}
                 </button>
-                <button
-                  className="action-btn"
-                  type="button"
-                  disabled={!canMutate || !selectedApprovalId}
-                  onClick={() => void onApprove(false)}
-                >
+                <button className="ghost-btn" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onDecideApproval(false)}>
                   {t.reject}
                 </button>
-                <button
-                  className="action-btn action-danger"
-                  type="button"
-                  disabled={!canMutate || !selectedApprovalId}
-                  onClick={() => void onExecute()}
-                >
+                <button className="action-btn action-danger" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onExecuteApproval()}>
                   {t.execute}
                 </button>
               </div>
+            </div>
 
-              {selectedApprovalId ? (
-                <pre>{JSON.stringify(selectedApproval, null, 2)}</pre>
-              ) : (
-                <p className="supporting">{t.noSelection}</p>
-              )}
+            <div className="section-grid approval-grid">
+              <article className="page-card">
+                <h3>{t.pendingApprovals}</h3>
+                <div className="list-scroll">
+                  {pendingApprovals.length === 0 ? <p className="supporting">{t.noData}</p> : null}
+                  {pendingApprovals.map((item) => {
+                    const row = asRecord(item);
+                    const approvalId = readString(row, 'approval_id');
+                    return (
+                      <button
+                        key={approvalId}
+                        type="button"
+                        className={approvalId === selectedApprovalId ? 'list-row list-row-active' : 'list-row'}
+                        onClick={() => setSelectedApprovalId(approvalId)}
+                      >
+                        <strong>{approvalId}</strong>
+                        <span>{readString(row, 'target_kind')}</span>
+                        <small>{readString(row, 'status')}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="page-card">
+                <h3>{t.selectedApproval}</h3>
+                {selectedApprovalId ? <JsonPanel value={selectedApproval} /> : <p className="supporting">{t.noSelection}</p>}
+              </article>
             </div>
           </section>
         ) : null}
 
         {activeView === 'runs' ? (
-          <section className="split-view">
-            <div className="list-pane">
-              <div className="pane-head">
-                <h3>{t.recentRuns}</h3>
+          <section className="workspace">
+            <div className="workspace-header">
+              <div>
+                <p className="workspace-kicker">{t.runsKicker}</p>
+                <h2>{t.runs}</h2>
+                <p className="workspace-lead">{t.runsLead}</p>
+              </div>
+              <div className="workspace-actions">
                 <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
-                  {t.refresh}
+                  {t.refreshRuns}
                 </button>
-              </div>
-
-              <div className="list-scroll">
-                {runItems.length === 0 ? <p className="supporting">{t.noData}</p> : null}
-                {runItems.map((item) => {
-                  const row = asRecord(item);
-                  const jobId = readString(row, 'job_id');
-                  return (
-                    <button
-                      key={jobId}
-                      type="button"
-                      className={jobId === selectedRunId ? 'row row-active' : 'row'}
-                      onClick={() => setSelectedRunId(jobId)}
-                    >
-                      <strong>{jobId}</strong>
-                      <span>{readString(row, 'status')}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="detail-pane">
-              <div className="pane-head">
-                <h3>{t.runDetail}</h3>
-                <button className="ghost-btn" type="button" disabled={!selectedRunId} onClick={() => void onExportArtifacts()}>
+                <button className="ghost-btn" type="button" disabled={!selectedRunId} onClick={() => void loadRunContext(selectedRunId)}>
+                  {t.refreshContext}
+                </button>
+                <button className="action-btn" type="button" disabled={!selectedRunId} onClick={() => void onExportArtifacts()}>
                   {t.export}
                 </button>
               </div>
+            </div>
 
-              {!selectedRunId ? <p className="supporting">{t.selectRun}</p> : null}
+            {driftEvents.length > 0 ? <div className="warning-banner">{t.driftWarning}</div> : null}
 
-              {selectedRunId ? (
-                <>
-                  <div className="tab-row">
-                    {(['overview', 'timeline', 'artifacts', 'replay'] as RunTabKey[]).map((tab) => (
+            <div className="section-grid runs-grid">
+              <article className="page-card">
+                <h3>{t.recentRuns}</h3>
+                <div className="list-scroll">
+                  {runItems.length === 0 ? <p className="supporting">{t.noData}</p> : null}
+                  {runItems.map((item) => {
+                    const row = asRecord(item);
+                    const jobId = readString(row, 'job_id');
+                    return (
                       <button
-                        key={tab}
+                        key={jobId}
                         type="button"
-                        className={tab === runTab ? 'tab-btn tab-btn-active' : 'tab-btn'}
-                        onClick={() => setRunTab(tab)}
+                        className={jobId === selectedRunId ? 'list-row list-row-active' : 'list-row'}
+                        onClick={() => setSelectedRunId(jobId)}
                       >
-                        {tab === 'overview'
-                          ? t.overview
-                          : tab === 'timeline'
-                            ? t.timeline
+                        <strong>{jobId}</strong>
+                        <span>{readString(row, 'status')}</span>
+                        <small>{readString(row, 'created_at')}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="page-card">
+                <div className="tab-strip">
+                  {(['overview', 'stream', 'approvals', 'artifacts', 'replay', 'diagnostics'] as RunTabKey[]).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      className={runTab === tab ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                      onClick={() => setRunTab(tab)}
+                    >
+                      {tab === 'overview'
+                        ? t.overview
+                        : tab === 'stream'
+                          ? t.stream
+                          : tab === 'approvals'
+                            ? t.approvals
                             : tab === 'artifacts'
                               ? t.artifacts
-                              : t.replay}
-                      </button>
-                    ))}
+                              : tab === 'replay'
+                                ? t.replay
+                                : t.diagnostics}
+                    </button>
+                  ))}
+                </div>
+
+                {!selectedRunId ? <p className="supporting">{t.selectRun}</p> : null}
+                {selectedRunId && runTab === 'overview' ? <JsonPanel value={runStatus} /> : null}
+
+                {selectedRunId && runTab === 'stream' ? (
+                  <div className="timeline-panel">
+                    {eventsWarning ? <div className="warning-inline">{eventsWarning}</div> : null}
+                    {events.length === 0 ? <p className="supporting">{t.noData}</p> : null}
+                    {events.map((item, index) => {
+                      const row = asRecord(item);
+                      return (
+                        <div className="timeline-event" key={`${index}-${readString(row, 'timestamp', String(index))}`}>
+                          <strong>{readString(row, 'event', 'event')}</strong>
+                          <span>{readString(row, 'timestamp')}</span>
+                          <code>{JSON.stringify(row.data ?? {}, null, 2)}</code>
+                        </div>
+                      );
+                    })}
                   </div>
+                ) : null}
 
-                  {runTab === 'overview' ? <pre>{JSON.stringify(runStatus, null, 2)}</pre> : null}
+                {selectedRunId && runTab === 'approvals' ? (
+                  linkedApprovals.length > 0 ? (
+                    <JsonPanel value={linkedApprovals} />
+                  ) : (
+                    <p className="supporting">{t.noLinkedApprovals}</p>
+                  )
+                ) : null}
 
-                  {runTab === 'timeline' ? (
-                    <div className="timeline-pane">
-                      {eventsWarning ? <div className="warning-inline">{eventsWarning}</div> : null}
-                      {events.length === 0 ? <p className="supporting">{t.noData}</p> : null}
-                      {events.map((item, index) => {
-                        const row = asRecord(item);
-                        return (
-                          <div className="timeline-event" key={`${index}-${readString(row, 'timestamp', String(index))}`}>
-                            <strong>{readString(row, 'event', 'event')}</strong>
-                            <span>{readString(row, 'timestamp')}</span>
-                            <code>{JSON.stringify(row.data ?? {}, null, 2)}</code>
-                          </div>
-                        );
-                      })}
+                {selectedRunId && runTab === 'artifacts' ? (
+                  <div className="artifact-panel">
+                    <div className="toolbar-row">
+                      <select value={selectedArtifactName} onChange={(event) => setSelectedArtifactName(event.target.value)}>
+                        {ARTIFACT_NAMES.map((name) => (
+                          <option value={name} key={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="ghost-btn"
+                        type="button"
+                        disabled={!settings.debugRaw}
+                        onClick={() => setShowRawArtifact((prev) => !prev)}
+                      >
+                        {showRawArtifact ? t.hideRaw : t.showRaw}
+                      </button>
                     </div>
-                  ) : null}
+                    <JsonPanel value={showRawArtifact ? parsedArtifact : artifactValue} />
+                  </div>
+                ) : null}
 
-                  {runTab === 'artifacts' ? (
-                    <div>
-                      <div className="artifact-controls">
-                        <select value={selectedArtifactName} onChange={(event) => setSelectedArtifactName(event.target.value)}>
-                          {ARTIFACT_NAMES.map((name) => (
-                            <option value={name} key={name}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          className="ghost-btn"
-                          type="button"
-                          disabled={!settings.debugRaw}
-                          onClick={() => {
-                            if (!settings.debugRaw) {
-                              return;
-                            }
-                            if (!showRawArtifact) {
-                              const confirmed = window.confirm('Show raw payload?');
-                              if (!confirmed) {
-                                return;
-                              }
-                            }
-                            setShowRawArtifact((prev) => !prev);
-                          }}
-                        >
-                          {showRawArtifact ? t.hideRaw : t.showRaw}
-                        </button>
-                      </div>
+                {selectedRunId && runTab === 'replay' ? <JsonPanel value={runReplay} /> : null}
 
-                      {!showRawArtifact ? (
-                        <pre>{JSON.stringify(artifactValue ?? {}, null, 2)}</pre>
-                      ) : (
-                        <pre>{JSON.stringify(parsedArtifact, null, 2)}</pre>
-                      )}
-                    </div>
-                  ) : null}
-
-                  {runTab === 'replay' ? <pre>{JSON.stringify(runReplay, null, 2)}</pre> : null}
-                </>
-              ) : null}
+                {selectedRunId && runTab === 'diagnostics' ? (
+                  <div className="section-grid">
+                    <article className="inner-card">
+                      <h3>{t.driftSignals}</h3>
+                      {driftEvents.length > 0 ? <JsonPanel value={driftEvents} /> : <p className="supporting">{t.noDrift}</p>}
+                    </article>
+                    <article className="inner-card">
+                      <h3>{t.systemContext}</h3>
+                      <JsonPanel value={{ doctor: handshakeRecord.doctor ?? {}, config: configData ?? {} }} />
+                    </article>
+                  </div>
+                ) : null}
+              </article>
             </div>
           </section>
         ) : null}
 
-        {activeView === 'diagnostics' ? (
-          <section className="panel-grid">
-            <article className="panel-card metric-card">
-              <h3>{t.uiVersion}</h3>
-              <p className="metric metric-text mono">{readString(handshakeRecord, 'uiVersion', '-')}</p>
-            </article>
-            <article className="panel-card metric-card">
-              <h3>{t.coreVersion}</h3>
-              <p className="metric metric-text mono">{readString(handshakeRecord, 'coreVersion', '-')}</p>
-            </article>
-            <article className="panel-card metric-card">
-              <h3>{t.contractVersion}</h3>
-              <p className="metric metric-text mono">{readString(handshakeRecord, 'contractVersion', '-')}</p>
-            </article>
-            <article className="panel-card wide">
-              <h3>{t.capabilities}</h3>
-              <pre>{JSON.stringify(capabilities, null, 2)}</pre>
-            </article>
-            <article className="panel-card wide">
-              <h3>{t.doctor}</h3>
-              <pre>{JSON.stringify(handshakeRecord.doctor ?? {}, null, 2)}</pre>
-            </article>
+        {activeView === 'system' ? (
+          <section className="workspace">
+            <div className="workspace-header">
+              <div>
+                <p className="workspace-kicker">{t.systemKicker}</p>
+                <h2>{t.system}</h2>
+                <p className="workspace-lead">{t.systemLead}</p>
+              </div>
+              <div className="workspace-actions">
+                <button className="ghost-btn" type="button" onClick={() => void refreshHandshake()}>
+                  {t.refreshDoctor}
+                </button>
+                <button className="ghost-btn" type="button" onClick={() => void refreshConfig()}>
+                  {t.refreshConfig}
+                </button>
+              </div>
+            </div>
+
+            <div className="metric-grid">
+              <article className="metric-card">
+                <h3>{t.contractVersion}</h3>
+                <p className="metric">{readString(handshakeRecord, 'contractVersion', '-')}</p>
+              </article>
+              <article className="metric-card">
+                <h3>{t.coreVersion}</h3>
+                <p className="metric">{readString(handshakeRecord, 'coreVersion', '-')}</p>
+              </article>
+              <article className="metric-card">
+                <h3>{t.profile}</h3>
+                <p className="metric">{settings.profile}</p>
+              </article>
+              <article className="metric-card">
+                <h3>{t.runtimeHealth}</h3>
+                <p className="metric">{readString(doctor, 'status', '-')}</p>
+              </article>
+            </div>
+
+            <div className="section-grid two-up">
+              <article className="page-card">
+                <h3>{t.doctor}</h3>
+                <JsonPanel value={doctor} />
+              </article>
+              <article className="page-card">
+                <h3>{t.effectiveConfig}</h3>
+                <JsonPanel value={configRecord} />
+              </article>
+              <article className="page-card">
+                <h3>{t.capabilities}</h3>
+                <JsonPanel value={capabilities} />
+              </article>
+              <article className="page-card">
+                <h3>{t.capabilityContract}</h3>
+                <JsonPanel value={{ profiles: supportedProfiles, features }} />
+              </article>
+            </div>
+          </section>
+        ) : null}
+
+        {activeView === 'operations' ? (
+          <section className="workspace">
+            <div className="workspace-header">
+              <div>
+                <p className="workspace-kicker">{t.operationsKicker}</p>
+                <h2>{t.operations}</h2>
+                <p className="workspace-lead">{t.operationsLead}</p>
+              </div>
+              <div className="workspace-actions">
+                <button className="ghost-btn" type="button" onClick={() => void snapshotMetrics(settings).then((payload) => setOperationOutputs((prev) => ({ ...prev, metrics: payload }))).catch(() => undefined)}>
+                  {t.quickMetrics}
+                </button>
+              </div>
+            </div>
+
+            <div className="tab-strip">
+              {(['identity', 'qualification', 'security', 'keys', 'support', 'maintenance'] as OperationTabKey[]).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={operationTab === tab ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                  onClick={() => setOperationTab(tab)}
+                >
+                  {tab === 'identity'
+                    ? t.identity
+                    : tab === 'qualification'
+                      ? t.qualification
+                      : tab === 'security'
+                        ? t.security
+                        : tab === 'keys'
+                          ? t.keys
+                          : tab === 'support'
+                            ? t.support
+                            : t.maintenance}
+                </button>
+              ))}
+            </div>
+
+            {operationTab === 'identity' ? (
+              <div className="section-grid two-up">
+                <article className="page-card">
+                  <h3>{t.identity}</h3>
+                  <div className="stack-actions">
+                    <button className="action-btn" type="button" onClick={() => void runOperation('identity', () => fetchIdentity(settings))}>
+                      {t.whoAmI}
+                    </button>
+                  </div>
+                  <label className="field">
+                    <span>{t.permission}</span>
+                    <input
+                      value={operationsForm.permission}
+                      onChange={(event) => setOperationsForm((prev) => ({ ...prev, permission: event.target.value }))}
+                    />
+                  </label>
+                  <button
+                    className="ghost-btn"
+                    type="button"
+                    onClick={() => void runOperation('identity', () => checkPermission(settings, operationsForm.permission))}
+                  >
+                    {t.checkPermission}
+                  </button>
+                </article>
+                <article className="page-card">
+                  <h3>{t.operationOutput}</h3>
+                  <JsonPanel value={operationOutputs.identity ?? {}} />
+                </article>
+              </div>
+            ) : null}
+
+            {operationTab === 'qualification' ? (
+              <div className="section-grid two-up">
+                <article className="page-card">
+                  <h3>{t.qualification}</h3>
+                  <div className="form-grid compact-grid">
+                    <label className="field">
+                      <span>{t.mode}</span>
+                      <input
+                        value={operationsForm.qualificationMode}
+                        onChange={(event) =>
+                          setOperationsForm((prev) => ({ ...prev, qualificationMode: event.target.value }))
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.soakHours}</span>
+                      <input
+                        value={operationsForm.qualificationSoakHours}
+                        onChange={(event) =>
+                          setOperationsForm((prev) => ({ ...prev, qualificationSoakHours: event.target.value }))
+                        }
+                      />
+                    </label>
+                    <label className="field field-span">
+                      <span>{t.outputRoot}</span>
+                      <input
+                        value={operationsForm.qualificationOutputRoot}
+                        onChange={(event) =>
+                          setOperationsForm((prev) => ({ ...prev, qualificationOutputRoot: event.target.value }))
+                        }
+                      />
+                    </label>
+                    <label className="field field-span">
+                      <span>{t.workloads}</span>
+                      <input
+                        value={operationsForm.qualificationWorkloads}
+                        onChange={(event) =>
+                          setOperationsForm((prev) => ({ ...prev, qualificationWorkloads: event.target.value }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="toolbar-row">
+                    <button className="action-btn" type="button" onClick={() => void runOperation('qualification', () => snapshotMetrics(settings))}>
+                      {t.metricsSnapshot}
+                    </button>
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      onClick={() =>
+                        void runOperation('qualification', () =>
+                          fetchGaReadiness(settings, {
+                            report: operationsForm.readinessReport,
+                            qualificationReport: operationsForm.readinessQualificationReport,
+                          }),
+                        )
+                      }
+                    >
+                      {t.gaReadiness}
+                    </button>
+                    <button
+                      className="action-btn"
+                      type="button"
+                      onClick={() =>
+                        void runOperation('qualification', () =>
+                          runQualification(settings, {
+                            mode: operationsForm.qualificationMode,
+                            soakHours: Number(operationsForm.qualificationSoakHours) || 6,
+                            outputRoot: operationsForm.qualificationOutputRoot,
+                            workloads: operationsForm.qualificationWorkloads || undefined,
+                            mergeFromReport: operationsForm.qualificationMergeFromReport || undefined,
+                          }),
+                        )
+                      }
+                    >
+                      {t.runQualification}
+                    </button>
+                  </div>
+                </article>
+                <article className="page-card">
+                  <h3>{t.operationOutput}</h3>
+                  <JsonPanel value={operationOutput} />
+                </article>
+              </div>
+            ) : null}
+
+            {operationTab === 'security' ? (
+              <div className="section-grid two-up">
+                <article className="page-card">
+                  <h3>{t.security}</h3>
+                  <button className="action-btn" type="button" onClick={() => void runOperation('security', () => fetchSecurityBaseline(settings))}>
+                    {t.securityBaseline}
+                  </button>
+                </article>
+                <article className="page-card">
+                  <h3>{t.operationOutput}</h3>
+                  <JsonPanel value={operationOutput} />
+                </article>
+              </div>
+            ) : null}
+
+            {operationTab === 'keys' ? (
+              <div className="section-grid two-up">
+                <article className="page-card">
+                  <h3>{t.keys}</h3>
+                  <label className="field">
+                    <span>{t.verifyPath}</span>
+                    <input
+                      value={operationsForm.verifyPath}
+                      onChange={(event) => setOperationsForm((prev) => ({ ...prev, verifyPath: event.target.value }))}
+                    />
+                  </label>
+                  <div className="form-grid compact-grid">
+                    <label className="field">
+                      <span>{t.nextKeyId}</span>
+                      <input
+                        value={operationsForm.keyNextKeyId}
+                        onChange={(event) => setOperationsForm((prev) => ({ ...prev, keyNextKeyId: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.activateAt}</span>
+                      <input
+                        value={operationsForm.keyActivateAt}
+                        onChange={(event) => setOperationsForm((prev) => ({ ...prev, keyActivateAt: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.retireAfter}</span>
+                      <input
+                        value={operationsForm.keyRetireAfter}
+                        onChange={(event) => setOperationsForm((prev) => ({ ...prev, keyRetireAfter: event.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <div className="toolbar-row">
+                    <button className="action-btn" type="button" onClick={() => void runOperation('keys', () => fetchKeysStatus(settings))}>
+                      {t.keysStatus}
+                    </button>
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      onClick={() => void runOperation('keys', () => verifySignedArtifact(settings, operationsForm.verifyPath))}
+                    >
+                      {t.verifyArtifact}
+                    </button>
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      onClick={() =>
+                        void runOperation('keys', () =>
+                          rotateKeyPlan(settings, {
+                            nextKeyId: operationsForm.keyNextKeyId || undefined,
+                            activateAt: operationsForm.keyActivateAt || undefined,
+                            retireAfter: operationsForm.keyRetireAfter || undefined,
+                          }),
+                        )
+                      }
+                    >
+                      {t.rotatePlan}
+                    </button>
+                  </div>
+                </article>
+                <article className="page-card">
+                  <h3>{t.operationOutput}</h3>
+                  <JsonPanel value={operationOutput} />
+                </article>
+              </div>
+            ) : null}
+
+            {operationTab === 'support' ? (
+              <div className="section-grid two-up">
+                <article className="page-card">
+                  <h3>{t.support}</h3>
+                  <label className="field">
+                    <span>{t.outputPathOptional}</span>
+                    <input
+                      value={operationsForm.supportOutput}
+                      onChange={(event) => setOperationsForm((prev) => ({ ...prev, supportOutput: event.target.value }))}
+                    />
+                  </label>
+                  <button
+                    className="action-btn"
+                    type="button"
+                    onClick={() => void runOperation('support', () => exportSupportBundle(settings, operationsForm.supportOutput || undefined))}
+                  >
+                    {t.exportSupportBundle}
+                  </button>
+                </article>
+                <article className="page-card">
+                  <h3>{t.operationOutput}</h3>
+                  <JsonPanel value={operationOutput} />
+                </article>
+              </div>
+            ) : null}
+
+            {operationTab === 'maintenance' ? (
+              <div className="section-grid two-up">
+                <article className="page-card">
+                  <h3>{t.maintenance}</h3>
+                  <div className="form-grid compact-grid">
+                    <label className="field">
+                      <span>{t.outputDirOptional}</span>
+                      <input
+                        value={operationsForm.backupOutputDir}
+                        onChange={(event) => setOperationsForm((prev) => ({ ...prev, backupOutputDir: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.backupDir}</span>
+                      <input
+                        value={operationsForm.backupVerifyDir}
+                        onChange={(event) => setOperationsForm((prev) => ({ ...prev, backupVerifyDir: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>{t.restoreBackupDir}</span>
+                      <input
+                        value={operationsForm.restoreVerifyDir}
+                        onChange={(event) => setOperationsForm((prev) => ({ ...prev, restoreVerifyDir: event.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <div className="toolbar-row">
+                    <button
+                      className="action-btn"
+                      type="button"
+                      onClick={() => void runOperation('maintenance', () => createBackup(settings, operationsForm.backupOutputDir || undefined))}
+                    >
+                      {t.createBackup}
+                    </button>
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      onClick={() => void runOperation('maintenance', () => verifyBackup(settings, operationsForm.backupVerifyDir))}
+                    >
+                      {t.verifyBackup}
+                    </button>
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      onClick={() => void runOperation('maintenance', () => verifyRestore(settings, operationsForm.restoreVerifyDir))}
+                    >
+                      {t.verifyRestore}
+                    </button>
+                    <button className="ghost-btn" type="button" onClick={() => void runOperation('maintenance', () => planMigration(settings))}>
+                      {t.migratePlan}
+                    </button>
+                    <button className="ghost-btn" type="button" onClick={() => void runOperation('maintenance', () => dryRunMigration(settings))}>
+                      {t.migrateDryRun}
+                    </button>
+                  </div>
+                </article>
+                <article className="page-card">
+                  <h3>{t.operationOutput}</h3>
+                  <JsonPanel value={operationOutput} />
+                </article>
+              </div>
+            ) : null}
           </section>
         ) : null}
 
         {activeView === 'settings' ? (
-          <section className="settings-layout">
-            <div className="settings-section">
-              <div className="settings-section-head">
+          <section className="workspace">
+            <div className="workspace-header">
+              <div>
+                <p className="workspace-kicker">{t.settingsKicker}</p>
+                <h2>{t.settings}</h2>
+                <p className="workspace-lead">{t.settingsLead}</p>
+              </div>
+            </div>
+
+            <div className="section-grid two-up">
+              <article className="page-card">
                 <h3>{t.runtimeSection}</h3>
-                <p>{t.runtimeSectionLead}</p>
-              </div>
-
-              <div className="settings-section-body">
-                <div className="form-row">
-                  <label htmlFor="operator-id">{t.operatorId}</label>
-                  <input
-                    id="operator-id"
-                    value={settings.operatorId}
-                    onChange={(event) => updateSettings({ operatorId: event.target.value })}
-                    placeholder={t.operatorIdPlaceholder ?? 'ops-team-01'}
-                  />
+                <div className="form-grid">
+                  <label className="field">
+                    <span>{t.operatorId}</span>
+                    <input
+                      value={settings.operatorId}
+                      onChange={(event) => updateSettings({ operatorId: event.target.value })}
+                      placeholder={t.operatorIdPlaceholder}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>{t.rootDir}</span>
+                    <input value={settings.rootDir} onChange={(event) => updateSettings({ rootDir: event.target.value })} />
+                  </label>
+                  <label className="field">
+                    <span>{t.mode}</span>
+                    <select value={settings.mode} onChange={(event) => updateSettings({ mode: event.target.value as PanelSettings['mode'] })}>
+                      <option value="auto">auto</option>
+                      <option value="external">external</option>
+                      <option value="bundled">bundled</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>{t.cliPath}</span>
+                    <input value={settings.cliPath} onChange={(event) => updateSettings({ cliPath: event.target.value })} />
+                  </label>
+                  <label className="field field-span">
+                    <span>{t.bundledPythonPath}</span>
+                    <input
+                      value={settings.bundledPythonPath}
+                      onChange={(event) => updateSettings({ bundledPythonPath: event.target.value })}
+                    />
+                  </label>
                 </div>
+              </article>
 
-                <div className="form-row">
-                  <label htmlFor="profile">{t.profile}</label>
-                  <input
-                    id="profile"
-                    value={settings.profile}
-                    onChange={(event) => updateSettings({ profile: event.target.value })}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <label htmlFor="root-dir">{t.rootDir}</label>
-                  <input
-                    id="root-dir"
-                    value={settings.rootDir}
-                    onChange={(event) => updateSettings({ rootDir: event.target.value })}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <label htmlFor="mode">{t.mode}</label>
-                  <select
-                    id="mode"
-                    value={settings.mode}
-                    onChange={(event) => updateSettings({ mode: event.target.value as PanelSettings['mode'] })}
-                  >
-                    <option value="auto">auto</option>
-                    <option value="external">external</option>
-                    <option value="bundled">bundled</option>
-                  </select>
-                </div>
-
-                <div className="form-row">
-                  <label htmlFor="cli-path">{t.cliPath}</label>
-                  <input
-                    id="cli-path"
-                    value={settings.cliPath}
-                    onChange={(event) => updateSettings({ cliPath: event.target.value })}
-                    placeholder="/usr/local/bin/binliquid"
-                  />
-                </div>
-
-                <div className="form-row">
-                  <label htmlFor="bundled-python-path">{t.bundledPythonPath}</label>
-                  <input
-                    id="bundled-python-path"
-                    value={settings.bundledPythonPath}
-                    onChange={(event) => updateSettings({ bundledPythonPath: event.target.value })}
-                    placeholder=".../Contents/Resources/binliquid-runtime/python/bin/python"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <div className="settings-section-head">
+              <article className="page-card">
                 <h3>{t.interfaceSection}</h3>
-                <p>{t.interfaceSectionLead}</p>
-              </div>
-
-              <div className="settings-section-body">
-                <div className="form-row">
-                  <label htmlFor="locale">{t.locale}</label>
-                  <select
-                    id="locale"
-                    value={settings.locale}
-                    onChange={(event) => updateSettings({ locale: event.target.value as LocaleMode })}
+                <div className="form-grid">
+                  <label className="field">
+                    <span>{t.locale}</span>
+                    <select value={settings.locale} onChange={(event) => updateSettings({ locale: event.target.value as LocaleMode })}>
+                      <option value="auto">auto</option>
+                      <option value="en">English</option>
+                      <option value="tr">Türkçe</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>{t.updaterMode}</span>
+                    <select
+                      value={settings.updaterMode}
+                      onChange={(event) => updateSettings({ updaterMode: event.target.value as PanelSettings['updaterMode'] })}
+                    >
+                      <option value="off">off</option>
+                      <option value="manual">manual</option>
+                      <option value="auto">auto</option>
+                    </select>
+                  </label>
+                  <label className="field field-inline">
+                    <span>{t.remoteTelemetry}</span>
+                    <input
+                      type="checkbox"
+                      checked={settings.remoteTelemetry}
+                      onChange={(event) => updateSettings({ remoteTelemetry: event.target.checked })}
+                    />
+                  </label>
+                  <label className="field field-inline">
+                    <span>{t.debugRaw}</span>
+                    <input
+                      type="checkbox"
+                      checked={settings.debugRaw}
+                      onChange={(event) => updateSettings({ debugRaw: event.target.checked })}
+                    />
+                  </label>
+                </div>
+                <div className="stack-actions">
+                  <button
+                    className="action-btn"
+                    type="button"
+                    onClick={() => {
+                      saveSettings(settings);
+                      pushToast('ok', t.saved);
+                    }}
                   >
-                    <option value="auto">auto</option>
-                    <option value="en">English</option>
-                    <option value="tr">Türkçe</option>
-                  </select>
+                    {t.save}
+                  </button>
                 </div>
-
-                <div className="form-row">
-                  <label>{t.theme}</label>
-                  <div className="theme-toggle">
-                    {THEME_MODES.map((mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        className={settings.theme === mode ? 'theme-toggle-btn theme-toggle-btn-active' : 'theme-toggle-btn'}
-                        onClick={() => updateSettings({ theme: mode })}
-                      >
-                        {mode === 'light'
-                          ? (t.themeLight ?? 'Light')
-                          : mode === 'dark'
-                            ? (t.themeDark ?? 'Dark')
-                            : (t.themeSystem ?? 'System')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <label htmlFor="updater-mode">{t.updaterMode}</label>
-                  <select
-                    id="updater-mode"
-                    value={settings.updaterMode}
-                    onChange={(event) =>
-                      updateSettings({ updaterMode: event.target.value as PanelSettings['updaterMode'] })
-                    }
-                  >
-                    <option value="off">off</option>
-                    <option value="manual">manual</option>
-                    <option value="auto">auto</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <div className="settings-section-head">
-                <h3>{t.safetySection}</h3>
-                <p>{t.safetySectionLead}</p>
-              </div>
-
-              <div className="settings-section-body">
-                <div className="form-row form-row-inline">
-                  <label htmlFor="remote-telemetry">{t.remoteTelemetry}</label>
-                  <input
-                    id="remote-telemetry"
-                    type="checkbox"
-                    checked={settings.remoteTelemetry}
-                    onChange={(event) => updateSettings({ remoteTelemetry: event.target.checked })}
-                  />
-                </div>
-
-                <div className="form-row form-row-inline">
-                  <label htmlFor="debug-raw">{t.debugRaw}</label>
-                  <input
-                    id="debug-raw"
-                    type="checkbox"
-                    checked={settings.debugRaw}
-                    onChange={(event) => updateSettings({ debugRaw: event.target.checked })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="settings-action-row">
-              <button
-                type="button"
-                className="action-btn"
-                onClick={() => {
-                  saveSettings(settings);
-                  pushToast('ok', t.saved);
-                }}
-              >
-                {t.save}
-              </button>
+              </article>
             </div>
           </section>
         ) : null}
       </main>
+
+      <aside className="context-rail">
+        <article className="rail-card">
+          <span className="card-label">{t.activeRun}</span>
+          <strong>{selectedRunId || '-'}</strong>
+          <p>{selectedRunId ? `${t.status}: ${runStatusValue || t.statusUnknown}` : t.noSelection}</p>
+          <div className="toolbar-row">
+            <button className="ghost-btn" type="button" disabled={!selectedRunId} onClick={() => void loadRunContext(selectedRunId)}>
+              {t.refreshContext}
+            </button>
+            <button className="ghost-btn" type="button" disabled={!selectedRunId} onClick={() => void onExportArtifacts()}>
+              {t.export}
+            </button>
+          </div>
+          <details className="details-panel compact">
+            <summary>{t.resumeRun}</summary>
+            <div className="form-grid compact-grid">
+              <label className="field field-span">
+                <span>{t.specPath}</span>
+                <input
+                  value={resumeForm.specPath}
+                  onChange={(event) => setResumeForm((prev) => ({ ...prev, specPath: event.target.value }))}
+                />
+              </label>
+              <label className="field">
+                <span>{t.resumeJobId}</span>
+                <input
+                  value={resumeForm.resumeJobId}
+                  onChange={(event) => setResumeForm((prev) => ({ ...prev, resumeJobId: event.target.value }))}
+                />
+              </label>
+            </div>
+            <button className="action-btn" type="button" disabled={!selectedRunId} onClick={() => void onResumeRun()}>
+              {t.resumeRun}
+            </button>
+          </details>
+        </article>
+
+        <article className="rail-card">
+          <span className="card-label">{t.approvals}</span>
+          <strong>{pendingApprovals.length}</strong>
+          <div className="rail-list">
+            {pendingApprovals.slice(0, 4).map((item) => {
+              const row = asRecord(item);
+              const approvalId = readString(row, 'approval_id');
+              return (
+                <button key={approvalId} type="button" className="rail-row" onClick={() => {
+                  setSelectedApprovalId(approvalId);
+                  setActiveView('approvals');
+                }}>
+                  <span>{approvalId}</span>
+                  <small>{readString(row, 'status')}</small>
+                </button>
+              );
+            })}
+          </div>
+        </article>
+
+        <article className="rail-card">
+          <span className="card-label">{t.systemContext}</span>
+          <strong>{settings.profile}</strong>
+          <p>
+            {t.mode}: {settings.mode}
+          </p>
+          <p>
+            {t.contractVersion}: {readString(handshakeRecord, 'contractVersion', '-')}
+          </p>
+          <JsonPanel value={{ doctor: doctor, status: statusArtifact }} />
+        </article>
+      </aside>
 
       <div className="toast-zone">
         {toasts.map((toast) => (

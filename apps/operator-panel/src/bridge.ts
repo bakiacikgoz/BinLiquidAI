@@ -1,5 +1,33 @@
 import { invoke } from '@tauri-apps/api/core';
 
+import {
+  previewApprovalDetail,
+  previewApprovalPending,
+  previewArtifact,
+  previewBackupCreate,
+  previewBackupVerify,
+  previewComputerUseControl,
+  previewComputerUseSessionState,
+  previewComputerUseSubmitResponse,
+  previewConfigResolve,
+  previewGaReadiness,
+  previewHandshake,
+  previewIdentity,
+  previewKeysStatus,
+  previewMigrateApplyDryRun,
+  previewMigratePlan,
+  previewMetricsSnapshot,
+  previewPermissionCheck,
+  previewQualification,
+  previewRestoreVerify,
+  previewRunDetail,
+  previewRunReplay,
+  previewRunSummary,
+  previewSecurityBaseline,
+  previewSubmitResponse,
+  previewSupportBundle,
+  previewTailEvents,
+} from './previewFixtures';
 import type { PanelSettings } from './settings';
 
 export type BridgeErrorCode =
@@ -32,16 +60,6 @@ export type BridgeResult<T> =
       error: BridgeErrorPayload;
     };
 
-export class BridgeError extends Error {
-  readonly payload: BridgeErrorPayload;
-
-  constructor(payload: BridgeErrorPayload) {
-    super(payload.message);
-    this.name = 'BridgeError';
-    this.payload = payload;
-  }
-}
-
 export interface BridgeConfig {
   mode: 'auto' | 'external' | 'bundled';
   cliPath?: string;
@@ -53,6 +71,7 @@ export interface BridgeConfig {
 }
 
 export interface TailEventsResponse {
+  contractVersion: string;
   events: unknown[];
   nextCursor: number;
   reset: boolean;
@@ -60,77 +79,75 @@ export interface TailEventsResponse {
   badLineCount: number;
 }
 
-type PreviewRunStatus = 'running' | 'blocked' | 'completed';
+export interface SubmitTeamRunOptions {
+  specPath: string;
+  request: string;
+  caseId?: string;
+  jobId?: string;
+  provider?: string;
+  fallbackProvider?: string;
+  model?: string;
+  hfModelId?: string;
+}
 
-const PREVIEW_APPROVALS = [
-  {
-    approval_id: 'apr_20260308_policy_gate',
-    status: 'pending',
-    requested_at: '2026-03-08T09:31:00Z',
-    reason_code: 'POLICY_EXCEPTION',
-    summary: 'Approval required for external export of audit envelope',
-    actor: 'router:policy',
-  },
-  {
-    approval_id: 'apr_20260308_exec_override',
-    status: 'pending',
-    requested_at: '2026-03-08T09:18:00Z',
-    reason_code: 'EXECUTION_OVERRIDE',
-    summary: 'Operator confirmation needed before privileged replay execution',
-    actor: 'supervisor:execution',
-  },
-] as const;
+export interface SubmitComputerUseRunOptions {
+  request: string;
+  caseId?: string;
+  jobId?: string;
+  mode?: 'dry_run' | 'step_approval' | 'execute';
+  provider?: string;
+  fallbackProvider?: string;
+  model?: string;
+  hfModelId?: string;
+}
 
-const PREVIEW_RUNS: Array<{ job_id: string; status: PreviewRunStatus; started_at: string; updated_at: string }> = [
-  {
-    job_id: 'run_20260308_0910',
-    status: 'running',
-    started_at: '2026-03-08T09:10:00Z',
-    updated_at: '2026-03-08T09:35:00Z',
-  },
-  {
-    job_id: 'run_20260308_0838',
-    status: 'blocked',
-    started_at: '2026-03-08T08:38:00Z',
-    updated_at: '2026-03-08T09:12:00Z',
-  },
-  {
-    job_id: 'run_20260307_2214',
-    status: 'completed',
-    started_at: '2026-03-07T22:14:00Z',
-    updated_at: '2026-03-07T22:26:00Z',
-  },
-];
+export interface ResumeTeamRunOptions {
+  specPath: string;
+  sourceJobId: string;
+  resumeJobId?: string;
+  provider?: string;
+  fallbackProvider?: string;
+  model?: string;
+  hfModelId?: string;
+}
 
-const PREVIEW_EVENTS = [
-  {
-    timestamp: '2026-03-08T09:10:12Z',
-    event: 'router_decision',
-    data: {
-      path: 'team',
-      policy: 'balanced',
-      confidence: 0.91,
-    },
-  },
-  {
-    timestamp: '2026-03-08T09:10:27Z',
-    event: 'expert_start',
-    data: {
-      expert: 'code_expert',
-      task: 'Validate operator replay envelope',
-    },
-  },
-  {
-    timestamp: '2026-03-08T09:11:05Z',
-    event: 'approval_pending',
-    data: {
-      approval_id: 'apr_20260308_policy_gate',
-      actor: 'router:policy',
-    },
-  },
-] as const;
+export interface ConfigResolveOptions {
+  provider?: string;
+  fallbackProvider?: string;
+  model?: string;
+  hfModelId?: string;
+}
 
-function toBridgeConfig(settings: PanelSettings): BridgeConfig {
+export interface QualificationRunOptions extends ConfigResolveOptions {
+  mode?: string;
+  soakHours?: number;
+  outputRoot?: string;
+  workloads?: string;
+  mergeFromReport?: string;
+}
+
+export interface GaReadinessOptions {
+  report?: string;
+  qualificationReport?: string;
+}
+
+export interface KeyRotatePlanOptions {
+  nextKeyId?: string;
+  activateAt?: string;
+  retireAfter?: string;
+}
+
+export class BridgeError extends Error {
+  readonly payload: BridgeErrorPayload;
+
+  constructor(payload: BridgeErrorPayload) {
+    super(payload.message);
+    this.name = 'BridgeError';
+    this.payload = payload;
+  }
+}
+
+function toBridgeConfig(settings: PanelSettings, timeoutMs = 15000): BridgeConfig {
   return {
     mode: settings.mode,
     cliPath: settings.cliPath.trim() || undefined,
@@ -139,8 +156,9 @@ function toBridgeConfig(settings: PanelSettings): BridgeConfig {
     rootDir: settings.rootDir,
     env: {
       BINLIQUID_PROFILE_NAME: settings.profile,
+      BINLIQUID_TEAM_ARTIFACT_DIR: settings.rootDir,
     },
-    timeoutMs: 15000,
+    timeoutMs,
   };
 }
 
@@ -160,182 +178,28 @@ async function callBridge<T>(command: string, args: Record<string, unknown>): Pr
   return result.data;
 }
 
-function previewCommands() {
-  return {
-    teamListJson: true,
-    teamReplayJson: true,
-    approvalShowJson: true,
-    approvalPendingJson: true,
-    approvalDecide: true,
-    approvalExecute: true,
-  };
-}
 
-function getPreviewHandshake(settings: PanelSettings) {
-  return {
-    uiVersion: '0.5.0-beta.1',
-    coreVersion: '0.5.0-preview',
-    contractVersion: '2.0',
-    capabilities: {
-      contractVersion: '2.0',
-      previewMode: true,
-      commands: previewCommands(),
-    },
-    doctor: {
-      runtime: 'browser-preview',
-      profile: settings.profile,
-      status: 'ok',
-      note: 'Mock bridge data is active because the Tauri runtime is not attached.',
-    },
-  };
-}
-
-function getPreviewApprovals(settings: PanelSettings) {
-  return {
-    pending: PREVIEW_APPROVALS.map((item) => ({
-      ...item,
-      profile: settings.profile,
-    })),
-  };
-}
-
-function getPreviewApprovalDetail(settings: PanelSettings, approvalId: string) {
-  const approval = PREVIEW_APPROVALS.find((item) => item.approval_id === approvalId) ?? PREVIEW_APPROVALS[0];
-  return {
-    ...approval,
-    profile: settings.profile,
-    previewMode: true,
-    requested_by: approval.actor,
-    command_hint: `binliquid approval show ${approval.approval_id} --json`,
-    summary: {
-      target: 'audit_envelope.json',
-      scope: 'enterprise qualification run',
-      risk: 'medium',
-    },
-  };
-}
-
-function getPreviewRuns(settings: PanelSettings) {
-  return {
-    items: PREVIEW_RUNS.map((item) => ({
-      ...item,
-      profile: settings.profile,
-    })),
-  };
-}
-
-function getPreviewRunStatus(settings: PanelSettings, jobId: string) {
-  const run = PREVIEW_RUNS.find((item) => item.job_id === jobId) ?? PREVIEW_RUNS[0];
-  return {
-    job: {
-      ...run,
-      profile: settings.profile,
-      root_dir: settings.rootDir,
-    },
-    summary: {
-      approvals_pending: run.status === 'blocked' ? 1 : 0,
-      artifacts_ready: 4,
-      policy: settings.profile,
-    },
-  };
-}
-
-function getPreviewRunReplay(settings: PanelSettings, jobId: string) {
-  return {
-    job_id: jobId,
-    profile: settings.profile,
-    previewMode: true,
-    replay: [
-      {
-        phase: 'plan',
-        actor: 'planner',
-        status: 'completed',
-      },
-      {
-        phase: 'execute',
-        actor: 'code_expert',
-        status: 'running',
-      },
-      {
-        phase: 'governance',
-        actor: 'policy',
-        status: 'pending',
-      },
-    ],
-  };
-}
-
-function getPreviewArtifact(jobId: string, artifactName: string) {
-  const payloads: Record<string, unknown> = {
-    'status.json': {
-      job_id: jobId,
-      status: 'running',
-      updated_at: '2026-03-08T09:35:00Z',
-      approvals_pending: 1,
-    },
-    'tasks.json': {
-      tasks: [
-        { id: 'task-01', state: 'done', title: 'Assemble replay context' },
-        { id: 'task-02', state: 'running', title: 'Validate audit envelope' },
-      ],
-    },
-    'handoffs.json': {
-      handoffs: [
-        { from: 'planner', to: 'code_expert', status: 'accepted' },
-        { from: 'code_expert', to: 'policy', status: 'waiting' },
-      ],
-    },
-    'audit_envelope.json': {
-      audit_id: 'audit_20260308_preview',
-      integrity: 'verified',
-      export_ready: false,
-    },
-  };
-
-  return {
-    artifactName,
-    previewMode: true,
-    payload: payloads[artifactName] ?? {},
-  };
-}
-
-function getPreviewTailEvents(cursor: number): TailEventsResponse {
-  if (cursor > 0) {
-    return {
-      events: [],
-      nextCursor: cursor,
-      reset: false,
-      truncated: false,
-      badLineCount: 0,
-    };
-  }
-
-  return {
-    events: [...PREVIEW_EVENTS],
-    nextCursor: 1872,
-    reset: false,
-    truncated: false,
-    badLineCount: 0,
-  };
+function withTimeout(settings: PanelSettings, timeoutMs: number): BridgeConfig {
+  return toBridgeConfig(settings, timeoutMs);
 }
 
 export async function handshake(settings: PanelSettings): Promise<unknown> {
   if (isBridgePreviewMode()) {
-    return getPreviewHandshake(settings);
+    return previewHandshake(settings);
   }
   return callBridge('bridge_handshake', { config: toBridgeConfig(settings) });
 }
 
 export async function fetchApprovals(settings: PanelSettings): Promise<unknown> {
   if (isBridgePreviewMode()) {
-    return getPreviewApprovals(settings);
+    return previewApprovalPending();
   }
   return callBridge('bridge_approval_pending', { config: toBridgeConfig(settings) });
 }
 
 export async function showApproval(settings: PanelSettings, approvalId: string): Promise<unknown> {
   if (isBridgePreviewMode()) {
-    return getPreviewApprovalDetail(settings, approvalId);
+    return previewApprovalDetail(approvalId);
   }
   return callBridge('bridge_approval_show', {
     config: toBridgeConfig(settings),
@@ -352,13 +216,16 @@ export async function decideApproval(
 ): Promise<unknown> {
   if (isBridgePreviewMode()) {
     return {
-      ok: true,
-      previewMode: true,
-      approvalId,
-      approve,
-      operatorId,
-      reason,
-      profile: settings.profile,
+      contract_version: '2.0',
+      approval_id: approvalId,
+      error_code: null,
+      ticket: {
+        ...previewApprovalDetail(approvalId).ticket,
+        status: approve ? 'approved' : 'rejected',
+        actor: operatorId,
+        decision_reason: reason ?? 'operator workspace action',
+        decided_at: '2026-03-08T09:40:00Z',
+      },
     };
   }
   return callBridge('bridge_approval_decide', {
@@ -377,11 +244,22 @@ export async function executeApproval(
 ): Promise<unknown> {
   if (isBridgePreviewMode()) {
     return {
-      ok: true,
-      previewMode: true,
-      approvalId,
-      operatorId,
-      profile: settings.profile,
+      contract_version: '2.0',
+      approval_id: approvalId,
+      actor: operatorId,
+      execution_used_path: 'llm_only',
+      trace_id: 'trace-preview-execute',
+      fallback_events: [],
+      metrics: {
+        router_reason_code: 'RULE_ROUTE',
+      },
+      ticket: {
+        ...previewApprovalDetail(approvalId).ticket,
+        status: 'executed',
+        execution_status: 'executed',
+        actor: operatorId,
+        executed_at: '2026-03-08T09:41:00Z',
+      },
     };
   }
   return callBridge('bridge_approval_execute', {
@@ -391,12 +269,109 @@ export async function executeApproval(
   });
 }
 
+export async function submitTeamRun(settings: PanelSettings, options: SubmitTeamRunOptions): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewSubmitResponse(settings, options.jobId);
+  }
+  return callBridge('bridge_team_submit', {
+    config: toBridgeConfig(settings),
+    specPath: options.specPath,
+    request: options.request,
+    caseId: options.caseId,
+    jobId: options.jobId,
+    provider: options.provider,
+    fallbackProvider: options.fallbackProvider,
+    model: options.model,
+    hfModelId: options.hfModelId,
+  });
+}
+
+export async function submitComputerUseRun(
+  settings: PanelSettings,
+  options: SubmitComputerUseRunOptions,
+): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewComputerUseSubmitResponse(settings, options.jobId);
+  }
+  return callBridge('bridge_computer_use_submit', {
+    config: toBridgeConfig(settings),
+    request: options.request,
+    caseId: options.caseId,
+    jobId: options.jobId,
+    mode: options.mode,
+    provider: options.provider,
+    fallbackProvider: options.fallbackProvider,
+    model: options.model,
+    hfModelId: options.hfModelId,
+  });
+}
+
+export async function pauseComputerUseSession(settings: PanelSettings, jobId: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewComputerUseControl(jobId, 'pause');
+  }
+  return callBridge('bridge_computer_use_pause', {
+    config: toBridgeConfig(settings),
+    jobId,
+  });
+}
+
+export async function resumeComputerUseSession(settings: PanelSettings, jobId: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewComputerUseControl(jobId, 'resume');
+  }
+  return callBridge('bridge_computer_use_resume', {
+    config: toBridgeConfig(settings),
+    jobId,
+  });
+}
+
+export async function stopComputerUseSession(settings: PanelSettings, jobId: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewComputerUseControl(jobId, 'stop');
+  }
+  return callBridge('bridge_computer_use_stop', {
+    config: toBridgeConfig(settings),
+    jobId,
+  });
+}
+
+export async function getComputerUseSessionState(
+  settings: PanelSettings,
+  jobId: string,
+): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewComputerUseSessionState(settings, jobId);
+  }
+  return callBridge('bridge_computer_use_state', {
+    config: toBridgeConfig(settings),
+    jobId,
+  });
+}
+
+export async function resumeTeamRun(settings: PanelSettings, options: ResumeTeamRunOptions): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewSubmitResponse(settings, options.resumeJobId ?? `${options.sourceJobId}-resume-ui`);
+  }
+  return callBridge('bridge_team_resume_submit', {
+    config: toBridgeConfig(settings),
+    specPath: options.specPath,
+    sourceJobId: options.sourceJobId,
+    resumeJobId: options.resumeJobId,
+    provider: options.provider,
+    fallbackProvider: options.fallbackProvider,
+    model: options.model,
+    hfModelId: options.hfModelId,
+  });
+}
+
 export async function listRuns(settings: PanelSettings, since?: string): Promise<unknown> {
   if (isBridgePreviewMode()) {
-    return {
-      ...getPreviewRuns(settings),
-      since,
-    };
+    const payload = previewRunSummary(settings) as Record<string, unknown>;
+    if (since) {
+      payload.since = since;
+    }
+    return payload;
   }
   return callBridge('bridge_team_list', {
     config: toBridgeConfig(settings),
@@ -406,7 +381,7 @@ export async function listRuns(settings: PanelSettings, since?: string): Promise
 
 export async function getRunStatus(settings: PanelSettings, jobId: string): Promise<unknown> {
   if (isBridgePreviewMode()) {
-    return getPreviewRunStatus(settings, jobId);
+    return previewRunDetail(settings, jobId);
   }
   return callBridge('bridge_team_status', {
     config: toBridgeConfig(settings),
@@ -416,7 +391,7 @@ export async function getRunStatus(settings: PanelSettings, jobId: string): Prom
 
 export async function getRunReplay(settings: PanelSettings, jobId: string): Promise<unknown> {
   if (isBridgePreviewMode()) {
-    return getPreviewRunReplay(settings, jobId);
+    return previewRunReplay(jobId);
   }
   return callBridge('bridge_team_replay', {
     config: toBridgeConfig(settings),
@@ -431,17 +406,236 @@ export async function exportRunArtifacts(
 ): Promise<unknown> {
   if (isBridgePreviewMode()) {
     return {
-      ok: true,
-      previewMode: true,
-      jobId,
-      exportDir,
-      profile: settings.profile,
+      contract_version: '2.0',
+      status: 'ok',
+      job_id: jobId,
+      export_dir: exportDir,
+      files: [
+        `${exportDir}/status.json`,
+        `${exportDir}/tasks.json`,
+        `${exportDir}/handoffs.json`,
+        `${exportDir}/audit_envelope.json`,
+      ],
     };
   }
   return callBridge('bridge_team_export', {
     config: toBridgeConfig(settings),
     jobId,
     exportDir,
+  });
+}
+
+export async function resolveConfig(settings: PanelSettings, options?: ConfigResolveOptions): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    const payload = previewConfigResolve(settings) as Record<string, unknown>;
+    const resolved = (payload.resolved as Record<string, unknown>) ?? {};
+    const sourceMap = (payload.source_map as Record<string, unknown>) ?? {};
+    if (options?.provider) {
+      resolved.llm_provider = options.provider;
+      sourceMap.llm_provider = 'cli';
+    }
+    if (options?.fallbackProvider) {
+      resolved.fallback_provider = options.fallbackProvider;
+      sourceMap.fallback_provider = 'cli';
+    }
+    if (options?.model) {
+      resolved.model_name = options.model;
+      sourceMap.model_name = 'cli';
+    }
+    if (options?.hfModelId) {
+      resolved.hf_model_id = options.hfModelId;
+      sourceMap.hf_model_id = 'cli';
+    }
+    return payload;
+  }
+  return callBridge('bridge_config_resolve', {
+    config: toBridgeConfig(settings),
+    provider: options?.provider,
+    fallbackProvider: options?.fallbackProvider,
+    model: options?.model,
+    hfModelId: options?.hfModelId,
+  });
+}
+
+export async function fetchIdentity(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewIdentity(settings);
+  }
+  return callBridge('bridge_auth_whoami', {
+    config: toBridgeConfig(settings),
+  });
+}
+
+export async function checkPermission(settings: PanelSettings, permission: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewPermissionCheck(permission);
+  }
+  return callBridge('bridge_auth_check', {
+    config: toBridgeConfig(settings),
+    permission,
+  });
+}
+
+export async function fetchSecurityBaseline(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewSecurityBaseline();
+  }
+  return callBridge('bridge_security_baseline', {
+    config: withTimeout(settings, 30000),
+  });
+}
+
+export async function fetchKeysStatus(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewKeysStatus();
+  }
+  return callBridge('bridge_keys_status', {
+    config: toBridgeConfig(settings),
+  });
+}
+
+export async function verifySignedArtifact(settings: PanelSettings, path: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return {
+      contract_version: '2.0',
+      path,
+      verified: true,
+      signature_verified: true,
+      signature_mode: 'unsigned',
+      key_id: 'enterprise-signing-current',
+      error_code: null,
+    };
+  }
+  return callBridge('bridge_keys_verify', {
+    config: toBridgeConfig(settings),
+    path,
+  });
+}
+
+export async function rotateKeyPlan(settings: PanelSettings, options: KeyRotatePlanOptions): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return {
+      contract_version: '2.0',
+      provider: 'local_file',
+      current_key_id: 'enterprise-signing-current',
+      next_key_id: options.nextKeyId ?? 'next-signing-key',
+      steps: ['prepare', 'dual-verify', 'activate', 'retire-old'],
+      activate_at: options.activateAt ?? '2026-03-15T09:00:00Z',
+      retire_after: options.retireAfter ?? '2026-03-29T09:00:00Z',
+      enterprise_ready: true,
+    };
+  }
+  return callBridge('bridge_keys_rotate_plan', {
+    config: toBridgeConfig(settings),
+    nextKeyId: options.nextKeyId,
+    activateAt: options.activateAt,
+    retireAfter: options.retireAfter,
+  });
+}
+
+export async function exportSupportBundle(settings: PanelSettings, output?: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewSupportBundle(output);
+  }
+  return callBridge('bridge_support_bundle_export', {
+    config: withTimeout(settings, 60000),
+    output,
+  });
+}
+
+export async function createBackup(settings: PanelSettings, outputDir?: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewBackupCreate(outputDir);
+  }
+  return callBridge('bridge_backup_create', {
+    config: withTimeout(settings, 60000),
+    outputDir,
+  });
+}
+
+export async function verifyBackup(settings: PanelSettings, backupDir: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewBackupVerify(backupDir);
+  }
+  return callBridge('bridge_backup_verify', {
+    config: withTimeout(settings, 30000),
+    backupDir,
+  });
+}
+
+export async function verifyRestore(settings: PanelSettings, backupDir: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewRestoreVerify(backupDir);
+  }
+  return callBridge('bridge_restore_verify', {
+    config: withTimeout(settings, 30000),
+    backupDir,
+  });
+}
+
+export async function planMigration(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewMigratePlan();
+  }
+  return callBridge('bridge_migrate_plan', {
+    config: toBridgeConfig(settings),
+  });
+}
+
+export async function dryRunMigration(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewMigrateApplyDryRun();
+  }
+  return callBridge('bridge_migrate_apply_dry_run', {
+    config: withTimeout(settings, 30000),
+  });
+}
+
+export async function snapshotMetrics(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewMetricsSnapshot();
+  }
+  return callBridge('bridge_metrics_snapshot', {
+    config: withTimeout(settings, 30000),
+  });
+}
+
+export async function fetchGaReadiness(settings: PanelSettings, options?: GaReadinessOptions): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    const payload = previewGaReadiness() as Record<string, unknown>;
+    if (options?.report) {
+      payload.report = options.report;
+    }
+    if (options?.qualificationReport) {
+      payload.qualification_report_path = options.qualificationReport;
+    }
+    return payload;
+  }
+  return callBridge('bridge_ga_readiness', {
+    config: withTimeout(settings, 30000),
+    report: options?.report,
+    qualificationReport: options?.qualificationReport,
+  });
+}
+
+export async function runQualification(settings: PanelSettings, options: QualificationRunOptions): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    const payload = previewQualification() as Record<string, unknown>;
+    payload.mode = options.mode ?? 'mixed';
+    payload.output_root = options.outputRoot ?? 'artifacts/qualification';
+    return payload;
+  }
+  return callBridge('bridge_qualification_run', {
+    config: withTimeout(settings, 120000),
+    mode: options.mode,
+    soakHours: options.soakHours,
+    outputRoot: options.outputRoot,
+    workloads: options.workloads,
+    mergeFromReport: options.mergeFromReport,
+    provider: options.provider,
+    fallbackProvider: options.fallbackProvider,
+    model: options.model,
+    hfModelId: options.hfModelId,
   });
 }
 
@@ -452,7 +646,7 @@ export async function readArtifact(
   maxBytes = 256 * 1024,
 ): Promise<unknown> {
   if (isBridgePreviewMode()) {
-    return getPreviewArtifact(jobId, artifactName);
+    return previewArtifact(settings, jobId, artifactName);
   }
   return callBridge('bridge_read_artifact', {
     rootDir: settings.rootDir,
@@ -470,7 +664,18 @@ export async function tailEvents(
   maxLines = 200,
 ): Promise<TailEventsResponse> {
   if (isBridgePreviewMode()) {
-    return getPreviewTailEvents(cursor);
+    const payload = previewTailEvents();
+    if (cursor > 0) {
+      return {
+        contractVersion: payload.contractVersion,
+        events: [],
+        nextCursor: cursor,
+        reset: false,
+        truncated: false,
+        badLineCount: 0,
+      };
+    }
+    return payload;
   }
   return callBridge('bridge_tail_events', {
     rootDir: settings.rootDir,

@@ -5,7 +5,7 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::process::Command;
 
 const CONTRACT_VERSION: &str = "2.0";
@@ -138,6 +138,7 @@ pub struct HandshakePayload {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadArtifactPayload {
+    contract_version: String,
     artifact_name: String,
     payload: Value,
     truncated: bool,
@@ -147,11 +148,22 @@ pub struct ReadArtifactPayload {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TailEventsPayload {
+    contract_version: String,
     events: Vec<Value>,
     next_cursor: u64,
     reset: bool,
     truncated: bool,
     bad_line_count: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpawnedRunPayload {
+    contract_version: String,
+    job_id: String,
+    profile: String,
+    root_dir: String,
+    process_id: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -355,6 +367,301 @@ pub async fn bridge_team_list(config: BridgeConfig, since: Option<String>) -> Br
 }
 
 #[tauri::command]
+pub async fn bridge_team_submit(
+    config: BridgeConfig,
+    spec_path: String,
+    request: String,
+    case_id: Option<String>,
+    job_id: Option<String>,
+    provider: Option<String>,
+    fallback_provider: Option<String>,
+    model: Option<String>,
+    hf_model_id: Option<String>,
+) -> BridgeResult<SpawnedRunPayload> {
+    let spec = match normalize_required_path(&spec_path, "spec_path", "team run") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let request = match normalize_required_text(&request, "request", "team run") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let run_job_id = match job_id.as_deref().map(normalize_job_id).transpose() {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+
+    let generated_job_id = run_job_id.unwrap_or_else(generate_job_id);
+    let mut args = vec![
+        "team".to_string(),
+        "run".to_string(),
+        "--spec".to_string(),
+        spec,
+        "--once".to_string(),
+        request,
+        "--job-id".to_string(),
+        generated_job_id.clone(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--case-id", case_id.as_deref());
+    push_optional_arg(&mut args, "--provider", provider.as_deref());
+    push_optional_arg(
+        &mut args,
+        "--fallback-provider",
+        fallback_provider.as_deref(),
+    );
+    push_optional_arg(&mut args, "--model", model.as_deref());
+    push_optional_arg(&mut args, "--hf-model-id", hf_model_id.as_deref());
+
+    match spawn_cli_background(&config, args).await {
+        Ok(process_id) => BridgeResult::ok(SpawnedRunPayload {
+            contract_version: CONTRACT_VERSION.to_string(),
+            job_id: generated_job_id,
+            profile: config.profile(),
+            root_dir: config.root_dir(),
+            process_id,
+        }),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_team_resume_submit(
+    config: BridgeConfig,
+    spec_path: String,
+    source_job_id: String,
+    resume_job_id: Option<String>,
+    provider: Option<String>,
+    fallback_provider: Option<String>,
+    model: Option<String>,
+    hf_model_id: Option<String>,
+) -> BridgeResult<SpawnedRunPayload> {
+    let spec = match normalize_required_path(&spec_path, "spec_path", "team resume") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let source_job_id = match normalize_job_id(&source_job_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let resume_job_id = match resume_job_id.as_deref().map(normalize_job_id).transpose() {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let generated_job_id = resume_job_id.unwrap_or_else(|| format!("{source_job_id}-resume-ui"));
+    let mut args = vec![
+        "team".to_string(),
+        "resume".to_string(),
+        "--spec".to_string(),
+        spec,
+        "--job-id".to_string(),
+        source_job_id,
+        "--resume-job-id".to_string(),
+        generated_job_id.clone(),
+        "--root-dir".to_string(),
+        config.root_dir(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--provider", provider.as_deref());
+    push_optional_arg(
+        &mut args,
+        "--fallback-provider",
+        fallback_provider.as_deref(),
+    );
+    push_optional_arg(&mut args, "--model", model.as_deref());
+    push_optional_arg(&mut args, "--hf-model-id", hf_model_id.as_deref());
+
+    match spawn_cli_background(&config, args).await {
+        Ok(process_id) => BridgeResult::ok(SpawnedRunPayload {
+            contract_version: CONTRACT_VERSION.to_string(),
+            job_id: generated_job_id,
+            profile: config.profile(),
+            root_dir: config.root_dir(),
+            process_id,
+        }),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_computer_use_submit(
+    config: BridgeConfig,
+    request: String,
+    case_id: Option<String>,
+    job_id: Option<String>,
+    mode: Option<String>,
+    provider: Option<String>,
+    fallback_provider: Option<String>,
+    model: Option<String>,
+    hf_model_id: Option<String>,
+) -> BridgeResult<SpawnedRunPayload> {
+    let request = match normalize_required_text(&request, "request", "computer-use run") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let run_job_id = match job_id.as_deref().map(normalize_job_id).transpose() {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let generated_job_id = run_job_id.unwrap_or_else(generate_job_id);
+    let mut args = vec![
+        "computer-use".to_string(),
+        "run".to_string(),
+        "--once".to_string(),
+        request,
+        "--job-id".to_string(),
+        generated_job_id.clone(),
+        "--root-dir".to_string(),
+        config.root_dir(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--case-id", case_id.as_deref());
+    push_optional_arg(&mut args, "--mode", mode.as_deref());
+    push_optional_arg(&mut args, "--provider", provider.as_deref());
+    push_optional_arg(
+        &mut args,
+        "--fallback-provider",
+        fallback_provider.as_deref(),
+    );
+    push_optional_arg(&mut args, "--model", model.as_deref());
+    push_optional_arg(&mut args, "--hf-model-id", hf_model_id.as_deref());
+
+    match spawn_cli_background(&config, args).await {
+        Ok(process_id) => BridgeResult::ok(SpawnedRunPayload {
+            contract_version: CONTRACT_VERSION.to_string(),
+            job_id: generated_job_id,
+            profile: config.profile(),
+            root_dir: config.root_dir(),
+            process_id,
+        }),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_computer_use_pause(
+    config: BridgeConfig,
+    job_id: String,
+) -> BridgeResult<Value> {
+    let normalized = match normalize_job_id(&job_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "computer-use".to_string(),
+            "pause".to_string(),
+            "--job-id".to_string(),
+            normalized,
+            "--root-dir".to_string(),
+            config.root_dir(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_computer_use_resume(
+    config: BridgeConfig,
+    job_id: String,
+) -> BridgeResult<Value> {
+    let normalized = match normalize_job_id(&job_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "computer-use".to_string(),
+            "resume".to_string(),
+            "--job-id".to_string(),
+            normalized,
+            "--root-dir".to_string(),
+            config.root_dir(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_computer_use_stop(config: BridgeConfig, job_id: String) -> BridgeResult<Value> {
+    let normalized = match normalize_job_id(&job_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "computer-use".to_string(),
+            "stop".to_string(),
+            "--job-id".to_string(),
+            normalized,
+            "--root-dir".to_string(),
+            config.root_dir(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_computer_use_state(
+    config: BridgeConfig,
+    job_id: String,
+) -> BridgeResult<Value> {
+    let normalized = match normalize_job_id(&job_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "computer-use".to_string(),
+            "state".to_string(),
+            "--job-id".to_string(),
+            normalized,
+            "--root-dir".to_string(),
+            config.root_dir(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
 pub async fn bridge_team_replay(config: BridgeConfig, job_id: String) -> BridgeResult<Value> {
     let normalized = match normalize_job_id(&job_id) {
         Ok(value) => value,
@@ -448,6 +755,389 @@ pub async fn bridge_team_export(
 }
 
 #[tauri::command]
+pub async fn bridge_config_resolve(
+    config: BridgeConfig,
+    provider: Option<String>,
+    fallback_provider: Option<String>,
+    model: Option<String>,
+    hf_model_id: Option<String>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "config".to_string(),
+        "resolve".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--provider", provider.as_deref());
+    push_optional_arg(
+        &mut args,
+        "--fallback-provider",
+        fallback_provider.as_deref(),
+    );
+    push_optional_arg(&mut args, "--model", model.as_deref());
+    push_optional_arg(&mut args, "--hf-model-id", hf_model_id.as_deref());
+
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_auth_whoami(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "auth".to_string(),
+            "whoami".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_auth_check(config: BridgeConfig, permission: String) -> BridgeResult<Value> {
+    let permission = match normalize_required_text(&permission, "permission", "auth check") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "auth".to_string(),
+            "check".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--permission".to_string(),
+            permission,
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_security_baseline(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "security".to_string(),
+            "baseline".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_keys_status(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "keys".to_string(),
+            "status".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_keys_verify(config: BridgeConfig, path: String) -> BridgeResult<Value> {
+    let path = match normalize_required_text(&path, "path", "keys verify") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "keys".to_string(),
+            "verify".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--path".to_string(),
+            path,
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_keys_rotate_plan(
+    config: BridgeConfig,
+    next_key_id: Option<String>,
+    activate_at: Option<String>,
+    retire_after: Option<String>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "keys".to_string(),
+        "rotate-plan".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--next-key-id", next_key_id.as_deref());
+    push_optional_arg(&mut args, "--activate-at", activate_at.as_deref());
+    push_optional_arg(&mut args, "--retire-after", retire_after.as_deref());
+
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_support_bundle_export(
+    config: BridgeConfig,
+    output: Option<String>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "support".to_string(),
+        "bundle".to_string(),
+        "export".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--output", output.as_deref());
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_backup_create(
+    config: BridgeConfig,
+    output_dir: Option<String>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "backup".to_string(),
+        "create".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--output-dir", output_dir.as_deref());
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_backup_verify(config: BridgeConfig, backup_dir: String) -> BridgeResult<Value> {
+    let backup_dir = match normalize_required_text(&backup_dir, "backup_dir", "backup verify") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "backup".to_string(),
+            "verify".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--backup-dir".to_string(),
+            backup_dir,
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_restore_verify(
+    config: BridgeConfig,
+    backup_dir: String,
+) -> BridgeResult<Value> {
+    let backup_dir = match normalize_required_text(&backup_dir, "backup_dir", "restore verify") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "restore".to_string(),
+            "verify".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--backup-dir".to_string(),
+            backup_dir,
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_migrate_plan(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "migrate".to_string(),
+            "plan".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_migrate_apply_dry_run(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "migrate".to_string(),
+            "apply".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--dry-run".to_string(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_metrics_snapshot(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "metrics".to_string(),
+            "snapshot".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_ga_readiness(
+    config: BridgeConfig,
+    report: Option<String>,
+    qualification_report: Option<String>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "ga".to_string(),
+        "readiness".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--report", report.as_deref());
+    push_optional_arg(
+        &mut args,
+        "--qualification-report",
+        qualification_report.as_deref(),
+    );
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_qualification_run(
+    config: BridgeConfig,
+    mode: Option<String>,
+    soak_hours: Option<f64>,
+    output_root: Option<String>,
+    workloads: Option<String>,
+    merge_from_report: Option<String>,
+    provider: Option<String>,
+    fallback_provider: Option<String>,
+    model: Option<String>,
+    hf_model_id: Option<String>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "qualification".to_string(),
+        "run".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--mode", mode.as_deref());
+    if let Some(hours) = soak_hours {
+        args.push("--soak-hours".to_string());
+        args.push(hours.to_string());
+    }
+    push_optional_arg(&mut args, "--output-root", output_root.as_deref());
+    push_optional_arg(&mut args, "--workloads", workloads.as_deref());
+    push_optional_arg(
+        &mut args,
+        "--merge-from-report",
+        merge_from_report.as_deref(),
+    );
+    push_optional_arg(&mut args, "--provider", provider.as_deref());
+    push_optional_arg(
+        &mut args,
+        "--fallback-provider",
+        fallback_provider.as_deref(),
+    );
+    push_optional_arg(&mut args, "--model", model.as_deref());
+    push_optional_arg(&mut args, "--hf-model-id", hf_model_id.as_deref());
+
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
 pub async fn bridge_read_artifact(
     root_dir: String,
     job_id: String,
@@ -476,6 +1166,7 @@ pub async fn bridge_tail_events(
         max_lines.unwrap_or(DEFAULT_MAX_LINES),
     ) {
         Ok(result) => BridgeResult::ok(TailEventsPayload {
+            contract_version: CONTRACT_VERSION.to_string(),
             events: result.events,
             next_cursor: result.next_cursor,
             reset: result.reset,
@@ -578,6 +1269,53 @@ fn default_bundled_python_path() -> Option<PathBuf> {
     } else {
         None
     }
+}
+
+fn push_optional_arg(args: &mut Vec<String>, flag: &str, value: Option<&str>) {
+    if let Some(raw) = value {
+        let normalized = raw.trim();
+        if !normalized.is_empty() {
+            args.push(flag.to_string());
+            args.push(normalized.to_string());
+        }
+    }
+}
+
+fn normalize_required_text(value: &str, field: &str, command: &str) -> Result<String, BridgeError> {
+    let normalized = value.trim();
+    if normalized.is_empty() {
+        return Err(BridgeError::new(
+            "INVALID_INPUT",
+            format!("{field} is required"),
+            "",
+            command,
+            false,
+        ));
+    }
+    Ok(normalized.to_string())
+}
+
+fn normalize_required_path(value: &str, field: &str, command: &str) -> Result<String, BridgeError> {
+    let normalized = normalize_required_text(value, field, command)?;
+    let path = PathBuf::from(&normalized);
+    if !path.exists() {
+        return Err(BridgeError::new(
+            "INVALID_INPUT",
+            format!("{field} does not exist"),
+            "",
+            command,
+            false,
+        ));
+    }
+    Ok(normalized)
+}
+
+fn generate_job_id() -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    format!("job-ui-{now}")
 }
 
 fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &ResolvedCli) {
@@ -699,6 +1437,36 @@ async fn run_cli_raw(
         stderr,
         command: cmdline,
     })
+}
+
+async fn spawn_cli_background(
+    config: &BridgeConfig,
+    args: Vec<String>,
+) -> Result<Option<u32>, BridgeError> {
+    let config = config.clone();
+    let resolved = resolve_cli_command(&config)?;
+    let mut command = Command::new(&resolved.program);
+    command.args(&resolved.prefix_args);
+    command.args(&args);
+    command.stdout(Stdio::null());
+    command.stderr(Stdio::null());
+    configure_cli_env(&mut command, &config, &resolved);
+
+    let child = command.spawn().map_err(|error| {
+        let code = if error.kind() == std::io::ErrorKind::NotFound {
+            "CLI_NOT_FOUND"
+        } else {
+            "CLI_FAILED"
+        };
+        BridgeError::new(
+            code,
+            error.to_string(),
+            "",
+            format_command(&resolved.program, &resolved.prefix_args, &args),
+            code != "CLI_NOT_FOUND",
+        )
+    })?;
+    Ok(child.id())
 }
 
 fn parse_json_output(output: &RawCliOutput) -> Result<Value, BridgeError> {
@@ -922,6 +1690,7 @@ fn read_artifact_impl(
     })?;
 
     Ok(ReadArtifactPayload {
+        contract_version: CONTRACT_VERSION.to_string(),
         artifact_name: artifact_name.to_string(),
         payload: parsed,
         truncated,
@@ -1095,7 +1864,10 @@ fn tail_events_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::io::Write;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn normalize_actor_requires_expected_format() {
@@ -1148,5 +1920,73 @@ mod tests {
 
         let result = safe_artifact_path(root.to_string_lossy().as_ref(), "../evil", "status.json");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn read_artifact_payload_serializes_contract_version() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().join("jobs");
+        let job = root.join("job-3");
+        fs::create_dir_all(&job).expect("mkdir");
+        fs::write(job.join("status.json"), "{\"job\":{\"job_id\":\"job-3\"}}").expect("write");
+
+        let payload = read_artifact_impl(
+            root.to_string_lossy().as_ref(),
+            "job-3",
+            "status.json",
+            None,
+        )
+        .expect("artifact");
+        let json = serde_json::to_value(payload).expect("serialize");
+
+        assert_eq!(json["contractVersion"], CONTRACT_VERSION);
+        assert_eq!(json["artifactName"], "status.json");
+    }
+
+    #[test]
+    fn spawned_run_payload_serializes_contract_version() {
+        let payload = SpawnedRunPayload {
+            contract_version: CONTRACT_VERSION.to_string(),
+            job_id: "job-4".to_string(),
+            profile: "balanced".to_string(),
+            root_dir: ".binliquid/team/jobs".to_string(),
+            process_id: Some(4242),
+        };
+        let json = serde_json::to_value(payload).expect("serialize");
+
+        assert_eq!(json["contractVersion"], CONTRACT_VERSION);
+        assert_eq!(json["jobId"], "job-4");
+    }
+
+    #[test]
+    fn spawn_cli_background_returns_pid_for_external_script() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().join("jobs");
+        fs::create_dir_all(&root).expect("mkdir");
+        let script = dir.path().join("fake-binliquid.sh");
+        fs::write(&script, "#!/bin/sh\nsleep 1\n").expect("script");
+        #[cfg(unix)]
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let config = BridgeConfig {
+            mode: Some("external".to_string()),
+            cli_path: Some(script.to_string_lossy().to_string()),
+            bundled_python_path: None,
+            profile: Some("balanced".to_string()),
+            root_dir: Some(root.to_string_lossy().to_string()),
+            env: HashMap::new(),
+            timeout_ms: Some(1_000),
+        };
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_io()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        let pid = runtime
+            .block_on(spawn_cli_background(&config, vec!["noop".to_string()]))
+            .expect("spawn");
+
+        assert!(pid.is_some());
     }
 }

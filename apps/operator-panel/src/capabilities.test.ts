@@ -3,12 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { hasContractMismatch } from './capabilities';
 
 const baseCommands = {
+  computerUseSubmit: true,
+  computerUsePause: true,
+  computerUseResume: true,
+  computerUseStop: true,
+  computerUseStateJson: true,
+  teamSubmit: true,
+  teamResumeSubmit: true,
   teamListJson: true,
+  teamStatusJson: true,
   teamReplayJson: true,
   approvalShowJson: true,
   approvalPendingJson: true,
   approvalDecide: true,
   approvalExecute: true,
+  configResolveJson: true,
 };
 
 describe('capability handshake validation', () => {
