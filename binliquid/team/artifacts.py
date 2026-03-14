@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.enterprise.signing import build_integrity, canonical_payload_hash
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.team.models import (
@@ -55,13 +56,18 @@ def write_event(paths: TeamArtifactPaths, event: TeamEvent) -> None:
 
 def write_status(paths: TeamArtifactPaths, payload: dict[str, Any]) -> None:
     paths.status_path.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False),
+        json.dumps(
+            {"contract_version": OPERATOR_PANEL_CONTRACT_VERSION, **payload},
+            indent=2,
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
 
 
 def write_task_runs(paths: TeamArtifactPaths, tasks: list[TaskRun]) -> None:
     payload = {
+        "contract_version": OPERATOR_PANEL_CONTRACT_VERSION,
         "generated_at": _now_iso(),
         "tasks": [item.model_dump(mode="json") for item in tasks],
     }
@@ -70,6 +76,7 @@ def write_task_runs(paths: TeamArtifactPaths, tasks: list[TaskRun]) -> None:
 
 def write_handoffs(paths: TeamArtifactPaths, handoffs: list[HandoffRecord]) -> None:
     payload = {
+        "contract_version": OPERATOR_PANEL_CONTRACT_VERSION,
         "generated_at": _now_iso(),
         "handoffs": [item.model_dump(mode="json") for item in handoffs],
     }
@@ -196,6 +203,7 @@ def write_audit_envelope(
 
     prev_hash = _read_prev_chain_hash(paths.root_dir)
     envelope_wo_integrity = {
+        "contract_version": OPERATOR_PANEL_CONTRACT_VERSION,
         "envelope_version": "3",
         "event_schema_version": "3",
         "handoff_schema_version": "3",
@@ -223,6 +231,7 @@ def write_audit_envelope(
         prev_hash=prev_hash,
     )
     envelope = AuditEnvelope(
+        contract_version=OPERATOR_PANEL_CONTRACT_VERSION,
         envelope_version="3",
         event_schema_version="3",
         handoff_schema_version="3",

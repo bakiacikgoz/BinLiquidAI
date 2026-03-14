@@ -198,6 +198,7 @@ class AuditIntegrity(BaseModel):
 class AuditEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    contract_version: str = "2.0"
     envelope_version: str = "3"
     event_schema_version: str = "3"
     handoff_schema_version: str = "3"

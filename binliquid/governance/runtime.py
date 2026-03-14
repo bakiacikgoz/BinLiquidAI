@@ -13,6 +13,7 @@ from binliquid.governance.models import (
     ApprovalStatus,
     ApprovalTicket,
     AuditRecord,
+    DeviceActionRecord,
     ExecutionStatus,
     GovernanceAction,
     GovernanceDecision,
@@ -44,6 +45,7 @@ class GovernanceRunState:
     tool_calls: list[ToolCallRecord] = field(default_factory=list)
     handoffs: list[HandoffCallRecord] = field(default_factory=list)
     memory_writes: list[MemoryWriteRecord] = field(default_factory=list)
+    device_actions: list[DeviceActionRecord] = field(default_factory=list)
     approval_status: str = "none"
 
 
@@ -745,6 +747,7 @@ class GovernanceRuntime:
             tool_calls=state.tool_calls,
             handoffs=state.handoffs,
             memory_writes=state.memory_writes,
+            device_actions=state.device_actions,
             approval_status=state.approval_status,
             redaction_mode="audit",
             privacy_mode=self._config.privacy_mode,
@@ -847,6 +850,106 @@ class GovernanceRuntime:
             approval_id=ticket.approval_id,
             explain=explain,
         )
+        self._record_decision(run_id, decision)
+        return decision, ticket
+
+    def request_device_action_approval(
+        self,
+        *,
+        run_id: str,
+        target_ref: str,
+        action_payload: dict[str, Any],
+        reason_code: str = "POLICY_REQUIRE_APPROVAL",
+        explain: str = "device action requires explicit approval",
+    ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
+        if not self._gov.enabled:
+            decision = self._default_allow_decision(
+                phase=GovernancePhase.DEVICE_ACTION,
+                target=target_ref,
+            )
+            return decision, None
+        if self._policy_bundle is None:
+            decision = GovernanceDecision(
+                phase=GovernancePhase.DEVICE_ACTION,
+                target=target_ref,
+                action=GovernanceAction.DENY,
+                reason_code="POLICY_UNAVAILABLE",
+                matched_rule_path=None,
+                policy_schema_version="unavailable",
+                policy_version="unavailable",
+                policy_hash="unavailable",
+                decision_engine_version=self._gov.decision_engine_version,
+                explain=self._policy_error,
+            )
+            self._record_decision(run_id, decision)
+            return decision, None
+
+        action_hash = self._hash_payload(
+            {
+                "kind": "device_action",
+                "target_ref": target_ref,
+                "action": action_payload,
+                "policy_hash": self._policy_bundle.policy_hash,
+            }
+        )
+        snapshot = {
+            "kind": "device_action",
+            "target_kind": "device_action",
+            "target_ref": target_ref,
+            "action_hash": action_hash,
+            "policy_hash": self._policy_bundle.policy_hash,
+            **action_payload,
+        }
+        request_hash = self._hash_payload(
+            {
+                "target_ref": target_ref,
+                "action_id": action_payload.get("action_id"),
+                "category": action_payload.get("category"),
+                "risk_class": action_payload.get("risk_class"),
+            }
+        )
+        snapshot_hash = self._hash_payload(snapshot)
+        ticket = self._approval_store.create_ticket(
+            run_id=run_id,
+            target_kind="device_action",
+            target_ref=target_ref,
+            action_hash=action_hash,
+            policy_hash=self._policy_bundle.policy_hash,
+            request_hash=request_hash,
+            snapshot_hash=snapshot_hash,
+            snapshot=snapshot,
+            ttl_seconds=self._gov.approval_ttl_seconds,
+            idempotency_key=f"device_action:{run_id}:{snapshot_hash}",
+        )
+        decision = GovernanceDecision(
+            phase=GovernancePhase.DEVICE_ACTION,
+            target=target_ref,
+            action=GovernanceAction.REQUIRE_APPROVAL,
+            reason_code=reason_code,
+            matched_rule_path="manual_device_action",
+            policy_schema_version=self._policy_bundle.policy.policy_schema_version,
+            policy_version=self._policy_bundle.policy.policy_version,
+            policy_hash=self._policy_bundle.policy_hash,
+            decision_engine_version=self._gov.decision_engine_version,
+            approval_required=True,
+            approval_id=ticket.approval_id,
+            explain=explain,
+        )
+        self._record_device_action(
+            run_id,
+            DeviceActionRecord(
+                action_id=str(action_payload.get("action_id") or ""),
+                category=str(action_payload.get("category") or ""),
+                risk_class=str(action_payload.get("risk_class") or ""),
+                target_ref=target_ref,
+                app_identity=str(action_payload.get("app_identity") or ""),
+                window_identity=str(action_payload.get("window_identity") or ""),
+                selector_source=str(action_payload.get("selector_source") or ""),
+                decision_action=decision.action,
+                reason_code=decision.reason_code,
+            ),
+        )
+        self._set_approval_status(run_id, "pending")
         self._record_decision(run_id, decision)
         return decision, ticket
 
@@ -971,6 +1074,10 @@ class GovernanceRuntime:
     def _record_memory_write(self, run_id: str, memory_write: MemoryWriteRecord) -> None:
         state = self._runs.setdefault(run_id, GovernanceRunState())
         state.memory_writes.append(memory_write)
+
+    def _record_device_action(self, run_id: str, device_action: DeviceActionRecord) -> None:
+        state = self._runs.setdefault(run_id, GovernanceRunState())
+        state.device_actions.append(device_action)
 
     def _set_approval_status(self, run_id: str, status: str) -> None:
         state = self._runs.setdefault(run_id, GovernanceRunState())

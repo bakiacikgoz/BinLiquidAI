@@ -432,6 +432,7 @@ def test_team_list_returns_jobs_and_since_filter(monkeypatch, tmp_path: Path) ->
     listed = runner.invoke(app, ["team", "list", "--root-dir", str(root), "--json"])
     assert listed.exit_code == 0
     listed_payload = json.loads(listed.stdout)
+    assert listed_payload["contract_version"] == "2.0"
     assert listed_payload["count"] == 2
     assert [item["job_id"] for item in listed_payload["items"]] == ["job-new", "job-old"]
 
@@ -484,6 +485,7 @@ def test_team_replay_verify_reports_verified(monkeypatch, tmp_path: Path) -> Non
     )
     assert replay.exit_code == 0
     replay_payload = json.loads(replay.stdout)
+    assert replay_payload["contract_version"] == "2.0"
     assert replay_payload["verified"] is True
     assert replay_payload["checks"]["event_count"] >= 1
     assert isinstance(replay_payload["trace_refs"], list)
@@ -520,3 +522,51 @@ def test_team_validate_rejects_unknown_tool_policy_profile(tmp_path: Path) -> No
     result = json.loads(validate.stdout)
     assert result["status"] == "invalid"
     assert any("tool_policy_profile" in item for item in result["errors"])
+
+
+def test_team_run_accepts_explicit_job_id(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    spec_path = tmp_path / "team.json"
+    _write_spec(spec_path)
+
+    monkeypatch.setattr(
+        "binliquid.cli._build_orchestrator",
+        lambda *a, **k: FakeTeamOrchestrator(),
+    )
+
+    run = runner.invoke(
+        app,
+        [
+            "team",
+            "run",
+            "--spec",
+            str(spec_path),
+            "--once",
+            "short request",
+            "--job-id",
+            "job-ui-custom",
+            "--json",
+        ],
+    )
+    assert run.exit_code == 0
+    payload = json.loads(run.stdout)
+    assert payload["job"]["job_id"] == "job-ui-custom"
+    assert (tmp_path / ".binliquid" / "team" / "jobs" / "job-ui-custom" / "status.json").exists()
+
+
+def test_operator_capabilities_exposes_workspace_parity_flags() -> None:
+    result = runner.invoke(app, ["operator", "capabilities", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["contractVersion"] == "2.0"
+    assert payload["features"]["operatorWorkflowParity"] is True
+    assert payload["features"]["enterpriseOpsParity"] is True
+    assert payload["features"]["computerUsePilot"]["scope"] == "browser+desktop+file"
+    assert payload["features"]["computerUsePilot"]["adapterStatus"] == "safari_applescript"
+    assert payload["commands"]["teamSubmit"] is True
+    assert payload["commands"]["teamResumeSubmit"] is True
+    assert payload["commands"]["computerUseSubmit"] is True
+    assert payload["commands"]["computerUsePause"] is True
+    assert payload["commands"]["computerUseResume"] is True
+    assert payload["commands"]["computerUseStop"] is True
+    assert "balanced" in payload["profiles"]

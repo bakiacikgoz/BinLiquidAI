@@ -6,6 +6,7 @@ import shutil
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -13,6 +14,9 @@ from benchmarks.run_ablation import run_ablation_benchmark, run_energy_benchmark
 from benchmarks.run_smoke import run_smoke_benchmark
 from benchmarks.run_team import run_team_benchmark
 from binliquid import __version__
+from binliquid.computer_use import ComputerUseMode
+from binliquid.computer_use.runtime import ComputerUseRunner, SessionCommand
+from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import Planner
@@ -77,6 +81,7 @@ research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
 approval_app = typer.Typer(help="Governance approval commands")
 operator_app = typer.Typer(help="Operator panel commands")
+computer_use_app = typer.Typer(help="Computer use execution commands")
 team_app = typer.Typer(help="Team runtime commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
@@ -95,6 +100,7 @@ app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
+app.add_typer(computer_use_app, name="computer-use")
 app.add_typer(team_app, name="team")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
@@ -412,6 +418,39 @@ def _require_permission_or_exit(config: RuntimeConfig, permission: str):
         raise typer.Exit(code=1) from None
 
 
+def _supported_profiles() -> list[str]:
+    config_dir = Path(__file__).resolve().parents[1] / "config"
+    known_order = ["balanced", "restricted", "enterprise", "research", "lite", "default"]
+    discovered = {
+        path.stem
+        for path in config_dir.glob("*.toml")
+        if path.is_file() and path.stem != "policies"
+    }
+    ordered = [name for name in known_order if name in discovered]
+    extras = sorted(discovered - set(ordered))
+    return [*ordered, *extras]
+
+
+def _with_contract_version(payload: dict[str, Any]) -> dict[str, Any]:
+    return {"contract_version": OPERATOR_PANEL_CONTRACT_VERSION, **payload}
+
+
+def _parse_computer_use_mode(mode: str) -> ComputerUseMode:
+    normalized = mode.strip().lower()
+    aliases = {
+        "assisted": ComputerUseMode.STEP_APPROVAL,
+        "step_approval": ComputerUseMode.STEP_APPROVAL,
+        "step-approval": ComputerUseMode.STEP_APPROVAL,
+        "supervised": ComputerUseMode.EXECUTE,
+        "execute": ComputerUseMode.EXECUTE,
+        "dry_run": ComputerUseMode.DRY_RUN,
+        "dry-run": ComputerUseMode.DRY_RUN,
+    }
+    if normalized not in aliases:
+        raise ValueError(f"unsupported computer use mode: {mode}")
+    return aliases[normalized]
+
+
 @config_app.command("resolve")
 def config_resolve(
     profile: str = typer.Option("balanced", help="Config profile"),
@@ -455,12 +494,14 @@ def config_resolve(
             typer.echo(message)
         raise typer.Exit(code=1)
 
-    payload = {
+    payload = _with_contract_version(
+        {
         "profile": profile,
         "status": "ok",
         "resolved": redact_config_payload(resolved.model_dump(mode="python")),
         "source_map": source_map,
-    }
+        }
+    )
     if json_output:
         typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
     else:
@@ -1049,7 +1090,13 @@ def approval_pending(
         raise typer.Exit(code=1)
     tickets = [item.model_dump(mode="json") for item in runtime.approval_store.list_pending()]
     if json_output:
-        typer.echo(json.dumps({"pending": tickets}, ensure_ascii=False, indent=2))
+        typer.echo(
+            json.dumps(
+                _with_contract_version({"pending": tickets}),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     else:
         typer.echo(f"pending_count={len(tickets)}")
         for item in tickets:
@@ -1090,12 +1137,14 @@ def approval_show(
     ticket_payload["snapshot"] = (
         ticket.snapshot if show_raw_snapshot else _redact_snapshot_payload(ticket.snapshot)
     )
-    payload = {
-        "approval_id": approval_id,
-        "status": ticket.status.value,
-        "execution_status": ticket.execution_status.value,
-        "ticket": ticket_payload,
-    }
+    payload = _with_contract_version(
+        {
+            "approval_id": approval_id,
+            "status": ticket.status.value,
+            "execution_status": ticket.execution_status.value,
+            "ticket": ticket_payload,
+        }
+    )
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -1131,11 +1180,13 @@ def approval_decide(
         actor=actor,
         reason=reason,
     )
-    payload = {
-        "approval_id": approval_id,
-        "error_code": result.error_code,
-        "ticket": result.ticket.model_dump(mode="json") if result.ticket else None,
-    }
+    payload = _with_contract_version(
+        {
+            "approval_id": approval_id,
+            "error_code": result.error_code,
+            "ticket": result.ticket.model_dump(mode="json") if result.ticket else None,
+        }
+    )
     typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     if result.error_code:
         raise typer.Exit(code=1)
@@ -1224,14 +1275,16 @@ def approval_execute(
         session_context=context,
         use_router=True,
     )
-    output = {
-        "approval_id": approval_id,
-        "actor": actor,
-        "execution_used_path": result.used_path,
-        "trace_id": result.trace_id,
-        "fallback_events": result.fallback_events,
-        "metrics": result.metrics,
-    }
+    output = _with_contract_version(
+        {
+            "approval_id": approval_id,
+            "actor": actor,
+            "execution_used_path": result.used_path,
+            "trace_id": result.trace_id,
+            "fallback_events": result.fallback_events,
+            "metrics": result.metrics,
+        }
+    )
     if result.used_path in {"governance_pending", "governance_blocked"}:
         runtime.approval_store.mark_execution_failed(
             approval_id=approval_id,
@@ -1338,25 +1391,53 @@ def operator_capabilities(
 ) -> None:
     payload = {
         "coreVersion": __version__,
-        "contractVersion": "2.0",
+        "contractVersion": OPERATOR_PANEL_CONTRACT_VERSION,
+        "profiles": _supported_profiles(),
+        "features": {
+            "operatorWorkflowParity": True,
+            "enterpriseOpsParity": True,
+            "computerUsePilot": {
+                "enabled": True,
+                "stage": "execution_slice",
+                "platform": "macos",
+                "scope": "browser+desktop+file",
+                "executionModes": ["dry_run", "step_approval", "execute"],
+                "replayable": True,
+                "failClosed": True,
+                "adapterStatus": "safari_applescript",
+            },
+        },
         "commands": {
+            "teamSubmit": True,
+            "teamResumeSubmit": True,
             "teamListJson": True,
+            "teamStatusJson": True,
             "teamReplayJson": True,
             "approvalShowJson": True,
             "approvalPendingJson": True,
             "approvalDecide": True,
             "approvalExecute": True,
+            "configResolveJson": True,
             "authWhoamiJson": True,
             "authCheckJson": True,
             "securityBaselineJson": True,
             "keysStatusJson": True,
             "keysVerifyJson": True,
+            "keysRotatePlanJson": True,
             "backupCreateJson": True,
             "backupVerifyJson": True,
             "restoreVerifyJson": True,
             "supportBundleExportJson": True,
             "metricsSnapshotJson": True,
             "gaReadinessJson": True,
+            "qualificationRunJson": True,
+            "migratePlanJson": True,
+            "migrateApplyDryRunJson": True,
+            "computerUseSubmit": True,
+            "computerUsePause": True,
+            "computerUseResume": True,
+            "computerUseStop": True,
+            "computerUseStateJson": True,
         },
         "artifactSchema": {
             "auditEnvelope": "3",
@@ -1371,6 +1452,147 @@ def operator_capabilities(
         typer.echo(
             f"coreVersion={payload['coreVersion']} contractVersion={payload['contractVersion']}"
         )
+
+
+@computer_use_app.command("run")
+def computer_use_run(
+    once: str = typer.Option(..., "--once", help="Computer-use request"),
+    job_id: str | None = typer.Option(None, "--job-id", help="Explicit job id"),
+    case_id: str | None = typer.Option(None, "--case-id", help="Optional case id"),
+    root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    mode: str = typer.Option("supervised", "--mode", help="assisted|supervised|dry-run"),
+    provider: str | None = typer.Option(None, help="Override provider"),
+    fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
+    model: str | None = typer.Option(None, "--model", help="Override model"),
+    hf_model_id: str | None = typer.Option(None, "--hf-model-id", help="Override HF model id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    resolved_mode = _parse_computer_use_mode(mode)
+    config, _source_map = resolve_runtime_config(
+        profile=profile,
+        root_dir=Path.cwd(),
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    _require_permission_or_exit(config, "runtime.run")
+    effective_root = root_dir or config.team.artifact_dir
+    effective_job_id = job_id or f"cu-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+    runner = ComputerUseRunner(config=config, root_dir=effective_root)
+    try:
+        payload = runner.run(
+            prompt=once,
+            job_id=effective_job_id,
+            case_id=case_id,
+            mode=resolved_mode,
+        )
+    except Exception as exc:  # noqa: BLE001
+        payload = _with_contract_version(
+            {
+                "status": "error",
+                "job_id": effective_job_id,
+                "root_dir": effective_root,
+                "error": str(exc),
+            }
+        )
+        if json_output:
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            typer.echo(str(exc))
+        raise typer.Exit(code=1) from None
+
+    output = _with_contract_version(
+        {
+            "status": "ok",
+            "job_id": effective_job_id,
+            "root_dir": effective_root,
+            **payload,
+        }
+    )
+    if json_output:
+        typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"job_id={effective_job_id} status={payload['job']['status']}")
+
+
+@computer_use_app.command("pause")
+def computer_use_pause(
+    job_id: str = typer.Option(..., "--job-id", help="Session job id"),
+    root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    runner = ComputerUseRunner(config=config, root_dir=root_dir or config.team.artifact_dir)
+    payload = _with_contract_version(runner.request_control(job_id=job_id, command=SessionCommand.PAUSE))
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"job_id={job_id} requested=pause")
+
+
+@computer_use_app.command("resume")
+def computer_use_resume(
+    job_id: str = typer.Option(..., "--job-id", help="Session job id"),
+    root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    runner = ComputerUseRunner(config=config, root_dir=root_dir or config.team.artifact_dir)
+    try:
+        payload = _with_contract_version(
+            runner.request_control(job_id=job_id, command=SessionCommand.RESUME)
+        )
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(
+            json.dumps(
+                _with_contract_version({"status": "error", "job_id": job_id, "error": str(exc)}),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=1) from None
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"job_id={job_id} requested=resume")
+
+
+@computer_use_app.command("stop")
+def computer_use_stop(
+    job_id: str = typer.Option(..., "--job-id", help="Session job id"),
+    root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    runner = ComputerUseRunner(config=config, root_dir=root_dir or config.team.artifact_dir)
+    payload = _with_contract_version(runner.request_control(job_id=job_id, command=SessionCommand.STOP))
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"job_id={job_id} requested=stop")
+
+
+@computer_use_app.command("state")
+def computer_use_state(
+    job_id: str = typer.Option(..., "--job-id", help="Session job id"),
+    root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    runner = ComputerUseRunner(config=config, root_dir=root_dir or config.team.artifact_dir)
+    payload = _with_contract_version(runner.session_state(job_id=job_id))
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"job_id={job_id} state={payload.get('computer_use', {}).get('lifecycle_state')}")
 
 
 @team_app.command("init")
@@ -1484,7 +1706,9 @@ def team_list(
 
     base = Path(root_dir)
     if not base.exists():
-        payload = {"status": "ok", "root_dir": str(base), "count": 0, "items": [], "errors": []}
+        payload = _with_contract_version(
+            {"status": "ok", "root_dir": str(base), "count": 0, "items": [], "errors": []}
+        )
         if json_output:
             typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
         else:
@@ -1534,13 +1758,15 @@ def team_list(
         )
 
     items.sort(key=lambda item: str(item.get("created_at") or ""), reverse=True)
-    output = {
-        "status": "ok",
-        "root_dir": str(base),
-        "count": len(items),
-        "items": items,
-        "errors": errors,
-    }
+    output = _with_contract_version(
+        {
+            "status": "ok",
+            "root_dir": str(base),
+            "count": len(items),
+            "items": items,
+            "errors": errors,
+        }
+    )
     if json_output:
         typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
     else:
@@ -1557,6 +1783,7 @@ def team_run(
     spec: str = typer.Option(..., "--spec", help="Team spec path"),
     once: str = typer.Option(..., "--once", help="Single request for one team job"),
     case_id: str | None = typer.Option(None, "--case-id", help="Optional existing case id"),
+    job_id: str | None = typer.Option(None, "--job-id", help="Optional explicit job id"),
     profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
@@ -1594,14 +1821,16 @@ def team_run(
         raise typer.Exit(code=2)
 
     supervisor = TeamSupervisor(orchestrator=orchestrator, config=config)
-    result = supervisor.run(spec=parsed, request=once, case_id=case_id)
-    payload = {
-        "job": result.job.model_dump(mode="json"),
-        "tasks": [item.model_dump(mode="json") for item in result.tasks],
-        "handoff_count": len(result.handoffs),
-        "event_count": len(result.events),
-        "audit_envelope_path": result.audit_envelope_path,
-    }
+    result = supervisor.run(spec=parsed, request=once, case_id=case_id, job_id=job_id)
+    payload = _with_contract_version(
+        {
+            "job": result.job.model_dump(mode="json"),
+            "tasks": [item.model_dump(mode="json") for item in result.tasks],
+            "handoff_count": len(result.handoffs),
+            "event_count": len(result.events),
+            "audit_envelope_path": result.audit_envelope_path,
+        }
+    )
     write_artifact("team_summary", payload)
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -1748,17 +1977,19 @@ def team_resume(
         continuation_state=continuation_state,
     )
 
-    payload = {
-        "status": "ok",
-        "resumed_from_job_id": job_id,
-        "job": result.job.model_dump(mode="json"),
-        "tasks": [item.model_dump(mode="json") for item in result.tasks],
-        "handoff_count": len(result.handoffs),
-        "event_count": len(result.events),
-        "resolved_approvals": resolved,
-        "resume_outcomes": result.resume_outcomes,
-        "audit_envelope_path": result.audit_envelope_path,
-    }
+    payload = _with_contract_version(
+        {
+            "status": "ok",
+            "resumed_from_job_id": job_id,
+            "job": result.job.model_dump(mode="json"),
+            "tasks": [item.model_dump(mode="json") for item in result.tasks],
+            "handoff_count": len(result.handoffs),
+            "event_count": len(result.events),
+            "resolved_approvals": resolved,
+            "resume_outcomes": result.resume_outcomes,
+            "audit_envelope_path": result.audit_envelope_path,
+        }
+    )
     write_artifact("team_summary", payload)
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -1777,7 +2008,7 @@ def team_status(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
-        payload = load_job_status(job_id, root_dir=root_dir)
+        payload = _with_contract_version(load_job_status(job_id, root_dir=root_dir))
     except Exception as exc:  # noqa: BLE001
         typer.echo(
             json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2)
@@ -1824,7 +2055,7 @@ def team_replay(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
-        payload = replay_job(job_id, root_dir=root_dir, verify=verify)
+        payload = _with_contract_version(replay_job(job_id, root_dir=root_dir, verify=verify))
     except Exception as exc:  # noqa: BLE001
         typer.echo(
             json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2)
@@ -1864,12 +2095,14 @@ def team_artifacts(
             copied.append(str(target))
     typer.echo(
         json.dumps(
-            {
-                "status": "ok",
-                "job_id": job_id,
-                "export_dir": str(destination),
-                "files": copied,
-            },
+            _with_contract_version(
+                {
+                    "status": "ok",
+                    "job_id": job_id,
+                    "export_dir": str(destination),
+                    "files": copied,
+                }
+            ),
             ensure_ascii=False,
             indent=2,
         )
@@ -2012,7 +2245,7 @@ def auth_whoami(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
-    payload = describe_actor(config)
+    payload = _with_contract_version(describe_actor(config))
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2029,7 +2262,7 @@ def auth_check(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
-    payload = check_permission(config, permission=permission)
+    payload = _with_contract_version(check_permission(config, permission=permission))
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2045,7 +2278,7 @@ def security_baseline(
 ) -> None:
     ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
-    payload = security_posture(config)
+    payload = _with_contract_version(security_posture(config))
     write_signed_json(
         path="artifacts/security_posture.json",
         artifact="security_posture",
@@ -2067,7 +2300,7 @@ def keys_status_cmd(
     profile: str = typer.Option("enterprise", help="Config profile"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    payload = key_status(RuntimeConfig.from_profile(profile))
+    payload = _with_contract_version(key_status(RuntimeConfig.from_profile(profile)))
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2080,7 +2313,9 @@ def keys_verify_cmd(
     profile: str = typer.Option("enterprise", help="Config profile"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    payload = verify_signed_artifact(path=path, config=RuntimeConfig.from_profile(profile))
+    payload = _with_contract_version(
+        verify_signed_artifact(path=path, config=RuntimeConfig.from_profile(profile))
+    )
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2097,11 +2332,13 @@ def keys_rotate_plan_cmd(
     retire_after: str | None = typer.Option(None, "--retire-after", help="Planned retirement time"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    payload = rotate_plan(
-        RuntimeConfig.from_profile(profile),
-        next_key_id=next_key_id,
-        activate_at=activate_at,
-        retire_after=retire_after,
+    payload = _with_contract_version(
+        rotate_plan(
+            RuntimeConfig.from_profile(profile),
+            next_key_id=next_key_id,
+            activate_at=activate_at,
+            retire_after=retire_after,
+        )
     )
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -2114,7 +2351,7 @@ def migrate_plan_cmd(
     profile: str = typer.Option("enterprise", help="Config profile"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    payload = migration_plan(RuntimeConfig.from_profile(profile))
+    payload = _with_contract_version(migration_plan(RuntimeConfig.from_profile(profile)))
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2129,7 +2366,7 @@ def migrate_apply_cmd(
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
     _require_permission_or_exit(config, "maintenance.enter")
-    payload = migration_apply(config, dry_run=dry_run)
+    payload = _with_contract_version(migration_apply(config, dry_run=dry_run))
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2144,7 +2381,7 @@ def backup_create_cmd(
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
     _require_permission_or_exit(config, "backup.create")
-    payload = create_backup(config, output_dir=output_dir)
+    payload = _with_contract_version(create_backup(config, output_dir=output_dir))
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2157,7 +2394,9 @@ def backup_verify_cmd(
     profile: str = typer.Option("enterprise", help="Config profile"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    payload = restore_verify(RuntimeConfig.from_profile(profile), backup_dir=backup_dir)
+    payload = _with_contract_version(
+        restore_verify(RuntimeConfig.from_profile(profile), backup_dir=backup_dir)
+    )
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2174,7 +2413,7 @@ def restore_verify_cmd(
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
     _require_permission_or_exit(config, "restore.verify")
-    payload = restore_verify(config, backup_dir=backup_dir)
+    payload = _with_contract_version(restore_verify(config, backup_dir=backup_dir))
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2191,7 +2430,7 @@ def support_bundle_export_cmd(
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
     _require_permission_or_exit(config, "support.export")
-    payload = export_support_bundle(config, output_path=output)
+    payload = _with_contract_version(export_support_bundle(config, output_path=output))
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -2205,7 +2444,7 @@ def metrics_snapshot_cmd(
 ) -> None:
     ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
-    payload = collect_metrics_snapshot(config)
+    payload = _with_contract_version(collect_metrics_snapshot(config))
     write_signed_json(
         path="artifacts/metrics_snapshot.json",
         artifact="metrics_snapshot",
@@ -2240,7 +2479,9 @@ def ga_readiness_cmd(
 ) -> None:
     ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
-    payload = ga_readiness_report(config, qualification_report_path=qualification_report)
+    payload = _with_contract_version(
+        ga_readiness_report(config, qualification_report_path=qualification_report)
+    )
     write_signed_json(
         path=report,
         artifact="ga_readiness_report",
@@ -2345,17 +2586,20 @@ def qualification_run_cmd(
         )
     except Exception as exc:  # noqa: BLE001
         error_code = getattr(exc, "error_code", "QUALIFICATION_FAILED")
-        payload = {
-            "status": "error",
-            "error_code": error_code,
-            "error": str(exc),
-        }
+        payload = _with_contract_version(
+            {
+                "status": "error",
+                "error_code": error_code,
+                "error": str(exc),
+            }
+        )
         if json_output:
             typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
         else:
             typer.echo(f"{error_code}: {exc}")
         raise typer.Exit(code=2) from None
 
+    payload = _with_contract_version(payload)
     paths = write_qualification_report(payload=payload, config=resolved, output_root=output_root)
     payload.setdefault("artifacts", {})
     payload["artifacts"].update(paths)

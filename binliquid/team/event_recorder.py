@@ -25,7 +25,7 @@ class EventRecorder:
         self._case_id = case_id
         self._job_id = job_id
         self._sink = sink
-        self._lock = lock
+        self._lock = _shared_lock(str(paths.events_path))
         self._event_seq = 0
 
     def emit(
@@ -59,6 +59,7 @@ class EventRecorder:
         data: dict[str, Any] | None = None,
     ) -> TeamEvent:
         with self._lock:
+            self._sync_event_seq()
             self._event_seq += 1
             payload = data or {}
             entry = TeamEvent(
@@ -97,7 +98,36 @@ class EventRecorder:
             write_event(self._paths, entry)
             return entry
 
+    def _sync_event_seq(self) -> None:
+        if not self._paths.events_path.exists():
+            return
+        lines = [
+            line
+            for line in self._paths.events_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        if not lines:
+            return
+        try:
+            payload = json.loads(lines[-1])
+        except json.JSONDecodeError:
+            return
+        self._event_seq = max(self._event_seq, int(payload.get("event_seq") or 0))
+
 
 def _payload_hash(payload: dict[str, Any]) -> str:
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+_LOCK_GUARD = Lock()
+_PATH_LOCKS: dict[str, Lock] = {}
+
+
+def _shared_lock(key: str) -> Lock:
+    with _LOCK_GUARD:
+        lock = _PATH_LOCKS.get(key)
+        if lock is None:
+            lock = Lock()
+            _PATH_LOCKS[key] = lock
+        return lock
