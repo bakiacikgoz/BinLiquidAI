@@ -1,18 +1,23 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 from binliquid.computer_use.adapters import BrowserAdapter, FileDialogAdapter, WindowMetadata
+from binliquid.computer_use.adapters._macos import MacOSAutomationError
 from binliquid.computer_use.models import (
     BrowserTaskFamily,
     ComputerUseMode,
+    ComputerUseReadinessStatus,
     EvidenceEnvelope,
     PerceptionSnapshot,
     PerceptionSource,
     ProposedAction,
+    ReadinessReport,
     SelectorContext,
     SessionExecutionState,
     SurfaceObservation,
@@ -57,11 +62,15 @@ class _FakeDesktopAdapter:
         self._dialog_open = False
         self._window_titles = {
             "Safari": "Safari window",
+            "Finder": "Finder window",
             "Notes": "Notes window",
+            "TextEdit": "TextEdit window",
         }
         self._bundle_ids = {
             "Safari": "com.apple.Safari",
+            "Finder": "com.apple.finder",
             "Notes": "com.apple.Notes",
+            "TextEdit": "com.apple.TextEdit",
         }
 
     def launch_app(self, app_name: str) -> None:
@@ -105,6 +114,113 @@ class _FakeDesktopAdapter:
             bundle_id=self.bundle_id(self._frontmost),
             focused_window_title=self._window_titles.get(target_app, f"{target_app} window"),
             modal_detected=self._dialog_open,
+            visible_selectors=None,
+            captured_at="2026-03-14T00:00:00+00:00",
+        )
+
+
+class _FakeFinderAdapter:
+    def __init__(self, *, desktop: _FakeDesktopAdapter, dialog: FileDialogAdapter) -> None:
+        self._desktop = desktop
+        self._dialog = dialog
+        self._selected_paths: list[str] = []
+
+    def reveal_path(self, path: str) -> str:
+        resolved = self._dialog.verify_file_exists(path)
+        self._selected_paths = [resolved]
+        self._desktop.focus_window("Finder")
+        return resolved
+
+    def rename_path(self, *, path: str, new_name: str) -> str:
+        source = Path(self._dialog.verify_file_exists(path))
+        destination = self._dialog.ensure_scoped_path(source.with_name(new_name))
+        source.rename(destination)
+        return self.reveal_path(str(destination))
+
+    def move_path(self, *, source: str, destination: str) -> str:
+        source_path = Path(self._dialog.verify_file_exists(source))
+        destination_path = self._dialog.ensure_scoped_path(destination)
+        if destination_path.exists() and destination_path.is_dir():
+            destination_path = self._dialog.ensure_scoped_path(destination_path / source_path.name)
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.rename(destination_path)
+        return self.reveal_path(str(destination_path))
+
+    def selected_paths(self) -> list[str]:
+        return list(self._selected_paths)
+
+    def current_folder(self) -> str | None:
+        if not self._selected_paths:
+            return None
+        return str(Path(self._selected_paths[0]).parent)
+
+    def observe_surface(self) -> SurfaceObservation:
+        return SurfaceObservation(
+            foreground_app=self._desktop.frontmost_app(),
+            bundle_id=self._desktop.bundle_id("Finder"),
+            focused_window_title="Finder window",
+            selected_paths=list(self._selected_paths),
+            active_document_path=self.current_folder(),
+            modal_detected=False,
+            visible_selectors=None,
+            captured_at="2026-03-14T00:00:00+00:00",
+        )
+
+
+class _FakeTextEditAdapter:
+    def __init__(self, *, desktop: _FakeDesktopAdapter, dialog: FileDialogAdapter) -> None:
+        self._desktop = desktop
+        self._dialog = dialog
+        self._current_path: str | None = None
+        self._text = ""
+
+    def open_file(self, path: str) -> str:
+        resolved = self._dialog.ensure_scoped_path(path)
+        if not resolved.exists():
+            resolved.parent.mkdir(parents=True, exist_ok=True)
+            resolved.write_text("", encoding="utf-8")
+        self._current_path = str(resolved)
+        self._text = resolved.read_text(encoding="utf-8")
+        self._desktop.focus_window("TextEdit")
+        return self._current_path
+
+    def append_text(self, *, text: str, path: str | None = None) -> str:
+        if path:
+            self.open_file(path)
+        if self._current_path is None:
+            raise RuntimeError("no_open_document")
+        self._desktop.focus_window("TextEdit")
+        self._text += text
+        return self._current_path
+
+    def save_document(self, *, path: str | None = None) -> str:
+        if path:
+            resolved = self._dialog.ensure_scoped_path(path)
+            if self._current_path is None:
+                self.open_file(path)
+            else:
+                resolved.parent.mkdir(parents=True, exist_ok=True)
+                self._current_path = str(resolved)
+        if self._current_path is None:
+            raise RuntimeError("no_open_document")
+        resolved = Path(self._current_path)
+        resolved.write_text(self._text, encoding="utf-8")
+        self._desktop.focus_window("TextEdit")
+        return self._current_path
+
+    def current_document_path(self) -> str | None:
+        return self._current_path
+
+    def current_document_text(self) -> str:
+        return self._text
+
+    def observe_surface(self) -> SurfaceObservation:
+        return SurfaceObservation(
+            foreground_app=self._desktop.frontmost_app(),
+            bundle_id=self._desktop.bundle_id("TextEdit"),
+            focused_window_title="TextEdit window",
+            active_document_path=self._current_path,
+            modal_detected=False,
             visible_selectors=None,
             captured_at="2026-03-14T00:00:00+00:00",
         )
@@ -325,6 +441,27 @@ def test_prompt_parser_builds_an_automation_sequence() -> None:
     assert actions[2].parameters["text"] == "Aegis"
 
 
+def test_prompt_parser_builds_local_desktop_actions() -> None:
+    family, actions = parse_prompt_to_actions(
+        prompt=(
+            'finder_reveal "/tmp/report.txt"\n'
+            'textedit_open "/tmp/note.txt"\n'
+            'textedit_append "reviewed"'
+        ),
+        mode=ComputerUseMode.EXECUTE,
+    )
+
+    assert family == BrowserTaskFamily.AUTOMATION_SEQUENCE
+    assert [item.action_id for item in actions] == [
+        "finder_reveal",
+        "textedit_open",
+        "textedit_append",
+    ]
+    assert actions[0].app_identity == "desktop:Finder"
+    assert actions[1].verification_kind == "document_path"
+    assert actions[2].verification_kind == "document_contains"
+
+
 def test_session_control_bus_round_trips_commands(tmp_path: Path) -> None:
     job_dir = tmp_path / "job-control"
     job_dir.mkdir()
@@ -381,6 +518,147 @@ def test_computer_use_runner_executes_a_real_runtime_slice_with_fake_adapters(
     event_names = _read_event_names(root_dir / "job-runtime-complete" / "events.jsonl")
     assert "action_verified" in event_names
     assert "session_completed" in event_names
+
+
+def test_computer_use_runner_executes_finder_local_file_flow(tmp_path: Path) -> None:
+    root_dir = tmp_path / "jobs"
+    source_dir = tmp_path / "incoming"
+    source_dir.mkdir()
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    source_path = source_dir / "report.txt"
+    source_path.write_text("queued report", encoding="utf-8")
+    renamed_path = source_dir / "report-renamed.txt"
+    final_path = processed_dir / renamed_path.name
+    config = RuntimeConfig.from_profile("default")
+    desktop = _FakeDesktopAdapter()
+    dialog = FileDialogAdapter(allowed_roots=[tmp_path])
+    runner = ComputerUseRunner(
+        config=config,
+        root_dir=root_dir,
+        adapters=RuntimeAdapters(
+            browser=_FakeBrowserAdapter(desktop=desktop),
+            desktop=desktop,
+            dialog=dialog,
+            finder=_FakeFinderAdapter(desktop=desktop, dialog=dialog),
+            editor=_FakeTextEditAdapter(desktop=desktop, dialog=dialog),
+        ),
+    )
+
+    payload = runner.run(
+        prompt="\n".join(
+            [
+                f'finder_reveal "{source_path}"',
+                f'finder_rename "{source_path}" to "{renamed_path.name}"',
+                f'finder_move "{renamed_path}" to "{processed_dir}"',
+            ]
+        ),
+        job_id="job-runtime-finder-flow",
+        mode=ComputerUseMode.EXECUTE,
+    )
+
+    assert payload["job"]["status"] == "completed"
+    assert final_path.exists()
+    status_payload = json.loads(
+        (root_dir / "job-runtime-finder-flow" / "status.json").read_text(encoding="utf-8")
+    )
+    assert status_payload["computer_use"]["world_model"]["selected_paths"] == [str(final_path)]
+    assert (
+        status_payload["computer_use"]["artifacts"]["finder_move"]["result_path"]
+        == str(final_path)
+    )
+
+
+def test_computer_use_runner_executes_textedit_local_edit_flow(tmp_path: Path) -> None:
+    root_dir = tmp_path / "jobs"
+    document_path = tmp_path / "notes.txt"
+    document_path.write_text("hello", encoding="utf-8")
+    config = RuntimeConfig.from_profile("default")
+    desktop = _FakeDesktopAdapter()
+    dialog = FileDialogAdapter(allowed_roots=[tmp_path])
+    runner = ComputerUseRunner(
+        config=config,
+        root_dir=root_dir,
+        adapters=RuntimeAdapters(
+            browser=_FakeBrowserAdapter(desktop=desktop),
+            desktop=desktop,
+            dialog=dialog,
+            finder=_FakeFinderAdapter(desktop=desktop, dialog=dialog),
+            editor=_FakeTextEditAdapter(desktop=desktop, dialog=dialog),
+        ),
+    )
+
+    payload = runner.run(
+        prompt="\n".join(
+            [
+                f'textedit_open "{document_path}"',
+                'textedit_append " world"',
+                f'textedit_save "{document_path}"',
+            ]
+        ),
+        job_id="job-runtime-textedit-flow",
+        mode=ComputerUseMode.EXECUTE,
+    )
+
+    assert payload["job"]["status"] == "completed"
+    assert document_path.read_text(encoding="utf-8") == "hello world"
+    status_payload = json.loads(
+        (root_dir / "job-runtime-textedit-flow" / "status.json").read_text(encoding="utf-8")
+    )
+    assert (
+        status_payload["computer_use"]["world_model"]["active_document_path"]
+        == str(document_path)
+    )
+    assert (
+        status_payload["computer_use"]["artifacts"]["textedit_save"]["document_path"]
+        == str(document_path)
+    )
+
+
+def test_computer_use_runner_executes_mixed_browser_and_local_document_flow(
+    tmp_path: Path,
+) -> None:
+    root_dir = tmp_path / "jobs"
+    download_target = tmp_path / "downloaded.txt"
+    config = RuntimeConfig.from_profile("default")
+    desktop = _FakeDesktopAdapter()
+    dialog = FileDialogAdapter(allowed_roots=[tmp_path])
+    runner = ComputerUseRunner(
+        config=config,
+        root_dir=root_dir,
+        adapters=RuntimeAdapters(
+            browser=_FakeBrowserAdapter(desktop=desktop),
+            desktop=desktop,
+            dialog=dialog,
+            finder=_FakeFinderAdapter(desktop=desktop, dialog=dialog),
+            editor=_FakeTextEditAdapter(desktop=desktop, dialog=dialog),
+        ),
+    )
+
+    payload = runner.run(
+        prompt="\n".join(
+            [
+                'open "https://ops.example.internal/report"',
+                f'download "#download" to "{download_target}"',
+                f'textedit_open "{download_target}"',
+                'textedit_append " reviewed"',
+                f'textedit_save "{download_target}"',
+            ]
+        ),
+        job_id="job-runtime-browser-local-flow",
+        mode=ComputerUseMode.EXECUTE,
+    )
+
+    assert payload["job"]["status"] == "completed"
+    assert download_target.read_text(encoding="utf-8") == "download artifact reviewed"
+    status_payload = json.loads(
+        (root_dir / "job-runtime-browser-local-flow" / "status.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert str(download_target) in status_payload["computer_use"]["world_model"][
+        "filesystem_result_set"
+    ]
 
 
 def test_computer_use_runner_allows_launch_app_to_change_foreground_surface(
@@ -1281,3 +1559,204 @@ def test_computer_use_runner_marks_active_recovery_as_not_resumable(tmp_path: Pa
     assert not thread.is_alive()
     assert "error" not in outcome
     assert "computer_use.recovery_not_resumable" in _read_event_names(events_path)
+
+
+def test_computer_use_readiness_report_flags_safari_javascript_blocker(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    downloads_dir = tmp_path / "downloads"
+    downloads_dir.mkdir()
+    desktop = _FakeDesktopAdapter()
+    runner = ComputerUseRunner(
+        config=RuntimeConfig.from_profile("default"),
+        root_dir=tmp_path / "jobs",
+        adapters=RuntimeAdapters(
+            browser=_FakeBrowserAdapter(desktop=desktop),
+            desktop=desktop,
+            dialog=FileDialogAdapter(allowed_roots=[tmp_path, downloads_dir]),
+        ),
+    )
+
+    monkeypatch.setattr(
+        "binliquid.computer_use.runtime.os.uname",
+        lambda: SimpleNamespace(sysname="Darwin"),
+    )
+    monkeypatch.setattr(
+        "binliquid.computer_use.runtime.shutil.which",
+        lambda name: "/usr/bin/osascript" if name == "osascript" else None,
+    )
+
+    class _Proc:
+        returncode = 0
+        stderr = ""
+
+    monkeypatch.setattr(
+        "binliquid.computer_use.runtime.subprocess.run",
+        lambda *args, **kwargs: _Proc(),
+    )
+
+    def fake_run_applescript(script: str, *, timeout_s: float = 15.0) -> str:
+        del timeout_s
+        if "return version" in script:
+            return "18.4"
+        if "UI elements enabled" in script:
+            return "true"
+        if 'do JavaScript "document.readyState"' in script:
+            raise MacOSAutomationError(
+                "Safari got an error: Allow JavaScript from Apple Events is disabled."
+            )
+        return ""
+
+    monkeypatch.setattr(
+        "binliquid.computer_use.runtime.run_applescript",
+        fake_run_applescript,
+    )
+
+    report = runner.readiness_report()
+    js_check = next(
+        item
+        for item in report["checks"]
+        if item["key"] == "safari_javascript_apple_events"
+    )
+    assert any(item["key"] == "finder" for item in report["checks"])
+    assert any(item["key"] == "textedit" for item in report["checks"])
+    assert report["status"] == "blocked"
+    assert js_check["status"] == "fail"
+    assert "Allow JavaScript from Apple Events" in js_check["remediation"]
+
+
+def test_computer_use_doctor_classifies_surface_mismatch(monkeypatch, tmp_path: Path) -> None:
+    root_dir = tmp_path / "jobs"
+    root_dir.mkdir()
+    job_id = "cu-doctor-surface"
+    job_dir = root_dir / job_id
+    job_dir.mkdir()
+    (job_dir / "status.json").write_text(
+        json.dumps(
+            {
+                "job": {
+                    "job_id": job_id,
+                    "case_id": f"case-{job_id}",
+                    "team_id": "aegis-computer-use",
+                    "status": "failed",
+                },
+                "computer_use": {
+                    "session_state": "failed",
+                    "lifecycle_state": "failed",
+                    "stopped_by_user": False,
+                    "surface_mismatch": {
+                        "code": "wrong_tab",
+                        "message": (
+                            "Runtime stopped because the active tab drifted "
+                            "away from the expected URL."
+                        ),
+                    },
+                    "last_control_result": {},
+                    "last_verification_result": {},
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    runner = ComputerUseRunner(
+        config=RuntimeConfig.from_profile("default"),
+        root_dir=root_dir,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_build_readiness_report",
+        lambda: ReadinessReport(
+            status=ComputerUseReadinessStatus.READY,
+            summary="This machine is ready for the pilot.",
+            checked_at="2026-03-14T10:10:00Z",
+            checks=[],
+        ),
+    )
+
+    report = runner.doctor(job_id=job_id)
+    assert report["status"] == "blocked"
+    assert report["surface_mismatch_code"] == "wrong_tab"
+    assert report["job_id"] == job_id
+    assert "expected tab" in report["remediation"]
+
+
+def test_computer_use_summary_aggregates_recent_outcomes(tmp_path: Path) -> None:
+    root_dir = tmp_path / "jobs"
+    root_dir.mkdir()
+    fixtures = [
+        (
+            "cu-summary-success",
+            {
+                "job": {
+                    "job_id": "cu-summary-success",
+                    "status": "completed",
+                    "finished_at": "2026-03-14T10:00:00Z",
+                },
+                "computer_use": {"session_state": "completed"},
+            },
+        ),
+        (
+            "cu-summary-blocked",
+            {
+                "job": {
+                    "job_id": "cu-summary-blocked",
+                    "status": "blocked",
+                    "finished_at": "2026-03-14T10:05:00Z",
+                },
+                "computer_use": {
+                    "session_state": "awaiting_approval",
+                    "last_control_result": {"reason": "approval_not_executed"},
+                },
+            },
+        ),
+        (
+            "cu-summary-failed",
+            {
+                "job": {
+                    "job_id": "cu-summary-failed",
+                    "status": "failed",
+                    "finished_at": "2026-03-14T10:10:00Z",
+                },
+                "computer_use": {
+                    "session_state": "failed",
+                    "surface_mismatch": {"code": "wrong_tab"},
+                },
+            },
+        ),
+        (
+            "cu-summary-stopped",
+            {
+                "job": {
+                    "job_id": "cu-summary-stopped",
+                    "status": "failed",
+                    "finished_at": "2026-03-14T10:15:00Z",
+                },
+                "computer_use": {
+                    "session_state": "stopped",
+                    "stopped_by_user": True,
+                },
+            },
+        ),
+    ]
+    for index, (job_id, payload) in enumerate(fixtures):
+        job_dir = root_dir / job_id
+        job_dir.mkdir()
+        status_path = job_dir / "status.json"
+        status_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        touched = 1_700_000_000 + index
+        os.utime(status_path, (touched, touched))
+
+    runner = ComputerUseRunner(config=RuntimeConfig.from_profile("default"), root_dir=root_dir)
+    summary = runner.summary(limit=4)
+    assert summary["counts"] == {
+        "success": 1,
+        "blocked": 1,
+        "failed": 1,
+        "stopped": 1,
+        "active": 0,
+    }
+    assert summary["top_failure_codes"][0]["code"] in {"wrong_tab", "approval_not_executed"}
+    assert summary["last_success_at"] == "2026-03-14T10:00:00Z"

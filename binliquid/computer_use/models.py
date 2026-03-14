@@ -181,6 +181,9 @@ class SurfaceObservation(BaseModel):
     focused_window_title: str | None = None
     active_tab_url: str | None = None
     active_tab_title: str | None = None
+    selected_paths: list[str] | None = None
+    active_document_path: str | None = None
+    clipboard_text: str | None = None
     modal_detected: bool = False
     visible_selectors: list[str] | None = None
     captured_at: str
@@ -276,6 +279,59 @@ class ControlCommandResult(BaseModel):
     deferred_until_safe_checkpoint: bool = False
 
 
+class ReadinessCheckStatus(StrEnum):
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+class ComputerUseReadinessStatus(StrEnum):
+    READY = "ready"
+    DEGRADED = "degraded"
+    BLOCKED = "blocked"
+
+
+class ReadinessCheck(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    key: str
+    status: ReadinessCheckStatus
+    summary: str
+    remediation: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReadinessReport(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    status: ComputerUseReadinessStatus
+    checks: list[ReadinessCheck] = Field(default_factory=list)
+    summary: str
+    checked_at: str
+
+
+class ComputerUseDoctorReport(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    status: Literal["ok", "warning", "blocked"]
+    summary: str
+    remediation: str | None = None
+    checked_at: str
+    artifact_root: str
+    readiness: ReadinessReport
+    job_id: str | None = None
+    job_dir: str | None = None
+    session_state: str | None = None
+    job_status: str | None = None
+    stopped_by_user: bool = False
+    last_control_result: dict[str, Any] = Field(default_factory=dict)
+    last_verification_result: dict[str, Any] = Field(default_factory=dict)
+    surface_mismatch_code: str | None = None
+    file_operation_mismatch_code: str | None = None
+    suggested_actions: list[str] = Field(default_factory=list)
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
 class VerificationResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -327,6 +383,9 @@ class WorldModel(BaseModel):
     focused_window_title: str | None = None
     current_url: str | None = None
     browser_tab_title: str | None = None
+    active_document_path: str | None = None
+    selected_paths: list[str] = Field(default_factory=list)
+    clipboard_text: str | None = None
     expected_surface: ExpectedSurface | None = None
     observed_surface: SurfaceObservation | None = None
     surface_mismatch: SurfaceMismatch | None = None

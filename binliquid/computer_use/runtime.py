@@ -3,13 +3,17 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 import threading
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -18,11 +22,16 @@ from binliquid.computer_use.adapters import (
     BrowserAdapter,
     DesktopAdapter,
     FileDialogAdapter,
+    FinderAdapter,
     SafariBrowserAdapter,
+    TextEditAdapter,
 )
+from binliquid.computer_use.adapters._macos import MacOSAutomationError, run_applescript
 from binliquid.computer_use.guards import detect_hard_stop
 from binliquid.computer_use.models import (
+    ComputerUseDoctorReport,
     ComputerUseMode,
+    ComputerUseReadinessStatus,
     ComputerUseStopReason,
     ControlCommand,
     ControlCommandResult,
@@ -35,6 +44,9 @@ from binliquid.computer_use.models import (
     PerceptionSnapshot,
     PerceptionSource,
     ProposedAction,
+    ReadinessCheck,
+    ReadinessCheckStatus,
+    ReadinessReport,
     RiskClass,
     SelectorContext,
     SessionExecutionState,
@@ -311,6 +323,8 @@ class RuntimeAdapters:
     browser: BrowserAdapter
     desktop: DesktopAdapter
     dialog: FileDialogAdapter
+    finder: FinderAdapter | None = None
+    editor: TextEditAdapter | None = None
 
 
 class ComputerUseRunner:
@@ -331,19 +345,882 @@ class ComputerUseRunner:
             Path.home().joinpath("Downloads"),
             Path("/tmp"),
         ]
+        desktop_adapter = DesktopAdapter()
+        dialog_adapter = FileDialogAdapter(allowed_roots=allowed_roots)
         runtime_adapters = adapters or RuntimeAdapters(
-            desktop=DesktopAdapter(),
-            dialog=FileDialogAdapter(allowed_roots=allowed_roots),
+            desktop=desktop_adapter,
+            dialog=dialog_adapter,
             browser=SafariBrowserAdapter(
-                desktop_adapter=DesktopAdapter(),
-                dialog_adapter=FileDialogAdapter(allowed_roots=allowed_roots),
+                desktop_adapter=desktop_adapter,
+                dialog_adapter=dialog_adapter,
+            ),
+            finder=FinderAdapter(
+                desktop_adapter=desktop_adapter,
+                dialog_adapter=dialog_adapter,
+            ),
+            editor=TextEditAdapter(
+                desktop_adapter=desktop_adapter,
+                dialog_adapter=dialog_adapter,
             ),
         )
+        if runtime_adapters.finder is None:
+            runtime_adapters.finder = FinderAdapter(
+                desktop_adapter=runtime_adapters.desktop,
+                dialog_adapter=runtime_adapters.dialog,
+            )
+        if runtime_adapters.editor is None:
+            runtime_adapters.editor = TextEditAdapter(
+                desktop_adapter=runtime_adapters.desktop,
+                dialog_adapter=runtime_adapters.dialog,
+            )
         self._adapters = runtime_adapters
         self._registry = registry or SessionRegistry(
             self._root_dir.parent / "computer_use_registry.json"
         )
         self._governance = GovernanceRuntime(config=config)
+
+    def readiness_report(self) -> dict[str, Any]:
+        return self._build_readiness_report().model_dump(mode="json")
+
+    def _build_readiness_report(self) -> ReadinessReport:
+        checked_at = datetime.now(UTC).isoformat()
+        checks: list[ReadinessCheck] = []
+        platform_ok = os.uname().sysname == "Darwin"
+        checks.append(
+            self._readiness_check(
+                key="platform",
+                ok=platform_ok,
+                summary=(
+                    "macOS pilot host detected."
+                    if platform_ok
+                    else "Computer-use pilot currently requires macOS."
+                ),
+                remediation="Run AegisOS computer-use on a macOS pilot machine.",
+                details={"platform": os.uname().sysname},
+            )
+        )
+
+        osascript_path = shutil.which("osascript")
+        checks.append(
+            self._readiness_check(
+                key="osascript",
+                ok=bool(osascript_path),
+                summary=(
+                    "osascript is available for AppleScript automation."
+                    if osascript_path
+                    else "osascript is unavailable on this machine."
+                ),
+                remediation="Install or restore macOS scripting tools before running computer-use.",
+                details={"path": osascript_path or ""},
+            )
+        )
+
+        safari_present = False
+        if platform_ok:
+            proc = subprocess.run(
+                ["open", "-Ra", "Safari"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            safari_present = proc.returncode == 0
+            safari_stderr = proc.stderr.strip()
+        else:
+            safari_stderr = ""
+        checks.append(
+            self._readiness_check(
+                key="safari",
+                ok=safari_present,
+                summary=(
+                    "Safari is installed and discoverable."
+                    if safari_present
+                    else "Safari could not be found on this machine."
+                ),
+                remediation=(
+                    "Install Safari and keep it available for the "
+                    "Safari-first pilot slice."
+                ),
+                details={"stderr": safari_stderr},
+            )
+        )
+        finder_present = False
+        textedit_present = False
+        finder_stderr = ""
+        textedit_stderr = ""
+        if platform_ok:
+            finder_proc = subprocess.run(
+                ["open", "-Ra", "Finder"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            finder_present = finder_proc.returncode == 0
+            finder_stderr = finder_proc.stderr.strip()
+            textedit_proc = subprocess.run(
+                ["open", "-Ra", "TextEdit"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            textedit_present = textedit_proc.returncode == 0
+            textedit_stderr = textedit_proc.stderr.strip()
+        checks.append(
+            self._readiness_check(
+                key="finder",
+                ok=finder_present,
+                summary=(
+                    "Finder is installed and available for local file flows."
+                    if finder_present
+                    else "Finder could not be discovered on this machine."
+                ),
+                remediation="Keep Finder available for local computer-control pilot flows.",
+                details={"stderr": finder_stderr},
+            )
+        )
+        checks.append(
+            self._readiness_check(
+                key="textedit",
+                ok=textedit_present,
+                summary=(
+                    "TextEdit is installed and available for local edit flows."
+                    if textedit_present
+                    else "TextEdit could not be discovered on this machine."
+                ),
+                remediation=(
+                    "Keep TextEdit available or configure another bounded local editor "
+                    "before using local document flows."
+                ),
+                details={"stderr": textedit_stderr},
+            )
+        )
+
+        automation_error: str | None = None
+        automation_ok = False
+        if platform_ok and osascript_path and safari_present:
+            try:
+                run_applescript('tell application "Safari" to return version', timeout_s=5.0)
+                automation_ok = True
+            except MacOSAutomationError as exc:
+                automation_error = str(exc)
+        checks.append(
+            self._readiness_check(
+                key="automation_access",
+                ok=automation_ok,
+                summary=(
+                    "Apple Events automation can talk to Safari."
+                    if automation_ok
+                    else "Safari automation access is unavailable."
+                ),
+                remediation=(
+                    "Allow Terminal/Codex to control Safari in "
+                    "System Settings > Privacy & Security > Automation."
+                ),
+                details={"error": automation_error or ""},
+            )
+        )
+
+        accessibility_error: str | None = None
+        accessibility_ok = False
+        ui_elements_enabled = False
+        if platform_ok and osascript_path:
+            try:
+                raw = run_applescript(
+                    'tell application "System Events" to return UI elements enabled',
+                    timeout_s=5.0,
+                )
+                ui_elements_enabled = raw.strip().lower() == "true"
+                accessibility_ok = ui_elements_enabled
+            except MacOSAutomationError as exc:
+                accessibility_error = str(exc)
+        checks.append(
+            self._readiness_check(
+                key="accessibility_access",
+                ok=accessibility_ok,
+                summary=(
+                    "Accessibility access is enabled for UI scripting."
+                    if accessibility_ok
+                    else "Accessibility access is not available for UI scripting."
+                ),
+                remediation=(
+                    "Enable Accessibility for Terminal/Codex in "
+                    "System Settings > Privacy & Security > Accessibility."
+                ),
+                details={
+                    "ui_elements_enabled": ui_elements_enabled,
+                    "error": accessibility_error or "",
+                },
+            )
+        )
+
+        safari_js_ok = False
+        safari_js_error: str | None = None
+        if platform_ok and osascript_path and safari_present and automation_ok:
+            try:
+                run_applescript(
+                    """
+tell application "Safari"
+  activate
+  if (count of documents) = 0 then
+    make new document with properties {URL:"about:blank"}
+  else
+    set URL of front document to "about:blank"
+  end if
+  delay 0.2
+  return do JavaScript "document.readyState" in front document
+end tell
+""".strip(),
+                    timeout_s=8.0,
+                )
+                safari_js_ok = True
+            except MacOSAutomationError as exc:
+                safari_js_error = str(exc)
+        checks.append(
+            self._readiness_check(
+                key="safari_javascript_apple_events",
+                ok=safari_js_ok,
+                summary=(
+                    "Safari allows JavaScript from Apple Events."
+                    if safari_js_ok
+                    else "Safari blocks JavaScript from Apple Events."
+                ),
+                remediation=(
+                    "Open Safari > Developer and enable Allow JavaScript from Apple Events."
+                ),
+                details={"error": safari_js_error or ""},
+            )
+        )
+
+        runtime_root_error: str | None = None
+        runtime_root_ok = False
+        try:
+            self._root_dir.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                dir=self._root_dir,
+                prefix=".readiness-",
+                delete=True,
+            ):
+                pass
+            runtime_root_ok = True
+        except OSError as exc:
+            runtime_root_error = str(exc)
+        checks.append(
+            self._readiness_check(
+                key="runtime_root_writable",
+                ok=runtime_root_ok,
+                summary=(
+                    "Runtime artifact root is writable."
+                    if runtime_root_ok
+                    else "Runtime artifact root is not writable."
+                ),
+                remediation="Pick a writable jobs root before starting a computer-use session.",
+                details={"root_dir": str(self._root_dir), "error": runtime_root_error or ""},
+            )
+        )
+
+        allowed_roots = self._adapters.dialog.allowed_roots()
+        invalid_roots = [root for root in allowed_roots if not Path(root).exists()]
+        checks.append(
+            ReadinessCheck(
+                key="allowed_roots",
+                status=(
+                    ReadinessCheckStatus.PASS
+                    if not invalid_roots
+                    else ReadinessCheckStatus.WARN
+                ),
+                summary=(
+                    "All scoped file roots are present."
+                    if not invalid_roots
+                    else "Some scoped file roots are missing on this machine."
+                ),
+                remediation=(
+                    "Create the missing directories or adjust the pilot root configuration."
+                    if invalid_roots
+                    else None
+                ),
+                details={"allowed_roots": allowed_roots, "missing_roots": invalid_roots},
+            )
+        )
+
+        temp_dir = Path(tempfile.gettempdir()).resolve()
+        temp_dir_ok = os.access(temp_dir, os.W_OK)
+        checks.append(
+            self._readiness_check(
+                key="temp_dir",
+                ok=temp_dir_ok,
+                summary=(
+                    "Temporary directory is writable."
+                    if temp_dir_ok
+                    else "Temporary directory is not writable."
+                ),
+                remediation=(
+                    "Ensure the system temporary directory is writable for "
+                    "download and artifact staging."
+                ),
+                details={"temp_dir": str(temp_dir)},
+            )
+        )
+
+        status = self._aggregate_readiness_status(checks)
+        return ReadinessReport(
+            status=status,
+            checks=checks,
+            summary=self._readiness_summary(status=status, checks=checks),
+            checked_at=checked_at,
+        )
+
+    def doctor(self, *, job_id: str | None = None) -> dict[str, Any]:
+        checked_at = datetime.now(UTC).isoformat()
+        readiness = self._build_readiness_report()
+        resolved_job_id = job_id or self._latest_job_id()
+        if not resolved_job_id:
+            report = ComputerUseDoctorReport(
+                status=(
+                    "blocked"
+                    if readiness.status == ComputerUseReadinessStatus.BLOCKED
+                    else "warning"
+                    if readiness.status == ComputerUseReadinessStatus.DEGRADED
+                    else "ok"
+                ),
+                summary=(
+                    "Machine readiness is available, but no computer-use "
+                    "session artifacts were found yet."
+                ),
+                remediation=(
+                    readiness.checks[0].remediation
+                    if readiness.status == ComputerUseReadinessStatus.BLOCKED
+                    else "Run a smoke session to capture runtime artifacts for doctor diagnostics."
+                ),
+                checked_at=checked_at,
+                artifact_root=str(self._root_dir),
+                readiness=readiness,
+                suggested_actions=self._readiness_actions(readiness),
+            )
+            return report.model_dump(mode="json")
+
+        job_dir = self._root_dir / resolved_job_id
+        status_path = job_dir / "status.json"
+        if not status_path.exists():
+            report = ComputerUseDoctorReport(
+                status="blocked",
+                summary=f"Doctor could not find status.json for {resolved_job_id}.",
+                remediation=(
+                    "Re-run the session or export the missing artifacts "
+                    "before collecting diagnostics."
+                ),
+                checked_at=checked_at,
+                artifact_root=str(self._root_dir),
+                readiness=readiness,
+                job_id=resolved_job_id,
+                job_dir=str(job_dir),
+                suggested_actions=["Re-run the session to rebuild its runtime artifacts."],
+            )
+            return report.model_dump(mode="json")
+
+        artifact = json.loads(status_path.read_text(encoding="utf-8"))
+        computer_use = dict(artifact.get("computer_use") or {})
+        job_payload = dict(artifact.get("job") or {})
+        session_state = str(
+            computer_use.get("session_state")
+            or computer_use.get("lifecycle_state")
+            or ""
+        ) or None
+        job_status = str(job_payload.get("status") or "") or None
+        last_control_result = dict(computer_use.get("last_control_result") or {})
+        last_verification_result = dict(computer_use.get("last_verification_result") or {})
+        surface_mismatch = dict(computer_use.get("surface_mismatch") or {})
+        file_mismatch = dict(computer_use.get("file_operation_mismatch") or {})
+        surface_code = str(surface_mismatch.get("code") or "") or None
+        file_code = str(file_mismatch.get("code") or "") or None
+        stopped_by_user = bool(computer_use.get("stopped_by_user"))
+        summary, remediation = self._doctor_summary(
+            readiness=readiness,
+            session_state=session_state,
+            job_status=job_status,
+            stopped_by_user=stopped_by_user,
+            last_control_result=last_control_result,
+            last_verification_result=last_verification_result,
+            surface_mismatch=surface_mismatch,
+            file_mismatch=file_mismatch,
+        )
+        report = ComputerUseDoctorReport(
+            status=self._doctor_status(
+                readiness=readiness,
+                session_state=session_state,
+                job_status=job_status,
+                stopped_by_user=stopped_by_user,
+                surface_mismatch_code=surface_code,
+                file_mismatch_code=file_code,
+            ),
+            summary=summary,
+            remediation=remediation,
+            checked_at=checked_at,
+            artifact_root=str(self._root_dir),
+            readiness=readiness,
+            job_id=resolved_job_id,
+            job_dir=str(job_dir),
+            session_state=session_state,
+            job_status=job_status,
+            stopped_by_user=stopped_by_user,
+            last_control_result=last_control_result,
+            last_verification_result=last_verification_result,
+            surface_mismatch_code=surface_code,
+            file_operation_mismatch_code=file_code,
+            suggested_actions=self._doctor_actions(
+                readiness=readiness,
+                session_state=session_state,
+                stopped_by_user=stopped_by_user,
+                last_control_result=last_control_result,
+                surface_mismatch_code=surface_code,
+                file_mismatch_code=file_code,
+            ),
+            context={
+                "last_safe_checkpoint": computer_use.get("last_safe_checkpoint"),
+                "pending_approval_id": computer_use.get("pending_approval_id"),
+                "last_error": computer_use.get("last_error"),
+                "recovery": self._build_recovery_state(
+                    job_id=resolved_job_id,
+                    emit_event=False,
+                ),
+            },
+        )
+        return report.model_dump(mode="json")
+
+    def summary(self, *, limit: int = 20) -> dict[str, Any]:
+        checked_at = datetime.now(UTC).isoformat()
+        readiness = self._build_readiness_report()
+        counts = {
+            "success": 0,
+            "blocked": 0,
+            "failed": 0,
+            "stopped": 0,
+            "active": 0,
+        }
+        failure_codes: Counter[str] = Counter()
+        recent_runs: list[dict[str, Any]] = []
+        last_success_at: str | None = None
+        last_blocked_at: str | None = None
+        last_failed_at: str | None = None
+        last_stopped_at: str | None = None
+
+        for status_path in self._recent_status_paths(limit=limit):
+            payload = json.loads(status_path.read_text(encoding="utf-8"))
+            job = dict(payload.get("job") or {})
+            computer_use = dict(payload.get("computer_use") or {})
+            outcome = self._summary_outcome(job=job, computer_use=computer_use)
+            counts[outcome] += 1
+            timestamp = str(job.get("finished_at") or job.get("created_at") or "") or None
+            failure_code = self._summary_failure_code(computer_use=computer_use)
+            if failure_code:
+                failure_codes[failure_code] += 1
+            if outcome == "success" and last_success_at is None:
+                last_success_at = timestamp
+            if outcome == "blocked" and last_blocked_at is None:
+                last_blocked_at = timestamp
+            if outcome == "failed" and last_failed_at is None:
+                last_failed_at = timestamp
+            if outcome == "stopped" and last_stopped_at is None:
+                last_stopped_at = timestamp
+            recent_runs.append(
+                {
+                    "job_id": str(job.get("job_id") or status_path.parent.name),
+                    "job_status": str(job.get("status") or ""),
+                    "session_state": str(
+                        computer_use.get("session_state")
+                        or computer_use.get("lifecycle_state")
+                        or ""
+                    )
+                    or None,
+                    "outcome": outcome,
+                    "failure_code": failure_code,
+                    "finished_at": job.get("finished_at"),
+                    "created_at": job.get("created_at"),
+                }
+            )
+
+        top_failure_codes = [
+            {"code": code, "count": count}
+            for code, count in failure_codes.most_common(5)
+        ]
+        return {
+            "status": "ok",
+            "checked_at": checked_at,
+            "artifact_root": str(self._root_dir),
+            "window": {"limit": limit, "observed": len(recent_runs)},
+            "counts": counts,
+            "recent_runs": recent_runs,
+            "top_failure_codes": top_failure_codes,
+            "last_success_at": last_success_at,
+            "last_blocked_at": last_blocked_at,
+            "last_failed_at": last_failed_at,
+            "last_stopped_at": last_stopped_at,
+            "readiness_status": readiness.status.value,
+            "readiness_blockers": [
+                item.key
+                for item in readiness.checks
+                if item.status == ReadinessCheckStatus.FAIL
+            ],
+            "readiness_warnings": [
+                item.key
+                for item in readiness.checks
+                if item.status == ReadinessCheckStatus.WARN
+            ],
+            "summary": self._summary_text(
+                counts=counts,
+                top_failure_codes=top_failure_codes,
+                readiness=readiness,
+            ),
+        }
+
+    def _readiness_check(
+        self,
+        *,
+        key: str,
+        ok: bool,
+        summary: str,
+        remediation: str | None,
+        details: dict[str, Any] | None = None,
+    ) -> ReadinessCheck:
+        return ReadinessCheck(
+            key=key,
+            status=ReadinessCheckStatus.PASS if ok else ReadinessCheckStatus.FAIL,
+            summary=summary,
+            remediation=None if ok else remediation,
+            details=details or {},
+        )
+
+    def _aggregate_readiness_status(
+        self,
+        checks: list[ReadinessCheck],
+    ) -> ComputerUseReadinessStatus:
+        if any(item.status == ReadinessCheckStatus.FAIL for item in checks):
+            return ComputerUseReadinessStatus.BLOCKED
+        if any(item.status == ReadinessCheckStatus.WARN for item in checks):
+            return ComputerUseReadinessStatus.DEGRADED
+        return ComputerUseReadinessStatus.READY
+
+    def _readiness_summary(
+        self,
+        *,
+        status: ComputerUseReadinessStatus,
+        checks: list[ReadinessCheck],
+    ) -> str:
+        failing = [item for item in checks if item.status == ReadinessCheckStatus.FAIL]
+        warnings = [item for item in checks if item.status == ReadinessCheckStatus.WARN]
+        if status == ComputerUseReadinessStatus.READY:
+            return "This machine is ready for the controlled Safari-first computer-use pilot."
+        if status == ComputerUseReadinessStatus.DEGRADED:
+            return (
+                "This machine can run the pilot, but some non-blocking "
+                "prerequisites need attention: "
+                + ", ".join(item.key for item in warnings)
+                + "."
+            )
+        return (
+            "Computer-use is blocked until these prerequisites are fixed: "
+            + ", ".join(item.key for item in failing)
+            + "."
+        )
+
+    def _readiness_actions(self, readiness: ReadinessReport) -> list[str]:
+        return [
+            item.remediation
+            for item in readiness.checks
+            if item.status != ReadinessCheckStatus.PASS and item.remediation
+        ]
+
+    def _recent_status_paths(self, *, limit: int) -> list[Path]:
+        if not self._root_dir.exists():
+            return []
+        candidates: list[tuple[float, Path]] = []
+        for status_path in self._root_dir.glob("*/status.json"):
+            try:
+                candidates.append((status_path.stat().st_mtime, status_path))
+            except OSError:
+                continue
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return [path for _, path in candidates[:limit]]
+
+    def _latest_job_id(self) -> str | None:
+        candidates = self._recent_status_paths(limit=1)
+        if not candidates:
+            return None
+        return candidates[0].parent.name
+
+    def _summary_outcome(
+        self,
+        *,
+        job: dict[str, Any],
+        computer_use: dict[str, Any],
+    ) -> Literal["success", "blocked", "failed", "stopped", "active"]:
+        session_state = str(
+            computer_use.get("session_state")
+            or computer_use.get("lifecycle_state")
+            or ""
+        ).lower()
+        job_status = str(job.get("status") or "").lower()
+        if session_state == SessionExecutionState.STOPPED.value or bool(
+            computer_use.get("stopped_by_user")
+        ):
+            return "stopped"
+        if (
+            session_state == SessionExecutionState.COMPLETED.value
+            or job_status == JobStatus.COMPLETED.value
+        ):
+            return "success"
+        if (
+            session_state == SessionExecutionState.AWAITING_APPROVAL.value
+            or job_status == "blocked"
+        ):
+            return "blocked"
+        if (
+            session_state == SessionExecutionState.FAILED.value
+            or job_status == JobStatus.FAILED.value
+        ):
+            return "failed"
+        return "active"
+
+    def _summary_failure_code(self, *, computer_use: dict[str, Any]) -> str | None:
+        candidates = [
+            dict(computer_use.get("surface_mismatch") or {}).get("code"),
+            dict(computer_use.get("file_operation_mismatch") or {}).get("code"),
+            dict(computer_use.get("last_verification_result") or {}).get("mismatch_code"),
+            dict(computer_use.get("last_control_result") or {}).get("reason"),
+            computer_use.get("last_error"),
+        ]
+        for candidate in candidates:
+            value = str(candidate or "").strip()
+            if value:
+                return value
+        return None
+
+    def _summary_text(
+        self,
+        *,
+        counts: dict[str, int],
+        top_failure_codes: list[dict[str, Any]],
+        readiness: ReadinessReport,
+    ) -> str:
+        if sum(counts.values()) == 0:
+            return "No computer-use pilot runs have been recorded in the current artifact root."
+        summary = (
+            "Recent pilot outcomes: "
+            f"{counts['success']} success, "
+            f"{counts['blocked']} blocked, "
+            f"{counts['failed']} failed, "
+            f"{counts['stopped']} stopped, "
+            f"{counts['active']} active."
+        )
+        if top_failure_codes:
+            summary += (
+                " Top failure code: "
+                f"{top_failure_codes[0]['code']} ({top_failure_codes[0]['count']})."
+            )
+        if readiness.status != ComputerUseReadinessStatus.READY:
+            summary += f" Current machine readiness is {readiness.status.value}."
+        return summary
+
+    def _doctor_status(
+        self,
+        *,
+        readiness: ReadinessReport,
+        session_state: str | None,
+        job_status: str | None,
+        stopped_by_user: bool,
+        surface_mismatch_code: str | None,
+        file_mismatch_code: str | None,
+    ) -> Literal["ok", "warning", "blocked"]:
+        if readiness.status == ComputerUseReadinessStatus.BLOCKED:
+            return "blocked"
+        if stopped_by_user:
+            return "warning"
+        if surface_mismatch_code or file_mismatch_code:
+            return "blocked"
+        if session_state in {
+            SessionExecutionState.FAILED.value,
+            SessionExecutionState.STOPPED.value,
+        } or job_status == JobStatus.FAILED.value:
+            return "blocked"
+        if session_state in {
+            SessionExecutionState.PAUSED.value,
+            SessionExecutionState.AWAITING_APPROVAL.value,
+            SessionExecutionState.STOPPING.value,
+            SessionExecutionState.RESUMING.value,
+        }:
+            return "warning"
+        if readiness.status == ComputerUseReadinessStatus.DEGRADED:
+            return "warning"
+        return "ok"
+
+    def _doctor_summary(
+        self,
+        *,
+        readiness: ReadinessReport,
+        session_state: str | None,
+        job_status: str | None,
+        stopped_by_user: bool,
+        last_control_result: dict[str, Any],
+        last_verification_result: dict[str, Any],
+        surface_mismatch: dict[str, Any],
+        file_mismatch: dict[str, Any],
+    ) -> tuple[str, str | None]:
+        if readiness.status == ComputerUseReadinessStatus.BLOCKED:
+            first_blocker = next(
+                (item for item in readiness.checks if item.status == ReadinessCheckStatus.FAIL),
+                None,
+            )
+            return (
+                first_blocker.summary if first_blocker is not None else readiness.summary,
+                first_blocker.remediation if first_blocker is not None else None,
+            )
+        if stopped_by_user:
+            return (
+                "The session stopped because the operator issued a stop command.",
+                "Start a new session or resume from a safe checkpoint if "
+                "the workflow still needs to continue.",
+            )
+        if surface_mismatch:
+            return (
+                str(surface_mismatch.get("message") or "Surface drift blocked execution."),
+                self._remediation_for_code(str(surface_mismatch.get("code") or "")),
+            )
+        if file_mismatch:
+            return (
+                str(
+                    file_mismatch.get("message")
+                    or "File or dialog verification blocked execution."
+                ),
+                self._remediation_for_code(str(file_mismatch.get("code") or "")),
+            )
+        if session_state == SessionExecutionState.AWAITING_APPROVAL.value:
+            return (
+                "The session is waiting for an approval before the next external action.",
+                "Review the approval card, then approve, reject, or stop the session explicitly.",
+            )
+        if session_state == SessionExecutionState.PAUSED.value:
+            return (
+                "The session is paused at a safe checkpoint.",
+                "Resume the session when the surface is stable, or stop it if the task should end.",
+            )
+        if session_state == SessionExecutionState.RESUMING.value:
+            return (
+                "The session is resuming from its last safe checkpoint.",
+                "Wait for the next verification step, and use doctor again if the resume stalls.",
+            )
+        if session_state == SessionExecutionState.STOPPING.value:
+            return (
+                "The session is draining toward a safe stop checkpoint.",
+                "Wait for the stop to complete before starting another "
+                "session on the same surface.",
+            )
+        if job_status == JobStatus.COMPLETED.value:
+            return (
+                "The latest computer-use session completed successfully.",
+                None,
+            )
+        verification_summary = str(last_verification_result.get("summary") or "").strip()
+        control_reason = str(last_control_result.get("reason") or "").strip()
+        if control_reason:
+            return (
+                f"Last control result: {control_reason}.",
+                self._remediation_for_code(control_reason),
+            )
+        if verification_summary:
+            return (verification_summary, None)
+        return (readiness.summary, None)
+
+    def _doctor_actions(
+        self,
+        *,
+        readiness: ReadinessReport,
+        session_state: str | None,
+        stopped_by_user: bool,
+        last_control_result: dict[str, Any],
+        surface_mismatch_code: str | None,
+        file_mismatch_code: str | None,
+    ) -> list[str]:
+        actions = self._readiness_actions(readiness)
+        for code in [
+            surface_mismatch_code,
+            file_mismatch_code,
+            str(last_control_result.get("reason") or "") or None,
+        ]:
+            remediation = self._remediation_for_code(code or "")
+            if remediation and remediation not in actions:
+                actions.append(remediation)
+        if session_state == SessionExecutionState.AWAITING_APPROVAL.value:
+            actions.append("Review the pending approval before trying to resume the session.")
+        if session_state == SessionExecutionState.PAUSED.value:
+            actions.append(
+                "Resume only after confirming the foreground app, tab, "
+                "and dialog state are still correct."
+            )
+        if stopped_by_user:
+            actions.append(
+                "Operator stop is terminal for the current run; start a "
+                "new run for follow-up work."
+            )
+        return actions
+
+    def _remediation_for_code(self, code: str) -> str | None:
+        mapping = {
+            "wrong_app": (
+                "Bring Safari back to the foreground before resuming or "
+                "restart the session on the intended surface."
+            ),
+            "wrong_window": "Refocus the expected window title before resuming the run.",
+            "wrong_tab": (
+                "Return Safari to the expected tab or rerun the step on "
+                "the intended URL."
+            ),
+            "unexpected_modal": (
+                "Dismiss the unexpected modal or stop the session and "
+                "inspect the surface manually."
+            ),
+            "missing_expected_selector": (
+                "Reload the page or wait for the selector to appear "
+                "before resuming."
+            ),
+            "path_outside_allowed_roots": (
+                "Move the file into an allowed root or expand the pilot "
+                "root policy before retrying."
+            ),
+            "file_missing": (
+                "Create or reattach the expected source file before "
+                "retrying the upload step."
+            ),
+            "file_not_created": "Verify the destination path and rerun the save or download step.",
+            "download_incomplete": (
+                "Retry the download after confirming the browser actually "
+                "triggered the artifact export."
+            ),
+            "download_auth_required": (
+                "The browser session lost authorization for the download. "
+                "Re-authenticate in Safari and retry on the protected page."
+            ),
+            "redirected_to_login": (
+                "The browser was redirected back to login. "
+                "Re-authenticate in Safari before retrying the protected flow."
+            ),
+            "wrong_filename": (
+                "Use the expected filename or update the task prompt to "
+                "match the actual output name."
+            ),
+            "not_writable": "Choose a writable destination inside the allowed roots.",
+            "approval_not_executed": "Approve the pending action before sending a resume command.",
+            "pause_not_allowed_while_awaiting_approval": (
+                "Use stop or an approval decision instead of pause while "
+                "the session is waiting on approval."
+            ),
+            "resume_not_allowed_from_running": (
+                "Wait for a paused checkpoint before resuming, or let the "
+                "running session continue."
+            ),
+            "stop_not_allowed_from_completed": (
+                "The run is already terminal; start a new session "
+                "instead of stopping it again."
+            ),
+        }
+        return mapping.get(code)
 
     def _execution_state(self, state: dict[str, Any]) -> SessionExecutionState:
         raw = str(
@@ -671,6 +1548,9 @@ class ComputerUseRunner:
             "foreground_app": None,
             "focused_window_title": None,
             "browser_tab_title": None,
+            "active_document_path": None,
+            "selected_paths": [],
+            "clipboard_text": None,
             "active_surface": None,
             "expected_surface": None,
             "observed_surface": None,
@@ -889,12 +1769,15 @@ class ComputerUseRunner:
                     )
                     if action.app_identity.startswith("browser:")
                     else (
+                        None
+                        if self._skip_pre_action_surface_verification(action=action)
+                        else (
                         ComputerUseStopReason.UNEXPECTED_MODAL
                         if perception.unexpected_modal
                         else ComputerUseStopReason.FOCUS_DRIFT
                         if not perception.focused
-                        and action.action_id not in {"launch_app", "focus_window"}
                         else None
+                    )
                     )
                 )
                 if stop_reason is not None:
@@ -1048,6 +1931,11 @@ class ComputerUseRunner:
                     state=state,
                     action=action,
                     file_verification=file_verification,
+                )
+                self._record_local_artifacts(
+                    state=state,
+                    action=action,
+                    verification=verification,
                 )
                 post_surface = self._observe_surface(action=action)
                 self._store_surface_state(
@@ -1314,19 +2202,45 @@ class ComputerUseRunner:
             browser_surface = self._select_adapter(action).observe_surface(
                 target=action.target_descriptor
             )
-            return SurfaceObservation(
-                foreground_app=desktop_surface.foreground_app or browser_surface.foreground_app,
-                bundle_id=desktop_surface.bundle_id or browser_surface.bundle_id,
-                focused_window_title=(
-                    desktop_surface.focused_window_title or browser_surface.focused_window_title
-                ),
-                active_tab_url=browser_surface.active_tab_url,
-                active_tab_title=browser_surface.active_tab_title,
-                modal_detected=desktop_surface.modal_detected or browser_surface.modal_detected,
-                visible_selectors=browser_surface.visible_selectors,
-                captured_at=browser_surface.captured_at,
+            return self._merge_surface_observations(
+                primary=desktop_surface,
+                secondary=browser_surface,
+            )
+        if action.app_identity == "desktop:Finder" and self._adapters.finder is not None:
+            return self._merge_surface_observations(
+                primary=desktop_surface,
+                secondary=self._adapters.finder.observe_surface(),
+            )
+        if action.app_identity == "desktop:TextEdit" and self._adapters.editor is not None:
+            return self._merge_surface_observations(
+                primary=desktop_surface,
+                secondary=self._adapters.editor.observe_surface(),
             )
         return desktop_surface
+
+    def _merge_surface_observations(
+        self,
+        *,
+        primary: SurfaceObservation,
+        secondary: SurfaceObservation,
+    ) -> SurfaceObservation:
+        return SurfaceObservation(
+            foreground_app=primary.foreground_app or secondary.foreground_app,
+            bundle_id=primary.bundle_id or secondary.bundle_id,
+            focused_window_title=(
+                primary.focused_window_title or secondary.focused_window_title
+            ),
+            active_tab_url=secondary.active_tab_url or primary.active_tab_url,
+            active_tab_title=secondary.active_tab_title or primary.active_tab_title,
+            selected_paths=secondary.selected_paths or primary.selected_paths,
+            active_document_path=(
+                secondary.active_document_path or primary.active_document_path
+            ),
+            clipboard_text=secondary.clipboard_text or primary.clipboard_text,
+            modal_detected=primary.modal_detected or secondary.modal_detected,
+            visible_selectors=secondary.visible_selectors or primary.visible_selectors,
+            captured_at=secondary.captured_at or primary.captured_at,
+        )
 
     def _derive_expected_surface(
         self,
@@ -1370,7 +2284,18 @@ class ComputerUseRunner:
         return expected
 
     def _skip_pre_action_surface_verification(self, *, action: ProposedAction) -> bool:
-        return action.action_id in {"launch_app", "focus_window"}
+        if action.action_id in {
+            "launch_app",
+            "focus_window",
+            "finder_reveal",
+            "finder_rename",
+            "finder_move",
+            "textedit_open",
+        }:
+            return True
+        if action.action_id in {"textedit_append", "textedit_save"}:
+            return bool(action.parameters.get("path"))
+        return False
 
     def _derive_expected_file_operation(
         self,
@@ -1668,6 +2593,153 @@ class ComputerUseRunner:
         if artifact:
             state["artifacts"][action.action_id] = artifact
 
+    def _record_local_artifacts(
+        self,
+        *,
+        state: dict[str, Any],
+        action: ProposedAction,
+        verification: VerificationResult,
+    ) -> None:
+        if not verification.verified or action.app_identity.startswith("browser:"):
+            return
+        artifact: dict[str, Any] = {}
+        if action.execution_result.get("selected_path"):
+            selected_path = str(action.execution_result["selected_path"])
+            artifact["selected_path"] = selected_path
+            if Path(selected_path).exists():
+                artifact["size_bytes"] = Path(selected_path).stat().st_size
+        if action.execution_result.get("selected_paths"):
+            artifact["selected_paths"] = [
+                str(item) for item in action.execution_result["selected_paths"]
+            ]
+        if action.execution_result.get("document_path"):
+            document_path = str(action.execution_result["document_path"])
+            artifact["document_path"] = document_path
+            if Path(document_path).exists():
+                artifact["size_bytes"] = Path(document_path).stat().st_size
+        if action.execution_result.get("result_path"):
+            result_path = str(action.execution_result["result_path"])
+            artifact["result_path"] = result_path
+            if Path(result_path).exists():
+                artifact.setdefault("size_bytes", Path(result_path).stat().st_size)
+        if artifact:
+            state["artifacts"][action.action_id] = artifact
+
+    def _verify_finder_action(self, *, action: ProposedAction) -> VerificationResult:
+        if self._adapters.finder is None:
+            raise RuntimeError("finder adapter unavailable")
+        frontmost = self._adapters.desktop.frontmost_app()
+        selected_paths = self._adapters.finder.selected_paths()
+        expected = str(
+            action.execution_result.get("result_path")
+            or action.execution_result.get("selected_path")
+            or action.verification_value
+            or ""
+        )
+        observed = {
+            "frontmost_app": frontmost,
+            "selected_paths": selected_paths,
+            "path_exists": Path(expected).exists() if expected else False,
+        }
+        if action.verification_kind == "selected_path":
+            verified = frontmost == "Finder" and expected in selected_paths
+            return VerificationResult(
+                verified=verified,
+                kind="selected_path",
+                summary=(
+                    "Finder selected the requested path."
+                    if verified
+                    else "Finder did not select the requested path."
+                ),
+                expected={"frontmost_app": "Finder", "selected_path": expected},
+                observed=observed,
+                mismatch_code=None if verified else "selected_path_mismatch",
+                retryable=not verified,
+            )
+        verified = frontmost == "Finder" and bool(expected) and Path(expected).exists()
+        return VerificationResult(
+            verified=verified,
+            kind="path_exists",
+            summary=(
+                "Finder updated the requested file path."
+                if verified
+                else "Finder did not produce the expected file path."
+            ),
+            expected={"frontmost_app": "Finder", "path": expected},
+            observed=observed,
+            mismatch_code=None if verified else "path_missing",
+            retryable=not verified,
+        )
+
+    def _verify_textedit_action(self, *, action: ProposedAction) -> VerificationResult:
+        if self._adapters.editor is None:
+            raise RuntimeError("TextEdit adapter unavailable")
+        frontmost = self._adapters.desktop.frontmost_app()
+        current_path = self._adapters.editor.current_document_path()
+        current_text = self._adapters.editor.current_document_text()
+        expected_path = str(
+            action.execution_result.get("document_path")
+            or action.parameters.get("path")
+            or action.verification_value
+            or ""
+        )
+        observed = {
+            "frontmost_app": frontmost,
+            "document_path": current_path,
+            "document_length": len(current_text),
+        }
+        if action.verification_kind == "document_path":
+            verified = frontmost == "TextEdit" and current_path == expected_path
+            return VerificationResult(
+                verified=verified,
+                kind="document_path",
+                summary=(
+                    "TextEdit focused the requested document."
+                    if verified
+                    else "TextEdit did not focus the requested document."
+                ),
+                expected={"frontmost_app": "TextEdit", "document_path": expected_path},
+                observed=observed,
+                mismatch_code=None if verified else "document_path_mismatch",
+                retryable=not verified,
+            )
+        if action.verification_kind == "document_contains":
+            expected_text = str(action.verification_value or "")
+            verified = frontmost == "TextEdit" and expected_text in current_text
+            return VerificationResult(
+                verified=verified,
+                kind="document_contains",
+                summary=(
+                    "TextEdit document contains the appended text."
+                    if verified
+                    else "TextEdit document is missing the appended text."
+                ),
+                expected={"frontmost_app": "TextEdit", "contains": expected_text},
+                observed={**observed, "document_text": current_text},
+                mismatch_code=None if verified else "document_text_mismatch",
+                retryable=not verified,
+            )
+        saved_path = current_path or expected_path
+        verified = (
+            frontmost == "TextEdit"
+            and bool(saved_path)
+            and Path(saved_path).exists()
+            and (not expected_path or saved_path == expected_path)
+        )
+        return VerificationResult(
+            verified=verified,
+            kind="saved_document",
+            summary=(
+                "TextEdit saved the document to the expected path."
+                if verified
+                else "TextEdit did not save the expected document."
+            ),
+            expected={"frontmost_app": "TextEdit", "document_path": expected_path or saved_path},
+            observed={**observed, "saved_path": saved_path},
+            mismatch_code=None if verified else "document_not_saved",
+            retryable=not verified,
+        )
+
     def _verify_surface(
         self,
         *,
@@ -1808,6 +2880,12 @@ class ComputerUseRunner:
             "browser_tab_title"
         )
         state["current_url"] = observed_surface.active_tab_url or state.get("current_url")
+        if observed_surface.selected_paths is not None:
+            state["selected_paths"] = list(observed_surface.selected_paths)
+        if observed_surface.active_document_path:
+            state["active_document_path"] = observed_surface.active_document_path
+        if observed_surface.clipboard_text is not None:
+            state["clipboard_text"] = observed_surface.clipboard_text
         state["active_surface"] = _surface_label(observed_surface)
 
     def _apply_execution_result(
@@ -1822,6 +2900,16 @@ class ComputerUseRunner:
             state["browser_tab_title"] = str(action.execution_result["title"])
         if action.execution_result.get("app_name"):
             state["foreground_app"] = str(action.execution_result["app_name"])
+        if action.execution_result.get("selected_path"):
+            state["selected_paths"] = [str(action.execution_result["selected_path"])]
+        if action.execution_result.get("selected_paths"):
+            state["selected_paths"] = [
+                str(item) for item in action.execution_result["selected_paths"]
+            ]
+        if action.execution_result.get("document_path"):
+            state["active_document_path"] = str(action.execution_result["document_path"])
+        if action.execution_result.get("clipboard_text") is not None:
+            state["clipboard_text"] = str(action.execution_result["clipboard_text"])
 
     def _inspect_action(self, action: ProposedAction) -> PerceptionSnapshot:
         if action.app_identity.startswith("browser:"):
@@ -1839,6 +2927,78 @@ class ComputerUseRunner:
         if action.action_id == "focus_window":
             self._adapters.desktop.focus_window(app_name)
             return {"status": "executed", "app_name": app_name}
+        if action.action_id == "finder_reveal":
+            if self._adapters.finder is None:
+                raise RuntimeError("finder adapter unavailable")
+            selected_path = self._adapters.finder.reveal_path(str(action.parameters.get("path")))
+            return {
+                "status": "executed",
+                "app_name": "Finder",
+                "selected_path": selected_path,
+                "selected_paths": [selected_path],
+                "result_path": selected_path,
+            }
+        if action.action_id == "finder_rename":
+            if self._adapters.finder is None:
+                raise RuntimeError("finder adapter unavailable")
+            result_path = self._adapters.finder.rename_path(
+                path=str(action.parameters.get("path")),
+                new_name=str(action.parameters.get("new_name") or ""),
+            )
+            return {
+                "status": "executed",
+                "app_name": "Finder",
+                "selected_path": result_path,
+                "selected_paths": [result_path],
+                "result_path": result_path,
+            }
+        if action.action_id == "finder_move":
+            if self._adapters.finder is None:
+                raise RuntimeError("finder adapter unavailable")
+            result_path = self._adapters.finder.move_path(
+                source=str(action.parameters.get("source")),
+                destination=str(action.parameters.get("destination")),
+            )
+            return {
+                "status": "executed",
+                "app_name": "Finder",
+                "selected_path": result_path,
+                "selected_paths": [result_path],
+                "result_path": result_path,
+            }
+        if action.action_id == "textedit_open":
+            if self._adapters.editor is None:
+                raise RuntimeError("TextEdit adapter unavailable")
+            document_path = self._adapters.editor.open_file(str(action.parameters.get("path")))
+            return {
+                "status": "executed",
+                "app_name": "TextEdit",
+                "document_path": document_path,
+            }
+        if action.action_id == "textedit_append":
+            if self._adapters.editor is None:
+                raise RuntimeError("TextEdit adapter unavailable")
+            document_path = self._adapters.editor.append_text(
+                text=str(action.parameters.get("text") or ""),
+                path=str(action.parameters.get("path") or "") or None,
+            )
+            return {
+                "status": "executed",
+                "app_name": "TextEdit",
+                "document_path": document_path or None,
+            }
+        if action.action_id == "textedit_save":
+            if self._adapters.editor is None:
+                raise RuntimeError("TextEdit adapter unavailable")
+            document_path = self._adapters.editor.save_document(
+                path=str(action.parameters.get("path") or "") or None
+            )
+            return {
+                "status": "executed",
+                "app_name": "TextEdit",
+                "document_path": document_path or None,
+                "result_path": document_path or None,
+            }
         raise RuntimeError(f"unsupported desktop action: {action.action_id}")
 
     def _verify_action(
@@ -1849,6 +3009,10 @@ class ComputerUseRunner:
     ) -> VerificationResult:
         if action.app_identity.startswith("browser:"):
             return self._select_adapter(action).verify(action=action, before=before)
+        if action.app_identity == "desktop:Finder":
+            return self._verify_finder_action(action=action)
+        if action.app_identity == "desktop:TextEdit":
+            return self._verify_textedit_action(action=action)
         frontmost = self._adapters.desktop.frontmost_app()
         expected = str(action.parameters.get("app_name") or action.target_descriptor.selector)
         verified = frontmost == expected
@@ -2819,6 +3983,29 @@ class ComputerUseRunner:
             current_url=str(state.get("current_url") or "") or None,
             browser_tab_title=str(state.get("browser_tab_title") or title_from_perception or "")
             or None,
+            active_document_path=(
+                str(
+                    state.get("active_document_path")
+                    or observed_surface_payload.get("active_document_path")
+                    or ""
+                )
+                or None
+            ),
+            selected_paths=[
+                str(item)
+                for item in (
+                    state.get("selected_paths")
+                    or observed_surface_payload.get("selected_paths")
+                    or []
+                )
+                if str(item)
+            ],
+            clipboard_text=str(
+                state.get("clipboard_text")
+                or observed_surface_payload.get("clipboard_text")
+                or ""
+            )
+            or None,
             expected_surface=(
                 ExpectedSurface.model_validate(expected_surface_payload)
                 if expected_surface_payload
@@ -2867,14 +4054,38 @@ class ComputerUseRunner:
             }
             if observed_file_operation_payload
             else (
-                {"download_dir": str(self._adapters.dialog._allowed_roots[0])}
-                if hasattr(self._adapters.dialog, "_allowed_roots")
-                else {}
-            ),
+                {"selected_paths": list(state.get("selected_paths") or [])}
+                if state.get("selected_paths")
+                else {
+                    "active_document_path": str(state.get("active_document_path") or "")
+                }
+                if state.get("active_document_path")
+                else (
+                    {"download_dir": str(self._adapters.dialog._allowed_roots[0])}
+                    if hasattr(self._adapters.dialog, "_allowed_roots")
+                    else {}
+                )
+            )
+            ,
             filesystem_result_set=[
                 str(item.get("download_path") or "")
                 for item in state.get("artifacts", {}).values()
                 if item.get("download_path")
+            ]
+            + [
+                str(item.get("result_path") or "")
+                for item in state.get("artifacts", {}).values()
+                if item.get("result_path")
+            ]
+            + [
+                str(item.get("document_path") or "")
+                for item in state.get("artifacts", {}).values()
+                if item.get("document_path")
+            ]
+            + [
+                str(item.get("selected_path") or "")
+                for item in state.get("artifacts", {}).values()
+                if item.get("selected_path")
             ]
             + (
                 [str(observed_file_operation_payload.get("resolved_path"))]
@@ -2965,6 +4176,16 @@ def _normalized_url_prefix(url: str) -> str:
 def _surface_label(observation: SurfaceObservation) -> str | None:
     if observation.active_tab_url:
         return f"{observation.foreground_app or 'browser'}:{observation.active_tab_url}"
+    if observation.active_document_path:
+        return (
+            f"{observation.foreground_app or 'desktop'}:"
+            f"{observation.active_document_path}"
+        )
+    if observation.selected_paths:
+        return (
+            f"{observation.foreground_app or 'desktop'}:"
+            f"{observation.selected_paths[0]}"
+        )
     if observation.focused_window_title:
         return (
             f"{observation.foreground_app or 'desktop'}:"

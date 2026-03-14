@@ -7,8 +7,9 @@ import sys
 import threading
 import time
 from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -57,6 +58,34 @@ def _real_computer_use_skip_reason() -> str | None:
 
 
 REAL_COMPUTER_USE_SKIP_REASON = _real_computer_use_skip_reason()
+
+
+def _real_local_computer_use_skip_reason() -> str | None:
+    if sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED:
+        return (
+            "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
+            "with AppleScript automation permissions."
+        )
+    try:
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                'tell application "TextEdit" to return name',
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        message = ""
+        if isinstance(exc, subprocess.CalledProcessError):
+            message = exc.stderr.strip() or exc.stdout.strip()
+        return f"Real local acceptance preflight failed: {message or exc}"
+    return None
+
+
+REAL_LOCAL_COMPUTER_USE_SKIP_REASON = _real_local_computer_use_skip_reason()
 
 
 def _reset_real_safari() -> None:
@@ -165,6 +194,195 @@ def _start_site_server(site_dir: Path) -> tuple[ThreadingHTTPServer, threading.T
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, thread
+
+
+def _start_auth_site_server() -> tuple[ThreadingHTTPServer, threading.Thread]:
+    session_cookie = "aegis_session=pilot"
+
+    class _AuthSiteHandler(BaseHTTPRequestHandler):
+        def log_message(self, format: str, *args) -> None:  # noqa: A003
+            del format, args
+
+        def _is_authenticated(self) -> bool:
+            return session_cookie in self.headers.get("Cookie", "")
+
+        def _redirect(self, location: str, *, cookie: str | None = None) -> None:
+            self.send_response(303)
+            self.send_header("Location", location)
+            if cookie is not None:
+                self.send_header("Set-Cookie", cookie)
+            self.end_headers()
+
+        def _write_html(self, body: str, *, status: int = 200) -> None:
+            encoded = body.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def do_GET(self) -> None:  # noqa: N802
+            path = urlparse(self.path).path
+            if path in {"/", "/entry", "/entry.html"}:
+                self._write_html(
+                    """
+<!doctype html>
+<html lang="en">
+  <body>
+    <p id="entry">Bootstrap an authenticated session for the protected fixture.</p>
+    <a id="enter" href="/session/bootstrap">Enter protected workspace</a>
+  </body>
+</html>
+""".strip()
+                )
+                return
+            if path in {"/", "/login", "/login.html"}:
+                self._write_html(
+                    """
+<!doctype html>
+<html lang="en">
+  <body>
+    <form id="login-form" action="/session/login" method="post">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" />
+      <button id="login" type="submit">Sign in</button>
+    </form>
+  </body>
+</html>
+""".strip()
+                )
+                return
+            if path == "/session/bootstrap":
+                self._redirect(
+                    "/protected/index.html",
+                    cookie=f"{session_cookie}; Path=/",
+                )
+                return
+            if path in {"/protected", "/protected/index.html"}:
+                if not self._is_authenticated():
+                    self._redirect("/login.html")
+                    return
+                self._write_html(
+                    """
+<!doctype html>
+<html lang="en">
+  <body>
+    <p id="welcome">Authenticated session active.</p>
+    <form id="protected-form" action="/protected/submit" method="post">
+      <label for="notes">Notes</label>
+      <input id="notes" name="notes" type="text" />
+      <button id="submit" type="submit">Submit</button>
+    </form>
+    <a
+      id="download"
+      href="/protected/artifact.txt"
+      download="protected-artifact.txt"
+    >
+      Download protected artifact
+    </a>
+  </body>
+</html>
+""".strip()
+                )
+                return
+            if path == "/protected/success.html":
+                if not self._is_authenticated():
+                    self._redirect("/login.html")
+                    return
+                self._write_html(
+                    """
+<!doctype html>
+<html lang="en">
+  <body>
+    <p id="success">Protected form submitted successfully.</p>
+  </body>
+</html>
+""".strip()
+                )
+                return
+            if path == "/protected/artifact.txt":
+                if not self._is_authenticated():
+                    self._redirect("/login.html")
+                    return
+                content = b"authenticated download artifact"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+                return
+            self.send_response(404)
+            self.end_headers()
+
+        def do_POST(self) -> None:  # noqa: N802
+            path = urlparse(self.path).path
+            content_length = int(self.headers.get("Content-Length", "0") or "0")
+            body = self.rfile.read(content_length).decode("utf-8")
+            parsed = parse_qs(body)
+            if path == "/session/login":
+                username = parsed.get("username", [""])[0]
+                if username:
+                    self._redirect(
+                        "/protected/index.html",
+                        cookie=f"{session_cookie}; Path=/",
+                    )
+                    return
+                self._write_html("missing username", status=400)
+                return
+            if path == "/protected/submit":
+                if not self._is_authenticated():
+                    self._redirect("/login.html")
+                    return
+                note = parsed.get("notes", [""])[0]
+                if note:
+                    self._redirect("/protected/success.html")
+                    return
+                self._write_html("missing note", status=400)
+                return
+            self.send_response(404)
+            self.end_headers()
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _AuthSiteHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread
+
+
+@pytest.mark.skipif(
+    REAL_LOCAL_COMPUTER_USE_SKIP_REASON is not None,
+    reason=REAL_LOCAL_COMPUTER_USE_SKIP_REASON or "",
+)
+def test_real_textedit_local_edit_acceptance(tmp_path: Path) -> None:
+    root_dir = tmp_path / "jobs"
+    root_dir.mkdir()
+    document_path = root_dir / "local-note.txt"
+    document_path.write_text("pilot", encoding="utf-8")
+
+    config = RuntimeConfig.from_profile("default")
+    runner = ComputerUseRunner(config=config, root_dir=root_dir)
+    payload = runner.run(
+        prompt="\n".join(
+            [
+                f'textedit_open "{document_path}"',
+                'textedit_append " local review"',
+                f'textedit_save "{document_path}"',
+            ]
+        ),
+        job_id="real-textedit-local-acceptance",
+        mode=ComputerUseMode.EXECUTE,
+    )
+
+    assert payload["job"]["status"] == "completed"
+    assert document_path.read_text(encoding="utf-8") == "pilot local review"
+    status_payload = json.loads(
+        (root_dir / "real-textedit-local-acceptance" / "status.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert (
+        status_payload["computer_use"]["world_model"]["active_document_path"]
+        == str(document_path)
+    )
 
 
 @pytest.mark.skipif(
@@ -362,6 +580,100 @@ def test_real_safari_download_acceptance(tmp_path: Path) -> None:
             ]
             == "download"
         )
+        assert (
+            status_payload["computer_use"]["artifacts"]["download_file"]["download_path"]
+            == str(download_target)
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5.0)
+
+
+@pytest.mark.skipif(
+    REAL_COMPUTER_USE_SKIP_REASON is not None,
+    reason=REAL_COMPUTER_USE_SKIP_REASON or "",
+)
+def test_real_safari_authenticated_navigation_acceptance(tmp_path: Path) -> None:
+    _reset_real_safari()
+    root_dir = tmp_path / "jobs"
+    root_dir.mkdir()
+    server, thread = _start_auth_site_server()
+
+    try:
+        config = RuntimeConfig.from_profile("default")
+        runner = ComputerUseRunner(config=config, root_dir=root_dir)
+        payload = runner.run(
+            prompt="\n".join(
+                [
+                    'launch "Safari"',
+                    f'open "http://127.0.0.1:{server.server_port}/entry.html"',
+                    'click "#enter"',
+                    'wait "0.5"',
+                    'type "Authenticated note" into "#notes"',
+                ]
+            ),
+            job_id="real-safari-auth-navigation",
+            mode=ComputerUseMode.EXECUTE,
+        )
+
+        assert payload["job"]["status"] == "completed"
+        status_payload = json.loads(
+            (root_dir / "real-safari-auth-navigation" / "status.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert (
+            status_payload["computer_use"]["current_url"]
+            == f"http://127.0.0.1:{server.server_port}/protected/index.html"
+        )
+        assert status_payload["computer_use"]["last_verification_result"]["verified"] is True
+        assert status_payload["computer_use"]["surface_mismatch"] is None
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5.0)
+
+
+@pytest.mark.skipif(
+    REAL_COMPUTER_USE_SKIP_REASON is not None,
+    reason=REAL_COMPUTER_USE_SKIP_REASON or "",
+)
+def test_real_safari_authenticated_download_acceptance(tmp_path: Path) -> None:
+    _reset_real_safari()
+    root_dir = tmp_path / "jobs"
+    root_dir.mkdir()
+    download_target = root_dir / "protected-artifact.txt"
+    server, thread = _start_auth_site_server()
+
+    try:
+        config = RuntimeConfig.from_profile("default")
+        runner = ComputerUseRunner(config=config, root_dir=root_dir)
+        payload = runner.run(
+            prompt="\n".join(
+                [
+                    'launch "Safari"',
+                    f'open "http://127.0.0.1:{server.server_port}/entry.html"',
+                    'click "#enter"',
+                    'wait "0.5"',
+                    f'download "#download" to "{download_target}"',
+                ]
+            ),
+            job_id="real-safari-auth-download",
+            mode=ComputerUseMode.EXECUTE,
+        )
+
+        assert payload["job"]["status"] == "completed"
+        assert download_target.exists()
+        assert download_target.read_text(encoding="utf-8") == "authenticated download artifact"
+        status_payload = json.loads(
+            (root_dir / "real-safari-auth-download" / "status.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        verification = status_payload["computer_use"]["last_verification_result"]
+        assert verification["expected_file_operation"]["operation"] == "download"
+        assert verification["file_operation_mismatch"] is None
         assert (
             status_payload["computer_use"]["artifacts"]["download_file"]["download_path"]
             == str(download_target)
