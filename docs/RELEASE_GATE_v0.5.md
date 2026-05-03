@@ -95,6 +95,19 @@ Release artifacts must be signed and notarized:
 - `xcrun notarytool submit --wait` PASS
 - `xcrun stapler staple` and `xcrun stapler validate` PASS
 
+GitHub release workflow requirements:
+- Environment `release-macos` must exist with required reviewer/policy controls.
+- Signing secrets must be present: `MACOS_SIGNING_IDENTITY`,
+  `MACOS_SIGNING_CERT_P12_B64`, `MACOS_SIGNING_CERT_PASSWORD`.
+- Notarization auth must use one mode:
+  - API key mode (preferred): `APPLE_NOTARY_KEY_ID`,
+    `APPLE_NOTARY_ISSUER_ID`, `APPLE_NOTARY_KEY_P8_B64`
+  - Apple ID mode: `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`
+
+If these credentials are missing, the release remains RC with an external
+credential blocker. Do not bypass this gate and do not mark notarization proof
+as passing without `notarytool`, stapler, and quarantine evidence.
+
 Quarantine gate:
 - clean macOS user/VM test required
 - downloaded artifact must open without Gatekeeper block

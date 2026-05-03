@@ -48,9 +48,17 @@ apps/operator-panel/scripts/codesign_notarize_macos.sh <App.app> <artifact.dmg>
 
 Required env vars:
 - `SIGNING_IDENTITY`
-- `APPLE_ID`
-- `APPLE_TEAM_ID`
-- `APPLE_APP_PASSWORD`
+- `MACOS_SIGNING_CERT_P12_B64`
+- `MACOS_SIGNING_CERT_PASSWORD`
+
+Notarization auth must use one of:
+- API key mode (preferred): `APPLE_NOTARY_KEY_FILE`, `APPLE_NOTARY_KEY_ID`,
+  optional `APPLE_NOTARY_ISSUER_ID`
+- Apple ID mode: `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`
+
+The GitHub release workflow receives the p12 and API key files as base64 secrets
+and decodes them only on the release runner. Secret values must not be printed or
+committed.
 
 Release gate requires:
 - codesign verify

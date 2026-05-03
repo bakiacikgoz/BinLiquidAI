@@ -252,3 +252,42 @@ Architecture/runtime proof is complete on both target macOS lanes.
 The only remaining blocker to declare "v0.5 finalized + releasable notarized artifacts produced" is external secret provisioning for Apple signing/notarization.
 
 Until those secrets are present and release workflow is rerun successfully, the project remains in "release-candidate with external credential blocker" state.
+
+====================================================================
+9) 2026-05-03 Resume Addendum
+====================================================================
+Local resume branch: resume/v0.5-release-finalization
+Local head at revalidation start: 2b174e2
+
+This addendum preserves the historical March 2026 evidence above and records
+the May 2026 revalidation drift observed while resuming release finalization.
+
+9.1 Current local validation deltas
+- `uv run binliquid operator capabilities --json` now reports:
+  - contractVersion == "2.0"
+  - artifactSchema.auditEnvelope == "3"
+  - artifactSchema.events == "3"
+- BinLiquid core version remains 0.4.1.
+- Operator Panel remains 0.5.0-beta.1.
+
+9.2 Latest remote release workflow evidence
+- Latest observed release run:
+  - Tag/branch: operator-panel-v0.5.0-beta.1-final3
+  - Run: https://github.com/bakiacikgoz/BinLiquidAI/actions/runs/22643394480
+  - Result: failure on both macOS lanes
+  - Failure point: "Import signing certificate"
+  - Build/runtime/sign/notary follow-on steps were skipped because signing
+    credentials were not provisioned.
+
+9.3 Resume remediation
+- Release workflow ordering was updated so UI dependency install, bundled runtime
+  build, runtime verification, and Tauri bundle build run before credential
+  validation and certificate import.
+- Signing secret validation now reports missing secret names explicitly:
+  - MACOS_SIGNING_IDENTITY
+  - MACOS_SIGNING_CERT_P12_B64
+  - MACOS_SIGNING_CERT_PASSWORD
+- API-key notarization decode was shell-syntax checked and locally exercised with
+  dummy non-secret values.
+- The notarized release gate remains blocked until real Apple signing/notary
+  credentials are configured and the release workflow is rerun.

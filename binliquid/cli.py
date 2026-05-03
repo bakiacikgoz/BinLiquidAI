@@ -1528,7 +1528,9 @@ def computer_use_pause(
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
     runner = ComputerUseRunner(config=config, root_dir=root_dir or config.team.artifact_dir)
-    payload = _with_contract_version(runner.request_control(job_id=job_id, command=SessionCommand.PAUSE))
+    payload = _with_contract_version(
+        runner.request_control(job_id=job_id, command=SessionCommand.PAUSE)
+    )
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -1572,7 +1574,9 @@ def computer_use_stop(
 ) -> None:
     config = RuntimeConfig.from_profile(profile)
     runner = ComputerUseRunner(config=config, root_dir=root_dir or config.team.artifact_dir)
-    payload = _with_contract_version(runner.request_control(job_id=job_id, command=SessionCommand.STOP))
+    payload = _with_contract_version(
+        runner.request_control(job_id=job_id, command=SessionCommand.STOP)
+    )
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
@@ -1592,7 +1596,9 @@ def computer_use_state(
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
-        typer.echo(f"job_id={job_id} state={payload.get('computer_use', {}).get('lifecycle_state')}")
+        typer.echo(
+            f"job_id={job_id} state={payload.get('computer_use', {}).get('lifecycle_state')}"
+        )
 
 
 @team_app.command("init")

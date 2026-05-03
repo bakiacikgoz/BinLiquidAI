@@ -297,7 +297,8 @@ Calibration outputs:
 - `transformers` fallback is for continuity, not quality parity.
 - Measured energy depends on platform permissions (`powermetrics`).
 - sLTC gains vary by workload distribution.
-- UI thin shell is intentionally deferred to keep CLI reliability first.
+- Operator Panel is available as a v0.5 beta surface on top of BinLiquid core v0.4.1;
+  notarized macOS release artifacts remain gated by Apple signing/notary credentials.
 - Model assets are not auto-installed (`ollama pull` remains operator-driven).
 - Team runs intentionally fail-closed when governance requires approval in a blocking dependency chain.
 - `team resume` and `team pilot-check` only consume approvals that are both `executed` and not yet `consumed`.

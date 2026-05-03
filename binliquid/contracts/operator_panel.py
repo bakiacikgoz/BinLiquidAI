@@ -4,7 +4,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.governance.models import ApprovalTicket
 from binliquid.team.models import JobRun, TaskRun, TeamEvent
 

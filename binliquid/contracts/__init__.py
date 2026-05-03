@@ -1,4 +1,3 @@
-from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.contracts.operator_panel import (
     ApprovalDetailPayloadContract,
     ApprovalPendingPayloadContract,
@@ -19,6 +18,7 @@ from binliquid.contracts.operator_panel import (
     TailEventsPayloadContract,
     TeamStatusArtifactContract,
 )
+from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 
 __all__ = [
     "ApprovalDetailPayloadContract",
