@@ -438,6 +438,13 @@ body::before,
   font-size: 11px;
 }
 
+.rail-empty {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
 .quick-actions-card .mc-button {
   justify-content: flex-start;
   width: 100%;

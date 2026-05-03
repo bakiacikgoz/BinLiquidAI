@@ -12,6 +12,45 @@ export type PendingApprovalSummary = {
   time: string;
 };
 
+export type SystemHealthStatus = 'Healthy' | 'Degraded' | 'Blocked' | 'Unknown';
+
+export type SystemHealthSummary = {
+  coreMode: string;
+  contractVersion: string;
+  health: SystemHealthStatus;
+  memoryUsagePct: number | null;
+  cpuUsagePct: number | null;
+  diskUsagePct: number | null;
+  networkStatus: string | null;
+};
+
+function healthTone(health: SystemHealthStatus): 'success' | 'warning' | 'error' | 'info' {
+  if (health === 'Healthy') {
+    return 'success';
+  }
+  if (health === 'Blocked') {
+    return 'error';
+  }
+  if (health === 'Degraded') {
+    return 'warning';
+  }
+  return 'info';
+}
+
+function formatMetric(value: number | null): string {
+  return value === null ? 'Ölçüm yok' : `${value}%`;
+}
+
+function MetricRow({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{formatMetric(value)}</strong>
+      {value !== null ? <ProgressBar value={value} /> : null}
+    </div>
+  );
+}
+
 export function RightRail({
   notifications,
   selectedRunId,
@@ -20,10 +59,16 @@ export function RightRail({
   profile,
   startedAt,
   duration,
-  coreMode,
-  contractVersion,
-  health,
+  systemHealth,
   pendingApprovals,
+  resumeDisabled = false,
+  resumeDisabledReason = '',
+  terminalDisabled = false,
+  terminalDisabledReason = '',
+  exportDisabled = false,
+  exportDisabledReason = '',
+  cancelDisabled = false,
+  cancelDisabledReason = '',
   onDismissNotification,
   onRefreshContext,
   onResume,
@@ -40,10 +85,16 @@ export function RightRail({
   profile: string;
   startedAt: string;
   duration: string;
-  coreMode: string;
-  contractVersion: string;
-  health: string;
+  systemHealth: SystemHealthSummary;
   pendingApprovals: PendingApprovalSummary[];
+  resumeDisabled?: boolean;
+  resumeDisabledReason?: string;
+  terminalDisabled?: boolean;
+  terminalDisabledReason?: string;
+  exportDisabled?: boolean;
+  exportDisabledReason?: string;
+  cancelDisabled?: boolean;
+  cancelDisabledReason?: string;
   onDismissNotification: (id: string) => void;
   onRefreshContext: () => void;
   onResume: () => void;
@@ -53,6 +104,9 @@ export function RightRail({
   onViewDetails: () => void;
   onViewApprovals: () => void;
 }) {
+  const healthBadgeTone = healthTone(systemHealth.health);
+  const networkTone = systemHealth.networkStatus === null ? 'muted' : healthBadgeTone;
+
   return (
     <aside className="context-rail premium-right-rail">
       <NotificationStack items={notifications} onDismiss={onDismissNotification} />
@@ -60,39 +114,29 @@ export function RightRail({
       <section className="rail-card system-health-card">
         <div className="rail-card-head">
           <span>SİSTEM SAĞLIĞI</span>
-          <Badge tone={health.toLowerCase() === 'healthy' ? 'success' : 'warning'}>
-            <StatusDot tone="success" /> {health}
+          <Badge tone={healthBadgeTone}>
+            <StatusDot tone={healthBadgeTone} /> {systemHealth.health}
           </Badge>
         </div>
         <div className="rail-metrics">
           <div>
             <span>Çekirdek Modu</span>
             <strong>
-              {coreMode} <StatusDot tone="success" />
+              {systemHealth.coreMode || '-'} <StatusDot tone={systemHealth.coreMode ? 'success' : 'muted'} />
             </strong>
           </div>
           <div>
             <span>Sözleşme Sürümü</span>
-            <strong>{contractVersion}</strong>
+            <strong>{systemHealth.contractVersion}</strong>
           </div>
-          <div>
-            <span>Bellek Kullanımı</span>
-            <strong>42%</strong>
-            <ProgressBar value={42} />
-          </div>
-          <div>
-            <span>CPU Kullanımı</span>
-            <strong>18%</strong>
-            <ProgressBar value={18} />
-          </div>
-          <div>
-            <span>Disk Kullanımı</span>
-            <strong>27%</strong>
-            <ProgressBar value={27} />
-          </div>
+          <MetricRow label="Bellek Kullanımı" value={systemHealth.memoryUsagePct} />
+          <MetricRow label="CPU Kullanımı" value={systemHealth.cpuUsagePct} />
+          <MetricRow label="Disk Kullanımı" value={systemHealth.diskUsagePct} />
           <div>
             <span>Ağ Durumu</span>
-            <strong className="rail-healthy">Healthy <StatusDot tone="success" /></strong>
+            <strong className={systemHealth.networkStatus ? 'rail-healthy' : undefined}>
+              {systemHealth.networkStatus ?? '-'} <StatusDot tone={networkTone} />
+            </strong>
           </div>
         </div>
       </section>
@@ -136,16 +180,20 @@ export function RightRail({
           <Badge tone="warning">{pendingApprovals.length}</Badge>
         </div>
         <div className="pending-approval-list">
-          {pendingApprovals.map((approval) => (
-            <button type="button" key={approval.id} onClick={onViewApprovals}>
-              <StatusDot tone="warning" />
-              <span>
-                <strong>{approval.title}</strong>
-                <em>{approval.subtitle}</em>
-              </span>
-              <time>{approval.time}</time>
-            </button>
-          ))}
+          {pendingApprovals.length > 0 ? (
+            pendingApprovals.map((approval) => (
+              <button type="button" key={approval.id} onClick={onViewApprovals}>
+                <StatusDot tone="warning" />
+                <span>
+                  <strong>{approval.title}</strong>
+                  <em>{approval.subtitle}</em>
+                </span>
+                <time>{approval.time}</time>
+              </button>
+            ))
+          ) : (
+            <p className="rail-empty">Bekleyen onay yok</p>
+          )}
         </div>
         <Button variant="ghost" onClick={onViewApprovals}>
           Tüm Onayları Görüntüle
@@ -157,16 +205,40 @@ export function RightRail({
         <Button icon={<Icon name="refresh" />} variant="ghost" onClick={onRefreshContext}>
           Bağlamı Yenile
         </Button>
-        <Button icon={<Icon name="play" />} variant="ghost" onClick={onResume}>
+        <Button
+          disabled={resumeDisabled}
+          icon={<Icon name="play" />}
+          title={resumeDisabledReason || undefined}
+          variant="ghost"
+          onClick={onResume}
+        >
           Çalıştırmayı Devam Ettir
         </Button>
-        <Button icon={<Icon name="terminal" />} variant="ghost" onClick={onOpenTerminal}>
+        <Button
+          disabled={terminalDisabled}
+          icon={<Icon name="terminal" />}
+          title={terminalDisabledReason || undefined}
+          variant="ghost"
+          onClick={onOpenTerminal}
+        >
           Terminal Aç
         </Button>
-        <Button icon={<Icon name="download" />} variant="ghost" onClick={onExport}>
+        <Button
+          disabled={exportDisabled}
+          icon={<Icon name="download" />}
+          title={exportDisabledReason || undefined}
+          variant="ghost"
+          onClick={onExport}
+        >
           Logları Dışa Aktar
         </Button>
-        <Button icon={<Icon name="reject" />} variant="danger" onClick={onCancel}>
+        <Button
+          disabled={cancelDisabled}
+          icon={<Icon name="reject" />}
+          title={cancelDisabledReason || undefined}
+          variant="danger"
+          onClick={onCancel}
+        >
           Çalıştırmayı İptal Et
         </Button>
       </section>

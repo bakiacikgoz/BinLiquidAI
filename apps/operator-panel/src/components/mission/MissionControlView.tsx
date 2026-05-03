@@ -33,11 +33,13 @@ export type MissionControlViewProps = {
   sessionEvents: SessionEventItem[];
   runtimeSummary: RuntimeSummaryItem[];
   rawSummary: unknown;
+  debugRawEnabled: boolean;
   hasApproval: boolean;
   approvalLabel: string;
   approvalDisabled: boolean;
   approvalDisabledReason: string;
   onSelectRun: (runId: string) => void;
+  onRawJsonRequested: () => boolean;
   onApprove: () => void;
   onEditApproval: () => void;
   onReject: () => void;
@@ -62,11 +64,13 @@ export function MissionControlView({
   sessionEvents,
   runtimeSummary,
   rawSummary,
+  debugRawEnabled,
   hasApproval,
   approvalLabel,
   approvalDisabled,
   approvalDisabledReason,
   onSelectRun,
+  onRawJsonRequested,
   onApprove,
   onEditApproval,
   onReject,
@@ -140,7 +144,12 @@ export function MissionControlView({
 
       <div className="mission-bottom-grid">
         <SessionEventsCard items={sessionEvents} />
-        <RuntimeSummaryCard items={runtimeSummary} rawJson={rawSummary} />
+        <RuntimeSummaryCard
+          debugRawEnabled={debugRawEnabled}
+          items={runtimeSummary}
+          rawJson={rawSummary}
+          onRawJsonRequested={onRawJsonRequested}
+        />
       </div>
     </section>
   );

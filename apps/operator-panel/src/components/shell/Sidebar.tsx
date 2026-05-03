@@ -6,10 +6,12 @@ export type ShellViewKey = 'workspace' | 'tasks' | 'approvals' | 'runs' | 'syste
 export type SidebarGroup = {
   title: string;
   items: Array<{
+    id: string;
     key: ShellViewKey;
     label: string;
     icon: IconName;
-    badge?: string;
+    activeWhen?: ShellViewKey[];
+    badgeCount?: number;
   }>;
 };
 
@@ -17,12 +19,16 @@ export function Sidebar({
   activeView,
   open,
   operatorId,
+  pendingApprovalCount,
+  warningCount,
   onClose,
   onNavigate,
 }: {
   activeView: ShellViewKey;
   open: boolean;
   operatorId: string;
+  pendingApprovalCount: number;
+  warningCount: number;
   onClose: () => void;
   onNavigate: (view: ShellViewKey) => void;
 }) {
@@ -30,37 +36,37 @@ export function Sidebar({
     {
       title: 'ÇALIŞMA ALANI',
       items: [
-        { key: 'workspace', label: 'Mission Control', icon: 'target' },
-        { key: 'runs', label: 'Çalıştırmalar', icon: 'terminal' },
-        { key: 'tasks', label: 'Görevler', icon: 'list' },
-        { key: 'approvals', label: 'Onaylar', icon: 'check', badge: '2' },
-        { key: 'operations', label: 'Yürütmeler', icon: 'clipboard' },
+        { id: 'mission-control', key: 'workspace', label: 'Mission Control', icon: 'target' },
+        { id: 'runs', key: 'runs', label: 'Çalıştırmalar', icon: 'terminal' },
+        { id: 'tasks', key: 'tasks', label: 'Görevler', icon: 'list' },
+        { id: 'approvals', key: 'approvals', label: 'Onaylar', icon: 'check', badgeCount: pendingApprovalCount },
+        { id: 'executions', key: 'operations', label: 'Yürütmeler', icon: 'clipboard' },
       ],
     },
     {
       title: 'SİSTEM',
       items: [
-        { key: 'system', label: 'Sistem Sağlığı', icon: 'layers' },
-        { key: 'system', label: 'Kaynaklar', icon: 'box' },
-        { key: 'system', label: 'Bağlantılar', icon: 'gauge' },
-        { key: 'settings', label: 'Ayarlar', icon: 'settings' },
+        { id: 'system-health', key: 'system', label: 'Sistem Sağlığı', icon: 'layers' },
+        { id: 'resources', key: 'system', label: 'Kaynaklar', icon: 'box', activeWhen: [] },
+        { id: 'connections', key: 'system', label: 'Bağlantılar', icon: 'gauge', activeWhen: [] },
+        { id: 'settings', key: 'settings', label: 'Ayarlar', icon: 'settings' },
       ],
     },
     {
       title: 'OPERASYONLAR',
       items: [
-        { key: 'runs', label: 'Loglar', icon: 'logs' },
-        { key: 'operations', label: 'Raporlar', icon: 'report' },
-        { key: 'operations', label: 'Uyarılar', icon: 'bell', badge: '1' },
-        { key: 'tasks', label: 'Planlamalar', icon: 'play' },
+        { id: 'logs', key: 'runs', label: 'Loglar', icon: 'logs', activeWhen: [] },
+        { id: 'reports', key: 'operations', label: 'Raporlar', icon: 'report', activeWhen: [] },
+        { id: 'warnings', key: 'operations', label: 'Uyarılar', icon: 'bell', activeWhen: [], badgeCount: warningCount },
+        { id: 'plans', key: 'tasks', label: 'Planlamalar', icon: 'play', activeWhen: [] },
       ],
     },
     {
       title: 'YÖNETİM',
       items: [
-        { key: 'operations', label: 'Kullanıcılar', icon: 'users' },
-        { key: 'operations', label: 'Roller', icon: 'user' },
-        { key: 'operations', label: 'Politikalar', icon: 'policy' },
+        { id: 'users', key: 'operations', label: 'Kullanıcılar', icon: 'users', activeWhen: [] },
+        { id: 'roles', key: 'operations', label: 'Roller', icon: 'user', activeWhen: [] },
+        { id: 'policies', key: 'operations', label: 'Politikalar', icon: 'policy', activeWhen: [] },
       ],
     },
   ];
@@ -84,21 +90,26 @@ export function Sidebar({
         {groups.map((group) => (
           <div className="premium-nav-group" key={group.title}>
             <span>{group.title}</span>
-            {group.items.map((item) => (
-              <button
-                key={`${group.title}-${item.label}`}
-                type="button"
-                className={activeView === item.key && item.label === 'Mission Control' ? 'premium-nav-item premium-nav-item-active' : 'premium-nav-item'}
-                onClick={() => {
-                  onNavigate(item.key);
-                  onClose();
-                }}
-              >
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-                {item.badge ? <em>{item.badge}</em> : null}
-              </button>
-            ))}
+            {group.items.map((item) => {
+              const activeTargets = item.activeWhen ?? [item.key];
+              const isActive = activeTargets.includes(activeView);
+              const badge = item.badgeCount && item.badgeCount > 0 ? String(item.badgeCount) : '';
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={isActive ? 'premium-nav-item premium-nav-item-active' : 'premium-nav-item'}
+                  onClick={() => {
+                    onNavigate(item.key);
+                    onClose();
+                  }}
+                >
+                  <Icon name={item.icon} />
+                  <span>{item.label}</span>
+                  {badge ? <em>{badge}</em> : null}
+                </button>
+              );
+            })}
           </div>
         ))}
       </nav>

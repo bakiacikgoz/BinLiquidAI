@@ -4,6 +4,7 @@ import {
   getComputerUseSessionState,
   handshake,
   isBridgePreviewMode,
+  isPreviewAllowedForEnv,
   listRuns,
   pauseComputerUseSession,
   readArtifact,
@@ -18,6 +19,13 @@ import {
 import { DEFAULT_SETTINGS } from './settings';
 
 describe('bridge preview fallback', () => {
+  it('requires dev, test, or explicit env flag for browser preview mode', () => {
+    expect(isPreviewAllowedForEnv({ MODE: 'production', DEV: false })).toBe(false);
+    expect(isPreviewAllowedForEnv({ MODE: 'production', DEV: false, VITE_OPERATOR_PANEL_PREVIEW: '1' })).toBe(true);
+    expect(isPreviewAllowedForEnv({ MODE: 'test', DEV: false })).toBe(true);
+    expect(isPreviewAllowedForEnv({ MODE: 'production', DEV: true })).toBe(true);
+  });
+
   it('returns preview handshake data when tauri runtime is unavailable', async () => {
     expect(isBridgePreviewMode()).toBe(true);
 

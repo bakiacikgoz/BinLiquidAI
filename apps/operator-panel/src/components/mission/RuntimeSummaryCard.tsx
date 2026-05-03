@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Icon } from '../primitives/Icon';
 import { SectionHeader } from '../primitives/SectionHeader';
+import { redactJson } from '../../redactJson';
 
 export type RuntimeSummaryItem = {
   id: string;
@@ -12,21 +13,54 @@ export type RuntimeSummaryItem = {
 export function RuntimeSummaryCard({
   items,
   rawJson,
+  debugRawEnabled = false,
   defaultShowRaw = false,
+  onRawJsonRequested,
 }: {
   items: RuntimeSummaryItem[];
   rawJson: unknown;
+  debugRawEnabled?: boolean;
   defaultShowRaw?: boolean;
+  onRawJsonRequested?: () => boolean;
 }) {
-  const [showRaw, setShowRaw] = useState(defaultShowRaw);
+  const [showRaw, setShowRaw] = useState(debugRawEnabled && defaultShowRaw);
+
+  useEffect(() => {
+    if (!debugRawEnabled && showRaw) {
+      setShowRaw(false);
+    }
+  }, [debugRawEnabled, showRaw]);
+
+  function toggleRaw() {
+    if (showRaw) {
+      setShowRaw(false);
+      return;
+    }
+
+    if (!debugRawEnabled) {
+      return;
+    }
+
+    if (onRawJsonRequested && !onRawJsonRequested()) {
+      return;
+    }
+
+    setShowRaw(true);
+  }
 
   return (
     <div className="mc-card runtime-summary-card">
       <SectionHeader
         title="RUNTIME ÖZETİ"
         action={
-          <button className="raw-toggle" type="button" onClick={() => setShowRaw((value) => !value)}>
-            Ham JSON'u Görüntüle <Icon name="chevron" />
+          <button
+            className="raw-toggle"
+            type="button"
+            disabled={!debugRawEnabled}
+            title={debugRawEnabled ? undefined : 'Ham payload modu ayarlardan açılmalı.'}
+            onClick={toggleRaw}
+          >
+            {showRaw ? "Ham JSON'u Gizle" : "Ham JSON'u Görüntüle"} <Icon name="chevron" />
           </button>
         }
       />
@@ -38,7 +72,9 @@ export function RuntimeSummaryCard({
           </li>
         ))}
       </ul>
-      {showRaw ? <pre className="json-panel runtime-raw-panel">{JSON.stringify(rawJson ?? {}, null, 2)}</pre> : null}
+      {showRaw ? (
+        <pre className="json-panel runtime-raw-panel">{JSON.stringify(redactJson(rawJson ?? {}), null, 2)}</pre>
+      ) : null}
     </div>
   );
 }

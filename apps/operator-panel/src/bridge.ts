@@ -166,11 +166,42 @@ function isTauriRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
+type PreviewEnvironment = {
+  DEV?: boolean;
+  MODE?: string;
+  VITE_OPERATOR_PANEL_PREVIEW?: string | boolean;
+};
+
+export function isPreviewAllowedForEnv(env: PreviewEnvironment): boolean {
+  return (
+    env.DEV === true ||
+    env.MODE === 'test' ||
+    env.VITE_OPERATOR_PANEL_PREVIEW === '1' ||
+    env.VITE_OPERATOR_PANEL_PREVIEW === 'true' ||
+    env.VITE_OPERATOR_PANEL_PREVIEW === true
+  );
+}
+
+function isPreviewAllowed(): boolean {
+  return isPreviewAllowedForEnv(import.meta.env);
+}
+
 export function isBridgePreviewMode(): boolean {
-  return !isTauriRuntime();
+  return !isTauriRuntime() && isPreviewAllowed();
 }
 
 async function callBridge<T>(command: string, args: Record<string, unknown>): Promise<T> {
+  if (!isTauriRuntime()) {
+    throw new BridgeError({
+      code: 'CLI_NOT_FOUND',
+      message:
+        'Operator Panel bridge is unavailable. Run inside Tauri or enable VITE_OPERATOR_PANEL_PREVIEW=1 for explicit browser preview.',
+      stderrPreview: '',
+      command,
+      retryable: false,
+    });
+  }
+
   const result = await invoke<BridgeResult<T>>(command, args);
   if (!result.ok) {
     throw new BridgeError(result.error);

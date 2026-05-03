@@ -56,15 +56,19 @@ import {
   readWorkspaceProgress,
   type WorkspaceStageKey,
 } from './workspace';
+import {
+  buildActivityItems,
+  buildNotificationItems,
+  buildPendingApprovalSummaries,
+  buildRuntimeSummaryItems,
+  buildSessionEventItems,
+  buildSystemHealthSummary,
+  mapWorkspaceStageToMissionStage,
+} from './missionMappers';
 import { MissionControlView } from './components/mission/MissionControlView';
-import type { ActivityItem } from './components/mission/LiveAgentActivity';
-import type { MissionStageKey } from './components/mission/StageProgress';
-import type { RuntimeSummaryItem } from './components/mission/RuntimeSummaryCard';
-import type { SessionEventItem } from './components/mission/SessionEventsCard';
 import { AppShell } from './components/shell/AppShell';
-import { RightRail, type PendingApprovalSummary } from './components/shell/RightRail';
+import { RightRail } from './components/shell/RightRail';
 import type { ShellViewKey } from './components/shell/Sidebar';
-import type { NotificationItem } from './components/notifications/NotificationStack';
 
 type ViewKey = 'workspace' | 'tasks' | 'approvals' | 'runs' | 'system' | 'operations' | 'settings';
 type RunTabKey = 'overview' | 'stream' | 'approvals' | 'artifacts' | 'replay' | 'diagnostics';
@@ -406,6 +410,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       setResumeForm((prev) => ({ ...prev, specPath: taskForm.specPath }));
     }
   }, [resumeForm.specPath, taskForm.specPath]);
+
+  useEffect(() => {
+    if (!settings.debugRaw) {
+      setShowRawArtifact(false);
+    }
+  }, [settings.debugRaw]);
 
   useEffect(() => {
     void loadApprovalDetail(selectedApprovalId);
@@ -772,6 +782,14 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
+  function confirmRawDisclosure(label: string): boolean {
+    if (!settings.debugRaw) {
+      pushToast('error', 'Ham payload modu ayarlardan açılmalı.');
+      return false;
+    }
+    return window.confirm(`${label}\nHam payload hassas bilgi içerebilir. Devam edilsin mi?`);
+  }
+
   const selectedArtifactPayload = artifactsByName[selectedArtifactName];
   const parsedArtifact = asRecord(selectedArtifactPayload);
   const artifactValue = parsedArtifact.payload;
@@ -797,22 +815,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       blocked: t.stageBlocked,
       done: t.stageDone,
     }[stage];
-  }
-
-  function mapMissionStage(stage: WorkspaceStageKey): MissionStageKey {
-    if (stage === 'reading_screen') {
-      return 'preparing';
-    }
-    if (stage === 'executing' || stage === 'verifying') {
-      return 'running';
-    }
-    if (stage === 'waiting_approval' || stage === 'blocked') {
-      return 'approval';
-    }
-    if (stage === 'done') {
-      return 'done';
-    }
-    return 'planning';
   }
 
   function formatTimestamp(value: string, fallback = '-'): string {
@@ -902,148 +904,43 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           ? 'Seçili onay yok.'
           : '';
   const approvalDisabled = !canMutate || !activeApprovalId;
-  const useVisualFallback = previewMode && workspaceSnapshot.timeline.length === 0;
-  const activityItems: ActivityItem[] = useVisualFallback
-    ? [
-        {
-          id: 'fallback-plan',
-          time: '14:35:12',
-          title: 'Planlama adımı başlatıldı.',
-          body: 'Ajan görevi analiz ediyor ve ilk planı oluşturuyor.',
-          tone: 'info',
-        },
-        {
-          id: 'fallback-context',
-          time: '14:35:07',
-          title: 'Bağlam kontrolü yapıldı.',
-          body: 'Çalışma bağlamı doğrulandı ve geçerli.',
-          tone: 'success',
-        },
-        {
-          id: 'fallback-resources',
-          time: '14:35:03',
-          title: 'Kaynaklar tarandı.',
-          body: 'Gerekli varlıklar ve bağımlılıklar kontrol edildi.',
-          tone: 'warning',
-        },
-        {
-          id: 'fallback-session',
-          time: '14:34:58',
-          title: 'Çalıştırma oturumu başlatıldı.',
-          body: 'Oturum session_7f3a başlatıldı.',
-          tone: 'neutral',
-        },
-        {
-          id: 'fallback-run',
-          time: '14:34:55',
-          title: 'Görev alındı.',
-          body: `${selectedRunId || 'run_2025_05_14_001'} kuyruğa eklendi.`,
-          tone: 'info',
-        },
-      ]
-    : workspaceSnapshot.timeline.slice(-5).reverse().map((item, index) => ({
-        id: item.id,
-        time: formatClock(item.timestamp, `14:3${index}:00`),
-        title: item.summary,
-        body: item.event,
-        tone: item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'info',
-      }));
-  const sessionEvents: SessionEventItem[] = useVisualFallback
-    ? [
-        {
-          id: 'session-plan',
-          time: '14:35',
-          title: 'Planlama aşaması geçildi',
-          body: 'Görev analizi tamamlandı. Kontrol döngüsü planlama aşamasında.',
-          tag: 'SİSTEM',
-          tone: 'info',
-        },
-        {
-          id: 'session-context',
-          time: '14:34',
-          title: 'Bağlam başarıyla yenilendi',
-          body: 'Çalışma bağlamı güncel ve doğrulandı.',
-          tag: 'BAĞLAM',
-          tone: 'success',
-        },
-        {
-          id: 'session-start',
-          time: '14:34',
-          title: 'Ajan oturumu başlatıldı',
-          body: `${sessionId} ile etkileşim başlatıldı.`,
-          tag: 'SİSTEM',
-          tone: 'info',
-        },
-      ]
-    : workspaceSnapshot.timeline.slice(-3).reverse().map((item) => ({
-        id: item.id,
-        time: formatClock(item.timestamp, '-').slice(0, 5),
-        title: item.summary,
-        body: item.event,
-        tag: item.tone === 'success' ? 'BAĞLAM' : item.tone === 'warning' ? 'UYARI' : 'SİSTEM',
-        tone: item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'info',
-      }));
-  const runtimeSummary: RuntimeSummaryItem[] = [
-    {
-      id: 'stage',
-      tone: 'success',
-      text: `Ajan şu anda ${workspaceStageLabel(workspaceSnapshot.stage).toLocaleLowerCase('tr-TR')} aşamasında.`,
-    },
-    {
-      id: 'context',
-      tone: 'success',
-      text: selectedRunId ? 'Çalışma bağlamı doğrulandı ve geçerli.' : 'Çalıştırma seçildiğinde bağlam yüklenecek.',
-    },
-    {
-      id: 'external',
-      tone: 'warning',
-      text: workspaceSnapshot.liveSurface ? 'Canlı yüzey bağlantısı izleniyor.' : 'Harici izleyici bağlantısı bulunmuyor.',
-    },
-    {
-      id: 'approval',
-      tone: hasApproval ? 'warning' : 'success',
-      text: hasApproval
-        ? 'Hazırlık sonraki adım için operatör onayı bekleniyor.'
-        : 'Bekleyen operatör onayı bulunmuyor.',
-    },
-    {
-      id: 'resources',
-      tone: 'success',
-      text: 'Kaynak kullanımı normal aralıklarda.',
-    },
-  ];
-  const notificationSeeds: NotificationItem[] = [
-    hasApproval
-      ? {
-          id: `approval-${activeApprovalId}`,
-          kind: 'warning',
-          title: 'Onay talebi oluşturuldu',
-          subtitle: 'Kullanıcı onayı bekleniyor.',
-          time: 'şimdi',
-        }
-      : null,
-    {
-      id: 'context-refreshed',
-      kind: 'success',
-      title: 'Bağlam yenilendi',
-      subtitle: 'Çalışma bağlamı başarıyla güncellendi.',
-      time: '1 dk önce',
-    },
-    {
-      id: 'checkpoint-created',
-      kind: 'info',
-      title: 'Kontrol noktası oluşturuldu',
-      subtitle: 'Checkpoint kaydedildi.',
-      time: '2 dk önce',
-    },
-  ].filter((item): item is NotificationItem => item !== null);
-  const notifications = notificationSeeds.filter((item) => !dismissedNotifications.includes(item.id));
-  const pendingApprovalSummaries: PendingApprovalSummary[] = approvalRows.slice(0, 2).map((item, index) => ({
-    id: readString(item, 'approval_id', `approval-${index}`),
-    title: index === 0 ? 'Planlama Onayı' : 'Kaynak Erişimi',
-    subtitle: readString(item, 'run_id') || selectedRunId || '-',
-    time: index === 0 ? 'şimdi' : '2 dk önce',
-  }));
+  const systemHealth = buildSystemHealthSummary({
+    coreMode: settings.mode,
+    handshakeRecord,
+    doctor,
+    metricsPayload: operationOutputs.metrics,
+  });
+  const activityItems = buildActivityItems(workspaceSnapshot, formatClock);
+  const sessionEvents = buildSessionEventItems(workspaceSnapshot, formatClock);
+  const runtimeSummary = buildRuntimeSummaryItems({
+    snapshot: workspaceSnapshot,
+    selectedRunId,
+    hasApproval,
+    stageLabel: workspaceStageLabel(workspaceSnapshot.stage),
+    systemHealth,
+  });
+  const notifications = buildNotificationItems({
+    approvalRows,
+    timeline: workspaceSnapshot.timeline,
+    dismissedIds: dismissedNotifications,
+    formatClock,
+  });
+  const pendingApprovalSummaries = buildPendingApprovalSummaries(approvalRows, selectedRunId);
+  const canResumeFromQuickAction =
+    canResumeSession || (Boolean(selectedRunId) && Boolean(resumeForm.specPath.trim()));
+  const resumeDisabledReason = !selectedRunId
+    ? 'Seçili çalıştırma yok.'
+    : !canResumeFromQuickAction
+      ? 'Devam için görev spec yolu veya resumable oturum gerekli.'
+      : '';
+  const cancelDisabled = !selectedRunId || !isComputerUseRun || !workspaceSnapshot.runtimeState.canStop;
+  const cancelDisabledReason = !selectedRunId
+    ? 'Seçili çalıştırma yok.'
+    : !isComputerUseRun
+      ? 'İptal yalnızca aktif computer-use oturumlarında kullanılabilir.'
+      : !workspaceSnapshot.runtimeState.canStop
+        ? 'Runtime bu durumda durdurma kabul etmiyor.'
+        : '';
 
   return (
     <AppShell
@@ -1053,6 +950,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       previewMode={previewMode}
       operatorWarning={!operatorIdValid ? t.setOperatorId : ''}
       contractWarning={contractMismatch ? t.contractMismatch : ''}
+      pendingApprovalCount={pendingApprovals.length}
+      warningCount={driftEvents.length}
       toasts={toasts}
       onNavigate={(view) => setActiveView(view)}
       onToggleNav={() => setMobileNavOpen((value) => !value)}
@@ -1061,16 +960,22 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       rightRail={
         <RightRail
           notifications={notifications}
-          selectedRunId={selectedRunId || (previewMode ? 'run_2025_05_14_001' : '-')}
+          selectedRunId={selectedRunId || '-'}
           sessionId={sessionId}
           mode={settings.mode === 'auto' ? 'Yardımlı' : settings.mode}
           profile={settings.profile}
           startedAt={startedAt}
           duration={duration}
-          coreMode={settings.mode}
-          contractVersion={readString(handshakeRecord, 'contractVersion', '-')}
-          health={readString(doctor, 'status', 'Healthy')}
+          systemHealth={systemHealth}
           pendingApprovals={pendingApprovalSummaries}
+          resumeDisabled={!canResumeFromQuickAction}
+          resumeDisabledReason={resumeDisabledReason}
+          terminalDisabled
+          terminalDisabledReason="Terminal entegrasyonu bu sürümde bağlı değil."
+          exportDisabled={!selectedRunId}
+          exportDisabledReason={!selectedRunId ? 'Seçili çalıştırma yok.' : ''}
+          cancelDisabled={cancelDisabled}
+          cancelDisabledReason={cancelDisabledReason}
           onDismissNotification={(id) => setDismissedNotifications((prev) => [...prev, id])}
           onRefreshContext={() => {
             void refreshCore();
@@ -1086,9 +991,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             }
           }}
           onOpenTerminal={() => {
-            setActiveView('runs');
-            setRunTab('stream');
-            pushToast('ok', 'Terminal görünümü için akış paneli açıldı');
+            pushToast('error', 'Terminal entegrasyonu bu sürümde bağlı değil.');
           }}
           onExport={() => void onExportArtifacts()}
           onCancel={() => void onControlSession('stop')}
@@ -1117,7 +1020,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             statusCode={missionStatusCode}
             statusError={missionStatusError}
             stageLabel={workspaceStageLabel(workspaceSnapshot.stage)}
-            stageKey={mapMissionStage(workspaceSnapshot.stage)}
+            stageKey={mapWorkspaceStageToMissionStage(workspaceSnapshot.stage, hasApproval)}
             startedAt={startedAt}
             duration={duration}
             progress={workspaceProgress}
@@ -1125,11 +1028,13 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             sessionEvents={sessionEvents}
             runtimeSummary={runtimeSummary}
             rawSummary={{ runStatus, computerUseState, configData, handshakeData }}
+            debugRawEnabled={settings.debugRaw}
             hasApproval={hasApproval}
             approvalLabel={approvalLabel}
             approvalDisabled={approvalDisabled}
             approvalDisabledReason={approvalDisabledReason}
             onSelectRun={setSelectedRunId}
+            onRawJsonRequested={() => confirmRawDisclosure('Runtime özeti ham JSON')}
             onApprove={() => void onApproveAndContinue()}
             onEditApproval={() => setActiveView('approvals')}
             onReject={() => void onDecideApproval(false)}
@@ -1501,7 +1406,16 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                         className="ghost-btn"
                         type="button"
                         disabled={!settings.debugRaw}
-                        onClick={() => setShowRawArtifact((prev) => !prev)}
+                        title={settings.debugRaw ? undefined : 'Ham payload modu ayarlardan açılmalı.'}
+                        onClick={() => {
+                          if (showRawArtifact) {
+                            setShowRawArtifact(false);
+                            return;
+                          }
+                          if (confirmRawDisclosure(`${selectedArtifactName} ham JSON`)) {
+                            setShowRawArtifact(true);
+                          }
+                        }}
                       >
                         {showRawArtifact ? t.hideRaw : t.showRaw}
                       </button>

@@ -14,6 +14,8 @@ export function AppShell({
   previewMode,
   operatorWarning,
   contractWarning,
+  pendingApprovalCount,
+  warningCount,
   onNavigate,
   onToggleNav,
   onCloseNav,
@@ -28,6 +30,8 @@ export function AppShell({
   previewMode: boolean;
   operatorWarning: string;
   contractWarning: string;
+  pendingApprovalCount: number;
+  warningCount: number;
   onNavigate: (view: ShellViewKey) => void;
   onToggleNav: () => void;
   onCloseNav: () => void;
@@ -45,6 +49,8 @@ export function AppShell({
         activeView={activeView}
         open={mobileNavOpen}
         operatorId={operatorId}
+        pendingApprovalCount={pendingApprovalCount}
+        warningCount={warningCount}
         onNavigate={onNavigate}
         onClose={onCloseNav}
       />
