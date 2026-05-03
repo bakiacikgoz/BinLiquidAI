@@ -6,7 +6,10 @@ import './styles/tokens.css'
 import './styles/themes/dark.css'
 import './styles/themes/light.css'
 import './styles/base.css'
-import './index.css'  // Keep existing styles for backwards compatibility
+import './index.css'  // Keep existing styles for secondary workspaces during migration
+import './styles/premium-components.css'
+import './styles/premium-shell.css'
+import './styles/premium-mission.css'
 
 import App from './App.tsx'
 

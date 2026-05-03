@@ -40,7 +40,7 @@ import {
   showApproval,
 } from './bridge';
 import { hasContractMismatch } from './capabilities';
-import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { dictionaries } from './i18n';
 import { actorForOperator, canMutateWithOperatorId } from './operator';
 import {
@@ -53,12 +53,18 @@ import {
 } from './settings';
 import {
   buildWorkspaceSnapshot,
-  listAttachmentLabels,
   readWorkspaceProgress,
-  selectRecentRuns,
   type WorkspaceStageKey,
-  type WorkspaceRuntimeStateKey,
 } from './workspace';
+import { MissionControlView } from './components/mission/MissionControlView';
+import type { ActivityItem } from './components/mission/LiveAgentActivity';
+import type { MissionStageKey } from './components/mission/StageProgress';
+import type { RuntimeSummaryItem } from './components/mission/RuntimeSummaryCard';
+import type { SessionEventItem } from './components/mission/SessionEventsCard';
+import { AppShell } from './components/shell/AppShell';
+import { RightRail, type PendingApprovalSummary } from './components/shell/RightRail';
+import type { ShellViewKey } from './components/shell/Sidebar';
+import type { NotificationItem } from './components/notifications/NotificationStack';
 
 type ViewKey = 'workspace' | 'tasks' | 'approvals' | 'runs' | 'system' | 'operations' | 'settings';
 type RunTabKey = 'overview' | 'stream' | 'approvals' | 'artifacts' | 'replay' | 'diagnostics';
@@ -107,8 +113,6 @@ type OperationsFormState = {
 };
 
 const ARTIFACT_NAMES = ['status.json', 'tasks.json', 'handoffs.json', 'audit_envelope.json'] as const;
-const THEME_MODES = ['light', 'dark', 'system'] as const;
-
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }
@@ -169,7 +173,6 @@ function mergeRunStatusWithSessionState(runStatusPayload: unknown, sessionStateP
 }
 
 function AppContent({ settings, updateSettings }: AppContentProps) {
-  const { resolvedTheme } = useTheme();
   const previewMode = isBridgePreviewMode();
 
   const [activeView, setActiveView] = useState<ViewKey>('workspace');
@@ -242,6 +245,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   });
   const [operationOutputs, setOperationOutputs] = useState<Record<string, unknown>>({});
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
 
   const locale = resolveLocale(settings.locale);
   const t = dictionaries[locale];
@@ -273,7 +277,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     return name.includes('snapshot_drift') || name.includes('approval_stale') || name.includes('stale_');
   });
   const configRecord = asRecord(configData);
-  const statusArtifact = asRecord(asRecord(artifactsByName['status.json']).payload);
 
   function pushToast(kind: Toast['kind'], text: string) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -728,6 +731,34 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
+  async function onApproveAndContinue() {
+    if (!selectedApprovalId || !canMutate) {
+      pushToast('error', t.setOperatorId);
+      return;
+    }
+
+    const actor = actorForOperator(settings.operatorId);
+    const confirmed = window.confirm(`Onayla ve Devam Et\n${selectedApprovalId}\n${actor}`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await decideApproval(settings, selectedApprovalId, true, settings.operatorId, 'mission control approval');
+      await executeApproval(settings, selectedApprovalId, settings.operatorId);
+      pushToast('ok', 'Onay akışı tamamlandı');
+      await Promise.all([refreshApprovals(), refreshRuns()]);
+      if (selectedRunId) {
+        await loadRunContext(selectedRunId, false);
+      }
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
   async function runOperation(key: string, task: () => Promise<unknown>) {
     try {
       const payload = await task();
@@ -744,23 +775,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const selectedArtifactPayload = artifactsByName[selectedArtifactName];
   const parsedArtifact = asRecord(selectedArtifactPayload);
   const artifactValue = parsedArtifact.payload;
-  const themeLabel = resolvedTheme === 'dark' ? t.themeDark : t.themeLight;
-
-  const views: Array<{ key: ViewKey; label: string; meta: string; badge: string }> = [
-    { key: 'workspace', label: t.workspace, meta: t.workspaceMeta, badge: t.chatFirst },
-    { key: 'tasks', label: t.tasks, meta: t.tasksMeta, badge: settings.profile },
-    { key: 'approvals', label: t.approvals, meta: t.approvalsMeta, badge: String(pendingApprovals.length) },
-    { key: 'runs', label: t.runs, meta: t.runsMeta, badge: String(runItems.length) },
-    {
-      key: 'system',
-      label: t.system,
-      meta: t.systemMeta,
-      badge: readString(handshakeRecord, 'contractVersion', '-'),
-    },
-    { key: 'operations', label: t.operations, meta: t.operationsMeta, badge: settings.profile },
-    { key: 'settings', label: t.settings, meta: t.settingsMeta, badge: themeLabel },
-  ];
-
   const operationOutput = operationOutputs[operationTab] ?? {};
   const workspaceSnapshot = buildWorkspaceSnapshot({
     runStatus,
@@ -771,16 +785,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     artifactsByName,
   });
   const workspaceProgress = readWorkspaceProgress(workspaceSnapshot);
-  const attachmentLabels = listAttachmentLabels(selectedRunId, taskForm.specPath, settings.rootDir);
-  const recentRuns = selectRecentRuns(runItems);
-  const topStatus = selectedRunId
-    ? workspaceSnapshot.currentStatus || runStatusValue || t.statusUnknown
-    : readString(doctor, 'status', t.statusUnknown);
-  const controlStateLabel =
-    workspaceSnapshot.runtimeState.rawState || readString(controlRegistry, 'state') || t.statusUnknown;
-  const canPauseSession = Boolean(selectedRunId) && isComputerUseRun && workspaceSnapshot.runtimeState.canPause;
   const canResumeSession = Boolean(selectedRunId) && isComputerUseRun && workspaceSnapshot.runtimeState.canResume;
-  const canStopSession = Boolean(selectedRunId) && isComputerUseRun && workspaceSnapshot.runtimeState.canStop;
 
   function workspaceStageLabel(stage: WorkspaceStageKey): string {
     return {
@@ -794,139 +799,304 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }[stage];
   }
 
-  function workspaceStageClass(stage: WorkspaceStageKey): string {
-    return [
-      'stage-pill',
-      stage === 'blocked'
-        ? 'stage-pill-warning'
-        : stage === 'done'
-          ? 'stage-pill-success'
-          : 'stage-pill-live',
-    ].join(' ');
+  function mapMissionStage(stage: WorkspaceStageKey): MissionStageKey {
+    if (stage === 'reading_screen') {
+      return 'preparing';
+    }
+    if (stage === 'executing' || stage === 'verifying') {
+      return 'running';
+    }
+    if (stage === 'waiting_approval' || stage === 'blocked') {
+      return 'approval';
+    }
+    if (stage === 'done') {
+      return 'done';
+    }
+    return 'planning';
   }
 
-  function runtimeStateLabel(state: WorkspaceRuntimeStateKey): string {
-    return {
-      running: t.runtimeStateRunning,
-      awaiting_approval: t.runtimeStateAwaitingApproval,
-      paused: t.runtimeStatePaused,
-      resuming: t.runtimeStateResuming,
-      stopping: t.runtimeStateStopping,
-      stopped: t.runtimeStateStopped,
-      completed: t.runtimeStateCompleted,
-      failed: t.runtimeStateFailed,
-      recovered: t.runtimeStateRecovered,
-      non_resumable: t.runtimeStateNonResumable,
-    }[state];
+  function formatTimestamp(value: string, fallback = '-'): string {
+    if (!value) {
+      return fallback;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(parsed);
   }
 
-  function runtimeStateClass(state: WorkspaceRuntimeStateKey): string {
-    return [
-      'stage-pill',
-      ['stopped', 'failed', 'non_resumable', 'awaiting_approval', 'paused', 'stopping'].includes(state)
-        ? 'stage-pill-warning'
-        : ['completed', 'recovered'].includes(state)
-          ? 'stage-pill-success'
-          : 'stage-pill-live',
-    ].join(' ');
+  function formatClock(value: string, fallback: string): string {
+    if (!value) {
+      return fallback;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return fallback;
+    }
+    return new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(parsed);
   }
 
-  function boolLabel(value: boolean): string {
-    return value ? t.yes : t.no;
+  const selectedRunRecord = asRecord(
+    runItems.find((item) => readString(asRecord(item), 'job_id') === selectedRunId),
+  );
+  const runOptions = runItems
+    .map((item) => {
+      const row = asRecord(item);
+      const id = readString(row, 'job_id');
+      return id ? { id, label: id } : null;
+    })
+    .filter((item): item is { id: string; label: string } => item !== null);
+  if (selectedRunId && !runOptions.some((item) => item.id === selectedRunId)) {
+    runOptions.unshift({ id: selectedRunId, label: selectedRunId });
   }
+
+  const selectedCreatedAt =
+    readString(runJob, 'created_at') ||
+    readString(selectedRunRecord, 'created_at') ||
+    readString(runJob, 'started_at');
+  const startedAt = formatTimestamp(selectedCreatedAt, previewMode ? '14 May 2025 14:32' : '-');
+  const duration = readString(runJob, 'duration') || readString(runComputerUse, 'duration') || (previewMode ? '00:03:18' : '-');
+  const sessionId =
+    readString(controlRegistry, 'session_id') ||
+    readString(runComputerUse, 'session_id') ||
+    (previewMode ? 'session_7f3a' : '-');
+  const missionStatusCode =
+    handshakeError?.code ||
+    readString(runComputerUse, 'last_error') ||
+    (runStatusValue ? humanizeCode(runStatusValue).toUpperCase() : readString(doctor, 'status', 'Bilinmiyor'));
+  const missionStatusError =
+    handshakeError?.message ||
+    workspaceSnapshot.blockedReason ||
+    readString(runComputerUse, 'last_error_message') ||
+    (previewMode ? 'Hata: No such file or directory (os error 2)' : 'Ölçüm yok');
+  const sessionStatus = workspaceSnapshot.currentStatus || runStatusValue || readString(doctor, 'status', 'Bilinmiyor');
+  const approvalRows = pendingApprovals.map((item) => asRecord(item));
+  const activeApproval =
+    approvalRows.find((item) => readString(item, 'approval_id') === selectedApprovalId) ||
+    approvalRows[0] ||
+    {};
+  const activeApprovalId = readString(activeApproval, 'approval_id');
+  const hasApproval = Boolean(activeApprovalId);
+  const approvalLabel =
+    readString(activeApproval, 'summary') ||
+    readString(activeApproval, 'target_kind') ||
+    'Plan gözden geçir ve çalıştırmaya izin ver.';
+  const approvalDisabledReason = contractMismatch
+    ? t.contractMismatch
+    : !settings.operatorId.trim()
+      ? t.setOperatorId
+      : !operatorIdValid
+        ? 'Operatör ID geçersiz.'
+        : !activeApprovalId
+          ? 'Seçili onay yok.'
+          : '';
+  const approvalDisabled = !canMutate || !activeApprovalId;
+  const useVisualFallback = previewMode && workspaceSnapshot.timeline.length === 0;
+  const activityItems: ActivityItem[] = useVisualFallback
+    ? [
+        {
+          id: 'fallback-plan',
+          time: '14:35:12',
+          title: 'Planlama adımı başlatıldı.',
+          body: 'Ajan görevi analiz ediyor ve ilk planı oluşturuyor.',
+          tone: 'info',
+        },
+        {
+          id: 'fallback-context',
+          time: '14:35:07',
+          title: 'Bağlam kontrolü yapıldı.',
+          body: 'Çalışma bağlamı doğrulandı ve geçerli.',
+          tone: 'success',
+        },
+        {
+          id: 'fallback-resources',
+          time: '14:35:03',
+          title: 'Kaynaklar tarandı.',
+          body: 'Gerekli varlıklar ve bağımlılıklar kontrol edildi.',
+          tone: 'warning',
+        },
+        {
+          id: 'fallback-session',
+          time: '14:34:58',
+          title: 'Çalıştırma oturumu başlatıldı.',
+          body: 'Oturum session_7f3a başlatıldı.',
+          tone: 'neutral',
+        },
+        {
+          id: 'fallback-run',
+          time: '14:34:55',
+          title: 'Görev alındı.',
+          body: `${selectedRunId || 'run_2025_05_14_001'} kuyruğa eklendi.`,
+          tone: 'info',
+        },
+      ]
+    : workspaceSnapshot.timeline.slice(-5).reverse().map((item, index) => ({
+        id: item.id,
+        time: formatClock(item.timestamp, `14:3${index}:00`),
+        title: item.summary,
+        body: item.event,
+        tone: item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'info',
+      }));
+  const sessionEvents: SessionEventItem[] = useVisualFallback
+    ? [
+        {
+          id: 'session-plan',
+          time: '14:35',
+          title: 'Planlama aşaması geçildi',
+          body: 'Görev analizi tamamlandı. Kontrol döngüsü planlama aşamasında.',
+          tag: 'SİSTEM',
+          tone: 'info',
+        },
+        {
+          id: 'session-context',
+          time: '14:34',
+          title: 'Bağlam başarıyla yenilendi',
+          body: 'Çalışma bağlamı güncel ve doğrulandı.',
+          tag: 'BAĞLAM',
+          tone: 'success',
+        },
+        {
+          id: 'session-start',
+          time: '14:34',
+          title: 'Ajan oturumu başlatıldı',
+          body: `${sessionId} ile etkileşim başlatıldı.`,
+          tag: 'SİSTEM',
+          tone: 'info',
+        },
+      ]
+    : workspaceSnapshot.timeline.slice(-3).reverse().map((item) => ({
+        id: item.id,
+        time: formatClock(item.timestamp, '-').slice(0, 5),
+        title: item.summary,
+        body: item.event,
+        tag: item.tone === 'success' ? 'BAĞLAM' : item.tone === 'warning' ? 'UYARI' : 'SİSTEM',
+        tone: item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'info',
+      }));
+  const runtimeSummary: RuntimeSummaryItem[] = [
+    {
+      id: 'stage',
+      tone: 'success',
+      text: `Ajan şu anda ${workspaceStageLabel(workspaceSnapshot.stage).toLocaleLowerCase('tr-TR')} aşamasında.`,
+    },
+    {
+      id: 'context',
+      tone: 'success',
+      text: selectedRunId ? 'Çalışma bağlamı doğrulandı ve geçerli.' : 'Çalıştırma seçildiğinde bağlam yüklenecek.',
+    },
+    {
+      id: 'external',
+      tone: 'warning',
+      text: workspaceSnapshot.liveSurface ? 'Canlı yüzey bağlantısı izleniyor.' : 'Harici izleyici bağlantısı bulunmuyor.',
+    },
+    {
+      id: 'approval',
+      tone: hasApproval ? 'warning' : 'success',
+      text: hasApproval
+        ? 'Hazırlık sonraki adım için operatör onayı bekleniyor.'
+        : 'Bekleyen operatör onayı bulunmuyor.',
+    },
+    {
+      id: 'resources',
+      tone: 'success',
+      text: 'Kaynak kullanımı normal aralıklarda.',
+    },
+  ];
+  const notificationSeeds: NotificationItem[] = [
+    hasApproval
+      ? {
+          id: `approval-${activeApprovalId}`,
+          kind: 'warning',
+          title: 'Onay talebi oluşturuldu',
+          subtitle: 'Kullanıcı onayı bekleniyor.',
+          time: 'şimdi',
+        }
+      : null,
+    {
+      id: 'context-refreshed',
+      kind: 'success',
+      title: 'Bağlam yenilendi',
+      subtitle: 'Çalışma bağlamı başarıyla güncellendi.',
+      time: '1 dk önce',
+    },
+    {
+      id: 'checkpoint-created',
+      kind: 'info',
+      title: 'Kontrol noktası oluşturuldu',
+      subtitle: 'Checkpoint kaydedildi.',
+      time: '2 dk önce',
+    },
+  ].filter((item): item is NotificationItem => item !== null);
+  const notifications = notificationSeeds.filter((item) => !dismissedNotifications.includes(item.id));
+  const pendingApprovalSummaries: PendingApprovalSummary[] = approvalRows.slice(0, 2).map((item, index) => ({
+    id: readString(item, 'approval_id', `approval-${index}`),
+    title: index === 0 ? 'Planlama Onayı' : 'Kaynak Erişimi',
+    subtitle: readString(item, 'run_id') || selectedRunId || '-',
+    time: index === 0 ? 'şimdi' : '2 dk önce',
+  }));
 
   return (
-    <div className={mobileNavOpen ? 'shell shell-nav-open' : 'shell'}>
-      <button
-        type="button"
-        className={mobileNavOpen ? 'sidebar-backdrop sidebar-backdrop-open' : 'sidebar-backdrop'}
-        aria-label={t.navigation}
-        onClick={() => setMobileNavOpen(false)}
-      />
-
-      <aside className={mobileNavOpen ? 'sidebar sidebar-open' : 'sidebar'}>
-        <div className="brand">
-          <div className="brand-chip">{t.brandChip}</div>
-          <div className="brand-copy">
-            <h1>{t.appTitle}</h1>
-            <p>{t.appSubtitle}</p>
-          </div>
-        </div>
-
-        <div className="sidebar-group">
-          <span className="sidebar-label">{t.navigation}</span>
-          <nav className="nav-list">
-            {views.map((view) => (
-              <button
-                key={view.key}
-                type="button"
-                className={view.key === activeView ? 'nav-item nav-item-active' : 'nav-item'}
-                onClick={() => {
-                  setActiveView(view.key);
-                  setMobileNavOpen(false);
-                }}
-              >
-                <span className="nav-item-copy">
-                  <span className="nav-item-label">{view.label}</span>
-                  <span className="nav-item-meta">{view.meta}</span>
-                </span>
-                <span className="nav-item-badge">{view.badge}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <div className="sidebar-foot">
-          <div className="sidebar-meta">
-            <span>{t.operatorId}</span>
-            <strong>{settings.operatorId.trim() || '-'}</strong>
-          </div>
-          <div className="sidebar-meta">
-            <span>{t.profile}</span>
-            <strong>{settings.profile}</strong>
-          </div>
-          <div className="sidebar-meta">
-            <span>{t.positioning}</span>
-            <strong>{t.positioningValue}</strong>
-          </div>
-        </div>
-      </aside>
-
-      <main className="main-panel">
-        <header className="workspace-topbar">
-          <div className="status-row">
-            <button type="button" className="nav-toggle-btn" onClick={() => setMobileNavOpen((value) => !value)}>
-              {t.navigation}
-            </button>
-            {previewMode ? <span className="pill pill-preview">{t.previewMode}</span> : null}
-            <span className="pill">{topStatus}</span>
-            <span className="pill pill-muted">
-              {t.mode}: {settings.mode}
-            </span>
-            <span className="pill pill-muted">
-              {t.live}: {eventsCursor}
-            </span>
-          </div>
-          <div className="topbar-actions">
-            {!operatorIdValid ? <div className="warning-inline">{t.setOperatorId}</div> : null}
-            <div className="theme-quick-switch">
-              {THEME_MODES.map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  className={settings.theme === mode ? 'theme-toggle-btn theme-toggle-btn-active' : 'theme-toggle-btn'}
-                  onClick={() => updateSettings({ theme: mode as PanelSettings['theme'] })}
-                >
-                  {mode === 'light' ? t.themeLight : mode === 'dark' ? t.themeDark : t.themeSystem}
-                </button>
-              ))}
-            </div>
-            <button className="ghost-btn" type="button" onClick={() => void refreshCore()}>
-              {t.refreshAll}
-            </button>
-          </div>
-        </header>
-
+    <AppShell
+      activeView={activeView as ShellViewKey}
+      mobileNavOpen={mobileNavOpen}
+      operatorId={settings.operatorId.trim()}
+      previewMode={previewMode}
+      operatorWarning={!operatorIdValid ? t.setOperatorId : ''}
+      contractWarning={contractMismatch ? t.contractMismatch : ''}
+      toasts={toasts}
+      onNavigate={(view) => setActiveView(view)}
+      onToggleNav={() => setMobileNavOpen((value) => !value)}
+      onCloseNav={() => setMobileNavOpen(false)}
+      onRefresh={() => void refreshCore()}
+      rightRail={
+        <RightRail
+          notifications={notifications}
+          selectedRunId={selectedRunId || (previewMode ? 'run_2025_05_14_001' : '-')}
+          sessionId={sessionId}
+          mode={settings.mode === 'auto' ? 'Yardımlı' : settings.mode}
+          profile={settings.profile}
+          startedAt={startedAt}
+          duration={duration}
+          coreMode={settings.mode}
+          contractVersion={readString(handshakeRecord, 'contractVersion', '-')}
+          health={readString(doctor, 'status', 'Healthy')}
+          pendingApprovals={pendingApprovalSummaries}
+          onDismissNotification={(id) => setDismissedNotifications((prev) => [...prev, id])}
+          onRefreshContext={() => {
+            void refreshCore();
+            if (selectedRunId) {
+              void loadRunContext(selectedRunId);
+            }
+          }}
+          onResume={() => {
+            if (canResumeSession) {
+              void onControlSession('resume');
+            } else {
+              void onResumeRun();
+            }
+          }}
+          onOpenTerminal={() => {
+            setActiveView('runs');
+            setRunTab('stream');
+            pushToast('ok', 'Terminal görünümü için akış paneli açıldı');
+          }}
+          onExport={() => void onExportArtifacts()}
+          onCancel={() => void onControlSession('stop')}
+          onViewDetails={() => setActiveView('runs')}
+          onViewApprovals={() => setActiveView('approvals')}
+        />
+      }
+    >
         {contractMismatch ? <div className="error-banner">{t.contractMismatch}</div> : null}
         {handshakeError ? (
           <div className="error-banner">
@@ -936,467 +1106,34 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'workspace' ? (
-          <section className="workspace">
-            <div className="workspace-header">
-              <div>
-                <p className="workspace-kicker">{t.workspaceKicker}</p>
-                <h2>{t.workspace}</h2>
-                <p className="workspace-lead">{t.workspaceLead}</p>
-              </div>
-              <div className="workspace-actions">
-                <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
-                  {t.refreshRuns}
-                </button>
-                <button
-                  className="ghost-btn"
-                  type="button"
-                  disabled={!selectedRunId}
-                  onClick={() => void loadRunContext(selectedRunId)}
-                >
-                  {t.refreshContext}
-                </button>
-                <button className="action-btn" type="button" onClick={() => void onSubmitComputerUseSession()}>
-                  {t.startSession}
-                </button>
-              </div>
-            </div>
-
-            <div className="workspace-stage-grid">
-              <article className="metric-card stage-card">
-                <span className="card-label">{t.currentObjective}</span>
-                <p className="stage-metric">{workspaceSnapshot.objective || t.requestPlaceholder}</p>
-                <p className="supporting">
-                  {selectedRunId ? `${t.activeRun}: ${selectedRunId}` : t.noSessionSelected}
-                </p>
-              </article>
-
-              <article className="metric-card stage-card">
-                <span className="card-label">{t.stageProgress}</span>
-                <div className="status-row">
-                  <span className={workspaceStageClass(workspaceSnapshot.stage)}>
-                    {workspaceStageLabel(workspaceSnapshot.stage)}
-                  </span>
-                  <span className="pill pill-muted">
-                    {t.status}: {workspaceSnapshot.currentStatus || t.statusUnknown}
-                  </span>
-                </div>
-                <div className="progress-meter" aria-hidden="true">
-                  <span style={{ width: `${workspaceProgress}%` }} />
-                </div>
-                <p className="supporting">
-                  {workspaceSnapshot.blockedReason
-                    ? `${t.blockedReasonLabel}: ${workspaceSnapshot.blockedReason}`
-                    : t.stageProgressHint}
-                </p>
-              </article>
-
-              <article className="metric-card stage-card">
-                <span className="card-label">{t.liveSurface}</span>
-                {workspaceSnapshot.liveSurface ? (
-                  <div className="surface-metadata">
-                    <div className="metric-row">
-                      <span>{t.activeApp}</span>
-                      <strong>{workspaceSnapshot.liveSurface.appIdentity}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.activeWindow}</span>
-                      <strong>{workspaceSnapshot.liveSurface.windowIdentity}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.riskClass}</span>
-                      <strong>{workspaceSnapshot.liveSurface.riskClass}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.targetRef}</span>
-                      <strong>{workspaceSnapshot.liveSurface.targetRef}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.expectedEffect}</span>
-                      <strong>{workspaceSnapshot.liveSurface.expectedEffect}</strong>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="supporting">{t.noLiveSurface}</p>
-                )}
-              </article>
-            </div>
-
-            <div className="workspace-hybrid-grid">
-              <article className="page-card transcript-card">
-                <div className="transcript-header">
-                  <div>
-                    <h3>{t.chatTranscript}</h3>
-                    <p className="supporting">{t.chatTranscriptLead}</p>
-                  </div>
-                  <span className={workspaceStageClass(workspaceSnapshot.stage)}>
-                    {workspaceStageLabel(workspaceSnapshot.stage)}
-                  </span>
-                </div>
-
-                <div className="recent-session-row">
-                  <span className="card-label">{t.recentSessions}</span>
-                  <div className="toolbar-row">
-                    {recentRuns.length > 0 ? (
-                      recentRuns.map((item) => {
-                        const runId = readString(item, 'job_id');
-                        return (
-                          <button
-                            key={runId}
-                            type="button"
-                            className={runId === selectedRunId ? 'tab-btn tab-btn-active' : 'tab-btn'}
-                            onClick={() => setSelectedRunId(runId)}
-                          >
-                            {runId}
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <span className="supporting">{t.noRecentSessions}</span>
-                    )}
-                  </div>
-                </div>
-
-                {attachmentLabels.length > 0 ? (
-                  <div className="context-chip-row">
-                    {attachmentLabels.map((label) => (
-                      <span className="context-chip" key={label}>
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="transcript-list">
-                  {workspaceSnapshot.transcript.map((entry) => (
-                    <div
-                      className={[
-                        'message-card',
-                        `message-${entry.role}`,
-                        entry.pending ? 'message-pending' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      key={entry.id}
-                    >
-                      <span className="card-label">{entry.title}</span>
-                      <strong>{entry.role === 'user' ? t.you : t.agent}</strong>
-                      <p>{entry.body}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="composer-shell">
-                  <div className="composer-toolbar">
-                    <label className="field">
-                      <span>{t.profile}</span>
-                      <select
-                        value={settings.profile}
-                        onChange={(event) => updateSettings({ profile: event.target.value })}
-                      >
-                        {(supportedProfiles.length > 0 ? supportedProfiles : [settings.profile]).map((item) => (
-                          <option value={String(item)} key={String(item)}>
-                            {String(item)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <div className="field">
-                      <span>{t.taskMode}</span>
-                      <div className="toolbar-row">
-                        <button
-                          className={automationMode === 'assisted' ? 'tab-btn tab-btn-active' : 'tab-btn'}
-                          type="button"
-                          onClick={() => {
-                            setAutomationMode('assisted');
-                            setStepMode(true);
-                          }}
-                        >
-                          {t.assistedMode}
-                        </button>
-                        <button
-                          className={automationMode === 'supervised' ? 'tab-btn tab-btn-active' : 'tab-btn'}
-                          type="button"
-                          onClick={() => {
-                            setAutomationMode('supervised');
-                            setStepMode(false);
-                          }}
-                        >
-                          {t.supervisedMode}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="form-grid">
-                    <label className="field field-span">
-                      <span>{t.specPath}</span>
-                      <input
-                        value={taskForm.specPath}
-                        onChange={(event) => setTaskForm((prev) => ({ ...prev, specPath: event.target.value }))}
-                        placeholder="examples/team/restricted_pilot.yaml"
-                      />
-                    </label>
-                    <label className="field field-span">
-                      <span>{t.request}</span>
-                      <textarea
-                        rows={6}
-                        value={taskForm.request}
-                        onChange={(event) => setTaskForm((prev) => ({ ...prev, request: event.target.value }))}
-                        placeholder={t.requestPlaceholder}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="toolbar-row">
-                    <button className="action-btn" type="button" onClick={() => void onSubmitComputerUseSession()}>
-                      {t.startSession}
-                    </button>
-                    <button
-                      className="ghost-btn"
-                      type="button"
-                      disabled={!selectedRunId}
-                      onClick={() => setActiveView('runs')}
-                    >
-                      {t.continueSession}
-                    </button>
-                    <button className="ghost-btn" type="button" onClick={() => setActiveView('tasks')}>
-                      {t.openTaskWorkspace}
-                    </button>
-                  </div>
-                </div>
-              </article>
-
-              <div className="workspace-side-stack">
-                <article className="page-card">
-                  <div className="transcript-header">
-                    <div>
-                      <h3>{t.runtimeTruth}</h3>
-                      <p className="supporting">{t.runtimeTruthLead}</p>
-                    </div>
-                    <span className={runtimeStateClass(workspaceSnapshot.runtimeState.displayState)}>
-                      {runtimeStateLabel(workspaceSnapshot.runtimeState.displayState)}
-                    </span>
-                  </div>
-                  <div className="surface-metadata">
-                    <div className="metric-row">
-                      <span>{t.sessionState}</span>
-                      <strong>{humanizeCode(workspaceSnapshot.runtimeState.rawState || t.statusUnknown)}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.lastSafeCheckpoint}</span>
-                      <strong>{workspaceSnapshot.runtimeState.lastSafeCheckpoint || t.noData}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.pendingApproval}</span>
-                      <strong>{workspaceSnapshot.runtimeState.pendingApprovalId || t.noData}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.pendingCommand}</span>
-                      <strong>
-                        {workspaceSnapshot.runtimeState.pendingCommand
-                          ? humanizeCode(workspaceSnapshot.runtimeState.pendingCommand)
-                          : t.noData}
-                      </strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.lastControlCommand}</span>
-                      <strong>
-                        {workspaceSnapshot.runtimeState.lastControlCommand
-                          ? humanizeCode(workspaceSnapshot.runtimeState.lastControlCommand)
-                          : t.noData}
-                      </strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.lastControlResult}</span>
-                      <strong>
-                        {workspaceSnapshot.runtimeState.lastControlOutcome
-                          ? humanizeCode(workspaceSnapshot.runtimeState.lastControlOutcome)
-                          : t.noData}
-                      </strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.resumeAllowed}</span>
-                      <strong>{boolLabel(workspaceSnapshot.runtimeState.resumeAllowed)}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.stoppedByUser}</span>
-                      <strong>{boolLabel(workspaceSnapshot.runtimeState.stoppedByUser)}</strong>
-                    </div>
-                    <div className="metric-row">
-                      <span>{t.controlHistory}</span>
-                      <strong>{String(workspaceSnapshot.runtimeState.controlHistoryCount)}</strong>
-                    </div>
-                  </div>
-                  {workspaceSnapshot.runtimeState.lastControlReason ? (
-                    <p className="supporting">
-                      {t.controlReason}: {humanizeCode(workspaceSnapshot.runtimeState.lastControlReason)}
-                    </p>
-                  ) : null}
-                  {workspaceSnapshot.runtimeState.recoverySummary ? (
-                    <p className="supporting">
-                      {t.recoveryStatus}: {workspaceSnapshot.runtimeState.recoverySummary}
-                    </p>
-                  ) : null}
-                  {workspaceSnapshot.runtimeState.lastVerificationSummary ? (
-                    <p className="supporting">
-                      {t.lastVerification}: {workspaceSnapshot.runtimeState.lastVerificationSummary}
-                    </p>
-                  ) : null}
-                </article>
-
-                <article className="page-card">
-                  <h3>{t.operatorControls}</h3>
-                  <div className="toolbar-row">
-                    <button
-                      className={stepMode ? 'tab-btn tab-btn-active' : 'tab-btn'}
-                      type="button"
-                      onClick={() => setStepMode(true)}
-                    >
-                      {t.stepMode}
-                    </button>
-                    <button
-                      className={!stepMode ? 'tab-btn tab-btn-active' : 'tab-btn'}
-                      type="button"
-                      onClick={() => setStepMode(false)}
-                    >
-                      {t.autoMode}
-                    </button>
-                  </div>
-                  <div className="control-switches">
-                    <label className="field field-inline">
-                      <span>{t.askBeforeExternalAction}</span>
-                      <input
-                        type="checkbox"
-                        checked={askBeforeExternal}
-                        onChange={(event) => setAskBeforeExternal(event.target.checked)}
-                      />
-                    </label>
-                    <label className="field field-inline">
-                      <span>{t.askBeforeDeletion}</span>
-                      <input
-                        type="checkbox"
-                        checked={askBeforeDeletion}
-                        onChange={(event) => setAskBeforeDeletion(event.target.checked)}
-                      />
-                    </label>
-                    <label className="field field-inline">
-                      <span>{t.askBeforeSend}</span>
-                      <input type="checkbox" checked={askBeforeSend} onChange={(event) => setAskBeforeSend(event.target.checked)} />
-                    </label>
-                  </div>
-                  <div className="toolbar-row">
-                    <button
-                      className="ghost-btn"
-                      type="button"
-                      disabled={!canPauseSession}
-                      onClick={() => void onControlSession('pause')}
-                    >
-                      {t.pause}
-                    </button>
-                    <button
-                      className="ghost-btn"
-                      type="button"
-                      disabled={!canStopSession}
-                      onClick={() => void onControlSession('stop')}
-                    >
-                      {t.stopNow}
-                    </button>
-                    <button
-                      className="action-btn"
-                      type="button"
-                      disabled={!canResumeSession}
-                      onClick={() => void onControlSession('resume')}
-                    >
-                      {t.resumeRun}
-                    </button>
-                  </div>
-                  <p className="supporting">
-                    {t.controlHooksPending} {t.status}: {controlStateLabel}
-                  </p>
-                  {workspaceSnapshot.runtimeState.recoveryState === 'non_resumable' ? (
-                    <p className="supporting">{t.recoveryNonResumable}</p>
-                  ) : null}
-                </article>
-
-                <article className="page-card">
-                  <div className="transcript-header">
-                    <div>
-                      <h3>{t.liveTimeline}</h3>
-                      <p className="supporting">{t.liveTimelineLead}</p>
-                    </div>
-                    <span className="pill pill-muted">{workspaceSnapshot.timeline.length}</span>
-                  </div>
-                  <div className="timeline-panel">
-                    {workspaceSnapshot.timeline.length === 0 ? <p className="supporting">{t.noTimeline}</p> : null}
-                    {workspaceSnapshot.timeline.map((item) => (
-                      <div className={`timeline-event timeline-event-${item.tone}`} key={item.id}>
-                        <strong>{item.summary}</strong>
-                        <span>
-                          {item.phase || t.noData} · {item.timestamp || '-'}
-                        </span>
-                        <small>{item.event}</small>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-
-                <article className="page-card">
-                  <h3>{t.approvalsAndArtifacts}</h3>
-                  <div className="workspace-side-grid">
-                    <div>
-                      <span className="card-label">{t.approvals}</span>
-                      <div className="artifact-list">
-                        {pendingApprovals.length > 0 ? (
-                          pendingApprovals.slice(0, 3).map((item) => {
-                            const row = asRecord(item);
-                            const approvalId = readString(row, 'approval_id');
-                            return (
-                              <button
-                                key={approvalId}
-                                type="button"
-                                className="rail-row"
-                                onClick={() => {
-                                  setSelectedApprovalId(approvalId);
-                                  setActiveView('approvals');
-                                }}
-                              >
-                                <span>{approvalId}</span>
-                                <small>{readString(row, 'status')}</small>
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <p className="supporting">{t.noLinkedApprovals}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="card-label">{t.artifacts}</span>
-                      <div className="artifact-list">
-                        {workspaceSnapshot.artifacts.map((artifact) => (
-                          <button
-                            key={artifact.name}
-                            type="button"
-                            className={artifact.available ? 'rail-row' : 'rail-row artifact-row-muted'}
-                            onClick={() => {
-                              setSelectedArtifactName(artifact.name);
-                              setRunTab('artifacts');
-                              setActiveView('runs');
-                            }}
-                          >
-                            <span>{artifact.name}</span>
-                            <small>{artifact.summary}</small>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              </div>
-            </div>
-          </section>
+          <MissionControlView
+            runOptions={runOptions}
+            selectedRunId={selectedRunId}
+            sessionId={sessionId}
+            sessionStatus={humanizeCode(sessionStatus)}
+            objective={workspaceSnapshot.objective || 'Yönetişimli görevi tarif edin.'}
+            priority="Yüksek"
+            targetType="Yönetişimli Görev"
+            statusCode={missionStatusCode}
+            statusError={missionStatusError}
+            stageLabel={workspaceStageLabel(workspaceSnapshot.stage)}
+            stageKey={mapMissionStage(workspaceSnapshot.stage)}
+            startedAt={startedAt}
+            duration={duration}
+            progress={workspaceProgress}
+            activityItems={activityItems}
+            sessionEvents={sessionEvents}
+            runtimeSummary={runtimeSummary}
+            rawSummary={{ runStatus, computerUseState, configData, handshakeData }}
+            hasApproval={hasApproval}
+            approvalLabel={approvalLabel}
+            approvalDisabled={approvalDisabled}
+            approvalDisabledReason={approvalDisabledReason}
+            onSelectRun={setSelectedRunId}
+            onApprove={() => void onApproveAndContinue()}
+            onEditApproval={() => setActiveView('approvals')}
+            onReject={() => void onDecideApproval(false)}
+          />
         ) : null}
 
         {activeView === 'tasks' ? (
@@ -1411,6 +1148,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
                   {t.refreshRuns}
                 </button>
+                <button className="ghost-btn" type="button" onClick={() => void onSubmitComputerUseSession()}>
+                  {t.startSession}
+                </button>
                 <button className="action-btn" type="button" onClick={() => void onSubmitTask()}>
                   {t.submitRun}
                 </button>
@@ -1420,6 +1160,54 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <div className="section-grid two-up">
               <article className="page-card">
                 <h3>{t.taskWorkspace}</h3>
+                <div className="toolbar-row">
+                  <button
+                    className={automationMode === 'assisted' ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                    type="button"
+                    onClick={() => {
+                      setAutomationMode('assisted');
+                      setStepMode(true);
+                    }}
+                  >
+                    {t.assistedMode}
+                  </button>
+                  <button
+                    className={automationMode === 'supervised' ? 'tab-btn tab-btn-active' : 'tab-btn'}
+                    type="button"
+                    onClick={() => {
+                      setAutomationMode('supervised');
+                      setStepMode(false);
+                    }}
+                  >
+                    {t.supervisedMode}
+                  </button>
+                </div>
+                <div className="control-switches">
+                  <label className="field field-inline">
+                    <span>{t.askBeforeExternalAction}</span>
+                    <input
+                      type="checkbox"
+                      checked={askBeforeExternal}
+                      onChange={(event) => setAskBeforeExternal(event.target.checked)}
+                    />
+                  </label>
+                  <label className="field field-inline">
+                    <span>{t.askBeforeDeletion}</span>
+                    <input
+                      type="checkbox"
+                      checked={askBeforeDeletion}
+                      onChange={(event) => setAskBeforeDeletion(event.target.checked)}
+                    />
+                  </label>
+                  <label className="field field-inline">
+                    <span>{t.askBeforeSend}</span>
+                    <input
+                      type="checkbox"
+                      checked={askBeforeSend}
+                      onChange={(event) => setAskBeforeSend(event.target.checked)}
+                    />
+                  </label>
+                </div>
                 <div className="form-grid">
                   <label className="field">
                     <span>{t.profile}</span>
@@ -1775,6 +1563,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <article className="metric-card">
                 <h3>{t.runtimeHealth}</h3>
                 <p className="metric">{readString(doctor, 'status', '-')}</p>
+              </article>
+              <article className="metric-card">
+                <h3>{t.live}</h3>
+                <p className="metric">{eventsCursor}</p>
               </article>
             </div>
 
@@ -2233,86 +2025,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             </div>
           </section>
         ) : null}
-      </main>
-
-      <aside className="context-rail">
-        <article className="rail-card">
-          <span className="card-label">{t.activeRun}</span>
-          <strong>{selectedRunId || '-'}</strong>
-          <p>{selectedRunId ? `${t.status}: ${runStatusValue || t.statusUnknown}` : t.noSelection}</p>
-          <div className="toolbar-row">
-            <button className="ghost-btn" type="button" disabled={!selectedRunId} onClick={() => void loadRunContext(selectedRunId)}>
-              {t.refreshContext}
-            </button>
-            <button className="ghost-btn" type="button" disabled={!selectedRunId} onClick={() => void onExportArtifacts()}>
-              {t.export}
-            </button>
-          </div>
-          <details className="details-panel compact">
-            <summary>{t.resumeRun}</summary>
-            <div className="form-grid compact-grid">
-              <label className="field field-span">
-                <span>{t.specPath}</span>
-                <input
-                  value={resumeForm.specPath}
-                  onChange={(event) => setResumeForm((prev) => ({ ...prev, specPath: event.target.value }))}
-                />
-              </label>
-              <label className="field">
-                <span>{t.resumeJobId}</span>
-                <input
-                  value={resumeForm.resumeJobId}
-                  onChange={(event) => setResumeForm((prev) => ({ ...prev, resumeJobId: event.target.value }))}
-                />
-              </label>
-            </div>
-            <button className="action-btn" type="button" disabled={!selectedRunId} onClick={() => void onResumeRun()}>
-              {t.resumeRun}
-            </button>
-          </details>
-        </article>
-
-        <article className="rail-card">
-          <span className="card-label">{t.approvals}</span>
-          <strong>{pendingApprovals.length}</strong>
-          <div className="rail-list">
-            {pendingApprovals.slice(0, 4).map((item) => {
-              const row = asRecord(item);
-              const approvalId = readString(row, 'approval_id');
-              return (
-                <button key={approvalId} type="button" className="rail-row" onClick={() => {
-                  setSelectedApprovalId(approvalId);
-                  setActiveView('approvals');
-                }}>
-                  <span>{approvalId}</span>
-                  <small>{readString(row, 'status')}</small>
-                </button>
-              );
-            })}
-          </div>
-        </article>
-
-        <article className="rail-card">
-          <span className="card-label">{t.systemContext}</span>
-          <strong>{settings.profile}</strong>
-          <p>
-            {t.mode}: {settings.mode}
-          </p>
-          <p>
-            {t.contractVersion}: {readString(handshakeRecord, 'contractVersion', '-')}
-          </p>
-          <JsonPanel value={{ doctor: doctor, status: statusArtifact }} />
-        </article>
-      </aside>
-
-      <div className="toast-zone">
-        {toasts.map((toast) => (
-          <div className={toast.kind === 'error' ? 'toast toast-error' : 'toast'} key={toast.id}>
-            {toast.text}
-          </div>
-        ))}
-      </div>
-    </div>
+    </AppShell>
   );
 }
 

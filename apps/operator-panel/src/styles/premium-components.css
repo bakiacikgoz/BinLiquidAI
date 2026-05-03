@@ -1,0 +1,208 @@
+.mc-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mc-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fg-muted);
+  box-shadow: none;
+}
+
+.mc-status-dot-success {
+  background: var(--color-success);
+  box-shadow: none;
+}
+
+.mc-status-dot-warning {
+  background: var(--color-warning);
+  box-shadow: none;
+}
+
+.mc-status-dot-error {
+  background: var(--color-error);
+  box-shadow: none;
+}
+
+.mc-status-dot-info {
+  background: var(--color-info);
+  box-shadow: none;
+}
+
+.mc-status-dot-pulse {
+  animation: stage-pulse 1.8s ease-in-out infinite;
+}
+
+.mc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 4px 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--surface-control);
+  color: var(--fg-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.mc-badge-success {
+  background: rgba(120, 210, 107, 0.1);
+  color: var(--color-success);
+}
+
+.mc-badge-warning {
+  background: rgba(217, 154, 34, 0.11);
+  color: var(--color-warning);
+}
+
+.mc-badge-error {
+  background: rgba(239, 82, 75, 0.1);
+  color: var(--color-error);
+}
+
+.mc-badge-info {
+  background: rgba(112, 167, 255, 0.1);
+  color: var(--color-info);
+}
+
+.mc-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 8px 14px;
+  border: 1px solid var(--line-default);
+  border-radius: 7px;
+  background: var(--surface-control);
+  color: var(--fg-secondary);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.mc-button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--surface-control-hover);
+  color: var(--fg-primary);
+}
+
+.mc-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.mc-button-primary {
+  border-color: rgba(217, 154, 34, 0.8);
+  background: var(--surface-warning);
+  color: var(--button-primary-fg);
+}
+
+.mc-button-danger {
+  border-color: rgba(239, 82, 75, 0.65);
+  background: rgba(239, 82, 75, 0.08);
+  color: var(--button-danger-fg);
+}
+
+.mc-card,
+.page-card,
+.metric-card,
+.rail-card {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  box-shadow: none;
+}
+
+.mc-kicker,
+.card-label,
+.rail-title {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mc-section-header,
+.rail-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mc-section-header h3,
+.rail-card-head > span,
+.rail-title {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mc-progress {
+  position: relative;
+  overflow: hidden;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--progress-track);
+}
+
+.mc-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-success);
+  box-shadow: none;
+  transition: width var(--duration-normal) var(--ease-standard);
+}
+
+.json-panel {
+  overflow: auto;
+  max-height: 360px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-code);
+  color: var(--fg-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+@keyframes stage-pulse {
+  0%,
+  100% {
+    opacity: 0.82;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
