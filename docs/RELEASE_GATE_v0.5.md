@@ -128,6 +128,7 @@ Windows release artifacts must pass:
 - runtime hash evidence
 - Tauri NSIS build
 - `windows-release-status.json` evidence
+- `windows-public-release-gate.json` evidence
 - clean Windows VM install/open/handshake smoke
 
 Unsigned NSIS artifacts are internal CI smoke artifacts only. Public or
@@ -135,8 +136,14 @@ enterprise Windows release artifacts require Authenticode signing and timestamp
 proof. If signing credentials are missing, the Windows release remains RC with
 an external credential blocker.
 
-Public release is allowed only when `windows-release-status.json` reports
-`signed=true`, `status=signed_verified`, and `public_release_allowed=true`.
+Signing alone can allow only a signed release-candidate artifact:
+`windows-release-status.json` must report `signed=true`, `timestamped=true`,
+`signtool_verify_status=pass`, and `signed_rc_allowed=true`.
+
+Public release is allowed only when `windows-public-release-gate.json` reports
+`status=pass`, `public_release_allowed=true`, and `blocking_reasons=[]` after
+clean VM installer smoke, installed runtime smoke, operator capabilities,
+doctor, and Windows computer-use-disabled evidence pass.
 
 ## 8) Updater / Telemetry Defaults
 

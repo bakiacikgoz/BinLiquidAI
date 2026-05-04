@@ -6,6 +6,10 @@ on:
     tags:
       - 'operator-panel-v*'
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   release-windows:
     runs-on: windows-2022
@@ -48,7 +52,9 @@ jobs:
 
       - name: Create release evidence directory
         shell: pwsh
-        run: New-Item -ItemType Directory -Force -Path artifacts/windows-release-evidence | Out-Null
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows-release-evidence | Out-Null
+          New-Item -ItemType Directory -Force -Path artifacts/windows-public-release-gate | Out-Null
 
       - name: Build bundled runtime
         shell: pwsh
@@ -87,38 +93,69 @@ jobs:
               platform = "windows"
               artifact_type = "nsis"
               signed = $false
+              timestamped = $false
+              signtool_verify_status = "not_run"
+              signed_rc_allowed = $false
               status = "blocked_external_credentials"
               reason = "missing_windows_signing_secret"
               public_release_allowed = $false
+              temp_certificate_removed = $true
               artifacts = @($nsisArtifacts | ForEach-Object { $_.Name })
             } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $statusPath -Encoding utf8
             "signed=false" >> $env:GITHUB_OUTPUT
+            "signed_rc_allowed=false" >> $env:GITHUB_OUTPUT
             exit 0
           }
 
           $pfxPath = Join-Path $env:RUNNER_TEMP "windows-signing-cert.pfx"
+          $signingEvidenceDir = "artifacts/windows-release-evidence/signing"
+          New-Item -ItemType Directory -Force -Path $signingEvidenceDir | Out-Null
           [System.IO.File]::WriteAllBytes($pfxPath, [System.Convert]::FromBase64String($env:WINDOWS_SIGNING_CERT_PFX_B64))
+          $artifactRecords = @()
+          $tempCertificateRemoved = $false
           try {
             foreach ($artifact in $nsisArtifacts) {
+              $safeEvidenceName = "$($artifact.BaseName)-signing.json"
+              $signingEvidencePath = Join-Path $signingEvidenceDir $safeEvidenceName
               pwsh apps/operator-panel/scripts/sign_windows_artifacts.ps1 `
                 -ArtifactPath $artifact.FullName `
                 -CertPfxPath $pfxPath `
-                -CertPassword $env:WINDOWS_SIGNING_CERT_PASSWORD
+                -CertPassword $env:WINDOWS_SIGNING_CERT_PASSWORD `
+                -EvidencePath $signingEvidencePath
+
+              $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $artifact.FullName
+              $artifactRecords += [pscustomobject]@{
+                name = $artifact.Name
+                sha256 = $hash.Hash.ToLowerInvariant()
+                signing_evidence = $signingEvidencePath
+              }
             }
           } finally {
             Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue
+            $tempCertificateRemoved = -not (Test-Path -LiteralPath $pfxPath)
           }
 
+          $primaryInstallerHash = $null
+          if ($artifactRecords.Count -gt 0) {
+            $primaryInstallerHash = $artifactRecords[0].sha256
+          }
           @{
             platform = "windows"
             artifact_type = "nsis"
             signed = $true
-            status = "signed_verified"
-            reason = $null
-            public_release_allowed = $true
-            artifacts = @($nsisArtifacts | ForEach-Object { $_.Name })
+            timestamped = $true
+            signtool_verify_status = "pass"
+            signed_rc_allowed = $true
+            status = "blocked_external_smoke"
+            reason = "clean_vm_smoke_missing"
+            public_release_allowed = $false
+            timestamp_url_configured = $true
+            temp_certificate_removed = $tempCertificateRemoved
+            installer_sha256 = $primaryInstallerHash
+            artifacts = @($artifactRecords)
           } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $statusPath -Encoding utf8
           "signed=true" >> $env:GITHUB_OUTPUT
+          "signed_rc_allowed=true" >> $env:GITHUB_OUTPUT
 
       - name: Hash NSIS artifacts
         shell: pwsh
@@ -134,6 +171,18 @@ jobs:
           $hashes | ConvertTo-Json -Depth 3 |
             Set-Content -LiteralPath artifacts/windows-release-evidence/nsis_file_hashes.json -Encoding utf8
 
+      - name: Evaluate Windows public release gate
+        shell: pwsh
+        run: |
+          uv run python scripts/evaluate_windows_release_gate.py `
+            --release-status artifacts/windows-release-evidence/windows-release-status.json `
+            --installer-smoke artifacts/windows-installer-smoke/windows-installer-smoke.json `
+            --operator-capabilities artifacts/windows-installer-smoke/operator_capabilities.json `
+            --doctor artifacts/windows-installer-smoke/doctor_balanced.json `
+            --runtime-manifest artifacts/windows-release-evidence/runtime_manifest.txt `
+            --bundle-hashes artifacts/windows-release-evidence/nsis_file_hashes.json `
+            --output artifacts/windows-public-release-gate/windows-public-release-gate.json
+
       - name: Upload unsigned CI smoke artifacts
         if: steps.signing.outputs.signed != 'true'
         uses: actions/upload-artifact@v4
@@ -142,6 +191,7 @@ jobs:
           path: |
             apps/operator-panel/src-tauri/target/release/bundle/nsis/**
             artifacts/windows-release-evidence/**
+            artifacts/windows-public-release-gate/**
 
       - name: Upload signed release-candidate artifacts
         if: steps.signing.outputs.signed == 'true'
@@ -151,3 +201,4 @@ jobs:
           path: |
             apps/operator-panel/src-tauri/target/release/bundle/nsis/**
             artifacts/windows-release-evidence/**
+            artifacts/windows-public-release-gate/**

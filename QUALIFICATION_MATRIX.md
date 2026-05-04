@@ -41,7 +41,9 @@ It does not claim that evidence already exists.
   any public or enterprise Windows release claim.
 - Windows release evidence additionally requires schema drift gate PASS,
   recursive resource bundle proof, runtime hash manifest, signed/unsigned release
-  status JSON, and `docs/WINDOWS_INSTALLER_SMOKE.md` clean VM smoke report.
+  status JSON, `docs/WINDOWS_INSTALLER_SMOKE.md` clean VM smoke report, and
+  `windows-public-release-gate.json` with `status=pass`,
+  `public_release_allowed=true`, and no blocking reasons.
 
 ## Required Report Outputs
 

@@ -11,7 +11,7 @@ Windows installer smoke is required before any public or enterprise Windows rele
 - NSIS installer artifact produced by the Windows release workflow.
 - Authenticode signature present for public release candidates, or `-AllowUnsignedSmoke` used only for internal smoke.
 
-## Automated Smoke
+## Internal Unsigned Smoke
 
 ```powershell
 pwsh apps/operator-panel/scripts/windows_installer_smoke.ps1 `
@@ -21,15 +21,22 @@ pwsh apps/operator-panel/scripts/windows_installer_smoke.ps1 `
   -AllowUnsignedSmoke
 ```
 
-Use `-RunInstall` only on an isolated VM or disposable runner:
+Unsigned smoke is internal validation only. It must never be used as public release evidence.
+
+## Signed Public RC Smoke
+
+Run this only with a signed installer on a clean or disposable Windows VM:
 
 ```powershell
 pwsh apps/operator-panel/scripts/windows_installer_smoke.ps1 `
-  -InstallerPath <path-to-nsis-exe> `
+  -InstallerPath <signed-nsis-exe> `
+  -ExpectedProductName "AegisOS Operator Panel" `
   -OutputDir artifacts/windows-installer-smoke `
-  -AllowUnsignedSmoke `
-  -RunInstall
+  -RunInstall `
+  -CleanVm
 ```
+
+Do not use `-AllowUnsignedSmoke` for signed public RC smoke. Use `-RunInstall` only on a clean or disposable VM because it installs the NSIS package.
 
 ## Evidence
 
@@ -47,6 +54,15 @@ The expected report shape includes:
   "platform": "windows",
   "installer_sha256": "...",
   "signed": false,
+  "timestamped": false,
+  "clean_vm_claimed": false,
+  "run_install_used": false,
+  "allow_unsigned_smoke_used": true,
+  "os_version": "...",
+  "powershell_version": "...",
+  "webview2_status": "present|unknown",
+  "app_exe_found": false,
+  "install_root_kind": "LocalAppData|ProgramFiles|ProgramFilesX86|unknown",
   "install_status": "pass|manual|blocked|fail",
   "bundled_runtime_status": "pass|manual|blocked|fail",
   "operator_capabilities_status": "pass|manual|blocked|fail",
@@ -56,11 +72,36 @@ The expected report shape includes:
 }
 ```
 
+## Public Release Gate
+
+After `windows-release-status.json` and installer smoke evidence exist, evaluate the machine-readable public release gate:
+
+```powershell
+uv run python scripts/evaluate_windows_release_gate.py `
+  --release-status artifacts/windows-release-evidence/windows-release-status.json `
+  --installer-smoke artifacts/windows-installer-smoke/windows-installer-smoke.json `
+  --operator-capabilities artifacts/windows-installer-smoke/operator_capabilities.json `
+  --doctor artifacts/windows-installer-smoke/doctor_balanced.json `
+  --output artifacts/windows-public-release-gate/windows-public-release-gate.json
+```
+
+Expected internal unsigned smoke result:
+
+```json
+{
+  "public_release_allowed": false,
+  "blocking_reasons": [
+    "unsigned_internal_smoke_not_public_release_eligible"
+  ]
+}
+```
+
 ## Release Rule
 
 Public or enterprise Windows release remains blocked until:
 
 - NSIS artifact is Authenticode signed and timestamped.
 - `signtool verify /pa /v` passes.
-- Clean VM installer smoke passes.
+- Clean VM installer smoke passes with `-RunInstall` and `-CleanVm`.
 - `operator capabilities --json` reports Windows live computer-use disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.
+- `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and no `blocking_reasons`.

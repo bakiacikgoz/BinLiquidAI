@@ -23,7 +23,8 @@
 - Windows live computer-use automation is disabled unless a Windows qualification
   report explicitly enables that surface
 - unsigned CI smoke installers are internal validation artifacts only; public or
-  enterprise release artifacts require Authenticode signing and timestamp proof
+  enterprise release artifacts require Authenticode signing, timestamp proof,
+  clean VM installer smoke, and `windows-public-release-gate.json` pass evidence
 
 ## Deployment Steps
 

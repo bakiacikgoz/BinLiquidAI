@@ -72,8 +72,12 @@
 - [ ] `pnpm --dir apps/operator-panel exec tauri build --debug --no-bundle` PASS
 - [ ] Windows CI uploads `artifacts/windows-ci-evidence/**`
 - [ ] Windows release workflow writes `windows-release-status.json`
-- [ ] Clean Windows VM install/open/handshake PASS before release claim, following `docs/WINDOWS_INSTALLER_SMOKE.md`
-- [ ] Authenticode signing + timestamp + `signtool verify /pa /v` PASS for release artifact, or release remains RC blocked
+- [ ] Authenticode signing + timestamp + `signtool verify /pa /v` PASS for signed RC artifact, or signed RC remains blocked
+- [ ] `windows-release-status.json` reports `signed_rc_allowed=true` only after signing, timestamp, and verify pass
+- [ ] Clean Windows VM install/open/handshake PASS before public release claim, following `docs/WINDOWS_INSTALLER_SMOKE.md`
+- [ ] `uv run python scripts/evaluate_windows_release_gate.py ...` writes `windows-public-release-gate.json`
+- [ ] `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and `blocking_reasons=[]` before public/enterprise Windows release
+- [ ] Unsigned/internal smoke reports `public_release_allowed=false`
 - [ ] `operator capabilities --json` reports Windows live computer-use disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
 
 ## macOS Signing + Notarization (v0.5)

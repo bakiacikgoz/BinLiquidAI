@@ -101,7 +101,7 @@ Missing signing secrets produce:
 }
 ```
 
-When signing secrets exist, the workflow decodes the PFX into runner temp storage, signs NSIS artifacts through `sign_windows_artifacts.ps1`, runs `signtool verify /pa /v`, removes the temp PFX, and only then marks `public_release_allowed=true`.
+When signing secrets exist, the workflow decodes the PFX into runner temp storage, signs NSIS artifacts through `sign_windows_artifacts.ps1`, runs `signtool verify /pa /v`, removes the temp PFX, and marks only `signed_rc_allowed=true`. `public_release_allowed` remains false until the Windows public release gate evaluator also sees clean VM installer smoke, installed runtime, capabilities, doctor, and Windows computer-use-disabled evidence.
 
 ## 7. Clean VM / Installer Smoke Status
 
