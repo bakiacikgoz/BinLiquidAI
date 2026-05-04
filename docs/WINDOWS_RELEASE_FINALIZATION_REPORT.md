@@ -2,7 +2,7 @@
 
 Date: 2026-05-04
 Branch: windows-public-release-evidence-closure
-Commit: not committed at report generation
+Commit: PR head, see https://github.com/bakiacikgoz/BinLiquidAI/pull/2
 Status: BLOCKED for real public release; PASS for local implementation verification
 
 ## Summary
@@ -15,8 +15,8 @@ No public or enterprise Windows artifact was published. Real signed RC, clean sm
 
 - branch: `windows-public-release-evidence-closure`
 - base commit: `436825bf2240a25916b6cc3c30f87dd741a92cb1`
-- working tree at report generation: uncommitted changes present
-- PR: not opened during local implementation
+- implementation commit: `1e51e8f22789614e52e480d067586c874d0625ff`
+- PR: https://github.com/bakiacikgoz/BinLiquidAI/pull/2
 - tag/ref: no RC tag created
 
 ## Workflow Runs
