@@ -2202,7 +2202,7 @@ mod tests {
         };
 
         let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
+            .enable_all()
             .build()
             .expect("runtime");
         let pid = runtime
