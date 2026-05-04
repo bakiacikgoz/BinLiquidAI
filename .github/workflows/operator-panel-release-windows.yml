@@ -80,27 +80,43 @@ jobs:
         env:
           WINDOWS_SIGNING_CERT_PFX_B64: ${{ secrets.WINDOWS_SIGNING_CERT_PFX_B64 }}
           WINDOWS_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
         run: |
           $statusPath = "artifacts/windows-release-evidence/windows-release-status.json"
           $nsisArtifacts = @(Get-ChildItem -Path "apps/operator-panel/src-tauri/target/release/bundle/nsis" -Filter "*.exe" -File -Recurse)
           if ($nsisArtifacts.Count -eq 0) {
             throw "No NSIS artifact found"
           }
+          $unsignedArtifactRecords = @($nsisArtifacts | ForEach-Object {
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName
+            [pscustomobject]@{
+              name = $_.Name
+              sha256 = $hash.Hash.ToLowerInvariant()
+            }
+          })
+          $primaryInstallerHash = $null
+          if ($unsignedArtifactRecords.Count -gt 0) {
+            $primaryInstallerHash = $unsignedArtifactRecords[0].sha256
+          }
 
           if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PFX_B64) -or
               [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PASSWORD)) {
             @{
+              schemaVersion = "windows-release-status/v1"
               platform = "windows"
               artifact_type = "nsis"
+              artifact_kind = "nsis"
               signed = $false
               timestamped = $false
               signtool_verify_status = "not_run"
               signed_rc_allowed = $false
               status = "blocked_external_credentials"
               reason = "missing_windows_signing_secret"
-              public_release_allowed = $false
+              artifact_sha256 = $primaryInstallerHash
+              installer_sha256 = $primaryInstallerHash
+              secret_material_written = $false
               temp_certificate_removed = $true
-              artifacts = @($nsisArtifacts | ForEach-Object { $_.Name })
+              artifacts = @($unsignedArtifactRecords)
             } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $statusPath -Encoding utf8
             "signed=false" >> $env:GITHUB_OUTPUT
             "signed_rc_allowed=false" >> $env:GITHUB_OUTPUT
@@ -140,18 +156,21 @@ jobs:
             $primaryInstallerHash = $artifactRecords[0].sha256
           }
           @{
+            schemaVersion = "windows-release-status/v1"
             platform = "windows"
             artifact_type = "nsis"
+            artifact_kind = "nsis"
             signed = $true
             timestamped = $true
             signtool_verify_status = "pass"
             signed_rc_allowed = $true
             status = "blocked_external_smoke"
             reason = "clean_vm_smoke_missing"
-            public_release_allowed = $false
             timestamp_url_configured = $true
             temp_certificate_removed = $tempCertificateRemoved
+            artifact_sha256 = $primaryInstallerHash
             installer_sha256 = $primaryInstallerHash
+            secret_material_written = $false
             artifacts = @($artifactRecords)
           } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $statusPath -Encoding utf8
           "signed=true" >> $env:GITHUB_OUTPUT
@@ -160,15 +179,15 @@ jobs:
       - name: Hash NSIS artifacts
         shell: pwsh
         run: |
-          $hashes = Get-ChildItem -Path "apps/operator-panel/src-tauri/target/release/bundle/nsis" -Filter "*.exe" -File -Recurse |
+          [object[]]$hashes = @(Get-ChildItem -Path "apps/operator-panel/src-tauri/target/release/bundle/nsis" -Filter "*.exe" -File -Recurse |
             ForEach-Object {
               $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName
               [pscustomobject]@{
                 path = $_.FullName
                 sha256 = $hash.Hash.ToLowerInvariant()
               }
-            }
-          $hashes | ConvertTo-Json -Depth 3 |
+            })
+          ConvertTo-Json -InputObject $hashes -Depth 3 |
             Set-Content -LiteralPath artifacts/windows-release-evidence/nsis_file_hashes.json -Encoding utf8
 
       - name: Evaluate Windows public release gate

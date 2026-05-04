@@ -1,0 +1,68 @@
+name: Operator Panel Windows Clean Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      signed_rc_run_id:
+        description: "GitHub Actions run id that produced operator-panel-windows-signed-release-candidate"
+        required: true
+      installer_sha256:
+        description: "Expected NSIS installer SHA256"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  clean-smoke:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    environment: clean-smoke-windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download signed RC artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: operator-panel-windows-signed-release-candidate
+          run-id: ${{ inputs.signed_rc_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/signed-rc-download
+
+      - name: Resolve and verify installer
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem -Path artifacts/signed-rc-download -Filter "*.exe" -File -Recurse)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer, found $($installers.Count)"
+          }
+          $installer = $installers[0]
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName).Hash.ToLowerInvariant()
+          $expectedHash = "${{ inputs.installer_sha256 }}".ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "Installer hash mismatch: expected $expectedHash, got $actualHash"
+          }
+          "WINDOWS_INSTALLER_PATH=$($installer.FullName)" >> $env:GITHUB_ENV
+
+      - name: Run clean VM installer smoke
+        shell: pwsh
+        run: |
+          pwsh apps/operator-panel/scripts/windows_installer_smoke.ps1 `
+            -InstallerPath "$env:WINDOWS_INSTALLER_PATH" `
+            -ExpectedInstallerSha256 "${{ inputs.installer_sha256 }}" `
+            -ExpectedProductName "AegisOS Operator Panel" `
+            -OutputDir artifacts/windows-installer-smoke `
+            -RunInstall `
+            -CleanVm `
+            -LaunchAppSmoke `
+            -RunUninstall
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-smoke-evidence
+          path: artifacts/windows-installer-smoke/**

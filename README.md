@@ -19,8 +19,9 @@ It provides two layers:
 
 - Linux x64: supported for the core runtime and primary server-side validation.
 - macOS: supported for operator tooling, Tauri release proof, and the existing Safari/Finder/TextEdit computer-use pilot.
-- Windows x64: supported for core CLI, operator panel, bundled runtime, and installer smoke evidence.
-- Windows live computer-use automation is not enabled unless a Windows-specific qualification report says otherwise.
+- Windows x64: supported for core CLI, operator panel, bundled runtime, and signed release-candidate evidence.
+- Windows public/enterprise release remains blocked until `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and no blocking reasons.
+- Windows live computer-use automation remains disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` unless a Windows-specific signed qualification report says otherwise.
 
 ### Core Runtime
 
@@ -204,7 +205,9 @@ make ui-dev
 Packaging and release scripts live under `apps/operator-panel/scripts/`.
 Windows release hardening evidence is documented in
 `docs/WINDOWS_RELEASE_HARDENING_REPORT.md`, `docs/WINDOWS_INSTALLER_SMOKE.md`,
-and `docs/WINDOWS_SIGNED_RC_GATE_REPORT.md`.
+`docs/WINDOWS_SIGNED_RC_GATE_REPORT.md`, and
+`docs/WINDOWS_PUBLIC_RELEASE_EVIDENCE_CLOSURE_REPORT.md`. Final signed gate
+closure status is tracked in `docs/WINDOWS_RELEASE_FINALIZATION_REPORT.md`.
 
 ## Model Recipes
 
@@ -310,8 +313,9 @@ Calibration outputs:
 - Operator Panel is available as a v0.5 beta surface on top of BinLiquid core v0.4.1;
   notarized macOS release artifacts remain gated by Apple signing/notary credentials.
 - Windows public/enterprise release remains blocked until Authenticode signing,
-  timestamp verification, clean VM installer smoke evidence, and
-  `windows-public-release-gate.json` pass.
+  timestamp verification, clean VM installer smoke evidence, installed
+  runtime/capabilities/doctor evidence, runtime manifest and bundle hash
+  evidence, and `windows-public-release-gate.json` pass.
 - Model assets are not auto-installed (`ollama pull` remains operator-driven).
 - Team runs intentionally fail-closed when governance requires approval in a blocking dependency chain.
 - `team resume` and `team pilot-check` only consume approvals that are both `executed` and not yet `consumed`.
@@ -329,6 +333,8 @@ Calibration outputs:
 - `docs/WINDOWS_RELEASE_HARDENING_REPORT.md`
 - `docs/WINDOWS_INSTALLER_SMOKE.md`
 - `docs/WINDOWS_SIGNED_RC_GATE_REPORT.md`
+- `docs/WINDOWS_PUBLIC_RELEASE_EVIDENCE_CLOSURE_REPORT.md`
+- `docs/WINDOWS_RELEASE_FINALIZATION_REPORT.md`
 - `docs/RFC_COMPUTER_USE_WINDOWS_QUALIFICATION.md`
 - `docs/OPERATIONS_RUNBOOK.md`
 - `SECURITY_BASELINE.md`

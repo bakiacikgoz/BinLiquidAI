@@ -18,13 +18,19 @@
 
 ### Windows Operator Workstation
 
-- operator panel, bundled runtime, and CLI smoke are supported on Windows x64
+- operator panel, bundled runtime, CLI smoke, and signed release-candidate evidence are supported on Windows x64
 - WebView2 runtime must be present for the Tauri shell
 - Windows live computer-use automation is disabled unless a Windows qualification
-  report explicitly enables that surface
+  report explicitly enables that surface; current reason code is
+  `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
 - unsigned CI smoke installers are internal validation artifacts only; public or
   enterprise release artifacts require Authenticode signing, timestamp proof,
-  clean VM installer smoke, and `windows-public-release-gate.json` pass evidence
+  clean VM installer smoke, installed runtime/capabilities/doctor evidence,
+  runtime manifest and bundle hash evidence, and
+  `windows-public-release-gate.json` pass evidence
+- do not deploy public or enterprise Windows artifacts if the gate file is
+  missing, blocked, failed, has blocking reasons, used unsigned smoke, has
+  `clean_vm_claimed != true`, or has an installer hash mismatch
 
 ## Deployment Steps
 

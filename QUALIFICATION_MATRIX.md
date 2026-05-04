@@ -9,7 +9,7 @@ It does not claim that evidence already exists.
 
 - `Linux Standard`: primary GA runtime reference
 - `macOS Operator`: secondary operator tooling surface
-- `Windows Standard`: core runtime, operator panel, bundled runtime, and NSIS installer smoke
+- `Windows Standard`: core runtime, operator panel, bundled runtime, signed release-candidate evidence, and clean NSIS installer smoke
 
 ## Workload Families
 
@@ -40,10 +40,14 @@ It does not claim that evidence already exists.
   escape, no unsupported computer-use overclaim, and signed release gate before
   any public or enterprise Windows release claim.
 - Windows release evidence additionally requires schema drift gate PASS,
-  recursive resource bundle proof, runtime hash manifest, signed/unsigned release
-  status JSON, `docs/WINDOWS_INSTALLER_SMOKE.md` clean VM smoke report, and
+  recursive resource bundle proof, runtime hash manifest, signed RC release
+  status JSON, bundle hash evidence, `docs/WINDOWS_INSTALLER_SMOKE.md` clean VM
+  smoke report, installed runtime/capabilities/doctor evidence, and
   `windows-public-release-gate.json` with `status=pass`,
   `public_release_allowed=true`, and no blocking reasons.
+- Windows live computer-use automation remains disabled with
+  `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` unless a separate signed Windows
+  qualification report explicitly enables that surface.
 
 ## Required Report Outputs
 

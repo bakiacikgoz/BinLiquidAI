@@ -7,7 +7,7 @@ Status: PARTIAL
 
 This report covers the Windows release hardening work applied after the initial Windows support baseline. The result is not a public Windows release. The correct claim is:
 
-> Windows core/operator panel/bundled runtime/installer smoke line now produces release-candidate evidence. Public/enterprise Windows release remains blocked until Authenticode signing, timestamp verification, and clean VM smoke are complete.
+> Windows core/operator panel/bundled runtime line now supports signed release-candidate evidence. Public/enterprise Windows release remains blocked until Authenticode signing, timestamp verification, clean VM smoke, installed runtime/capabilities/doctor evidence, runtime manifest evidence, bundle hash evidence, and `windows-public-release-gate.json` all pass.
 
 ## 1. Implemented Changes
 
@@ -23,6 +23,7 @@ This report covers the Windows release hardening work applied after the initial 
 - Added Windows CI evidence artifacts.
 - Split unsigned internal smoke from signed release-candidate artifacts in the Windows release workflow.
 - Added Windows signing script, bootstrap script, installer smoke script, smoke runbook, and Windows computer-use qualification RFC.
+- Added clean smoke and promote workflow gates so public release permission is produced only by `artifacts/windows-public-release-gate/windows-public-release-gate.json`.
 
 ## 2. Contract/Schema Closure
 
@@ -96,18 +97,24 @@ Missing signing secrets produce:
   "artifact_type": "nsis",
   "signed": false,
   "status": "blocked_external_credentials",
-  "reason": "missing_windows_signing_secret",
-  "public_release_allowed": false
+  "reason": "missing_windows_signing_secret"
 }
 ```
 
-When signing secrets exist, the workflow decodes the PFX into runner temp storage, signs NSIS artifacts through `sign_windows_artifacts.ps1`, runs `signtool verify /pa /v`, removes the temp PFX, and marks only `signed_rc_allowed=true`. `public_release_allowed` remains false until the Windows public release gate evaluator also sees clean VM installer smoke, installed runtime, capabilities, doctor, and Windows computer-use-disabled evidence.
+When signing secrets exist, the workflow decodes the PFX into runner temp storage, signs NSIS artifacts through `sign_windows_artifacts.ps1`, runs `signtool verify /pa /v`, verifies Authenticode timestamp proof with `Get-AuthenticodeSignature`, removes the temp PFX, and marks only `signed_rc_allowed=true`. The workflow no longer writes a public release decision into `windows-release-status.json`; only `artifacts/windows-public-release-gate/windows-public-release-gate.json` owns `public_release_allowed`.
 
 ## 7. Clean VM / Installer Smoke Status
 
 `docs/WINDOWS_INSTALLER_SMOKE.md` and `apps/operator-panel/scripts/windows_installer_smoke.ps1` define the repeatable smoke process.
 
-Local clean VM smoke has not been run in this branch. This remains a release blocker.
+Local clean VM smoke has not been run in this branch. This remains a release blocker. The repeatable route is:
+
+1. Run Windows CI.
+2. Run the signed RC workflow.
+3. Confirm `signed_rc_allowed=true` and record the installer SHA256.
+4. Run `.github/workflows/operator-panel-windows-clean-smoke.yml` with the signed RC run id and installer SHA256.
+5. Run `.github/workflows/operator-panel-promote-windows.yml` with signed RC, clean smoke, and expected installer SHA256 inputs.
+6. Ship only if `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and no blocking reasons.
 
 ## 8. Windows Computer-Use Boundary Confirmation
 

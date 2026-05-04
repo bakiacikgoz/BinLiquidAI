@@ -1,0 +1,117 @@
+name: Operator Panel Promote Windows Public Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      signed_rc_run_id:
+        description: "GitHub Actions run id that produced signed RC evidence"
+        required: true
+      clean_smoke_run_id:
+        description: "GitHub Actions run id that produced clean smoke evidence"
+        required: true
+      expected_installer_sha256:
+        description: "Expected NSIS installer SHA256"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  promote:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    environment: promote-windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        shell: pwsh
+        run: python -m pip install uv
+
+      - name: Download signed RC artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: operator-panel-windows-signed-release-candidate
+          run-id: ${{ inputs.signed_rc_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/signed-rc-download
+
+      - name: Download clean smoke evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer-smoke-evidence
+          run-id: ${{ inputs.clean_smoke_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/clean-smoke-download
+
+      - name: Normalize evidence layout and verify hash continuity
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows-release-evidence | Out-Null
+          New-Item -ItemType Directory -Force -Path artifacts/windows-installer-smoke | Out-Null
+          New-Item -ItemType Directory -Force -Path artifacts/windows-public-release-gate | Out-Null
+
+          $installers = @(Get-ChildItem -Path artifacts/signed-rc-download -Filter "*.exe" -File -Recurse)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer, found $($installers.Count)"
+          }
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installers[0].FullName).Hash.ToLowerInvariant()
+          $expectedHash = "${{ inputs.expected_installer_sha256 }}".ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "Installer hash mismatch: expected $expectedHash, got $actualHash"
+          }
+
+          $requiredReleaseFiles = @(
+            "windows-release-status.json",
+            "runtime_manifest.txt",
+            "nsis_file_hashes.json"
+          )
+          foreach ($fileName in $requiredReleaseFiles) {
+            $matches = @(Get-ChildItem -Path artifacts/signed-rc-download -Filter $fileName -File -Recurse)
+            if ($matches.Count -ne 1) {
+              throw "Expected one $fileName in signed RC artifact, found $($matches.Count)"
+            }
+            Copy-Item -LiteralPath $matches[0].FullName -Destination "artifacts/windows-release-evidence/$fileName" -Force
+          }
+
+          $requiredSmokeFiles = @(
+            "windows-installer-smoke.json",
+            "operator_capabilities.json",
+            "doctor_balanced.json"
+          )
+          foreach ($fileName in $requiredSmokeFiles) {
+            $matches = @(Get-ChildItem -Path artifacts/clean-smoke-download -Filter $fileName -File -Recurse)
+            if ($matches.Count -ne 1) {
+              throw "Expected one $fileName in clean smoke artifact, found $($matches.Count)"
+            }
+            Copy-Item -LiteralPath $matches[0].FullName -Destination "artifacts/windows-installer-smoke/$fileName" -Force
+          }
+
+      - name: Evaluate public release gate
+        shell: pwsh
+        run: |
+          uv sync --python 3.11 --extra dev --frozen
+          uv run python scripts/evaluate_windows_release_gate.py `
+            --release-status artifacts/windows-release-evidence/windows-release-status.json `
+            --installer-smoke artifacts/windows-installer-smoke/windows-installer-smoke.json `
+            --operator-capabilities artifacts/windows-installer-smoke/operator_capabilities.json `
+            --doctor artifacts/windows-installer-smoke/doctor_balanced.json `
+            --runtime-manifest artifacts/windows-release-evidence/runtime_manifest.txt `
+            --bundle-hashes artifacts/windows-release-evidence/nsis_file_hashes.json `
+            --output artifacts/windows-public-release-gate/windows-public-release-gate.json `
+            --fail-on-blocked
+
+      - name: Upload public release gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-public-release-gate
+          path: artifacts/windows-public-release-gate/**

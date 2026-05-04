@@ -139,11 +139,34 @@ an external credential blocker.
 Signing alone can allow only a signed release-candidate artifact:
 `windows-release-status.json` must report `signed=true`, `timestamped=true`,
 `signtool_verify_status=pass`, and `signed_rc_allowed=true`.
+`windows-release-status.json` must not be treated as a public release decision
+source and must not grant `public_release_allowed=true`.
 
 Public release is allowed only when `windows-public-release-gate.json` reports
 `status=pass`, `public_release_allowed=true`, and `blocking_reasons=[]` after
-clean VM installer smoke, installed runtime smoke, operator capabilities,
-doctor, and Windows computer-use-disabled evidence pass.
+clean VM installer smoke, app launch smoke, installed runtime smoke, operator
+capabilities, doctor, runtime manifest, bundle hash, installer hash continuity,
+and Windows computer-use-disabled evidence pass.
+
+The Windows public release runbook order is:
+
+1. Run Windows CI.
+2. Run the Windows signed RC workflow.
+3. Confirm `signed_rc_allowed=true`; do not read public release permission from `windows-release-status.json`.
+4. Run the clean Windows smoke workflow with the signed installer SHA256 under `clean-smoke-windows`.
+5. Run the promote workflow under `promote-windows`.
+6. Verify `artifacts/windows-public-release-gate/windows-public-release-gate.json` reports `status=pass`.
+7. Only then create or promote a public/enterprise Windows artifact.
+
+No-Ship if any of the following are true:
+- `windows-public-release-gate.json` is missing.
+- `status != pass`.
+- `public_release_allowed != true`.
+- `blocking_reasons` is non-empty.
+- Windows computer-use is enabled.
+- installer smoke used `-AllowUnsignedSmoke`.
+- `clean_vm_claimed != true`.
+- installer hash mismatches signed RC evidence.
 
 ## 8) Updater / Telemetry Defaults
 

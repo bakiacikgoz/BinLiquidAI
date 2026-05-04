@@ -74,11 +74,16 @@
 - [ ] Windows release workflow writes `windows-release-status.json`
 - [ ] Authenticode signing + timestamp + `signtool verify /pa /v` PASS for signed RC artifact, or signed RC remains blocked
 - [ ] `windows-release-status.json` reports `signed_rc_allowed=true` only after signing, timestamp, and verify pass
-- [ ] Clean Windows VM install/open/handshake PASS before public release claim, following `docs/WINDOWS_INSTALLER_SMOKE.md`
-- [ ] `uv run python scripts/evaluate_windows_release_gate.py ...` writes `windows-public-release-gate.json`
+- [ ] `windows-release-status.json` does not grant `public_release_allowed=true`
+- [ ] `runtime_manifest.txt` and `nsis_file_hashes.json` are present in signed RC evidence
+- [ ] Clean Windows smoke workflow runs signed installer with `-RunInstall -CleanVm -LaunchAppSmoke -RunUninstall` and without `-AllowUnsignedSmoke`
+- [ ] Clean Windows VM install/open/runtime/capabilities/doctor smoke PASS before public release claim, following `docs/WINDOWS_INSTALLER_SMOKE.md`
+- [ ] Promote workflow runs `uv run python scripts/evaluate_windows_release_gate.py ... --fail-on-blocked`
 - [ ] `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and `blocking_reasons=[]` before public/enterprise Windows release
 - [ ] Unsigned/internal smoke reports `public_release_allowed=false`
 - [ ] `operator capabilities --json` reports Windows live computer-use disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
+- [ ] `windows-installer-smoke.json` also reports `computer_use_live_enabled=false` and `computer_use_reason_code=WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
+- [ ] Do not ship if `windows-public-release-gate.json` is missing, blocked, failed, has blocking reasons, used unsigned smoke, has `clean_vm_claimed != true`, or has an installer hash mismatch
 
 ## macOS Signing + Notarization (v0.5)
 

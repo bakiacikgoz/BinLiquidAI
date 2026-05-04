@@ -1,13 +1,42 @@
 # Windows Signed RC Gate Report
 
 Date: 2026-05-04
-Branch: windows-signed-rc-gate
-Commit: not committed yet
-Status: PARTIAL
+Branch: windows-public-release-evidence-closure, continuing from windows-signed-rc-gate
+Commit: not committed
+Reconciliation Update: included in current working tree
+Status: PARTIAL for public release; signed RC gate reconciled
 
 ## Summary
 
 This change adds a fail-closed Windows public release gate evaluator. Signing can produce a signed release-candidate artifact, but it no longer sets `public_release_allowed=true` by itself. Public or enterprise Windows release remains blocked until signing, timestamp verification, clean VM installer smoke, installed bundled runtime smoke, operator capabilities, doctor, and Windows computer-use-disabled evidence all pass.
+
+## Branch Reconciliation
+
+Commands run before this reconciliation edit:
+
+```text
+$ git status --short --branch --untracked-files=all
+## windows-signed-rc-gate
+
+$ git branch --show-current
+windows-signed-rc-gate
+
+$ git diff --stat
+```
+
+`git diff --stat` produced no output, meaning the branch worktree was clean before this report reconciliation update.
+
+Required files were verified present:
+
+- `scripts/evaluate_windows_release_gate.py`: present
+- `tests/test_windows_release_gate.py`: present
+
+Workflow check:
+
+- `.github/workflows/operator-panel-release-windows.yml` signing status writes `signed_rc_allowed`, signing/timestamp/verify evidence, and external blocker status.
+- The signing step does not write `public_release_allowed=true`.
+- `windows-release-status.json` does not own the public release decision.
+- The public release decision is produced only by `artifacts/windows-public-release-gate/windows-public-release-gate.json`.
 
 ## Changed Files
 
@@ -29,7 +58,7 @@ This change adds a fail-closed Windows public release gate evaluator. Signing ca
 - `artifacts/windows-installer-smoke/windows-installer-smoke.json`
 - `artifacts/windows-installer-smoke/operator_capabilities.json`
 - `artifacts/windows-installer-smoke/doctor_balanced.json`
-- optional runtime manifest and bundle hash evidence
+- required runtime manifest and bundle hash evidence
 
 ## Release Gate Output
 
@@ -61,11 +90,19 @@ The Windows release workflow now records:
 - `timestamped`
 - `signtool_verify_status`
 - `signed_rc_allowed`
-- `public_release_allowed=false` until evaluator pass
 - `temp_certificate_removed`
 - signing evidence JSON per NSIS artifact
 
 Secret values, PFX bytes, and certificate passwords are not written to evidence.
+
+## Workflow Public Release Decision Flow
+
+1. Missing signing secrets produce `windows-release-status.json` with `status=blocked_external_credentials` and `signed_rc_allowed=false`.
+2. Successful signing produces `windows-release-status.json` with `signed=true`, `timestamped=true`, `signtool_verify_status=pass`, and `signed_rc_allowed=true`.
+3. Signing success still leaves `status=blocked_external_smoke` when clean VM smoke evidence is missing.
+4. `scripts/evaluate_windows_release_gate.py` reads signing, installer smoke, operator capabilities, and doctor evidence.
+5. Runtime manifest and bundle hash evidence are validated as public gate blockers.
+6. Only `artifacts/windows-public-release-gate/windows-public-release-gate.json` can report `public_release_allowed=true`.
 
 ## Clean VM Smoke Evidence
 
@@ -81,6 +118,19 @@ Secret values, PFX bytes, and certificate passwords are not written to evidence.
 - `install_root_kind`
 
 Public release requires signed smoke with `-RunInstall -CleanVm` and without `-AllowUnsignedSmoke`.
+
+## Public Evidence Closure Addendum
+
+The follow-up branch adds:
+
+- `schemaVersion`, `generated_at_utc`, `decision_source`, and per-input SHA256 provenance to the public gate report.
+- Runtime manifest parsing and bundle hash validation as hard public release blockers.
+- Smoke-level computer-use hard gates in addition to operator capabilities.
+- Real Authenticode timestamp proof in signing evidence.
+- Clean smoke and promote workflows with hash continuity and `--fail-on-blocked`.
+- Static workflow tests that prevent signing from granting public release permission.
+
+The detailed closure report is `docs/WINDOWS_PUBLIC_RELEASE_EVIDENCE_CLOSURE_REPORT.md`.
 
 ## Computer-Use Boundary Confirmation
 
@@ -113,7 +163,7 @@ git diff --check
 Summary:
 
 - Ruff: pass.
-- Python test suite: pass, including `tests/test_windows_release_gate.py` with 15 evaluator tests.
+- Python test suite: pass, including `tests/test_windows_release_gate.py` with 29 evaluator tests.
 - Schema drift gate: pass.
 - Operator panel Vitest suite: 12 files / 43 tests passed.
 - Operator panel lint and production build: pass.
@@ -133,5 +183,5 @@ Summary:
 ## Rollback Plan
 
 - Revert the evaluator and workflow changes as one release-gate slice if needed.
-- Keep `public_release_allowed=false` during rollback.
+- Keep the public release gate artifact blocked during rollback.
 - Preserve unsigned internal smoke labeling and Windows computer-use fail-closed behavior.
