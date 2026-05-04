@@ -1,27 +1,77 @@
 # Windows Release Finalization Report
 
 Date: 2026-05-04
-Branch: windows-public-release-evidence-closure
-Commit: PR head, see https://github.com/bakiacikgoz/BinLiquidAI/pull/2
-Status: BLOCKED for real public release; PASS for local implementation verification
+Branch: main, integrated from windows-public-release-evidence-closure
+Commit: 743bb6ff1bbd0117195fe253f7906ad0cce5c8ad
+Status: PASS for implementation, local verification, and GitHub CI; BLOCKED for real public release
 
 ## Summary
 
 The Windows signed gate implementation is locally finalized and verified. The code now keeps signed release-candidate status separate from public release permission, strengthens clean smoke evidence, and requires the promote gate to be the only source of `public_release_allowed=true`.
 
+The implementation branch was pushed, verified through GitHub Actions, then fast-forwarded into `origin/main` at `743bb6ff1bbd0117195fe253f7906ad0cce5c8ad`.
+
 No public or enterprise Windows artifact was published. Real signed RC, clean smoke, and promote workflow runs were not started because they require protected GitHub environment approval and real signing secrets.
 
 ## Source Control
 
-- branch: `windows-public-release-evidence-closure`
+- source branch: `windows-public-release-evidence-closure`
+- main branch: `origin/main`
 - base commit: `436825bf2240a25916b6cc3c30f87dd741a92cb1`
 - implementation commit: `1e51e8f22789614e52e480d067586c874d0625ff`
+- report metadata commit: `9b29831588566cbb9b1d933b46d7f4309b43a8df`
+- CI fix commit: `743bb6ff1bbd0117195fe253f7906ad0cce5c8ad`
 - PR: https://github.com/bakiacikgoz/BinLiquidAI/pull/2
 - tag/ref: no RC tag created
 
+## Source Control Snapshot
+
+```text
+git branch --show-current
+main
+
+git rev-parse HEAD
+743bb6ff1bbd0117195fe253f7906ad0cce5c8ad
+
+git status --short
+<clean before this report refresh>
+
+git diff --stat
+<empty before this report refresh>
+
+git diff --check
+result: pass
+```
+
+## Changed Files
+
+```text
+.github/workflows/operator-panel-promote-windows.yml
+.github/workflows/operator-panel-release-windows.yml
+.github/workflows/operator-panel-windows-clean-smoke.yml
+DEPLOYMENT_GUIDE.md
+QUALIFICATION_MATRIX.md
+README.md
+apps/operator-panel/scripts/sign_windows_artifacts.ps1
+apps/operator-panel/scripts/windows_installer_smoke.ps1
+apps/operator-panel/src-tauri/src/bridge.rs
+docs/RELEASE_CHECKLIST.md
+docs/RELEASE_GATE_v0.5.md
+docs/WINDOWS_INSTALLER_SMOKE.md
+docs/WINDOWS_PUBLIC_RELEASE_EVIDENCE_CLOSURE_REPORT.md
+docs/WINDOWS_RELEASE_FINALIZATION_REPORT.md
+docs/WINDOWS_RELEASE_HARDENING_REPORT.md
+docs/WINDOWS_SIGNED_RC_GATE_REPORT.md
+scripts/evaluate_windows_release_gate.py
+tests/test_windows_release_gate.py
+tests/test_windows_release_workflows_static.py
+```
+
 ## Workflow Runs
 
-- Windows CI run id: not run in GitHub during this local pass
+- CI run id: `25324363368`, result: success
+- Operator Panel CI run id: `25324363304`, result: success
+- Windows CI run id: `25324363315`, result: success
 - Signed RC run id: BLOCKED, requires explicit operator approval and `release-windows` secrets
 - Clean smoke run id: BLOCKED, requires signed RC run id and installer SHA256
 - Promote gate run id: BLOCKED, requires signed RC and clean smoke evidence
