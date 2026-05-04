@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-from binliquid.contracts.operator_panel import (
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from binliquid.contracts.operator_panel import (  # noqa: E402
     ApprovalDetailPayloadContract,
     ApprovalPendingPayloadContract,
     AuthCheckPayloadContract,
@@ -52,7 +57,7 @@ def main() -> None:
     for name, model in SCHEMAS.items():
         target = root / f"{name}.schema.json"
         target.write_text(
-            json.dumps(model.model_json_schema(), ensure_ascii=False, indent=2),
+            json.dumps(model.model_json_schema(), ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
         )
 

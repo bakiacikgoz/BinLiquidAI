@@ -1428,6 +1428,8 @@ def operator_capabilities(
             "replayable": True,
             "failClosed": True,
             "adapterStatus": "safari_applescript",
+            "reasonCode": "MACOS_COMPUTER_USE_PILOT",
+            "summary": "macOS computer-use pilot is enabled behind fail-closed controls.",
         }
     )
     payload = {

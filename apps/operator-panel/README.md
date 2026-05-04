@@ -36,6 +36,8 @@ Build Windows x64 runtime payload into Tauri resources:
 
 ```powershell
 pwsh apps/operator-panel/scripts/build_bundled_runtime_windows.ps1 -Arch x64
+pwsh apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1 `
+  -RuntimeDir apps/operator-panel/src-tauri/resources/binliquid-runtime
 apps/operator-panel/src-tauri/resources/binliquid-runtime/python/Scripts/python.exe -m binliquid --version
 pnpm --dir apps/operator-panel exec tauri build --config src-tauri/tauri.windows.conf.json --bundles nsis
 ```
@@ -43,6 +45,10 @@ pnpm --dir apps/operator-panel exec tauri build --config src-tauri/tauri.windows
 Windows runtime entrypoint used by bridge:
 
 `binliquid-runtime/python/Scripts/python.exe -m binliquid ...`
+
+Generated runtime contents under `resources/binliquid-runtime/python/` are build
+artifacts. Do not commit the generated venv/runtime tree; produce it through the
+script or CI and keep `RUNTIME_MANIFEST.txt` as evidence artifact output.
 
 ## Security Notes
 

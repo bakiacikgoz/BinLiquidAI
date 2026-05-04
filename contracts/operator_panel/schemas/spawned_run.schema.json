@@ -10,14 +10,6 @@
       "title": "Jobid",
       "type": "string"
     },
-    "profile": {
-      "title": "Profile",
-      "type": "string"
-    },
-    "rootDir": {
-      "title": "Rootdir",
-      "type": "string"
-    },
     "processId": {
       "anyOf": [
         {
@@ -28,6 +20,14 @@
         }
       ],
       "title": "Processid"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rootDir": {
+      "title": "Rootdir",
+      "type": "string"
     }
   },
   "required": [

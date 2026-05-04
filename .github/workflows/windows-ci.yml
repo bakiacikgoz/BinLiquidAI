@@ -9,8 +9,18 @@ on:
 
 jobs:
   windows-core-and-panel:
-    runs-on: windows-2022
-    timeout-minutes: 45
+    name: Windows core and panel (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.canary }}
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            canary: false
+          - runner: windows-2025
+            canary: true
 
     steps:
       - name: Checkout
@@ -38,29 +48,41 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Create evidence directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path artifacts/windows-ci-evidence | Out-Null
+
       - name: Install Python deps
         shell: pwsh
-        run: uv sync --python 3.11 --extra dev
+        run: uv sync --python 3.11 --extra dev --frozen
 
       - name: Python lint
         shell: pwsh
         run: uv run ruff check .
 
+      - name: Schema drift gate
+        shell: pwsh
+        run: |
+          uv run python scripts/generate_operator_contract_schemas.py
+          git diff --exit-code contracts/operator_panel/schemas
+
       - name: Python tests
         shell: pwsh
         run: uv run pytest -q
 
-      - name: Core smoke
+      - name: Core smoke evidence
         shell: pwsh
         run: |
           uv run binliquid --version
           uv run python -m binliquid --version
-          uv run binliquid operator capabilities --json
-          uv run binliquid doctor --profile balanced --json
+          uv run binliquid operator capabilities --json |
+            Tee-Object -FilePath artifacts/windows-ci-evidence/operator_capabilities.json
+          uv run binliquid doctor --profile balanced --json |
+            Tee-Object -FilePath artifacts/windows-ci-evidence/doctor_balanced.json
 
       - name: Install UI deps
         shell: pwsh
-        run: pnpm install --dir apps/operator-panel
+        run: pnpm install --dir apps/operator-panel --frozen-lockfile
 
       - name: UI tests
         shell: pwsh
@@ -86,11 +108,40 @@ jobs:
         shell: pwsh
         run: |
           $runtime = "apps/operator-panel/src-tauri/resources/binliquid-runtime"
-          if (!(Test-Path "$runtime/RUNTIME_MANIFEST.txt")) { exit 1 }
-          if (!(Test-Path "$runtime/python/Scripts/python.exe")) { exit 1 }
-          & "$runtime/python/Scripts/python.exe" -m binliquid --version
-          Get-Content "$runtime/RUNTIME_MANIFEST.txt"
+          pwsh apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1 -RuntimeDir $runtime |
+            Tee-Object -FilePath artifacts/windows-ci-evidence/runtime_verify.txt
+          Copy-Item "$runtime/RUNTIME_MANIFEST.txt" artifacts/windows-ci-evidence/runtime_manifest.txt
+
+      - name: Bundle evidence hashes
+        shell: pwsh
+        run: |
+          $items = @(
+            "apps/operator-panel/src-tauri/tauri.conf.json",
+            "apps/operator-panel/src-tauri/tauri.windows.conf.json",
+            "apps/operator-panel/src-tauri/resources/binliquid-runtime/RUNTIME_MANIFEST.txt",
+            "apps/operator-panel/src-tauri/resources/binliquid-runtime/python/Scripts/python.exe"
+          )
+          $hashes = foreach ($item in $items) {
+            if (Test-Path -LiteralPath $item -PathType Leaf) {
+              $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $item
+              [pscustomobject]@{
+                path = $item
+                sha256 = $hash.Hash.ToLowerInvariant()
+              }
+            }
+          }
+          $hashes | ConvertTo-Json -Depth 3 |
+            Set-Content -LiteralPath artifacts/windows-ci-evidence/bundle_file_hashes.json -Encoding utf8
 
       - name: Tauri build smoke
         shell: pwsh
-        run: pnpm --dir apps/operator-panel exec tauri build --debug --no-bundle
+        run: |
+          pnpm --dir apps/operator-panel exec tauri build --debug --no-bundle *>&1 |
+            Tee-Object -FilePath artifacts/windows-ci-evidence/tauri_build_smoke.txt
+
+      - name: Upload Windows CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ci-evidence-${{ matrix.runner }}
+          path: artifacts/windows-ci-evidence/**

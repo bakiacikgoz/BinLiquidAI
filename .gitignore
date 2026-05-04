@@ -3,7 +3,11 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .venv/
+dist/
+build/
+*.egg-info/
 .binliquid/
+.worktrees/
 benchmarks/results/
 artifacts/
 .DS_Store
@@ -14,3 +18,4 @@ apps/**/src-tauri/target/
 apps/**/src-tauri/gen/
 apps/**/src-tauri/resources/binliquid-runtime/python/
 apps/**/src-tauri/resources/binliquid-runtime/RUNTIME_MANIFEST.txt
+apps/**/src-tauri/resources/binliquid-runtime/*.json

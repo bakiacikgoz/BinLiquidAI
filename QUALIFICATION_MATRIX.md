@@ -39,6 +39,9 @@ It does not claim that evidence already exists.
   install/open/handshake smoke, no shell passthrough, no path traversal or symlink
   escape, no unsupported computer-use overclaim, and signed release gate before
   any public or enterprise Windows release claim.
+- Windows release evidence additionally requires schema drift gate PASS,
+  recursive resource bundle proof, runtime hash manifest, signed/unsigned release
+  status JSON, and `docs/WINDOWS_INSTALLER_SMOKE.md` clean VM smoke report.
 
 ## Required Report Outputs
 

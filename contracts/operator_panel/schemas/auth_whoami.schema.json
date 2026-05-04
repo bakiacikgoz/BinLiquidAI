@@ -1,19 +1,6 @@
 {
   "additionalProperties": false,
   "properties": {
-    "contract_version": {
-      "const": "2.0",
-      "title": "Contract Version",
-      "type": "string"
-    },
-    "identity_enabled": {
-      "title": "Identity Enabled",
-      "type": "boolean"
-    },
-    "verified": {
-      "title": "Verified",
-      "type": "boolean"
-    },
     "actor": {
       "anyOf": [
         {
@@ -27,17 +14,10 @@
       "default": null,
       "title": "Actor"
     },
-    "error_code": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Error Code"
+    "contract_version": {
+      "const": "2.0",
+      "title": "Contract Version",
+      "type": "string"
     },
     "error": {
       "anyOf": [
@@ -50,6 +30,26 @@
       ],
       "default": null,
       "title": "Error"
+    },
+    "error_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Code"
+    },
+    "identity_enabled": {
+      "title": "Identity Enabled",
+      "type": "boolean"
+    },
+    "verified": {
+      "title": "Verified",
+      "type": "boolean"
     }
   },
   "required": [

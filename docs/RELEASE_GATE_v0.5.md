@@ -120,17 +120,23 @@ If notarization fails, release is blocked (beta included).
 
 Windows release artifacts must pass:
 - `windows-2022` CI
+- schema drift gate
 - core lint/test
 - operator panel test/lint/build
 - Rust bridge tests
 - bundled runtime manifest verification
+- runtime hash evidence
 - Tauri NSIS build
+- `windows-release-status.json` evidence
 - clean Windows VM install/open/handshake smoke
 
 Unsigned NSIS artifacts are internal CI smoke artifacts only. Public or
 enterprise Windows release artifacts require Authenticode signing and timestamp
 proof. If signing credentials are missing, the Windows release remains RC with
 an external credential blocker.
+
+Public release is allowed only when `windows-release-status.json` reports
+`signed=true`, `status=signed_verified`, and `public_release_allowed=true`.
 
 ## 8) Updater / Telemetry Defaults
 

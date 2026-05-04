@@ -3,79 +3,6 @@
     "TeamEvent": {
       "additionalProperties": false,
       "properties": {
-        "schema_version": {
-          "default": "3",
-          "title": "Schema Version",
-          "type": "string"
-        },
-        "event": {
-          "title": "Event",
-          "type": "string"
-        },
-        "event_id": {
-          "title": "Event Id",
-          "type": "string"
-        },
-        "event_seq": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Event Seq",
-          "type": "integer"
-        },
-        "timestamp": {
-          "format": "date-time",
-          "title": "Timestamp",
-          "type": "string"
-        },
-        "team_id": {
-          "title": "Team Id",
-          "type": "string"
-        },
-        "case_id": {
-          "title": "Case Id",
-          "type": "string"
-        },
-        "job_id": {
-          "title": "Job Id",
-          "type": "string"
-        },
-        "task_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Task Id"
-        },
-        "task_run_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Task Run Id"
-        },
-        "task_attempt": {
-          "anyOf": [
-            {
-              "minimum": 1,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Task Attempt"
-        },
         "agent_id": {
           "anyOf": [
             {
@@ -88,78 +15,6 @@
           "default": null,
           "title": "Agent Id"
         },
-        "role": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Role"
-        },
-        "phase": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Phase"
-        },
-        "status_before": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Status Before"
-        },
-        "status_after": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Status After"
-        },
-        "trace_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Trace Id"
-        },
-        "causal_ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Causal Ref"
-        },
         "approval_id": {
           "anyOf": [
             {
@@ -171,18 +26,6 @@
           ],
           "default": null,
           "title": "Approval Id"
-        },
-        "payload_hash": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Payload Hash"
         },
         "branch_id": {
           "anyOf": [
@@ -208,7 +51,11 @@
           "default": null,
           "title": "Branch Parent"
         },
-        "snapshot_hash": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "causal_ref": {
           "anyOf": [
             {
               "type": "string"
@@ -218,43 +65,7 @@
             }
           ],
           "default": null,
-          "title": "Snapshot Hash"
-        },
-        "resolved_memory_fingerprint": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resolved Memory Fingerprint"
-        },
-        "memory_target": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Memory Target"
-        },
-        "expected_state_version": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Expected State Version"
+          "title": "Causal Ref"
         },
         "committed_state_version": {
           "anyOf": [
@@ -267,18 +78,6 @@
           ],
           "default": null,
           "title": "Committed State Version"
-        },
-        "resume_token_ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resume Token Ref"
         },
         "conflict_detected": {
           "anyOf": [
@@ -304,6 +103,37 @@
           "default": null,
           "title": "Conflict Resolution"
         },
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "event": {
+          "title": "Event",
+          "type": "string"
+        },
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event_seq": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Event Seq",
+          "type": "integer"
+        },
+        "expected_state_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State Version"
+        },
         "fallback_mode_applied": {
           "anyOf": [
             {
@@ -315,6 +145,87 @@
           ],
           "default": null,
           "title": "Fallback Mode Applied"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "memory_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Target"
+        },
+        "payload_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Payload Hash"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
+        "resolved_memory_fingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolved Memory Fingerprint"
+        },
+        "resume_token_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume Token Ref"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "schema_version": {
+          "default": "3",
+          "title": "Schema Version",
+          "type": "string"
         },
         "serialized_due_to_policy": {
           "anyOf": [
@@ -328,10 +239,99 @@
           "default": null,
           "title": "Serialized Due To Policy"
         },
-        "data": {
-          "additionalProperties": true,
-          "title": "Data",
-          "type": "object"
+        "snapshot_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Hash"
+        },
+        "status_after": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status After"
+        },
+        "status_before": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status Before"
+        },
+        "task_attempt": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Attempt"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Id"
+        },
+        "task_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Run Id"
+        },
+        "team_id": {
+          "title": "Team Id",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "trace_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trace Id"
         }
       },
       "required": [
@@ -346,6 +346,10 @@
   },
   "additionalProperties": false,
   "properties": {
+    "badLineCount": {
+      "title": "Badlinecount",
+      "type": "integer"
+    },
     "contractVersion": {
       "const": "2.0",
       "title": "Contractversion",
@@ -369,10 +373,6 @@
     "truncated": {
       "title": "Truncated",
       "type": "boolean"
-    },
-    "badLineCount": {
-      "title": "Badlinecount",
-      "type": "integer"
     }
   },
   "required": [

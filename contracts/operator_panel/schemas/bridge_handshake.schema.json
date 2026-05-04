@@ -3,21 +3,13 @@
     "ComputerUseCapabilityContract": {
       "additionalProperties": false,
       "properties": {
+        "adapterStatus": {
+          "title": "Adapterstatus",
+          "type": "string"
+        },
         "enabled": {
           "title": "Enabled",
           "type": "boolean"
-        },
-        "stage": {
-          "title": "Stage",
-          "type": "string"
-        },
-        "platform": {
-          "title": "Platform",
-          "type": "string"
-        },
-        "scope": {
-          "title": "Scope",
-          "type": "string"
         },
         "executionModes": {
           "items": {
@@ -26,17 +18,49 @@
           "title": "Executionmodes",
           "type": "array"
         },
-        "replayable": {
-          "title": "Replayable",
-          "type": "boolean"
-        },
         "failClosed": {
           "title": "Failclosed",
           "type": "boolean"
         },
-        "adapterStatus": {
-          "title": "Adapterstatus",
+        "platform": {
+          "title": "Platform",
           "type": "string"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoncode"
+        },
+        "replayable": {
+          "title": "Replayable",
+          "type": "boolean"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
         }
       },
       "required": [
@@ -55,21 +79,27 @@
     "OperatorCapabilitiesPayload": {
       "additionalProperties": false,
       "properties": {
-        "coreVersion": {
-          "title": "Coreversion",
-          "type": "string"
+        "artifactSchema": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Artifactschema",
+          "type": "object"
+        },
+        "commands": {
+          "$ref": "#/$defs/OperatorCommandCapabilitiesContract"
         },
         "contractVersion": {
           "const": "2.0",
           "title": "Contractversion",
           "type": "string"
         },
-        "profiles": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Profiles",
-          "type": "array"
+        "coreVersion": {
+          "title": "Coreversion",
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/$defs/OperatorFeatureFlagsContract"
         },
         "previewMode": {
           "anyOf": [
@@ -83,18 +113,12 @@
           "default": null,
           "title": "Previewmode"
         },
-        "features": {
-          "$ref": "#/$defs/OperatorFeatureFlagsContract"
-        },
-        "commands": {
-          "$ref": "#/$defs/OperatorCommandCapabilitiesContract"
-        },
-        "artifactSchema": {
-          "additionalProperties": {
+        "profiles": {
+          "items": {
             "type": "string"
           },
-          "title": "Artifactschema",
-          "type": "object"
+          "title": "Profiles",
+          "type": "array"
         }
       },
       "required": [
@@ -110,14 +134,6 @@
     "OperatorCommandCapabilitiesContract": {
       "additionalProperties": false,
       "properties": {
-        "approvalPendingJson": {
-          "title": "Approvalpendingjson",
-          "type": "boolean"
-        },
-        "approvalShowJson": {
-          "title": "Approvalshowjson",
-          "type": "boolean"
-        },
         "approvalDecide": {
           "title": "Approvaldecide",
           "type": "boolean"
@@ -126,88 +142,20 @@
           "title": "Approvalexecute",
           "type": "boolean"
         },
-        "computerUseSubmit": {
-          "title": "Computerusesubmit",
+        "approvalPendingJson": {
+          "title": "Approvalpendingjson",
           "type": "boolean"
         },
-        "computerUsePause": {
-          "title": "Computerusepause",
-          "type": "boolean"
-        },
-        "computerUseResume": {
-          "title": "Computeruseresume",
-          "type": "boolean"
-        },
-        "computerUseStop": {
-          "title": "Computerusestop",
-          "type": "boolean"
-        },
-        "computerUseStateJson": {
-          "title": "Computerusestatefuljson",
-          "type": "boolean"
-        },
-        "teamSubmit": {
-          "title": "Teamsubmit",
-          "type": "boolean"
-        },
-        "teamResumeSubmit": {
-          "title": "Teamresumesubmit",
-          "type": "boolean"
-        },
-        "teamListJson": {
-          "title": "Teamlistjson",
-          "type": "boolean"
-        },
-        "teamStatusJson": {
-          "title": "Teamstatusjson",
-          "type": "boolean"
-        },
-        "teamReplayJson": {
-          "title": "Teamreplayjson",
-          "type": "boolean"
-        },
-        "configResolveJson": {
-          "title": "Configresolvejson",
-          "type": "boolean"
-        },
-        "authWhoamiJson": {
-          "title": "Authwhoamijson",
+        "approvalShowJson": {
+          "title": "Approvalshowjson",
           "type": "boolean"
         },
         "authCheckJson": {
           "title": "Authcheckjson",
           "type": "boolean"
         },
-        "securityBaselineJson": {
-          "title": "Securitybaselinejson",
-          "type": "boolean"
-        },
-        "keysStatusJson": {
-          "title": "Keysstatusjson",
-          "type": "boolean"
-        },
-        "keysVerifyJson": {
-          "title": "Keysverifyjson",
-          "type": "boolean"
-        },
-        "keysRotatePlanJson": {
-          "title": "Keysrotateplanjson",
-          "type": "boolean"
-        },
-        "supportBundleExportJson": {
-          "title": "Supportbundleexportjson",
-          "type": "boolean"
-        },
-        "metricsSnapshotJson": {
-          "title": "Metricssnapshotjson",
-          "type": "boolean"
-        },
-        "gaReadinessJson": {
-          "title": "Gareadinessjson",
-          "type": "boolean"
-        },
-        "qualificationRunJson": {
-          "title": "Qualificationrunjson",
+        "authWhoamiJson": {
+          "title": "Authwhoamijson",
           "type": "boolean"
         },
         "backupCreateJson": {
@@ -218,16 +166,92 @@
           "title": "Backupverifyjson",
           "type": "boolean"
         },
-        "restoreVerifyJson": {
-          "title": "Restoreverifyjson",
+        "computerUsePause": {
+          "title": "Computerusepause",
+          "type": "boolean"
+        },
+        "computerUseResume": {
+          "title": "Computeruseresume",
+          "type": "boolean"
+        },
+        "computerUseStateJson": {
+          "title": "Computerusestatejson",
+          "type": "boolean"
+        },
+        "computerUseStop": {
+          "title": "Computerusestop",
+          "type": "boolean"
+        },
+        "computerUseSubmit": {
+          "title": "Computerusesubmit",
+          "type": "boolean"
+        },
+        "configResolveJson": {
+          "title": "Configresolvejson",
+          "type": "boolean"
+        },
+        "gaReadinessJson": {
+          "title": "Gareadinessjson",
+          "type": "boolean"
+        },
+        "keysRotatePlanJson": {
+          "title": "Keysrotateplanjson",
+          "type": "boolean"
+        },
+        "keysStatusJson": {
+          "title": "Keysstatusjson",
+          "type": "boolean"
+        },
+        "keysVerifyJson": {
+          "title": "Keysverifyjson",
+          "type": "boolean"
+        },
+        "metricsSnapshotJson": {
+          "title": "Metricssnapshotjson",
+          "type": "boolean"
+        },
+        "migrateApplyDryRunJson": {
+          "title": "Migrateapplydryrunjson",
           "type": "boolean"
         },
         "migratePlanJson": {
           "title": "Migrateplanjson",
           "type": "boolean"
         },
-        "migrateApplyDryRunJson": {
-          "title": "Migrateapplydryrunjson",
+        "qualificationRunJson": {
+          "title": "Qualificationrunjson",
+          "type": "boolean"
+        },
+        "restoreVerifyJson": {
+          "title": "Restoreverifyjson",
+          "type": "boolean"
+        },
+        "securityBaselineJson": {
+          "title": "Securitybaselinejson",
+          "type": "boolean"
+        },
+        "supportBundleExportJson": {
+          "title": "Supportbundleexportjson",
+          "type": "boolean"
+        },
+        "teamListJson": {
+          "title": "Teamlistjson",
+          "type": "boolean"
+        },
+        "teamReplayJson": {
+          "title": "Teamreplayjson",
+          "type": "boolean"
+        },
+        "teamResumeSubmit": {
+          "title": "Teamresumesubmit",
+          "type": "boolean"
+        },
+        "teamStatusJson": {
+          "title": "Teamstatusjson",
+          "type": "boolean"
+        },
+        "teamSubmit": {
+          "title": "Teamsubmit",
           "type": "boolean"
         }
       },
@@ -269,16 +293,16 @@
     "OperatorFeatureFlagsContract": {
       "additionalProperties": false,
       "properties": {
-        "operatorWorkflowParity": {
-          "title": "Operatorworkflowparity",
-          "type": "boolean"
+        "computerUsePilot": {
+          "$ref": "#/$defs/ComputerUseCapabilityContract"
         },
         "enterpriseOpsParity": {
           "title": "Enterpriseopsparity",
           "type": "boolean"
         },
-        "computerUsePilot": {
-          "$ref": "#/$defs/ComputerUseCapabilityContract"
+        "operatorWorkflowParity": {
+          "title": "Operatorworkflowparity",
+          "type": "boolean"
         }
       },
       "required": [
@@ -292,37 +316,37 @@
   },
   "additionalProperties": false,
   "properties": {
-    "uiVersion": {
-      "title": "Uiversion",
-      "type": "string"
-    },
-    "coreVersion": {
-      "title": "Coreversion",
-      "type": "string"
-    },
-    "profile": {
-      "title": "Profile",
-      "type": "string"
+    "capabilities": {
+      "$ref": "#/$defs/OperatorCapabilitiesPayload"
     },
     "contractVersion": {
       "const": "2.0",
       "title": "Contractversion",
       "type": "string"
     },
-    "capabilities": {
-      "$ref": "#/$defs/OperatorCapabilitiesPayload"
+    "coreVersion": {
+      "title": "Coreversion",
+      "type": "string"
     },
     "doctor": {
       "additionalProperties": true,
       "title": "Doctor",
       "type": "object"
     },
+    "mode": {
+      "title": "Mode",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
     "rootDir": {
       "title": "Rootdir",
       "type": "string"
     },
-    "mode": {
-      "title": "Mode",
+    "uiVersion": {
+      "title": "Uiversion",
       "type": "string"
     }
   },

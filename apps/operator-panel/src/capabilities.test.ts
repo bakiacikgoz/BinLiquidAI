@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasContractMismatch } from './capabilities';
+import { getComputerUseCapability, hasContractMismatch, isComputerUseLiveEnabled } from './capabilities';
 
 const baseCommands = {
   computerUseSubmit: true,
@@ -18,6 +18,34 @@ const baseCommands = {
   approvalDecide: true,
   approvalExecute: true,
   configResolveJson: true,
+  authWhoamiJson: true,
+  authCheckJson: true,
+  securityBaselineJson: true,
+  keysStatusJson: true,
+  keysVerifyJson: true,
+  keysRotatePlanJson: true,
+  supportBundleExportJson: true,
+  metricsSnapshotJson: true,
+  gaReadinessJson: true,
+  qualificationRunJson: true,
+  backupCreateJson: true,
+  backupVerifyJson: true,
+  restoreVerifyJson: true,
+  migratePlanJson: true,
+  migrateApplyDryRunJson: true,
+};
+
+const enabledComputerUse = {
+  enabled: true,
+  stage: 'execution_slice',
+  platform: 'macos',
+  scope: 'browser+desktop+file',
+  executionModes: ['dry_run', 'step_approval', 'execute'],
+  replayable: true,
+  failClosed: true,
+  adapterStatus: 'safari_applescript',
+  reasonCode: 'MACOS_COMPUTER_USE_PILOT',
+  summary: 'macOS pilot is enabled.',
 };
 
 describe('capability handshake validation', () => {
@@ -55,5 +83,67 @@ describe('capability handshake validation', () => {
         },
       }),
     ).toBe(true);
+  });
+
+  it('rejects when enterprise command flags are missing', () => {
+    expect(
+      hasContractMismatch({
+        capabilities: {
+          contractVersion: '2.0',
+          commands: {
+            ...baseCommands,
+            supportBundleExportJson: false,
+          },
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('reads computer-use capability details', () => {
+    expect(
+      getComputerUseCapability({
+        capabilities: {
+          features: {
+            computerUsePilot: enabledComputerUse,
+          },
+        },
+      }),
+    ).toEqual(enabledComputerUse);
+  });
+
+  it('enables live computer-use only when the fail-closed pilot is enabled', () => {
+    expect(
+      isComputerUseLiveEnabled({
+        capabilities: {
+          features: {
+            computerUsePilot: enabledComputerUse,
+          },
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps Windows computer-use disabled and exposes the reason code', () => {
+    const capability = getComputerUseCapability({
+      capabilities: {
+        features: {
+          computerUsePilot: {
+            ...enabledComputerUse,
+            enabled: false,
+            stage: 'not_qualified',
+            platform: 'windows',
+            scope: 'core+operator_panel+bundled_runtime',
+            executionModes: [],
+            adapterStatus: 'windows_scaffold',
+            reasonCode: 'WINDOWS_COMPUTER_USE_NOT_QUALIFIED',
+            summary: 'Windows live computer-use is not qualified.',
+          },
+        },
+      },
+    });
+
+    expect(capability.enabled).toBe(false);
+    expect(capability.reasonCode).toBe('WINDOWS_COMPUTER_USE_NOT_QUALIFIED');
+    expect(isComputerUseLiveEnabled({ capabilities: { features: { computerUsePilot: capability } } })).toBe(false);
   });
 });

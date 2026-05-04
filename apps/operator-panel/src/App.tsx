@@ -39,7 +39,7 @@ import {
   verifySignedArtifact,
   showApproval,
 } from './bridge';
-import { hasContractMismatch } from './capabilities';
+import { getComputerUseCapability, hasContractMismatch, isComputerUseLiveEnabled } from './capabilities';
 import { ThemeProvider } from './context/ThemeContext';
 import { dictionaries } from './i18n';
 import { actorForOperator, canMutateWithOperatorId } from './operator';
@@ -261,6 +261,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const doctor = asRecord(handshakeRecord.doctor);
   const supportedProfiles = readArray(capabilities, 'profiles');
   const contractMismatch = hasContractMismatch(handshakeData);
+  const computerUseCapability = getComputerUseCapability(handshakeData);
+  const computerUseLiveEnabled = isComputerUseLiveEnabled(handshakeData);
+  const computerUseDisabledReason =
+    computerUseLiveEnabled
+      ? ''
+      : computerUseCapability.summary ||
+        (computerUseCapability.reasonCode
+          ? `Computer-use live action disabled: ${computerUseCapability.reasonCode}`
+          : 'Computer-use live action requires a qualified capability handshake.');
   const operatorIdValid = isOperatorIdValid(settings.operatorId);
   const canMutate = canMutateWithOperatorId(settings.operatorId, contractMismatch);
 
@@ -590,6 +599,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   }
 
   async function onSubmitComputerUseSession() {
+    if (!computerUseLiveEnabled) {
+      pushToast('error', computerUseDisabledReason);
+      return;
+    }
+
     if (!taskForm.request.trim()) {
       pushToast('error', t.sessionValidation);
       return;
@@ -804,7 +818,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     artifactsByName,
   });
   const workspaceProgress = readWorkspaceProgress(workspaceSnapshot);
-  const canResumeSession = Boolean(selectedRunId) && isComputerUseRun && workspaceSnapshot.runtimeState.canResume;
+  const canResumeSession =
+    Boolean(selectedRunId) && isComputerUseRun && computerUseLiveEnabled && workspaceSnapshot.runtimeState.canResume;
 
   function workspaceStageLabel(stage: WorkspaceStageKey): string {
     return {
@@ -927,14 +942,17 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     formatClock,
   });
   const pendingApprovalSummaries = buildPendingApprovalSummaries(approvalRows, selectedRunId);
+  const computerUseLiveActionBlocked = isComputerUseRun && !computerUseLiveEnabled;
   const canResumeFromQuickAction =
-    canResumeSession || (Boolean(selectedRunId) && Boolean(resumeForm.specPath.trim()));
+    !computerUseLiveActionBlocked &&
+    (canResumeSession || (Boolean(selectedRunId) && Boolean(resumeForm.specPath.trim())));
   const resumeDisabledReason = !selectedRunId
     ? 'Seçili çalıştırma yok.'
     : !canResumeFromQuickAction
       ? 'Devam için görev spec yolu veya resumable oturum gerekli.'
       : '';
-  const cancelDisabled = !selectedRunId || !isComputerUseRun || !workspaceSnapshot.runtimeState.canStop;
+  const cancelDisabled =
+    !selectedRunId || !isComputerUseRun || computerUseLiveActionBlocked || !workspaceSnapshot.runtimeState.canStop;
   const cancelDisabledReason = !selectedRunId
     ? 'Seçili çalıştırma yok.'
     : !isComputerUseRun
@@ -1056,7 +1074,13 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
                   {t.refreshRuns}
                 </button>
-                <button className="ghost-btn" type="button" onClick={() => void onSubmitComputerUseSession()}>
+                <button
+                  className="ghost-btn"
+                  type="button"
+                  disabled={!computerUseLiveEnabled}
+                  title={computerUseDisabledReason}
+                  onClick={() => void onSubmitComputerUseSession()}
+                >
                   {t.startSession}
                 </button>
                 <button className="action-btn" type="button" onClick={() => void onSubmitTask()}>
@@ -1220,7 +1244,18 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     <span>{t.workflowParity}</span>
                     <strong>{readBool(features, 'operatorWorkflowParity') ? t.enabled : t.disabled}</strong>
                   </div>
+                  <div className="metric-row">
+                    <span>Computer-use live</span>
+                    <strong>{computerUseLiveEnabled ? t.enabled : 'Qualification required'}</strong>
+                  </div>
+                  <div className="metric-row">
+                    <span>Reason code</span>
+                    <strong>{computerUseCapability.reasonCode || '-'}</strong>
+                  </div>
                 </div>
+                {!computerUseLiveEnabled ? (
+                  <div className="warning-inline">{computerUseDisabledReason}</div>
+                ) : null}
                 <div className="stack-actions">
                   <button className="action-btn" type="button" onClick={() => void onSubmitTask()}>
                     {t.submitRun}

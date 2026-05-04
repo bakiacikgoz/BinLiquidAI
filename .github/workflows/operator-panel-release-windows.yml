@@ -9,7 +9,7 @@ on:
 jobs:
   release-windows:
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 75
     environment: release-windows
 
     steps:
@@ -38,13 +38,29 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Python deps
+        shell: pwsh
+        run: uv sync --python 3.11 --extra dev --frozen
+
       - name: Install UI deps
         shell: pwsh
-        run: pnpm install --dir apps/operator-panel
+        run: pnpm install --dir apps/operator-panel --frozen-lockfile
+
+      - name: Create release evidence directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path artifacts/windows-release-evidence | Out-Null
 
       - name: Build bundled runtime
         shell: pwsh
         run: pwsh apps/operator-panel/scripts/build_bundled_runtime_windows.ps1 -Arch x64
+
+      - name: Verify bundled runtime
+        shell: pwsh
+        run: |
+          $runtime = "apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          pwsh apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1 -RuntimeDir $runtime |
+            Tee-Object -FilePath artifacts/windows-release-evidence/runtime_verify.txt
+          Copy-Item "$runtime/RUNTIME_MANIFEST.txt" artifacts/windows-release-evidence/runtime_manifest.txt
 
       - name: Build unsigned NSIS artifact
         shell: pwsh
@@ -52,31 +68,86 @@ jobs:
           pnpm --dir apps/operator-panel build
           pnpm --dir apps/operator-panel exec tauri build --config src-tauri/tauri.windows.conf.json --bundles nsis
 
-      - name: Evaluate signing gate
+      - name: Evaluate signing gate and sign when configured
         id: signing
         shell: pwsh
         env:
           WINDOWS_SIGNING_CERT_PFX_B64: ${{ secrets.WINDOWS_SIGNING_CERT_PFX_B64 }}
           WINDOWS_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $statusPath = "artifacts/windows-release-evidence/windows-release-status.json"
+          $nsisArtifacts = @(Get-ChildItem -Path "apps/operator-panel/src-tauri/target/release/bundle/nsis" -Filter "*.exe" -File -Recurse)
+          if ($nsisArtifacts.Count -eq 0) {
+            throw "No NSIS artifact found"
+          }
+
           if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PFX_B64) -or
               [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PASSWORD)) {
-            "status=blocked_external_credentials" | Out-File artifacts/windows-release-status.txt
-            "reason=missing_windows_signing_secret" | Out-File artifacts/windows-release-status.txt -Append
+            @{
+              platform = "windows"
+              artifact_type = "nsis"
+              signed = $false
+              status = "blocked_external_credentials"
+              reason = "missing_windows_signing_secret"
+              public_release_allowed = $false
+              artifacts = @($nsisArtifacts | ForEach-Object { $_.Name })
+            } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $statusPath -Encoding utf8
             "signed=false" >> $env:GITHUB_OUTPUT
             exit 0
           }
-          "status=signing_config_present" | Out-File artifacts/windows-release-status.txt
-          "signed=false" | Out-File artifacts/windows-release-status.txt -Append
-          "note=signing implementation must run before public release upload" |
-            Out-File artifacts/windows-release-status.txt -Append
-          "signed=false" >> $env:GITHUB_OUTPUT
+
+          $pfxPath = Join-Path $env:RUNNER_TEMP "windows-signing-cert.pfx"
+          [System.IO.File]::WriteAllBytes($pfxPath, [System.Convert]::FromBase64String($env:WINDOWS_SIGNING_CERT_PFX_B64))
+          try {
+            foreach ($artifact in $nsisArtifacts) {
+              pwsh apps/operator-panel/scripts/sign_windows_artifacts.ps1 `
+                -ArtifactPath $artifact.FullName `
+                -CertPfxPath $pfxPath `
+                -CertPassword $env:WINDOWS_SIGNING_CERT_PASSWORD
+            }
+          } finally {
+            Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue
+          }
+
+          @{
+            platform = "windows"
+            artifact_type = "nsis"
+            signed = $true
+            status = "signed_verified"
+            reason = $null
+            public_release_allowed = $true
+            artifacts = @($nsisArtifacts | ForEach-Object { $_.Name })
+          } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $statusPath -Encoding utf8
+          "signed=true" >> $env:GITHUB_OUTPUT
+
+      - name: Hash NSIS artifacts
+        shell: pwsh
+        run: |
+          $hashes = Get-ChildItem -Path "apps/operator-panel/src-tauri/target/release/bundle/nsis" -Filter "*.exe" -File -Recurse |
+            ForEach-Object {
+              $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName
+              [pscustomobject]@{
+                path = $_.FullName
+                sha256 = $hash.Hash.ToLowerInvariant()
+              }
+            }
+          $hashes | ConvertTo-Json -Depth 3 |
+            Set-Content -LiteralPath artifacts/windows-release-evidence/nsis_file_hashes.json -Encoding utf8
 
       - name: Upload unsigned CI smoke artifacts
+        if: steps.signing.outputs.signed != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: operator-panel-windows-unsigned-ci-smoke
           path: |
             apps/operator-panel/src-tauri/target/release/bundle/nsis/**
-            artifacts/windows-release-status.txt
+            artifacts/windows-release-evidence/**
+
+      - name: Upload signed release-candidate artifacts
+        if: steps.signing.outputs.signed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-panel-windows-signed-release-candidate
+          path: |
+            apps/operator-panel/src-tauri/target/release/bundle/nsis/**
+            artifacts/windows-release-evidence/**

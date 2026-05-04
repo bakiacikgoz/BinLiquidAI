@@ -36,6 +36,16 @@ Windows support currently covers core CLI and operator-panel packaging. Windows
 live computer-use automation remains disabled unless a Windows qualification
 report explicitly enables it.
 
+For a full Windows developer setup, use the bootstrap script:
+
+```powershell
+pwsh scripts/bootstrap_windows.ps1
+```
+
+The script uses frozen Python and UI dependency installs. It checks for `uv`,
+Node/Corepack/pnpm, Rust, and reports WebView2 prerequisite status without
+installing system components automatically.
+
 ## Enterprise Fixture Preparation
 
 For local enterprise validation, prepare signing keys and a verified identity assertion:

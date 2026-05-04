@@ -6,6 +6,7 @@ use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::Manager;
 use tokio::process::Command;
 
 const CONTRACT_VERSION: &str = "2.0";
@@ -183,25 +184,46 @@ struct TailOutcome {
 }
 
 #[tauri::command]
-pub async fn bridge_handshake(config: BridgeConfig) -> BridgeResult<HandshakePayload> {
+pub async fn bridge_handshake(
+    app: tauri::AppHandle,
+    config: BridgeConfig,
+) -> BridgeResult<HandshakePayload> {
     let profile = config.profile();
-    let version = match run_cli_text(&config, vec!["--version".to_string()]).await {
+    let resource_dir = app_resource_dir(&app);
+    let version = match run_cli_text_with_resource_dir(
+        &config,
+        vec!["--version".to_string()],
+        resource_dir.as_deref(),
+    )
+    .await
+    {
         Ok(text) => text.lines().next().unwrap_or_default().trim().to_string(),
         Err(error) => return BridgeResult::err(error),
     };
 
-    let capabilities = match run_cli_json(&config, vec!["operator", "capabilities", "--json"]).await
+    let capabilities = match run_cli_json_with_resource_dir(
+        &config,
+        vec!["operator", "capabilities", "--json"],
+        resource_dir.as_deref(),
+    )
+    .await
     {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
 
-    let doctor = match run_cli_json(&config, vec!["doctor", "--profile", profile.as_str()]).await {
+    let doctor = match run_cli_json_with_resource_dir(
+        &config,
+        vec!["doctor", "--profile", profile.as_str()],
+        resource_dir.as_deref(),
+    )
+    .await
+    {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
 
-    let resolved = match resolve_cli_command(&config) {
+    let resolved = match resolve_cli_command(&config, resource_dir.as_deref()) {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
@@ -1193,7 +1215,14 @@ fn core_mode_name(mode: CoreMode) -> &'static str {
     }
 }
 
-fn resolve_cli_command(config: &BridgeConfig) -> Result<ResolvedCli, BridgeError> {
+fn app_resource_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
+    app.path().resource_dir().ok()
+}
+
+fn resolve_cli_command(
+    config: &BridgeConfig,
+    resource_dir: Option<&Path>,
+) -> Result<ResolvedCli, BridgeError> {
     let mode = parse_core_mode(config.mode.as_deref());
 
     let cli_path = config
@@ -1203,12 +1232,15 @@ fn resolve_cli_command(config: &BridgeConfig) -> Result<ResolvedCli, BridgeError
         .filter(|value| !value.is_empty())
         .map(str::to_string);
 
-    let bundled_path = config
+    let configured_bundled_path = config
         .bundled_python_path
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
+        .map(PathBuf::from);
+
+    let bundled_path = configured_bundled_path
+        .or_else(|| resource_dir.and_then(resolve_bundled_python_from_resource_dir))
         .or_else(default_bundled_python_path);
 
     if mode == CoreMode::External {
@@ -1417,33 +1449,50 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
     }
 }
 
-async fn run_cli_text(config: &BridgeConfig, args: Vec<String>) -> Result<String, BridgeError> {
-    let output = run_cli_raw(config, args).await?;
+async fn run_cli_text_with_resource_dir(
+    config: &BridgeConfig,
+    args: Vec<String>,
+    resource_dir: Option<&Path>,
+) -> Result<String, BridgeError> {
+    let output = run_cli_raw_with_resource_dir(config, args, resource_dir).await?;
     Ok(output.stdout)
 }
 
-async fn run_cli_json(config: &BridgeConfig, args: Vec<&str>) -> Result<Value, BridgeError> {
+async fn run_cli_json_with_resource_dir(
+    config: &BridgeConfig,
+    args: Vec<&str>,
+    resource_dir: Option<&Path>,
+) -> Result<Value, BridgeError> {
     let owned = args
         .into_iter()
         .map(ToString::to_string)
         .collect::<Vec<_>>();
-    run_cli_json_owned(config, owned).await
+    run_cli_json_owned_with_resource_dir(config, owned, resource_dir).await
 }
 
 async fn run_cli_json_owned(
     config: &BridgeConfig,
     args: Vec<String>,
 ) -> Result<Value, BridgeError> {
-    let output = run_cli_raw(config, args).await?;
+    run_cli_json_owned_with_resource_dir(config, args, None).await
+}
+
+async fn run_cli_json_owned_with_resource_dir(
+    config: &BridgeConfig,
+    args: Vec<String>,
+    resource_dir: Option<&Path>,
+) -> Result<Value, BridgeError> {
+    let output = run_cli_raw_with_resource_dir(config, args, resource_dir).await?;
     parse_json_output(&output)
 }
 
-async fn run_cli_raw(
+async fn run_cli_raw_with_resource_dir(
     config: &BridgeConfig,
     args: Vec<String>,
+    resource_dir: Option<&Path>,
 ) -> Result<RawCliOutput, BridgeError> {
     let config = config.clone();
-    let resolved = resolve_cli_command(&config)?;
+    let resolved = resolve_cli_command(&config, resource_dir)?;
     let mut command = Command::new(&resolved.program);
     command.args(&resolved.prefix_args);
     command.args(&args);
@@ -1504,7 +1553,7 @@ async fn spawn_cli_background(
     args: Vec<String>,
 ) -> Result<Option<u32>, BridgeError> {
     let config = config.clone();
-    let resolved = resolve_cli_command(&config)?;
+    let resolved = resolve_cli_command(&config, None)?;
     let mut command = Command::new(&resolved.program);
     command.args(&resolved.prefix_args);
     command.args(&args);
@@ -2056,7 +2105,7 @@ mod tests {
             timeout_ms: None,
         };
 
-        let external = resolve_cli_command(&config).expect("external");
+        let external = resolve_cli_command(&config, None).expect("external");
         assert_eq!(external.mode, CoreMode::External);
         assert_eq!(external.program, "binliquid-custom");
 
@@ -2064,9 +2113,56 @@ mod tests {
             cli_path: None,
             ..config
         };
-        let bundled = resolve_cli_command(&bundled_config).expect("bundled");
+        let bundled = resolve_cli_command(&bundled_config, None).expect("bundled");
         assert_eq!(bundled.mode, CoreMode::Bundled);
         assert_eq!(bundled.prefix_args, vec!["-m", "binliquid"]);
+    }
+
+    #[test]
+    fn resolve_cli_command_auto_prefers_cli_path_over_resource_runtime() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let resource_dir = dir.path().join("resources");
+        let python = resource_dir.join(bundled_python_relative_path());
+        fs::create_dir_all(python.parent().expect("parent")).expect("mkdir");
+        fs::write(&python, "placeholder").expect("python");
+        let config = BridgeConfig {
+            mode: Some("auto".to_string()),
+            cli_path: Some("binliquid-custom".to_string()),
+            bundled_python_path: None,
+            profile: Some("balanced".to_string()),
+            root_dir: None,
+            env: HashMap::new(),
+            timeout_ms: None,
+        };
+
+        let resolved = resolve_cli_command(&config, Some(&resource_dir)).expect("external");
+
+        assert_eq!(resolved.mode, CoreMode::External);
+        assert_eq!(resolved.program, "binliquid-custom");
+    }
+
+    #[test]
+    fn resolve_cli_command_auto_uses_resource_runtime_when_cli_absent() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let resource_dir = dir.path().join("resources");
+        let python = resource_dir.join(bundled_python_relative_path());
+        fs::create_dir_all(python.parent().expect("parent")).expect("mkdir");
+        fs::write(&python, "placeholder").expect("python");
+        let config = BridgeConfig {
+            mode: Some("auto".to_string()),
+            cli_path: None,
+            bundled_python_path: None,
+            profile: Some("balanced".to_string()),
+            root_dir: None,
+            env: HashMap::new(),
+            timeout_ms: None,
+        };
+
+        let resolved = resolve_cli_command(&config, Some(&resource_dir)).expect("bundled");
+
+        assert_eq!(resolved.mode, CoreMode::Bundled);
+        assert_eq!(resolved.program, python.to_string_lossy());
+        assert_eq!(resolved.prefix_args, vec!["-m", "binliquid"]);
     }
 
     #[test]

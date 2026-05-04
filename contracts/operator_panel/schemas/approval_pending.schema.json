@@ -17,54 +17,8 @@
     "ApprovalTicket": {
       "additionalProperties": false,
       "properties": {
-        "version": {
-          "minimum": 0,
-          "title": "Version",
-          "type": "integer"
-        },
-        "approval_id": {
-          "title": "Approval Id",
-          "type": "string"
-        },
-        "run_id": {
-          "title": "Run Id",
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/$defs/ApprovalStatus"
-        },
-        "target_kind": {
-          "title": "Target Kind",
-          "type": "string"
-        },
-        "target_ref": {
-          "title": "Target Ref",
-          "type": "string"
-        },
         "action_hash": {
           "title": "Action Hash",
-          "type": "string"
-        },
-        "policy_hash": {
-          "title": "Policy Hash",
-          "type": "string"
-        },
-        "request_hash": {
-          "title": "Request Hash",
-          "type": "string"
-        },
-        "snapshot_hash": {
-          "title": "Snapshot Hash",
-          "type": "string"
-        },
-        "snapshot": {
-          "additionalProperties": true,
-          "title": "Snapshot",
-          "type": "object"
-        },
-        "expires_at": {
-          "format": "date-time",
-          "title": "Expires At",
           "type": "string"
         },
         "actor": {
@@ -79,107 +33,9 @@
           "default": null,
           "title": "Actor"
         },
-        "decision_reason": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Decision Reason"
-        },
-        "execution_status": {
-          "$ref": "#/$defs/ExecutionStatus",
-          "default": "not_executed"
-        },
-        "executed_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Executed At"
-        },
-        "execution_error_code": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Execution Error Code"
-        },
-        "execution_contract_hash": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Execution Contract Hash"
-        },
-        "resume_token_ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resume Token Ref"
-        },
-        "resume_claimed_job_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resume Claimed Job Id"
-        },
-        "resume_claimed_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resume Claimed At"
-        },
-        "consumed_by_job_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Consumed By Job Id"
+        "approval_id": {
+          "title": "Approval Id",
+          "type": "string"
         },
         "consumed_at": {
           "anyOf": [
@@ -194,9 +50,17 @@
           "default": null,
           "title": "Consumed At"
         },
-        "idempotency_key": {
-          "title": "Idempotency Key",
-          "type": "string"
+        "consumed_by_job_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consumed By Job Id"
         },
         "created_at": {
           "format": "date-time",
@@ -215,6 +79,142 @@
           ],
           "default": null,
           "title": "Decided At"
+        },
+        "decision_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decision Reason"
+        },
+        "executed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Executed At"
+        },
+        "execution_contract_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Contract Hash"
+        },
+        "execution_error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Error Code"
+        },
+        "execution_status": {
+          "$ref": "#/$defs/ExecutionStatus",
+          "default": "not_executed"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "request_hash": {
+          "title": "Request Hash",
+          "type": "string"
+        },
+        "resume_claimed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume Claimed At"
+        },
+        "resume_claimed_job_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume Claimed Job Id"
+        },
+        "resume_token_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume Token Ref"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "snapshot": {
+          "additionalProperties": true,
+          "title": "Snapshot",
+          "type": "object"
+        },
+        "snapshot_hash": {
+          "title": "Snapshot Hash",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ApprovalStatus"
+        },
+        "target_kind": {
+          "title": "Target Kind",
+          "type": "string"
+        },
+        "target_ref": {
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 0,
+          "title": "Version",
+          "type": "integer"
         }
       },
       "required": [

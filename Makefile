@@ -1,7 +1,12 @@
-.PHONY: bootstrap install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run ui-install ui-dev ui-build ui-tauri-build
 
-bootstrap:
+bootstrap: bootstrap-macos
+
+bootstrap-macos:
 	bash scripts/bootstrap_macos.sh
+
+bootstrap-windows:
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap_windows.ps1
 
 install:
 	uv sync --python 3.11 --extra dev

@@ -1,10 +1,88 @@
 {
   "additionalProperties": false,
   "properties": {
+    "approval_event_count": {
+      "title": "Approval Event Count",
+      "type": "integer"
+    },
+    "approvals": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Approvals",
+      "type": "array"
+    },
+    "case_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Case Id"
+    },
+    "checks": {
+      "additionalProperties": true,
+      "title": "Checks",
+      "type": "object"
+    },
+    "consistency": {
+      "additionalProperties": true,
+      "title": "Consistency",
+      "type": "object"
+    },
     "contract_version": {
       "const": "2.0",
       "title": "Contract Version",
       "type": "string"
+    },
+    "decision_count": {
+      "title": "Decision Count",
+      "type": "integer"
+    },
+    "errors": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "event_count": {
+      "title": "Event Count",
+      "type": "integer"
+    },
+    "final_output": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Final Output"
+    },
+    "handoff_event_count": {
+      "title": "Handoff Event Count",
+      "type": "integer"
+    },
+    "handoffs": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Handoffs",
+      "type": "array"
+    },
+    "integrity": {
+      "additionalProperties": true,
+      "title": "Integrity",
+      "type": "object"
     },
     "job_id": {
       "title": "Job Id",
@@ -22,6 +100,18 @@
       "default": null,
       "title": "Status"
     },
+    "task_event_count": {
+      "title": "Task Event Count",
+      "type": "integer"
+    },
+    "tasks": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Tasks",
+      "type": "array"
+    },
     "team_id": {
       "anyOf": [
         {
@@ -34,84 +124,11 @@
       "default": null,
       "title": "Team Id"
     },
-    "case_id": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Case Id"
-    },
-    "final_output": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Final Output"
-    },
-    "event_count": {
-      "title": "Event Count",
-      "type": "integer"
-    },
-    "task_event_count": {
-      "title": "Task Event Count",
-      "type": "integer"
-    },
-    "handoff_event_count": {
-      "title": "Handoff Event Count",
-      "type": "integer"
-    },
-    "approval_event_count": {
-      "title": "Approval Event Count",
-      "type": "integer"
-    },
-    "decision_count": {
-      "title": "Decision Count",
-      "type": "integer"
-    },
-    "integrity": {
-      "additionalProperties": true,
-      "title": "Integrity",
-      "type": "object"
-    },
     "trace_refs": {
       "items": {
         "type": "string"
       },
       "title": "Trace Refs",
-      "type": "array"
-    },
-    "approvals": {
-      "items": {
-        "additionalProperties": true,
-        "type": "object"
-      },
-      "title": "Approvals",
-      "type": "array"
-    },
-    "tasks": {
-      "items": {
-        "additionalProperties": true,
-        "type": "object"
-      },
-      "title": "Tasks",
-      "type": "array"
-    },
-    "handoffs": {
-      "items": {
-        "additionalProperties": true,
-        "type": "object"
-      },
-      "title": "Handoffs",
       "type": "array"
     },
     "verified": {
@@ -125,23 +142,6 @@
       ],
       "default": null,
       "title": "Verified"
-    },
-    "errors": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Errors",
-      "type": "array"
-    },
-    "checks": {
-      "additionalProperties": true,
-      "title": "Checks",
-      "type": "object"
-    },
-    "consistency": {
-      "additionalProperties": true,
-      "title": "Consistency",
-      "type": "object"
     }
   },
   "required": [

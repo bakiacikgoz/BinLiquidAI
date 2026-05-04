@@ -35,6 +35,12 @@ function Invoke-Checked {
   }
 }
 
+function Get-FileSha256 {
+  param([string]$Path)
+
+  return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $ScriptDir "..\..\..")).Path
 $AppDir = Join-Path $RepoRoot "apps\operator-panel"
@@ -98,13 +104,29 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
   throw "[runtime] runtime validation failed: $RuntimePython -m binliquid --version"
 }
 
+$UvLockPath = Join-Path $RepoRoot "uv.lock"
+$UvLockHash = if (Test-Path -LiteralPath $UvLockPath -PathType Leaf) { Get-FileSha256 -Path $UvLockPath } else { "missing" }
+$GitSha = "unknown"
+try {
+  $gitOutput = & git -C $RepoRoot rev-parse HEAD 2>$null
+  if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($gitOutput)) {
+    $GitSha = $gitOutput.Trim()
+  }
+} catch {
+  $GitSha = "unknown"
+}
+
 $manifest = @(
   "platform=windows",
   "arch=x86_64",
   "python=python/Scripts/python.exe",
   "binliquid_version=$($version.Trim())",
   "created_at_utc=$((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"))",
-  "source_wheel=$WheelPath"
+  "source_wheel=$WheelPath",
+  "source_wheel_sha256=$(Get-FileSha256 -Path $WheelPath)",
+  "python_exe_sha256=$(Get-FileSha256 -Path $RuntimePython)",
+  "uv_lock_sha256=$UvLockHash",
+  "git_sha=$GitSha"
 )
 $manifest | Set-Content -LiteralPath (Join-Path $RuntimeDir "RUNTIME_MANIFEST.txt") -Encoding utf8
 
@@ -114,7 +136,7 @@ Generated Windows runtime bundle for AegisOS Operator Panel.
 Release gate:
 1) python/Scripts/python.exe exists
 2) python/Scripts/python.exe -m binliquid --version passes
-3) RUNTIME_MANIFEST.txt records platform, arch, Python entrypoint, and source wheel
+3) RUNTIME_MANIFEST.txt records platform, arch, Python entrypoint, source wheel, hashes, and git evidence
 
 Do not ship placeholder-only runtime contents.
 "@ | Set-Content -LiteralPath (Join-Path $RuntimeDir "README.txt") -Encoding utf8

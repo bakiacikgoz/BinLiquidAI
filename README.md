@@ -19,7 +19,7 @@ It provides two layers:
 
 - Linux x64: supported for the core runtime and primary server-side validation.
 - macOS: supported for operator tooling, Tauri release proof, and the existing Safari/Finder/TextEdit computer-use pilot.
-- Windows x64: supported for core CLI, operator panel, bundled runtime, and installer smoke.
+- Windows x64: supported for core CLI, operator panel, bundled runtime, and installer smoke evidence.
 - Windows live computer-use automation is not enabled unless a Windows-specific qualification report says otherwise.
 
 ### Core Runtime
@@ -202,6 +202,8 @@ make ui-dev
 ```
 
 Packaging and release scripts live under `apps/operator-panel/scripts/`.
+Windows release hardening evidence is documented in
+`docs/WINDOWS_RELEASE_HARDENING_REPORT.md` and `docs/WINDOWS_INSTALLER_SMOKE.md`.
 
 ## Model Recipes
 
@@ -306,6 +308,8 @@ Calibration outputs:
 - sLTC gains vary by workload distribution.
 - Operator Panel is available as a v0.5 beta surface on top of BinLiquid core v0.4.1;
   notarized macOS release artifacts remain gated by Apple signing/notary credentials.
+- Windows public/enterprise release remains blocked until Authenticode signing,
+  timestamp verification, and clean VM installer smoke evidence pass.
 - Model assets are not auto-installed (`ollama pull` remains operator-driven).
 - Team runs intentionally fail-closed when governance requires approval in a blocking dependency chain.
 - `team resume` and `team pilot-check` only consume approvals that are both `executed` and not yet `consumed`.
@@ -320,6 +324,9 @@ Calibration outputs:
 
 - `docs/RELEASE_GATE_v0.5.md`
 - `docs/RELEASE_CHECKLIST.md`
+- `docs/WINDOWS_RELEASE_HARDENING_REPORT.md`
+- `docs/WINDOWS_INSTALLER_SMOKE.md`
+- `docs/RFC_COMPUTER_USE_WINDOWS_QUALIFICATION.md`
 - `docs/OPERATIONS_RUNBOOK.md`
 - `SECURITY_BASELINE.md`
 - `KEY_MANAGEMENT.md`

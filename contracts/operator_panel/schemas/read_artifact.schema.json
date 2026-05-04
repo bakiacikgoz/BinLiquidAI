@@ -1,13 +1,17 @@
 {
   "additionalProperties": false,
   "properties": {
+    "artifactName": {
+      "title": "Artifactname",
+      "type": "string"
+    },
+    "bytesRead": {
+      "title": "Bytesread",
+      "type": "integer"
+    },
     "contractVersion": {
       "const": "2.0",
       "title": "Contractversion",
-      "type": "string"
-    },
-    "artifactName": {
-      "title": "Artifactname",
       "type": "string"
     },
     "payload": {
@@ -18,10 +22,6 @@
     "truncated": {
       "title": "Truncated",
       "type": "boolean"
-    },
-    "bytesRead": {
-      "title": "Bytesread",
-      "type": "integer"
     }
   },
   "required": [

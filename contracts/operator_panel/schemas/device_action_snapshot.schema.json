@@ -1,63 +1,12 @@
 {
   "additionalProperties": false,
   "properties": {
-    "kind": {
-      "const": "device_action",
-      "title": "Kind",
-      "type": "string"
-    },
-    "target_kind": {
-      "const": "device_action",
-      "title": "Target Kind",
-      "type": "string"
-    },
     "action_hash": {
       "title": "Action Hash",
       "type": "string"
     },
-    "policy_hash": {
-      "title": "Policy Hash",
-      "type": "string"
-    },
     "action_id": {
       "title": "Action Id",
-      "type": "string"
-    },
-    "category": {
-      "title": "Category",
-      "type": "string"
-    },
-    "risk_class": {
-      "title": "Risk Class",
-      "type": "string"
-    },
-    "target_ref": {
-      "title": "Target Ref",
-      "type": "string"
-    },
-    "window_or_tab_identity": {
-      "title": "Window Or Tab Identity",
-      "type": "string"
-    },
-    "window_identity": {
-      "title": "Window Identity",
-      "type": "string"
-    },
-    "app_identity": {
-      "title": "App Identity",
-      "type": "string"
-    },
-    "selector_source": {
-      "title": "Selector Source",
-      "type": "string"
-    },
-    "selector_context": {
-      "additionalProperties": true,
-      "title": "Selector Context",
-      "type": "object"
-    },
-    "perception_fingerprint": {
-      "title": "Perception Fingerprint",
       "type": "string"
     },
     "action_plan": {
@@ -65,10 +14,61 @@
       "title": "Action Plan",
       "type": "object"
     },
+    "app_identity": {
+      "title": "App Identity",
+      "type": "string"
+    },
+    "category": {
+      "title": "Category",
+      "type": "string"
+    },
     "execution_contract": {
       "additionalProperties": true,
       "title": "Execution Contract",
       "type": "object"
+    },
+    "kind": {
+      "const": "device_action",
+      "title": "Kind",
+      "type": "string"
+    },
+    "perception_fingerprint": {
+      "title": "Perception Fingerprint",
+      "type": "string"
+    },
+    "policy_hash": {
+      "title": "Policy Hash",
+      "type": "string"
+    },
+    "risk_class": {
+      "title": "Risk Class",
+      "type": "string"
+    },
+    "selector_context": {
+      "additionalProperties": true,
+      "title": "Selector Context",
+      "type": "object"
+    },
+    "selector_source": {
+      "title": "Selector Source",
+      "type": "string"
+    },
+    "target_kind": {
+      "const": "device_action",
+      "title": "Target Kind",
+      "type": "string"
+    },
+    "target_ref": {
+      "title": "Target Ref",
+      "type": "string"
+    },
+    "window_identity": {
+      "title": "Window Identity",
+      "type": "string"
+    },
+    "window_or_tab_identity": {
+      "title": "Window Or Tab Identity",
+      "type": "string"
     }
   },
   "required": [

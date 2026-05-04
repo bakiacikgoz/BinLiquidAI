@@ -10,10 +10,6 @@
       "title": "Profile",
       "type": "string"
     },
-    "status": {
-      "title": "Status",
-      "type": "string"
-    },
     "resolved": {
       "additionalProperties": true,
       "title": "Resolved",
@@ -23,6 +19,10 @@
       "additionalProperties": true,
       "title": "Source Map",
       "type": "object"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
     }
   },
   "required": [

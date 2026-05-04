@@ -1,13 +1,13 @@
 {
   "additionalProperties": false,
   "properties": {
+    "compat_env_hmac_enabled": {
+      "title": "Compat Env Hmac Enabled",
+      "type": "boolean"
+    },
     "contract_version": {
       "const": "2.0",
       "title": "Contract Version",
-      "type": "string"
-    },
-    "provider": {
-      "title": "Provider",
       "type": "string"
     },
     "current_key_id": {
@@ -22,6 +22,22 @@
       "default": null,
       "title": "Current Key Id"
     },
+    "enterprise_compatible": {
+      "title": "Enterprise Compatible",
+      "type": "boolean"
+    },
+    "key_manifest_path": {
+      "title": "Key Manifest Path",
+      "type": "string"
+    },
+    "key_manifest_present": {
+      "title": "Key Manifest Present",
+      "type": "boolean"
+    },
+    "pkcs11_status": {
+      "title": "Pkcs11 Status",
+      "type": "string"
+    },
     "private_key_path": {
       "title": "Private Key Path",
       "type": "string"
@@ -30,8 +46,8 @@
       "title": "Private Key Present",
       "type": "boolean"
     },
-    "trusted_keys_dir": {
-      "title": "Trusted Keys Dir",
+    "provider": {
+      "title": "Provider",
       "type": "string"
     },
     "trusted_key_count": {
@@ -45,24 +61,8 @@
       "title": "Trusted Keys",
       "type": "array"
     },
-    "key_manifest_path": {
-      "title": "Key Manifest Path",
-      "type": "string"
-    },
-    "key_manifest_present": {
-      "title": "Key Manifest Present",
-      "type": "boolean"
-    },
-    "compat_env_hmac_enabled": {
-      "title": "Compat Env Hmac Enabled",
-      "type": "boolean"
-    },
-    "enterprise_compatible": {
-      "title": "Enterprise Compatible",
-      "type": "boolean"
-    },
-    "pkcs11_status": {
-      "title": "Pkcs11 Status",
+    "trusted_keys_dir": {
+      "title": "Trusted Keys Dir",
       "type": "string"
     }
   },

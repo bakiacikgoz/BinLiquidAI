@@ -3,30 +3,26 @@
     "JobRun": {
       "additionalProperties": false,
       "properties": {
-        "job_id": {
-          "title": "Job Id",
-          "type": "string"
-        },
         "case_id": {
           "title": "Case Id",
           "type": "string"
-        },
-        "team_id": {
-          "title": "Team Id",
-          "type": "string"
-        },
-        "request": {
-          "title": "Request",
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/$defs/JobStatus",
-          "default": "pending"
         },
         "created_at": {
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "final_output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Output"
         },
         "finished_at": {
           "anyOf": [
@@ -41,22 +37,26 @@
           "default": null,
           "title": "Finished At"
         },
-        "final_output": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Final Output"
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
         },
         "metrics": {
           "additionalProperties": true,
           "title": "Metrics",
           "type": "object"
+        },
+        "request": {
+          "title": "Request",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus",
+          "default": "pending"
+        },
+        "team_id": {
+          "title": "Team Id",
+          "type": "string"
         }
       },
       "required": [
@@ -82,13 +82,50 @@
     "TaskRun": {
       "additionalProperties": false,
       "properties": {
-        "task_id": {
-          "title": "Task Id",
+        "approval_state": {
+          "default": "none",
+          "title": "Approval State",
           "type": "string"
         },
-        "task_run_id": {
-          "title": "Task Run Id",
+        "assigned_agent_id": {
+          "title": "Assigned Agent Id",
           "type": "string"
+        },
+        "attempt_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Attempt Count",
+          "type": "integer"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "input_payload": {
+          "additionalProperties": true,
+          "title": "Input Payload",
+          "type": "object"
+        },
+        "memory_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Target"
         },
         "parent_task_id": {
           "anyOf": [
@@ -102,19 +139,17 @@
           "default": null,
           "title": "Parent Task Id"
         },
-        "assigned_agent_id": {
-          "title": "Assigned Agent Id",
-          "type": "string"
-        },
-        "role": {
-          "title": "Role",
-          "type": "string"
-        },
-        "task_attempt": {
-          "default": 1,
-          "minimum": 1,
-          "title": "Task Attempt",
-          "type": "integer"
+        "reason_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
         },
         "requested_scope": {
           "anyOf": [
@@ -145,54 +180,14 @@
           "default": null,
           "title": "Requested Visibility"
         },
-        "memory_target": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Memory Target"
-        },
-        "input_payload": {
-          "additionalProperties": true,
-          "title": "Input Payload",
-          "type": "object"
-        },
-        "status": {
-          "$ref": "#/$defs/TaskStatus",
-          "default": "pending"
-        },
-        "attempt_count": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Attempt Count",
-          "type": "integer"
-        },
-        "approval_state": {
-          "default": "none",
-          "title": "Approval State",
-          "type": "string"
-        },
         "result_payload": {
           "additionalProperties": true,
           "title": "Result Payload",
           "type": "object"
         },
-        "reason_code": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Reason Code"
+        "role": {
+          "title": "Role",
+          "type": "string"
         },
         "started_at": {
           "anyOf": [
@@ -207,18 +202,23 @@
           "default": null,
           "title": "Started At"
         },
-        "finished_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Finished At"
+        "status": {
+          "$ref": "#/$defs/TaskStatus",
+          "default": "pending"
+        },
+        "task_attempt": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Task Attempt",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "task_run_id": {
+          "title": "Task Run Id",
+          "type": "string"
         }
       },
       "required": [
@@ -244,21 +244,6 @@
   },
   "additionalProperties": false,
   "properties": {
-    "contract_version": {
-      "const": "2.0",
-      "title": "Contract Version",
-      "type": "string"
-    },
-    "job": {
-      "$ref": "#/$defs/JobRun"
-    },
-    "tasks": {
-      "items": {
-        "$ref": "#/$defs/TaskRun"
-      },
-      "title": "Tasks",
-      "type": "array"
-    },
     "audit_envelope_path": {
       "anyOf": [
         {
@@ -270,6 +255,24 @@
       ],
       "default": null,
       "title": "Audit Envelope Path"
+    },
+    "computer_use": {
+      "additionalProperties": true,
+      "title": "Computer Use",
+      "type": "object"
+    },
+    "continuation": {
+      "additionalProperties": true,
+      "title": "Continuation",
+      "type": "object"
+    },
+    "contract_version": {
+      "const": "2.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "job": {
+      "$ref": "#/$defs/JobRun"
     },
     "job_dir": {
       "anyOf": [
@@ -291,10 +294,12 @@
       "title": "Resume Outcomes",
       "type": "array"
     },
-    "continuation": {
-      "additionalProperties": true,
-      "title": "Continuation",
-      "type": "object"
+    "tasks": {
+      "items": {
+        "$ref": "#/$defs/TaskRun"
+      },
+      "title": "Tasks",
+      "type": "array"
     }
   },
   "required": [

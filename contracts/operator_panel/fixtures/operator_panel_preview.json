@@ -23,7 +23,9 @@
           "executionModes": ["dry_run", "step_approval", "execute"],
           "replayable": true,
           "failClosed": true,
-          "adapterStatus": "safari_applescript"
+          "adapterStatus": "safari_applescript",
+          "reasonCode": "MACOS_COMPUTER_USE_PILOT",
+          "summary": "macOS pilot preview is enabled; Windows live computer-use remains disabled until qualification."
         }
       },
       "commands": {

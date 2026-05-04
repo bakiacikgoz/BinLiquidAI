@@ -3,21 +3,21 @@
     "ApprovalDetailPayloadContract": {
       "additionalProperties": false,
       "properties": {
+        "approval_id": {
+          "title": "Approval Id",
+          "type": "string"
+        },
         "contract_version": {
           "const": "2.0",
           "title": "Contract Version",
           "type": "string"
         },
-        "approval_id": {
-          "title": "Approval Id",
+        "execution_status": {
+          "title": "Execution Status",
           "type": "string"
         },
         "status": {
           "title": "Status",
-          "type": "string"
-        },
-        "execution_status": {
-          "title": "Execution Status",
           "type": "string"
         },
         "ticket": {
@@ -73,54 +73,8 @@
     "ApprovalTicket": {
       "additionalProperties": false,
       "properties": {
-        "version": {
-          "minimum": 0,
-          "title": "Version",
-          "type": "integer"
-        },
-        "approval_id": {
-          "title": "Approval Id",
-          "type": "string"
-        },
-        "run_id": {
-          "title": "Run Id",
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/$defs/ApprovalStatus"
-        },
-        "target_kind": {
-          "title": "Target Kind",
-          "type": "string"
-        },
-        "target_ref": {
-          "title": "Target Ref",
-          "type": "string"
-        },
         "action_hash": {
           "title": "Action Hash",
-          "type": "string"
-        },
-        "policy_hash": {
-          "title": "Policy Hash",
-          "type": "string"
-        },
-        "request_hash": {
-          "title": "Request Hash",
-          "type": "string"
-        },
-        "snapshot_hash": {
-          "title": "Snapshot Hash",
-          "type": "string"
-        },
-        "snapshot": {
-          "additionalProperties": true,
-          "title": "Snapshot",
-          "type": "object"
-        },
-        "expires_at": {
-          "format": "date-time",
-          "title": "Expires At",
           "type": "string"
         },
         "actor": {
@@ -135,107 +89,9 @@
           "default": null,
           "title": "Actor"
         },
-        "decision_reason": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Decision Reason"
-        },
-        "execution_status": {
-          "$ref": "#/$defs/ExecutionStatus",
-          "default": "not_executed"
-        },
-        "executed_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Executed At"
-        },
-        "execution_error_code": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Execution Error Code"
-        },
-        "execution_contract_hash": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Execution Contract Hash"
-        },
-        "resume_token_ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resume Token Ref"
-        },
-        "resume_claimed_job_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resume Claimed Job Id"
-        },
-        "resume_claimed_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resume Claimed At"
-        },
-        "consumed_by_job_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Consumed By Job Id"
+        "approval_id": {
+          "title": "Approval Id",
+          "type": "string"
         },
         "consumed_at": {
           "anyOf": [
@@ -250,9 +106,17 @@
           "default": null,
           "title": "Consumed At"
         },
-        "idempotency_key": {
-          "title": "Idempotency Key",
-          "type": "string"
+        "consumed_by_job_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Consumed By Job Id"
         },
         "created_at": {
           "format": "date-time",
@@ -271,6 +135,142 @@
           ],
           "default": null,
           "title": "Decided At"
+        },
+        "decision_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decision Reason"
+        },
+        "executed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Executed At"
+        },
+        "execution_contract_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Contract Hash"
+        },
+        "execution_error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Error Code"
+        },
+        "execution_status": {
+          "$ref": "#/$defs/ExecutionStatus",
+          "default": "not_executed"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "request_hash": {
+          "title": "Request Hash",
+          "type": "string"
+        },
+        "resume_claimed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume Claimed At"
+        },
+        "resume_claimed_job_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume Claimed Job Id"
+        },
+        "resume_token_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume Token Ref"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "snapshot": {
+          "additionalProperties": true,
+          "title": "Snapshot",
+          "type": "object"
+        },
+        "snapshot_hash": {
+          "title": "Snapshot Hash",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ApprovalStatus"
+        },
+        "target_kind": {
+          "title": "Target Kind",
+          "type": "string"
+        },
+        "target_ref": {
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 0,
+          "title": "Version",
+          "type": "integer"
         }
       },
       "required": [
@@ -293,19 +293,6 @@
     "AuthCheckPayloadContract": {
       "additionalProperties": false,
       "properties": {
-        "contract_version": {
-          "const": "2.0",
-          "title": "Contract Version",
-          "type": "string"
-        },
-        "permission": {
-          "title": "Permission",
-          "type": "string"
-        },
-        "allowed": {
-          "title": "Allowed",
-          "type": "boolean"
-        },
         "actor": {
           "anyOf": [
             {
@@ -319,17 +306,14 @@
           "default": null,
           "title": "Actor"
         },
-        "error_code": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Error Code"
+        "allowed": {
+          "title": "Allowed",
+          "type": "boolean"
+        },
+        "contract_version": {
+          "const": "2.0",
+          "title": "Contract Version",
+          "type": "string"
         },
         "error": {
           "anyOf": [
@@ -342,6 +326,22 @@
           ],
           "default": null,
           "title": "Error"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "permission": {
+          "title": "Permission",
+          "type": "string"
         }
       },
       "required": [
@@ -355,19 +355,6 @@
     "AuthWhoAmIPayloadContract": {
       "additionalProperties": false,
       "properties": {
-        "contract_version": {
-          "const": "2.0",
-          "title": "Contract Version",
-          "type": "string"
-        },
-        "identity_enabled": {
-          "title": "Identity Enabled",
-          "type": "boolean"
-        },
-        "verified": {
-          "title": "Verified",
-          "type": "boolean"
-        },
         "actor": {
           "anyOf": [
             {
@@ -381,17 +368,10 @@
           "default": null,
           "title": "Actor"
         },
-        "error_code": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Error Code"
+        "contract_version": {
+          "const": "2.0",
+          "title": "Contract Version",
+          "type": "string"
         },
         "error": {
           "anyOf": [
@@ -404,6 +384,26 @@
           ],
           "default": null,
           "title": "Error"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "identity_enabled": {
+          "title": "Identity Enabled",
+          "type": "boolean"
+        },
+        "verified": {
+          "title": "Verified",
+          "type": "boolean"
         }
       },
       "required": [
@@ -417,37 +417,37 @@
     "BridgeHandshakeContract": {
       "additionalProperties": false,
       "properties": {
-        "uiVersion": {
-          "title": "Uiversion",
-          "type": "string"
-        },
-        "coreVersion": {
-          "title": "Coreversion",
-          "type": "string"
-        },
-        "profile": {
-          "title": "Profile",
-          "type": "string"
+        "capabilities": {
+          "$ref": "#/$defs/OperatorCapabilitiesPayload"
         },
         "contractVersion": {
           "const": "2.0",
           "title": "Contractversion",
           "type": "string"
         },
-        "capabilities": {
-          "$ref": "#/$defs/OperatorCapabilitiesPayload"
+        "coreVersion": {
+          "title": "Coreversion",
+          "type": "string"
         },
         "doctor": {
           "additionalProperties": true,
           "title": "Doctor",
           "type": "object"
         },
+        "mode": {
+          "title": "Mode",
+          "type": "string"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
         "rootDir": {
           "title": "Rootdir",
           "type": "string"
         },
-        "mode": {
-          "title": "Mode",
+        "uiVersion": {
+          "title": "Uiversion",
           "type": "string"
         }
       },
@@ -467,21 +467,13 @@
     "ComputerUseCapabilityContract": {
       "additionalProperties": false,
       "properties": {
+        "adapterStatus": {
+          "title": "Adapterstatus",
+          "type": "string"
+        },
         "enabled": {
           "title": "Enabled",
           "type": "boolean"
-        },
-        "stage": {
-          "title": "Stage",
-          "type": "string"
-        },
-        "platform": {
-          "title": "Platform",
-          "type": "string"
-        },
-        "scope": {
-          "title": "Scope",
-          "type": "string"
         },
         "executionModes": {
           "items": {
@@ -490,17 +482,49 @@
           "title": "Executionmodes",
           "type": "array"
         },
-        "replayable": {
-          "title": "Replayable",
-          "type": "boolean"
-        },
         "failClosed": {
           "title": "Failclosed",
           "type": "boolean"
         },
-        "adapterStatus": {
-          "title": "Adapterstatus",
+        "platform": {
+          "title": "Platform",
           "type": "string"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoncode"
+        },
+        "replayable": {
+          "title": "Replayable",
+          "type": "boolean"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
         }
       },
       "required": [
@@ -528,10 +552,6 @@
           "title": "Profile",
           "type": "string"
         },
-        "status": {
-          "title": "Status",
-          "type": "string"
-        },
         "resolved": {
           "additionalProperties": true,
           "title": "Resolved",
@@ -541,6 +561,10 @@
           "additionalProperties": true,
           "title": "Source Map",
           "type": "object"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
         }
       },
       "required": [
@@ -554,63 +578,12 @@
     "DeviceActionApprovalSnapshotContract": {
       "additionalProperties": false,
       "properties": {
-        "kind": {
-          "const": "device_action",
-          "title": "Kind",
-          "type": "string"
-        },
-        "target_kind": {
-          "const": "device_action",
-          "title": "Target Kind",
-          "type": "string"
-        },
         "action_hash": {
           "title": "Action Hash",
           "type": "string"
         },
-        "policy_hash": {
-          "title": "Policy Hash",
-          "type": "string"
-        },
         "action_id": {
           "title": "Action Id",
-          "type": "string"
-        },
-        "category": {
-          "title": "Category",
-          "type": "string"
-        },
-        "risk_class": {
-          "title": "Risk Class",
-          "type": "string"
-        },
-        "target_ref": {
-          "title": "Target Ref",
-          "type": "string"
-        },
-        "window_or_tab_identity": {
-          "title": "Window Or Tab Identity",
-          "type": "string"
-        },
-        "window_identity": {
-          "title": "Window Identity",
-          "type": "string"
-        },
-        "app_identity": {
-          "title": "App Identity",
-          "type": "string"
-        },
-        "selector_source": {
-          "title": "Selector Source",
-          "type": "string"
-        },
-        "selector_context": {
-          "additionalProperties": true,
-          "title": "Selector Context",
-          "type": "object"
-        },
-        "perception_fingerprint": {
-          "title": "Perception Fingerprint",
           "type": "string"
         },
         "action_plan": {
@@ -618,10 +591,61 @@
           "title": "Action Plan",
           "type": "object"
         },
+        "app_identity": {
+          "title": "App Identity",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
         "execution_contract": {
           "additionalProperties": true,
           "title": "Execution Contract",
           "type": "object"
+        },
+        "kind": {
+          "const": "device_action",
+          "title": "Kind",
+          "type": "string"
+        },
+        "perception_fingerprint": {
+          "title": "Perception Fingerprint",
+          "type": "string"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "risk_class": {
+          "title": "Risk Class",
+          "type": "string"
+        },
+        "selector_context": {
+          "additionalProperties": true,
+          "title": "Selector Context",
+          "type": "object"
+        },
+        "selector_source": {
+          "title": "Selector Source",
+          "type": "string"
+        },
+        "target_kind": {
+          "const": "device_action",
+          "title": "Target Kind",
+          "type": "string"
+        },
+        "target_ref": {
+          "title": "Target Ref",
+          "type": "string"
+        },
+        "window_identity": {
+          "title": "Window Identity",
+          "type": "string"
+        },
+        "window_or_tab_identity": {
+          "title": "Window Or Tab Identity",
+          "type": "string"
         }
       },
       "required": [
@@ -654,30 +678,26 @@
     "JobRun": {
       "additionalProperties": false,
       "properties": {
-        "job_id": {
-          "title": "Job Id",
-          "type": "string"
-        },
         "case_id": {
           "title": "Case Id",
           "type": "string"
-        },
-        "team_id": {
-          "title": "Team Id",
-          "type": "string"
-        },
-        "request": {
-          "title": "Request",
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/$defs/JobStatus",
-          "default": "pending"
         },
         "created_at": {
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "final_output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Output"
         },
         "finished_at": {
           "anyOf": [
@@ -692,22 +712,26 @@
           "default": null,
           "title": "Finished At"
         },
-        "final_output": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Final Output"
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
         },
         "metrics": {
           "additionalProperties": true,
           "title": "Metrics",
           "type": "object"
+        },
+        "request": {
+          "title": "Request",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus",
+          "default": "pending"
+        },
+        "team_id": {
+          "title": "Team Id",
+          "type": "string"
         }
       },
       "required": [
@@ -733,13 +757,13 @@
     "KeyStatusPayloadContract": {
       "additionalProperties": false,
       "properties": {
+        "compat_env_hmac_enabled": {
+          "title": "Compat Env Hmac Enabled",
+          "type": "boolean"
+        },
         "contract_version": {
           "const": "2.0",
           "title": "Contract Version",
-          "type": "string"
-        },
-        "provider": {
-          "title": "Provider",
           "type": "string"
         },
         "current_key_id": {
@@ -754,6 +778,22 @@
           "default": null,
           "title": "Current Key Id"
         },
+        "enterprise_compatible": {
+          "title": "Enterprise Compatible",
+          "type": "boolean"
+        },
+        "key_manifest_path": {
+          "title": "Key Manifest Path",
+          "type": "string"
+        },
+        "key_manifest_present": {
+          "title": "Key Manifest Present",
+          "type": "boolean"
+        },
+        "pkcs11_status": {
+          "title": "Pkcs11 Status",
+          "type": "string"
+        },
         "private_key_path": {
           "title": "Private Key Path",
           "type": "string"
@@ -762,8 +802,8 @@
           "title": "Private Key Present",
           "type": "boolean"
         },
-        "trusted_keys_dir": {
-          "title": "Trusted Keys Dir",
+        "provider": {
+          "title": "Provider",
           "type": "string"
         },
         "trusted_key_count": {
@@ -777,24 +817,8 @@
           "title": "Trusted Keys",
           "type": "array"
         },
-        "key_manifest_path": {
-          "title": "Key Manifest Path",
-          "type": "string"
-        },
-        "key_manifest_present": {
-          "title": "Key Manifest Present",
-          "type": "boolean"
-        },
-        "compat_env_hmac_enabled": {
-          "title": "Compat Env Hmac Enabled",
-          "type": "boolean"
-        },
-        "enterprise_compatible": {
-          "title": "Enterprise Compatible",
-          "type": "boolean"
-        },
-        "pkcs11_status": {
-          "title": "Pkcs11 Status",
+        "trusted_keys_dir": {
+          "title": "Trusted Keys Dir",
           "type": "string"
         }
       },
@@ -817,21 +841,27 @@
     "OperatorCapabilitiesPayload": {
       "additionalProperties": false,
       "properties": {
-        "coreVersion": {
-          "title": "Coreversion",
-          "type": "string"
+        "artifactSchema": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Artifactschema",
+          "type": "object"
+        },
+        "commands": {
+          "$ref": "#/$defs/OperatorCommandCapabilitiesContract"
         },
         "contractVersion": {
           "const": "2.0",
           "title": "Contractversion",
           "type": "string"
         },
-        "profiles": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Profiles",
-          "type": "array"
+        "coreVersion": {
+          "title": "Coreversion",
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/$defs/OperatorFeatureFlagsContract"
         },
         "previewMode": {
           "anyOf": [
@@ -845,18 +875,12 @@
           "default": null,
           "title": "Previewmode"
         },
-        "features": {
-          "$ref": "#/$defs/OperatorFeatureFlagsContract"
-        },
-        "commands": {
-          "$ref": "#/$defs/OperatorCommandCapabilitiesContract"
-        },
-        "artifactSchema": {
-          "additionalProperties": {
+        "profiles": {
+          "items": {
             "type": "string"
           },
-          "title": "Artifactschema",
-          "type": "object"
+          "title": "Profiles",
+          "type": "array"
         }
       },
       "required": [
@@ -872,14 +896,6 @@
     "OperatorCommandCapabilitiesContract": {
       "additionalProperties": false,
       "properties": {
-        "approvalPendingJson": {
-          "title": "Approvalpendingjson",
-          "type": "boolean"
-        },
-        "approvalShowJson": {
-          "title": "Approvalshowjson",
-          "type": "boolean"
-        },
         "approvalDecide": {
           "title": "Approvaldecide",
           "type": "boolean"
@@ -888,88 +904,20 @@
           "title": "Approvalexecute",
           "type": "boolean"
         },
-        "computerUseSubmit": {
-          "title": "Computerusesubmit",
+        "approvalPendingJson": {
+          "title": "Approvalpendingjson",
           "type": "boolean"
         },
-        "computerUsePause": {
-          "title": "Computerusepause",
-          "type": "boolean"
-        },
-        "computerUseResume": {
-          "title": "Computeruseresume",
-          "type": "boolean"
-        },
-        "computerUseStop": {
-          "title": "Computerusestop",
-          "type": "boolean"
-        },
-        "computerUseStateJson": {
-          "title": "Computerusestatefuljson",
-          "type": "boolean"
-        },
-        "teamSubmit": {
-          "title": "Teamsubmit",
-          "type": "boolean"
-        },
-        "teamResumeSubmit": {
-          "title": "Teamresumesubmit",
-          "type": "boolean"
-        },
-        "teamListJson": {
-          "title": "Teamlistjson",
-          "type": "boolean"
-        },
-        "teamStatusJson": {
-          "title": "Teamstatusjson",
-          "type": "boolean"
-        },
-        "teamReplayJson": {
-          "title": "Teamreplayjson",
-          "type": "boolean"
-        },
-        "configResolveJson": {
-          "title": "Configresolvejson",
-          "type": "boolean"
-        },
-        "authWhoamiJson": {
-          "title": "Authwhoamijson",
+        "approvalShowJson": {
+          "title": "Approvalshowjson",
           "type": "boolean"
         },
         "authCheckJson": {
           "title": "Authcheckjson",
           "type": "boolean"
         },
-        "securityBaselineJson": {
-          "title": "Securitybaselinejson",
-          "type": "boolean"
-        },
-        "keysStatusJson": {
-          "title": "Keysstatusjson",
-          "type": "boolean"
-        },
-        "keysVerifyJson": {
-          "title": "Keysverifyjson",
-          "type": "boolean"
-        },
-        "keysRotatePlanJson": {
-          "title": "Keysrotateplanjson",
-          "type": "boolean"
-        },
-        "supportBundleExportJson": {
-          "title": "Supportbundleexportjson",
-          "type": "boolean"
-        },
-        "metricsSnapshotJson": {
-          "title": "Metricssnapshotjson",
-          "type": "boolean"
-        },
-        "gaReadinessJson": {
-          "title": "Gareadinessjson",
-          "type": "boolean"
-        },
-        "qualificationRunJson": {
-          "title": "Qualificationrunjson",
+        "authWhoamiJson": {
+          "title": "Authwhoamijson",
           "type": "boolean"
         },
         "backupCreateJson": {
@@ -980,16 +928,92 @@
           "title": "Backupverifyjson",
           "type": "boolean"
         },
-        "restoreVerifyJson": {
-          "title": "Restoreverifyjson",
+        "computerUsePause": {
+          "title": "Computerusepause",
+          "type": "boolean"
+        },
+        "computerUseResume": {
+          "title": "Computeruseresume",
+          "type": "boolean"
+        },
+        "computerUseStateJson": {
+          "title": "Computerusestatejson",
+          "type": "boolean"
+        },
+        "computerUseStop": {
+          "title": "Computerusestop",
+          "type": "boolean"
+        },
+        "computerUseSubmit": {
+          "title": "Computerusesubmit",
+          "type": "boolean"
+        },
+        "configResolveJson": {
+          "title": "Configresolvejson",
+          "type": "boolean"
+        },
+        "gaReadinessJson": {
+          "title": "Gareadinessjson",
+          "type": "boolean"
+        },
+        "keysRotatePlanJson": {
+          "title": "Keysrotateplanjson",
+          "type": "boolean"
+        },
+        "keysStatusJson": {
+          "title": "Keysstatusjson",
+          "type": "boolean"
+        },
+        "keysVerifyJson": {
+          "title": "Keysverifyjson",
+          "type": "boolean"
+        },
+        "metricsSnapshotJson": {
+          "title": "Metricssnapshotjson",
+          "type": "boolean"
+        },
+        "migrateApplyDryRunJson": {
+          "title": "Migrateapplydryrunjson",
           "type": "boolean"
         },
         "migratePlanJson": {
           "title": "Migrateplanjson",
           "type": "boolean"
         },
-        "migrateApplyDryRunJson": {
-          "title": "Migrateapplydryrunjson",
+        "qualificationRunJson": {
+          "title": "Qualificationrunjson",
+          "type": "boolean"
+        },
+        "restoreVerifyJson": {
+          "title": "Restoreverifyjson",
+          "type": "boolean"
+        },
+        "securityBaselineJson": {
+          "title": "Securitybaselinejson",
+          "type": "boolean"
+        },
+        "supportBundleExportJson": {
+          "title": "Supportbundleexportjson",
+          "type": "boolean"
+        },
+        "teamListJson": {
+          "title": "Teamlistjson",
+          "type": "boolean"
+        },
+        "teamReplayJson": {
+          "title": "Teamreplayjson",
+          "type": "boolean"
+        },
+        "teamResumeSubmit": {
+          "title": "Teamresumesubmit",
+          "type": "boolean"
+        },
+        "teamStatusJson": {
+          "title": "Teamstatusjson",
+          "type": "boolean"
+        },
+        "teamSubmit": {
+          "title": "Teamsubmit",
           "type": "boolean"
         }
       },
@@ -1031,16 +1055,16 @@
     "OperatorFeatureFlagsContract": {
       "additionalProperties": false,
       "properties": {
-        "operatorWorkflowParity": {
-          "title": "Operatorworkflowparity",
-          "type": "boolean"
+        "computerUsePilot": {
+          "$ref": "#/$defs/ComputerUseCapabilityContract"
         },
         "enterpriseOpsParity": {
           "title": "Enterpriseopsparity",
           "type": "boolean"
         },
-        "computerUsePilot": {
-          "$ref": "#/$defs/ComputerUseCapabilityContract"
+        "operatorWorkflowParity": {
+          "title": "Operatorworkflowparity",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1054,12 +1078,9 @@
     "PreviewFixtureArtifactsContract": {
       "additionalProperties": false,
       "properties": {
-        "status": {
-          "$ref": "#/$defs/TeamStatusArtifactContract"
-        },
-        "tasks": {
+        "auditEnvelope": {
           "additionalProperties": true,
-          "title": "Tasks",
+          "title": "Auditenvelope",
           "type": "object"
         },
         "handoffs": {
@@ -1067,9 +1088,12 @@
           "title": "Handoffs",
           "type": "object"
         },
-        "auditEnvelope": {
+        "status": {
+          "$ref": "#/$defs/TeamStatusArtifactContract"
+        },
+        "tasks": {
           "additionalProperties": true,
-          "title": "Auditenvelope",
+          "title": "Tasks",
           "type": "object"
         }
       },
@@ -1082,36 +1106,6 @@
     "PreviewFixtureOperationsContract": {
       "additionalProperties": false,
       "properties": {
-        "identity": {
-          "$ref": "#/$defs/AuthWhoAmIPayloadContract"
-        },
-        "permissionCheck": {
-          "$ref": "#/$defs/AuthCheckPayloadContract"
-        },
-        "security": {
-          "$ref": "#/$defs/SecurityBaselinePayloadContract"
-        },
-        "keys": {
-          "$ref": "#/$defs/KeyStatusPayloadContract"
-        },
-        "support": {
-          "$ref": "#/$defs/SupportBundleExportPayloadContract"
-        },
-        "metrics": {
-          "additionalProperties": true,
-          "title": "Metrics",
-          "type": "object"
-        },
-        "gaReadiness": {
-          "additionalProperties": true,
-          "title": "Gareadiness",
-          "type": "object"
-        },
-        "qualification": {
-          "additionalProperties": true,
-          "title": "Qualification",
-          "type": "object"
-        },
         "backupCreate": {
           "additionalProperties": true,
           "title": "Backupcreate",
@@ -1122,9 +1116,25 @@
           "title": "Backupverify",
           "type": "object"
         },
-        "restoreVerify": {
+        "gaReadiness": {
           "additionalProperties": true,
-          "title": "Restoreverify",
+          "title": "Gareadiness",
+          "type": "object"
+        },
+        "identity": {
+          "$ref": "#/$defs/AuthWhoAmIPayloadContract"
+        },
+        "keys": {
+          "$ref": "#/$defs/KeyStatusPayloadContract"
+        },
+        "metrics": {
+          "additionalProperties": true,
+          "title": "Metrics",
+          "type": "object"
+        },
+        "migrateApplyDryRun": {
+          "additionalProperties": true,
+          "title": "Migrateapplydryrun",
           "type": "object"
         },
         "migratePlan": {
@@ -1132,10 +1142,24 @@
           "title": "Migrateplan",
           "type": "object"
         },
-        "migrateApplyDryRun": {
+        "permissionCheck": {
+          "$ref": "#/$defs/AuthCheckPayloadContract"
+        },
+        "qualification": {
           "additionalProperties": true,
-          "title": "Migrateapplydryrun",
+          "title": "Qualification",
           "type": "object"
+        },
+        "restoreVerify": {
+          "additionalProperties": true,
+          "title": "Restoreverify",
+          "type": "object"
+        },
+        "security": {
+          "$ref": "#/$defs/SecurityBaselinePayloadContract"
+        },
+        "support": {
+          "$ref": "#/$defs/SupportBundleExportPayloadContract"
         }
       },
       "required": [
@@ -1151,10 +1175,88 @@
     "RunReplayPayloadContract": {
       "additionalProperties": false,
       "properties": {
+        "approval_event_count": {
+          "title": "Approval Event Count",
+          "type": "integer"
+        },
+        "approvals": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Approvals",
+          "type": "array"
+        },
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "checks": {
+          "additionalProperties": true,
+          "title": "Checks",
+          "type": "object"
+        },
+        "consistency": {
+          "additionalProperties": true,
+          "title": "Consistency",
+          "type": "object"
+        },
         "contract_version": {
           "const": "2.0",
           "title": "Contract Version",
           "type": "string"
+        },
+        "decision_count": {
+          "title": "Decision Count",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "event_count": {
+          "title": "Event Count",
+          "type": "integer"
+        },
+        "final_output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Output"
+        },
+        "handoff_event_count": {
+          "title": "Handoff Event Count",
+          "type": "integer"
+        },
+        "handoffs": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Handoffs",
+          "type": "array"
+        },
+        "integrity": {
+          "additionalProperties": true,
+          "title": "Integrity",
+          "type": "object"
         },
         "job_id": {
           "title": "Job Id",
@@ -1172,6 +1274,18 @@
           "default": null,
           "title": "Status"
         },
+        "task_event_count": {
+          "title": "Task Event Count",
+          "type": "integer"
+        },
+        "tasks": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Tasks",
+          "type": "array"
+        },
         "team_id": {
           "anyOf": [
             {
@@ -1184,84 +1298,11 @@
           "default": null,
           "title": "Team Id"
         },
-        "case_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Case Id"
-        },
-        "final_output": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Final Output"
-        },
-        "event_count": {
-          "title": "Event Count",
-          "type": "integer"
-        },
-        "task_event_count": {
-          "title": "Task Event Count",
-          "type": "integer"
-        },
-        "handoff_event_count": {
-          "title": "Handoff Event Count",
-          "type": "integer"
-        },
-        "approval_event_count": {
-          "title": "Approval Event Count",
-          "type": "integer"
-        },
-        "decision_count": {
-          "title": "Decision Count",
-          "type": "integer"
-        },
-        "integrity": {
-          "additionalProperties": true,
-          "title": "Integrity",
-          "type": "object"
-        },
         "trace_refs": {
           "items": {
             "type": "string"
           },
           "title": "Trace Refs",
-          "type": "array"
-        },
-        "approvals": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Approvals",
-          "type": "array"
-        },
-        "tasks": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Tasks",
-          "type": "array"
-        },
-        "handoffs": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Handoffs",
           "type": "array"
         },
         "verified": {
@@ -1275,23 +1316,6 @@
           ],
           "default": null,
           "title": "Verified"
-        },
-        "errors": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Errors",
-          "type": "array"
-        },
-        "checks": {
-          "additionalProperties": true,
-          "title": "Checks",
-          "type": "object"
-        },
-        "consistency": {
-          "additionalProperties": true,
-          "title": "Consistency",
-          "type": "object"
         }
       },
       "required": [
@@ -1309,24 +1333,12 @@
     "RunSummaryItemContract": {
       "additionalProperties": false,
       "properties": {
-        "job_id": {
-          "title": "Job Id",
+        "audit_envelope_path": {
+          "title": "Audit Envelope Path",
           "type": "string"
         },
         "case_id": {
           "title": "Case Id",
-          "type": "string"
-        },
-        "team_id": {
-          "title": "Team Id",
-          "type": "string"
-        },
-        "status": {
-          "title": "Status",
-          "type": "string"
-        },
-        "request": {
-          "title": "Request",
           "type": "string"
         },
         "created_at": {
@@ -1337,12 +1349,24 @@
           "title": "Finished At",
           "type": "string"
         },
-        "audit_envelope_path": {
-          "title": "Audit Envelope Path",
-          "type": "string"
-        },
         "job_dir": {
           "title": "Job Dir",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "request": {
+          "title": "Request",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "team_id": {
+          "title": "Team Id",
           "type": "string"
         }
       },
@@ -1368,24 +1392,9 @@
           "title": "Contract Version",
           "type": "string"
         },
-        "status": {
-          "title": "Status",
-          "type": "string"
-        },
-        "root_dir": {
-          "title": "Root Dir",
-          "type": "string"
-        },
         "count": {
           "title": "Count",
           "type": "integer"
-        },
-        "items": {
-          "items": {
-            "$ref": "#/$defs/RunSummaryItemContract"
-          },
-          "title": "Items",
-          "type": "array"
         },
         "errors": {
           "items": {
@@ -1396,6 +1405,21 @@
           },
           "title": "Errors",
           "type": "array"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/RunSummaryItemContract"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "root_dir": {
+          "title": "Root Dir",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
         }
       },
       "required": [
@@ -1410,23 +1434,15 @@
     "SecurityBaselinePayloadContract": {
       "additionalProperties": false,
       "properties": {
-        "contract_version": {
-          "const": "2.0",
-          "title": "Contract Version",
-          "type": "string"
-        },
-        "profile": {
-          "title": "Profile",
-          "type": "string"
-        },
-        "overall_status": {
-          "title": "Overall Status",
-          "type": "string"
-        },
         "checks": {
           "additionalProperties": true,
           "title": "Checks",
           "type": "object"
+        },
+        "contract_version": {
+          "const": "2.0",
+          "title": "Contract Version",
+          "type": "string"
         },
         "errors": {
           "items": {
@@ -1434,20 +1450,6 @@
           },
           "title": "Errors",
           "type": "array"
-        },
-        "warnings": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Warnings",
-          "type": "array"
-        },
-        "roots": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "title": "Roots",
-          "type": "object"
         },
         "key_status": {
           "additionalProperties": true,
@@ -1459,6 +1461,28 @@
             "type": "string"
           },
           "title": "Misconfiguration Risks",
+          "type": "array"
+        },
+        "overall_status": {
+          "title": "Overall Status",
+          "type": "string"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "roots": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Roots",
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
           "type": "array"
         }
       },
@@ -1482,14 +1506,6 @@
           "title": "Jobid",
           "type": "string"
         },
-        "profile": {
-          "title": "Profile",
-          "type": "string"
-        },
-        "rootDir": {
-          "title": "Rootdir",
-          "type": "string"
-        },
         "processId": {
           "anyOf": [
             {
@@ -1500,6 +1516,14 @@
             }
           ],
           "title": "Processid"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "rootDir": {
+          "title": "Rootdir",
+          "type": "string"
         }
       },
       "required": [
@@ -1515,26 +1539,26 @@
     "SupportBundleExportPayloadContract": {
       "additionalProperties": false,
       "properties": {
-        "contract_version": {
-          "const": "2.0",
-          "title": "Contract Version",
+        "archive_path": {
+          "title": "Archive Path",
           "type": "string"
         },
         "bundle_dir": {
           "title": "Bundle Dir",
           "type": "string"
         },
-        "archive_path": {
-          "title": "Archive Path",
-          "type": "string"
-        },
-        "manifest_path": {
-          "title": "Manifest Path",
+        "contract_version": {
+          "const": "2.0",
+          "title": "Contract Version",
           "type": "string"
         },
         "file_count": {
           "title": "File Count",
           "type": "integer"
+        },
+        "manifest_path": {
+          "title": "Manifest Path",
+          "type": "string"
         }
       },
       "required": [
@@ -1550,6 +1574,10 @@
     "TailEventsPayloadContract": {
       "additionalProperties": false,
       "properties": {
+        "badLineCount": {
+          "title": "Badlinecount",
+          "type": "integer"
+        },
         "contractVersion": {
           "const": "2.0",
           "title": "Contractversion",
@@ -1573,10 +1601,6 @@
         "truncated": {
           "title": "Truncated",
           "type": "boolean"
-        },
-        "badLineCount": {
-          "title": "Badlinecount",
-          "type": "integer"
         }
       },
       "required": [
@@ -1592,13 +1616,50 @@
     "TaskRun": {
       "additionalProperties": false,
       "properties": {
-        "task_id": {
-          "title": "Task Id",
+        "approval_state": {
+          "default": "none",
+          "title": "Approval State",
           "type": "string"
         },
-        "task_run_id": {
-          "title": "Task Run Id",
+        "assigned_agent_id": {
+          "title": "Assigned Agent Id",
           "type": "string"
+        },
+        "attempt_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Attempt Count",
+          "type": "integer"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "input_payload": {
+          "additionalProperties": true,
+          "title": "Input Payload",
+          "type": "object"
+        },
+        "memory_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Target"
         },
         "parent_task_id": {
           "anyOf": [
@@ -1612,19 +1673,17 @@
           "default": null,
           "title": "Parent Task Id"
         },
-        "assigned_agent_id": {
-          "title": "Assigned Agent Id",
-          "type": "string"
-        },
-        "role": {
-          "title": "Role",
-          "type": "string"
-        },
-        "task_attempt": {
-          "default": 1,
-          "minimum": 1,
-          "title": "Task Attempt",
-          "type": "integer"
+        "reason_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
         },
         "requested_scope": {
           "anyOf": [
@@ -1655,54 +1714,14 @@
           "default": null,
           "title": "Requested Visibility"
         },
-        "memory_target": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Memory Target"
-        },
-        "input_payload": {
-          "additionalProperties": true,
-          "title": "Input Payload",
-          "type": "object"
-        },
-        "status": {
-          "$ref": "#/$defs/TaskStatus",
-          "default": "pending"
-        },
-        "attempt_count": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Attempt Count",
-          "type": "integer"
-        },
-        "approval_state": {
-          "default": "none",
-          "title": "Approval State",
-          "type": "string"
-        },
         "result_payload": {
           "additionalProperties": true,
           "title": "Result Payload",
           "type": "object"
         },
-        "reason_code": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Reason Code"
+        "role": {
+          "title": "Role",
+          "type": "string"
         },
         "started_at": {
           "anyOf": [
@@ -1717,18 +1736,23 @@
           "default": null,
           "title": "Started At"
         },
-        "finished_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Finished At"
+        "status": {
+          "$ref": "#/$defs/TaskStatus",
+          "default": "pending"
+        },
+        "task_attempt": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Task Attempt",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "task_run_id": {
+          "title": "Task Run Id",
+          "type": "string"
         }
       },
       "required": [
@@ -1754,79 +1778,6 @@
     "TeamEvent": {
       "additionalProperties": false,
       "properties": {
-        "schema_version": {
-          "default": "3",
-          "title": "Schema Version",
-          "type": "string"
-        },
-        "event": {
-          "title": "Event",
-          "type": "string"
-        },
-        "event_id": {
-          "title": "Event Id",
-          "type": "string"
-        },
-        "event_seq": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Event Seq",
-          "type": "integer"
-        },
-        "timestamp": {
-          "format": "date-time",
-          "title": "Timestamp",
-          "type": "string"
-        },
-        "team_id": {
-          "title": "Team Id",
-          "type": "string"
-        },
-        "case_id": {
-          "title": "Case Id",
-          "type": "string"
-        },
-        "job_id": {
-          "title": "Job Id",
-          "type": "string"
-        },
-        "task_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Task Id"
-        },
-        "task_run_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Task Run Id"
-        },
-        "task_attempt": {
-          "anyOf": [
-            {
-              "minimum": 1,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Task Attempt"
-        },
         "agent_id": {
           "anyOf": [
             {
@@ -1839,78 +1790,6 @@
           "default": null,
           "title": "Agent Id"
         },
-        "role": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Role"
-        },
-        "phase": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Phase"
-        },
-        "status_before": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Status Before"
-        },
-        "status_after": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Status After"
-        },
-        "trace_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Trace Id"
-        },
-        "causal_ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Causal Ref"
-        },
         "approval_id": {
           "anyOf": [
             {
@@ -1922,18 +1801,6 @@
           ],
           "default": null,
           "title": "Approval Id"
-        },
-        "payload_hash": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Payload Hash"
         },
         "branch_id": {
           "anyOf": [
@@ -1959,7 +1826,11 @@
           "default": null,
           "title": "Branch Parent"
         },
-        "snapshot_hash": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "causal_ref": {
           "anyOf": [
             {
               "type": "string"
@@ -1969,43 +1840,7 @@
             }
           ],
           "default": null,
-          "title": "Snapshot Hash"
-        },
-        "resolved_memory_fingerprint": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resolved Memory Fingerprint"
-        },
-        "memory_target": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Memory Target"
-        },
-        "expected_state_version": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Expected State Version"
+          "title": "Causal Ref"
         },
         "committed_state_version": {
           "anyOf": [
@@ -2018,18 +1853,6 @@
           ],
           "default": null,
           "title": "Committed State Version"
-        },
-        "resume_token_ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Resume Token Ref"
         },
         "conflict_detected": {
           "anyOf": [
@@ -2055,6 +1878,37 @@
           "default": null,
           "title": "Conflict Resolution"
         },
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "event": {
+          "title": "Event",
+          "type": "string"
+        },
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event_seq": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Event Seq",
+          "type": "integer"
+        },
+        "expected_state_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State Version"
+        },
         "fallback_mode_applied": {
           "anyOf": [
             {
@@ -2066,6 +1920,87 @@
           ],
           "default": null,
           "title": "Fallback Mode Applied"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "memory_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Target"
+        },
+        "payload_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Payload Hash"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
+        "resolved_memory_fingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolved Memory Fingerprint"
+        },
+        "resume_token_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume Token Ref"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "schema_version": {
+          "default": "3",
+          "title": "Schema Version",
+          "type": "string"
         },
         "serialized_due_to_policy": {
           "anyOf": [
@@ -2079,10 +2014,99 @@
           "default": null,
           "title": "Serialized Due To Policy"
         },
-        "data": {
-          "additionalProperties": true,
-          "title": "Data",
-          "type": "object"
+        "snapshot_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Hash"
+        },
+        "status_after": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status After"
+        },
+        "status_before": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status Before"
+        },
+        "task_attempt": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Attempt"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Id"
+        },
+        "task_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Run Id"
+        },
+        "team_id": {
+          "title": "Team Id",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "trace_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trace Id"
         }
       },
       "required": [
@@ -2097,21 +2121,6 @@
     "TeamStatusArtifactContract": {
       "additionalProperties": false,
       "properties": {
-        "contract_version": {
-          "const": "2.0",
-          "title": "Contract Version",
-          "type": "string"
-        },
-        "job": {
-          "$ref": "#/$defs/JobRun"
-        },
-        "tasks": {
-          "items": {
-            "$ref": "#/$defs/TaskRun"
-          },
-          "title": "Tasks",
-          "type": "array"
-        },
         "audit_envelope_path": {
           "anyOf": [
             {
@@ -2123,6 +2132,24 @@
           ],
           "default": null,
           "title": "Audit Envelope Path"
+        },
+        "computer_use": {
+          "additionalProperties": true,
+          "title": "Computer Use",
+          "type": "object"
+        },
+        "continuation": {
+          "additionalProperties": true,
+          "title": "Continuation",
+          "type": "object"
+        },
+        "contract_version": {
+          "const": "2.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "job": {
+          "$ref": "#/$defs/JobRun"
         },
         "job_dir": {
           "anyOf": [
@@ -2144,10 +2171,12 @@
           "title": "Resume Outcomes",
           "type": "array"
         },
-        "continuation": {
-          "additionalProperties": true,
-          "title": "Continuation",
-          "type": "object"
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/TaskRun"
+          },
+          "title": "Tasks",
+          "type": "array"
         }
       },
       "required": [
@@ -2160,25 +2189,31 @@
   },
   "additionalProperties": false,
   "properties": {
+    "approvalDetail": {
+      "$ref": "#/$defs/ApprovalDetailPayloadContract"
+    },
+    "approvalPending": {
+      "$ref": "#/$defs/ApprovalPendingPayloadContract"
+    },
+    "configResolve": {
+      "$ref": "#/$defs/ConfigResolvePayloadContract"
+    },
     "contractVersion": {
       "const": "2.0",
       "title": "Contractversion",
       "type": "string"
     },
+    "deviceActionSnapshot": {
+      "$ref": "#/$defs/DeviceActionApprovalSnapshotContract"
+    },
     "handshake": {
       "$ref": "#/$defs/BridgeHandshakeContract"
     },
-    "submitTeamRun": {
-      "$ref": "#/$defs/SpawnedRunPayloadContract"
+    "operations": {
+      "$ref": "#/$defs/PreviewFixtureOperationsContract"
     },
-    "approvalPending": {
-      "$ref": "#/$defs/ApprovalPendingPayloadContract"
-    },
-    "approvalDetail": {
-      "$ref": "#/$defs/ApprovalDetailPayloadContract"
-    },
-    "runSummary": {
-      "$ref": "#/$defs/RunSummaryPayloadContract"
+    "readArtifact": {
+      "$ref": "#/$defs/PreviewFixtureArtifactsContract"
     },
     "runDetail": {
       "$ref": "#/$defs/TeamStatusArtifactContract"
@@ -2186,20 +2221,14 @@
     "runReplay": {
       "$ref": "#/$defs/RunReplayPayloadContract"
     },
-    "readArtifact": {
-      "$ref": "#/$defs/PreviewFixtureArtifactsContract"
+    "runSummary": {
+      "$ref": "#/$defs/RunSummaryPayloadContract"
+    },
+    "submitTeamRun": {
+      "$ref": "#/$defs/SpawnedRunPayloadContract"
     },
     "tailEvents": {
       "$ref": "#/$defs/TailEventsPayloadContract"
-    },
-    "configResolve": {
-      "$ref": "#/$defs/ConfigResolvePayloadContract"
-    },
-    "operations": {
-      "$ref": "#/$defs/PreviewFixtureOperationsContract"
-    },
-    "deviceActionSnapshot": {
-      "$ref": "#/$defs/DeviceActionApprovalSnapshotContract"
     }
   },
   "required": [

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import jsonschema
 from typer.testing import CliRunner
 
 from binliquid.cli import app
@@ -178,6 +179,16 @@ def test_operator_capabilities_payload_matches_contract() -> None:
     result = runner.invoke(app, ["operator", "capabilities", "--json"])
     assert result.exit_code == 0
     payload = OperatorCapabilitiesPayload.model_validate_json(result.stdout)
+    schema_path = (
+        Path(__file__).resolve().parents[1]
+        / "contracts"
+        / "operator_panel"
+        / "schemas"
+        / "operator_capabilities.schema.json"
+    )
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    jsonschema.Draft202012Validator(schema).validate(json.loads(result.stdout))
+
     assert payload.contract_version == "2.0"
     if current_platform().label == "windows":
         assert payload.features.computer_use_pilot.enabled is False
