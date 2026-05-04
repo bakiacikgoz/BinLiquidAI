@@ -77,6 +77,8 @@ Required outcomes:
 No-Ship if any of the following are true:
 - shell passthrough exists in bridge command execution
 - path traversal or symlink escape is possible in artifact access
+- Windows child processes fail because required system env variables are removed
+- Windows live computer-use automation is advertised without a Windows qualification report
 - default UI view exposes raw sensitive payloads
 - parse failures are silent in UI/bridge
 
@@ -114,7 +116,23 @@ Quarantine gate:
 
 If notarization fails, release is blocked (beta included).
 
-## 7) Updater / Telemetry Defaults
+## 7) Windows Signing + Installer Gates
+
+Windows release artifacts must pass:
+- `windows-2022` CI
+- core lint/test
+- operator panel test/lint/build
+- Rust bridge tests
+- bundled runtime manifest verification
+- Tauri NSIS build
+- clean Windows VM install/open/handshake smoke
+
+Unsigned NSIS artifacts are internal CI smoke artifacts only. Public or
+enterprise Windows release artifacts require Authenticode signing and timestamp
+proof. If signing credentials are missing, the Windows release remains RC with
+an external credential blocker.
+
+## 8) Updater / Telemetry Defaults
 
 - updater defaults to `off`
 - remote telemetry defaults to `off`

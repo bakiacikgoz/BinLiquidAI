@@ -15,6 +15,13 @@ It provides two layers:
 
 ## Current Status
 
+### Supported Baseline
+
+- Linux x64: supported for the core runtime and primary server-side validation.
+- macOS: supported for operator tooling, Tauri release proof, and the existing Safari/Finder/TextEdit computer-use pilot.
+- Windows x64: supported for core CLI, operator panel, bundled runtime, and installer smoke.
+- Windows live computer-use automation is not enabled unless a Windows-specific qualification report says otherwise.
+
 ### Core Runtime
 
 The core runtime is the most mature part of the system and should be considered the production-grade foundation of the platform.
@@ -74,7 +81,7 @@ This slice formalizes the deployment contract. It does not replace qualification
 | Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
 | Governance v0.4 (policy + approval + audit) | working | fail-closed + async approvals |
 | Team Runtime v0.4 (DAG + bounded concurrency + handoff/memory governance) | pilot-hardened under restricted profile | bounded-concurrency safeguards, replay verification, and pilot usage only behind `team pilot-check` plus target-environment live-provider rehearsal |
-| Desktop UI (Tauri operator panel) | beta | `apps/operator-panel` (macOS-first) |
+| Desktop UI (Tauri operator panel) | beta | `apps/operator-panel`; macOS release proof and Windows x64 smoke path |
 
 ## First 5 Minutes
 

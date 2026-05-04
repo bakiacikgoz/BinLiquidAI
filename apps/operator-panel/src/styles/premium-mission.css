@@ -1,5 +1,5 @@
 .mission-control-view {
-  max-width: 910px;
+  max-width: 1120px;
   margin: 0 auto;
 }
 
@@ -512,7 +512,7 @@
 
 @media (max-width: 1480px) {
   .mission-control-view {
-    max-width: 900px;
+    max-width: 1080px;
   }
 
   .mission-middle-grid,

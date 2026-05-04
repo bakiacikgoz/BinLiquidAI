@@ -9,6 +9,7 @@ It does not claim that evidence already exists.
 
 - `Linux Standard`: primary GA runtime reference
 - `macOS Operator`: secondary operator tooling surface
+- `Windows Standard`: core runtime, operator panel, bundled runtime, and NSIS installer smoke
 
 ## Workload Families
 
@@ -33,6 +34,11 @@ It does not claim that evidence already exists.
 - no unclassified provider/runtime failures
 - sqlite integrity passes before and after soak
 - artifact growth remains inside retention forecast
+- Windows Standard additionally requires green `windows-2022` CI, bundled runtime
+  manifest verification, external and bundled bridge handshake proof, clean VM
+  install/open/handshake smoke, no shell passthrough, no path traversal or symlink
+  escape, no unsupported computer-use overclaim, and signed release gate before
+  any public or enterprise Windows release claim.
 
 ## Required Report Outputs
 

@@ -181,6 +181,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
   const [activeView, setActiveView] = useState<ViewKey>('workspace');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [runTab, setRunTab] = useState<RunTabKey>('overview');
   const [operationTab, setOperationTab] = useState<OperationTabKey>('identity');
   const [automationMode, setAutomationMode] = useState<AutomationMode>('assisted');
@@ -946,6 +947,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     <AppShell
       activeView={activeView as ShellViewKey}
       mobileNavOpen={mobileNavOpen}
+      sidebarCollapsed={sidebarCollapsed}
       operatorId={settings.operatorId.trim()}
       previewMode={previewMode}
       operatorWarning={!operatorIdValid ? t.setOperatorId : ''}
@@ -955,6 +957,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       toasts={toasts}
       onNavigate={(view) => setActiveView(view)}
       onToggleNav={() => setMobileNavOpen((value) => !value)}
+      onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
       onCloseNav={() => setMobileNavOpen(false)}
       onRefresh={() => void refreshCore()}
       rightRail={

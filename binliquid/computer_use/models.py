@@ -308,6 +308,9 @@ class ReadinessReport(BaseModel):
     checks: list[ReadinessCheck] = Field(default_factory=list)
     summary: str
     checked_at: str
+    platform: str = "unknown"
+    supported_surfaces: list[str] = Field(default_factory=list)
+    computer_use: dict[str, Any] = Field(default_factory=dict)
 
 
 class ComputerUseDoctorReport(BaseModel):

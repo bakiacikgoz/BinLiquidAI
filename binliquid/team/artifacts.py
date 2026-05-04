@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.enterprise.signing import build_integrity, canonical_payload_hash
@@ -55,13 +57,13 @@ def write_event(paths: TeamArtifactPaths, event: TeamEvent) -> None:
 
 
 def write_status(paths: TeamArtifactPaths, payload: dict[str, Any]) -> None:
-    paths.status_path.write_text(
+    _atomic_write_text(
+        paths.status_path,
         json.dumps(
             {"contract_version": OPERATOR_PANEL_CONTRACT_VERSION, **payload},
             indent=2,
             ensure_ascii=False,
         ),
-        encoding="utf-8",
     )
 
 
@@ -281,6 +283,26 @@ def _read_prev_chain_hash(root_dir: Path) -> str | None:
 
 def _write_chain_hash(root_dir: Path, value: str) -> None:
     _chain_head_path(root_dir).write_text(value, encoding="utf-8")
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    tmp_path.write_text(text, encoding="utf-8")
+    try:
+        for attempt in range(20):
+            try:
+                tmp_path.replace(path)
+                return
+            except PermissionError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.05)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 

@@ -1,0 +1,82 @@
+name: Operator Panel Release Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'operator-panel-v*'
+
+jobs:
+  release-windows:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    environment: release-windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        shell: pwsh
+        run: python -m pip install uv
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install UI deps
+        shell: pwsh
+        run: pnpm install --dir apps/operator-panel
+
+      - name: Build bundled runtime
+        shell: pwsh
+        run: pwsh apps/operator-panel/scripts/build_bundled_runtime_windows.ps1 -Arch x64
+
+      - name: Build unsigned NSIS artifact
+        shell: pwsh
+        run: |
+          pnpm --dir apps/operator-panel build
+          pnpm --dir apps/operator-panel exec tauri build --config src-tauri/tauri.windows.conf.json --bundles nsis
+
+      - name: Evaluate signing gate
+        id: signing
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_CERT_PFX_B64: ${{ secrets.WINDOWS_SIGNING_CERT_PFX_B64 }}
+          WINDOWS_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PFX_B64) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PASSWORD)) {
+            "status=blocked_external_credentials" | Out-File artifacts/windows-release-status.txt
+            "reason=missing_windows_signing_secret" | Out-File artifacts/windows-release-status.txt -Append
+            "signed=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          "status=signing_config_present" | Out-File artifacts/windows-release-status.txt
+          "signed=false" | Out-File artifacts/windows-release-status.txt -Append
+          "note=signing implementation must run before public release upload" |
+            Out-File artifacts/windows-release-status.txt -Append
+          "signed=false" >> $env:GITHUB_OUTPUT
+
+      - name: Upload unsigned CI smoke artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-panel-windows-unsigned-ci-smoke
+          path: |
+            apps/operator-panel/src-tauri/target/release/bundle/nsis/**
+            artifacts/windows-release-status.txt

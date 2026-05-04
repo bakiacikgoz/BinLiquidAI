@@ -17,6 +17,7 @@ from binliquid.contracts import (
 )
 from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.runtime.config import RuntimeConfig
+from binliquid.runtime.platform import current_platform
 from binliquid.schemas.models import OrchestratorResult
 
 runner = CliRunner()
@@ -178,7 +179,15 @@ def test_operator_capabilities_payload_matches_contract() -> None:
     assert result.exit_code == 0
     payload = OperatorCapabilitiesPayload.model_validate_json(result.stdout)
     assert payload.contract_version == "2.0"
-    assert payload.features.computer_use_pilot.adapter_status == "safari_applescript"
+    if current_platform().label == "windows":
+        assert payload.features.computer_use_pilot.enabled is False
+        assert (
+            payload.features.computer_use_pilot.reason_code
+            == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+        )
+        assert payload.features.computer_use_pilot.adapter_status == "windows_scaffold"
+    else:
+        assert payload.features.computer_use_pilot.adapter_status == "safari_applescript"
 
 
 def test_team_runtime_payloads_match_frozen_contracts(monkeypatch, tmp_path: Path) -> None:

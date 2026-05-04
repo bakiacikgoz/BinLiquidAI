@@ -18,18 +18,22 @@ export type SidebarGroup = {
 export function Sidebar({
   activeView,
   open,
+  collapsed,
   operatorId,
   pendingApprovalCount,
   warningCount,
   onClose,
+  onToggleCollapse,
   onNavigate,
 }: {
   activeView: ShellViewKey;
   open: boolean;
+  collapsed: boolean;
   operatorId: string;
   pendingApprovalCount: number;
   warningCount: number;
   onClose: () => void;
+  onToggleCollapse: () => void;
   onNavigate: (view: ShellViewKey) => void;
 }) {
   const groups: SidebarGroup[] = [
@@ -71,8 +75,17 @@ export function Sidebar({
     },
   ];
 
+  const sidebarClassName = [
+    'sidebar',
+    'premium-sidebar',
+    open ? 'sidebar-open' : '',
+    collapsed ? 'premium-sidebar-collapsed' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <aside className={open ? 'sidebar sidebar-open premium-sidebar' : 'sidebar premium-sidebar'}>
+    <aside className={sidebarClassName}>
       <div className="premium-brand">
         <div className="brand-mark">
           <Icon name="hex" />
@@ -81,7 +94,12 @@ export function Sidebar({
           <h1>AegisOS</h1>
           <p>Operator Runtime</p>
         </div>
-        <button type="button" aria-label="Menüyü daralt" onClick={onClose}>
+        <button
+          type="button"
+          aria-label={collapsed ? 'Menüyü genişlet' : 'Menüyü daralt'}
+          title={collapsed ? 'Menüyü genişlet' : 'Menüyü daralt'}
+          onClick={open ? onClose : onToggleCollapse}
+        >
           <Icon name="chevron" />
         </button>
       </div>
@@ -98,6 +116,8 @@ export function Sidebar({
                 <button
                   key={item.id}
                   type="button"
+                  aria-label={item.label}
+                  title={collapsed ? item.label : undefined}
                   className={isActive ? 'premium-nav-item premium-nav-item-active' : 'premium-nav-item'}
                   onClick={() => {
                     onNavigate(item.key);

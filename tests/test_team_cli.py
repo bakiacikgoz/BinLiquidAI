@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 from binliquid.cli import app
 from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.runtime.config import RuntimeConfig
+from binliquid.runtime.platform import current_platform
 from binliquid.schemas.models import OrchestratorResult
 
 runner = CliRunner()
@@ -561,8 +562,14 @@ def test_operator_capabilities_exposes_workspace_parity_flags() -> None:
     assert payload["contractVersion"] == "2.0"
     assert payload["features"]["operatorWorkflowParity"] is True
     assert payload["features"]["enterpriseOpsParity"] is True
-    assert payload["features"]["computerUsePilot"]["scope"] == "browser+desktop+file"
-    assert payload["features"]["computerUsePilot"]["adapterStatus"] == "safari_applescript"
+    computer_use = payload["features"]["computerUsePilot"]
+    if current_platform().label == "windows":
+        assert computer_use["enabled"] is False
+        assert computer_use["reasonCode"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+        assert computer_use["adapterStatus"] == "windows_scaffold"
+    else:
+        assert computer_use["scope"] == "browser+desktop+file"
+        assert computer_use["adapterStatus"] == "safari_applescript"
     assert payload["commands"]["teamSubmit"] is True
     assert payload["commands"]["teamResumeSubmit"] is True
     assert payload["commands"]["computerUseSubmit"] is True

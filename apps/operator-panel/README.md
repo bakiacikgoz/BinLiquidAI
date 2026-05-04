@@ -21,22 +21,37 @@ In `auto` mode, bridge resolution order is:
 
 ## Release Mode (Bundled Runtime)
 
-Build runtime payload into Tauri resources:
+Build macOS runtime payload into Tauri resources:
 
 ```bash
 apps/operator-panel/scripts/build_bundled_runtime_macos.sh arm64
 apps/operator-panel/scripts/build_bundled_runtime_macos.sh x86_64
 ```
 
-Runtime entrypoint used by bridge:
+macOS runtime entrypoint used by bridge:
 
 `Contents/Resources/binliquid-runtime/python/bin/python -m binliquid ...`
+
+Build Windows x64 runtime payload into Tauri resources:
+
+```powershell
+pwsh apps/operator-panel/scripts/build_bundled_runtime_windows.ps1 -Arch x64
+apps/operator-panel/src-tauri/resources/binliquid-runtime/python/Scripts/python.exe -m binliquid --version
+pnpm --dir apps/operator-panel exec tauri build --config src-tauri/tauri.windows.conf.json --bundles nsis
+```
+
+Windows runtime entrypoint used by bridge:
+
+`binliquid-runtime/python/Scripts/python.exe -m binliquid ...`
 
 ## Security Notes
 
 - No shell passthrough.
 - Bridge command surface is allowlisted.
 - Artifact reads are root-dir bounded with symlink/traversal checks.
+- Bundled mode keeps a minimal platform-aware environment after `env_clear`;
+  Windows preserves required system process variables such as `SystemRoot`,
+  `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `ComSpec`, `PATHEXT`, `TEMP`, and `TMP`.
 - Event tail uses cursor contract with reset/truncated/badLineCount reporting.
 - Mutation actions require valid `operator_id`; actor format is `ui:<operator_id>`.
 

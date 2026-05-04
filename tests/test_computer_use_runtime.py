@@ -1579,8 +1579,13 @@ def test_computer_use_readiness_report_flags_safari_javascript_blocker(
     )
 
     monkeypatch.setattr(
-        "binliquid.computer_use.runtime.os.uname",
-        lambda: SimpleNamespace(sysname="Darwin"),
+        "binliquid.computer_use.runtime.current_platform",
+        lambda: SimpleNamespace(
+            system="Darwin",
+            label="macos",
+            machine="arm64",
+            release="23.0.0",
+        ),
     )
     monkeypatch.setattr(
         "binliquid.computer_use.runtime.shutil.which",

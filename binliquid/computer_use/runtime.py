@@ -24,6 +24,7 @@ from binliquid.computer_use.adapters import (
     FileDialogAdapter,
     FinderAdapter,
     SafariBrowserAdapter,
+    ScaffoldBrowserAdapter,
     TextEditAdapter,
 )
 from binliquid.computer_use.adapters._macos import MacOSAutomationError, run_applescript
@@ -63,6 +64,7 @@ from binliquid.computer_use.prompt_parser import parse_prompt_to_actions
 from binliquid.computer_use.recorder import build_recorder_artifact
 from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.runtime.config import RuntimeConfig
+from binliquid.runtime.platform import current_platform, default_temp_dir, safe_allowed_roots
 from binliquid.team.artifacts import (
     TeamArtifactPaths,
     ensure_team_artifact_paths,
@@ -338,13 +340,8 @@ class ComputerUseRunner:
     ) -> None:
         self._config = config
         self._root_dir = Path(root_dir or config.team.artifact_dir)
-        allowed_roots = [
-            Path.cwd(),
-            Path(config.workspace_root).expanduser(),
-            self._root_dir,
-            Path.home().joinpath("Downloads"),
-            Path("/tmp"),
-        ]
+        self._adapters_injected = adapters is not None
+        allowed_roots = safe_allowed_roots(config, self._root_dir)
         desktop_adapter = DesktopAdapter()
         dialog_adapter = FileDialogAdapter(allowed_roots=allowed_roots)
         runtime_adapters = adapters or RuntimeAdapters(
@@ -385,7 +382,29 @@ class ComputerUseRunner:
     def _build_readiness_report(self) -> ReadinessReport:
         checked_at = datetime.now(UTC).isoformat()
         checks: list[ReadinessCheck] = []
-        platform_ok = os.uname().sysname == "Darwin"
+        platform_info = current_platform()
+        platform_ok = platform_info.label == "macos"
+        supported_surfaces = ["core", "operator_panel", "bundled_runtime"]
+        computer_use_boundary = {
+            "live_execution": platform_ok,
+            "reason_code": (
+                "MACOS_COMPUTER_USE_PILOT"
+                if platform_ok
+                else "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+                if platform_info.label == "windows"
+                else "COMPUTER_USE_PLATFORM_NOT_QUALIFIED"
+            ),
+            "summary": (
+                "macOS computer-use pilot automation is eligible for local readiness checks."
+                if platform_ok
+                else (
+                    "Windows core/operator support is available; Windows live "
+                    "computer-use automation is not qualified."
+                )
+                if platform_info.label == "windows"
+                else "Live computer-use automation is not qualified on this platform."
+            ),
+        }
         checks.append(
             self._readiness_check(
                 key="platform",
@@ -396,7 +415,14 @@ class ComputerUseRunner:
                     else "Computer-use pilot currently requires macOS."
                 ),
                 remediation="Run AegisOS computer-use on a macOS pilot machine.",
-                details={"platform": os.uname().sysname},
+                details={
+                    "platform": platform_info.system,
+                    "platform_label": platform_info.label,
+                    "machine": platform_info.machine,
+                    "release": platform_info.release,
+                    "supported_surfaces": supported_surfaces,
+                    "computer_use": computer_use_boundary,
+                },
             )
         )
 
@@ -641,7 +667,7 @@ end tell
             )
         )
 
-        temp_dir = Path(tempfile.gettempdir()).resolve()
+        temp_dir = default_temp_dir()
         temp_dir_ok = os.access(temp_dir, os.W_OK)
         checks.append(
             self._readiness_check(
@@ -666,6 +692,9 @@ end tell
             checks=checks,
             summary=self._readiness_summary(status=status, checks=checks),
             checked_at=checked_at,
+            platform=platform_info.label,
+            supported_surfaces=supported_surfaces,
+            computer_use=computer_use_boundary,
         )
 
     def doctor(self, *, job_id: str | None = None) -> dict[str, Any]:
@@ -1576,6 +1605,7 @@ end tell
         }
         write_task_runs(paths, [])
         write_handoffs(paths, [])
+        platform_info = current_platform()
         recorder.emit(
             "team_start",
             phase="team",
@@ -1599,6 +1629,60 @@ end tell
             events=events,
             actions=actions,
         )
+        if (
+            platform_info.label != "macos"
+            and (
+                not self._adapters_injected
+                or isinstance(self._adapters.browser, ScaffoldBrowserAdapter)
+            )
+        ):
+            reason_code = (
+                "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+                if platform_info.label == "windows"
+                else "COMPUTER_USE_PLATFORM_NOT_QUALIFIED"
+            )
+            reason_message = (
+                "Windows core/operator support is available; Windows live "
+                "computer-use automation is not qualified."
+                if platform_info.label == "windows"
+                else "Live computer-use automation is not qualified on this platform."
+            )
+            job.status = JobStatus.FAILED
+            job.finished_at = datetime.now(UTC)
+            job.final_output = reason_message
+            self._set_execution_state(state, SessionExecutionState.FAILED)
+            state["stage"] = ExecutionStage.STOPPED.value
+            state["last_error"] = reason_code
+            state["platform"] = platform_info.label
+            state["platform_boundary"] = {
+                "reason_code": reason_code,
+                "summary": reason_message,
+                "live_execution": False,
+                "supported_surfaces": ["core", "operator_panel", "bundled_runtime"],
+            }
+            recorder.emit(
+                "computer_use.platform_not_qualified",
+                phase="computer_use",
+                status_before=JobStatus.RUNNING.value,
+                status_after=JobStatus.FAILED.value,
+                data=state["platform_boundary"],
+            )
+            recorder.emit(
+                "session_stopped",
+                phase="computer_use",
+                status_before=JobStatus.RUNNING.value,
+                status_after=JobStatus.FAILED.value,
+                data={"reason": reason_code},
+            )
+            self._registry.update(job_id=job_id, state=SessionExecutionState.FAILED.value)
+            self._write_runtime_status(
+                paths=paths,
+                job=job,
+                state=state,
+                events=events,
+                actions=actions,
+            )
+            return self._status_payload(job=job, state=state)
 
         try:
             for action in actions:

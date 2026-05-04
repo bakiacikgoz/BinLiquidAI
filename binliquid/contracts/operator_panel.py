@@ -21,6 +21,8 @@ class ComputerUseCapabilityContract(ContractModel):
     replayable: bool
     fail_closed: bool = Field(alias="failClosed")
     adapter_status: str = Field(alias="adapterStatus")
+    reason_code: str | None = Field(default=None, alias="reasonCode")
+    summary: str | None = None
 
 
 class OperatorFeatureFlagsContract(ContractModel):

@@ -16,6 +16,15 @@
 - no direct mutation authority outside CLI permission checks
 - access limited to approved operator roles
 
+### Windows Operator Workstation
+
+- operator panel, bundled runtime, and CLI smoke are supported on Windows x64
+- WebView2 runtime must be present for the Tauri shell
+- Windows live computer-use automation is disabled unless a Windows qualification
+  report explicitly enables that surface
+- unsigned CI smoke installers are internal validation artifacts only; public or
+  enterprise release artifacts require Authenticode signing and timestamp proof
+
 ## Deployment Steps
 
 1. Install dependencies and application package.

@@ -1262,12 +1262,52 @@ fn resolve_cli_command(config: &BridgeConfig) -> Result<ResolvedCli, BridgeError
 
 fn default_bundled_python_path() -> Option<PathBuf> {
     let current = std::env::current_exe().ok()?;
-    let contents = current.parent()?.parent()?;
-    let path = contents.join("Resources/binliquid-runtime/python/bin/python");
+    let exe_dir = current.parent()?;
+    let mut resource_dirs = vec![exe_dir.join("resources"), exe_dir.to_path_buf()];
+
+    if let Some(contents) = exe_dir.parent() {
+        resource_dirs.push(contents.join("Resources"));
+    }
+
+    for resource_dir in resource_dirs {
+        if let Some(path) = resolve_bundled_python_from_resource_dir(&resource_dir) {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+fn bundled_python_relative_path() -> &'static str {
+    if cfg!(windows) {
+        "binliquid-runtime/python/Scripts/python.exe"
+    } else {
+        "binliquid-runtime/python/bin/python"
+    }
+}
+
+fn resolve_bundled_python_from_resource_dir(resource_dir: &Path) -> Option<PathBuf> {
+    let path = resource_dir.join(bundled_python_relative_path());
     if path.exists() {
         Some(path)
     } else {
         None
+    }
+}
+
+fn path_separator() -> &'static str {
+    if cfg!(windows) {
+        ";"
+    } else {
+        ":"
+    }
+}
+
+fn fallback_system_path() -> &'static str {
+    if cfg!(windows) {
+        r"C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem"
+    } else {
+        "/usr/bin:/bin:/usr/sbin:/sbin"
     }
 }
 
@@ -1320,6 +1360,7 @@ fn generate_job_id() -> String {
 
 fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &ResolvedCli) {
     command.env_clear();
+    let base_path = std::env::var("PATH").unwrap_or_else(|_| fallback_system_path().to_string());
 
     match resolved.mode {
         CoreMode::Bundled => {
@@ -1327,21 +1368,40 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
                 .parent()
                 .map(|value| value.to_string_lossy().to_string())
                 .unwrap_or_default();
-            let system_path = "/usr/bin:/bin:/usr/sbin:/sbin";
             if runtime_path.is_empty() {
-                command.env("PATH", system_path);
+                command.env("PATH", base_path);
             } else {
-                command.env("PATH", format!("{runtime_path}:{system_path}"));
+                command.env(
+                    "PATH",
+                    format!("{runtime_path}{}{base_path}", path_separator()),
+                );
             }
         }
         _ => {
-            if let Ok(path) = std::env::var("PATH") {
-                command.env("PATH", path);
-            }
+            command.env("PATH", base_path);
         }
     }
 
-    for key in ["HOME", "USER", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL"] {
+    let env_keys: &[&str] = if cfg!(windows) {
+        &[
+            "SystemRoot",
+            "WINDIR",
+            "USERPROFILE",
+            "APPDATA",
+            "LOCALAPPDATA",
+            "PROGRAMDATA",
+            "TEMP",
+            "TMP",
+            "ComSpec",
+            "PATHEXT",
+            "PROCESSOR_ARCHITECTURE",
+            "NUMBER_OF_PROCESSORS",
+        ]
+    } else {
+        &["HOME", "USER", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL"]
+    };
+
+    for key in env_keys {
         if let Ok(value) = std::env::var(key) {
             command.env(key, value);
         }
@@ -1959,12 +2019,79 @@ mod tests {
     }
 
     #[test]
+    fn bundled_python_relative_path_matches_platform() {
+        let path = bundled_python_relative_path();
+        if cfg!(windows) {
+            assert_eq!(path, "binliquid-runtime/python/Scripts/python.exe");
+        } else {
+            assert_eq!(path, "binliquid-runtime/python/bin/python");
+        }
+    }
+
+    #[test]
+    fn resolve_bundled_python_from_resource_dir_detects_runtime() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let resource_dir = dir.path();
+        let python = resource_dir.join(bundled_python_relative_path());
+        fs::create_dir_all(python.parent().expect("parent")).expect("mkdir");
+        fs::write(&python, "placeholder").expect("python");
+
+        let resolved = resolve_bundled_python_from_resource_dir(resource_dir).expect("runtime");
+
+        assert_eq!(resolved, python);
+    }
+
+    #[test]
+    fn resolve_cli_command_auto_prefers_cli_path_then_bundled() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let bundled = dir.path().join("python");
+        fs::write(&bundled, "placeholder").expect("python");
+        let config = BridgeConfig {
+            mode: Some("auto".to_string()),
+            cli_path: Some("binliquid-custom".to_string()),
+            bundled_python_path: Some(bundled.to_string_lossy().to_string()),
+            profile: Some("balanced".to_string()),
+            root_dir: None,
+            env: HashMap::new(),
+            timeout_ms: None,
+        };
+
+        let external = resolve_cli_command(&config).expect("external");
+        assert_eq!(external.mode, CoreMode::External);
+        assert_eq!(external.program, "binliquid-custom");
+
+        let bundled_config = BridgeConfig {
+            cli_path: None,
+            ..config
+        };
+        let bundled = resolve_cli_command(&bundled_config).expect("bundled");
+        assert_eq!(bundled.mode, CoreMode::Bundled);
+        assert_eq!(bundled.prefix_args, vec!["-m", "binliquid"]);
+    }
+
+    #[test]
+    fn path_separator_matches_platform() {
+        if cfg!(windows) {
+            assert_eq!(path_separator(), ";");
+        } else {
+            assert_eq!(path_separator(), ":");
+        }
+    }
+
+    #[test]
     fn spawn_cli_background_returns_pid_for_external_script() {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path().join("jobs");
         fs::create_dir_all(&root).expect("mkdir");
-        let script = dir.path().join("fake-binliquid.sh");
-        fs::write(&script, "#!/bin/sh\nsleep 1\n").expect("script");
+        let script = if cfg!(windows) {
+            let path = dir.path().join("fake-binliquid.cmd");
+            fs::write(&path, "@echo off\r\nping -n 2 127.0.0.1 >nul\r\n").expect("script");
+            path
+        } else {
+            let path = dir.path().join("fake-binliquid.sh");
+            fs::write(&path, "#!/bin/sh\nsleep 1\n").expect("script");
+            path
+        };
         #[cfg(unix)]
         fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).expect("chmod");
 
@@ -1979,7 +2106,6 @@ mod tests {
         };
 
         let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_io()
             .enable_time()
             .build()
             .expect("runtime");

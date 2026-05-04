@@ -1,0 +1,96 @@
+name: Windows CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  windows-core-and-panel:
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        shell: pwsh
+        run: python -m pip install uv
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python deps
+        shell: pwsh
+        run: uv sync --python 3.11 --extra dev
+
+      - name: Python lint
+        shell: pwsh
+        run: uv run ruff check .
+
+      - name: Python tests
+        shell: pwsh
+        run: uv run pytest -q
+
+      - name: Core smoke
+        shell: pwsh
+        run: |
+          uv run binliquid --version
+          uv run python -m binliquid --version
+          uv run binliquid operator capabilities --json
+          uv run binliquid doctor --profile balanced --json
+
+      - name: Install UI deps
+        shell: pwsh
+        run: pnpm install --dir apps/operator-panel
+
+      - name: UI tests
+        shell: pwsh
+        run: pnpm --dir apps/operator-panel test
+
+      - name: UI lint
+        shell: pwsh
+        run: pnpm --dir apps/operator-panel lint
+
+      - name: UI build
+        shell: pwsh
+        run: pnpm --dir apps/operator-panel build
+
+      - name: Rust bridge tests
+        shell: pwsh
+        run: cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml
+
+      - name: Build bundled runtime
+        shell: pwsh
+        run: pwsh apps/operator-panel/scripts/build_bundled_runtime_windows.ps1 -Arch x64
+
+      - name: Verify bundled runtime
+        shell: pwsh
+        run: |
+          $runtime = "apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          if (!(Test-Path "$runtime/RUNTIME_MANIFEST.txt")) { exit 1 }
+          if (!(Test-Path "$runtime/python/Scripts/python.exe")) { exit 1 }
+          & "$runtime/python/Scripts/python.exe" -m binliquid --version
+          Get-Content "$runtime/RUNTIME_MANIFEST.txt"
+
+      - name: Tauri build smoke
+        shell: pwsh
+        run: pnpm --dir apps/operator-panel exec tauri build --debug --no-bundle

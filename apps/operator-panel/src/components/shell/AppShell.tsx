@@ -10,6 +10,7 @@ export function AppShell({
   toasts,
   activeView,
   mobileNavOpen,
+  sidebarCollapsed,
   operatorId,
   previewMode,
   operatorWarning,
@@ -18,6 +19,7 @@ export function AppShell({
   warningCount,
   onNavigate,
   onToggleNav,
+  onToggleSidebar,
   onCloseNav,
   onRefresh,
 }: {
@@ -26,6 +28,7 @@ export function AppShell({
   toasts: ToastItem[];
   activeView: ShellViewKey;
   mobileNavOpen: boolean;
+  sidebarCollapsed: boolean;
   operatorId: string;
   previewMode: boolean;
   operatorWarning: string;
@@ -34,11 +37,21 @@ export function AppShell({
   warningCount: number;
   onNavigate: (view: ShellViewKey) => void;
   onToggleNav: () => void;
+  onToggleSidebar: () => void;
   onCloseNav: () => void;
   onRefresh: () => void;
 }) {
+  const shellClassName = [
+    'shell',
+    'premium-shell',
+    mobileNavOpen ? 'shell-nav-open' : '',
+    sidebarCollapsed ? 'shell-sidebar-collapsed' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className={mobileNavOpen ? 'shell shell-nav-open premium-shell' : 'shell premium-shell'}>
+    <div className={shellClassName}>
       <button
         type="button"
         className={mobileNavOpen ? 'sidebar-backdrop sidebar-backdrop-open' : 'sidebar-backdrop'}
@@ -48,11 +61,13 @@ export function AppShell({
       <Sidebar
         activeView={activeView}
         open={mobileNavOpen}
+        collapsed={sidebarCollapsed}
         operatorId={operatorId}
         pendingApprovalCount={pendingApprovalCount}
         warningCount={warningCount}
         onNavigate={onNavigate}
         onClose={onCloseNav}
+        onToggleCollapse={onToggleSidebar}
       />
       <main className="main-panel premium-main-panel">
         <TopControls

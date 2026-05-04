@@ -54,6 +54,22 @@
 - [ ] `uv run binliquid team list --root-dir .binliquid/team/jobs --json`
 - [ ] `uv run binliquid approval show --id <approval_id> --json`
 
+## Windows Operator Panel Gates
+
+- [ ] `windows-2022` CI PASS
+- [ ] `uv run ruff check .` PASS on Windows
+- [ ] `uv run pytest -q` PASS on Windows
+- [ ] `pnpm --dir apps/operator-panel test` PASS on Windows
+- [ ] `pnpm --dir apps/operator-panel lint` PASS on Windows
+- [ ] `pnpm --dir apps/operator-panel build` PASS on Windows
+- [ ] `cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml` PASS on Windows
+- [ ] `pwsh apps/operator-panel/scripts/build_bundled_runtime_windows.ps1 -Arch x64` PASS
+- [ ] `apps/operator-panel/src-tauri/resources/binliquid-runtime/python/Scripts/python.exe -m binliquid --version` PASS
+- [ ] `apps/operator-panel/src-tauri/resources/binliquid-runtime/RUNTIME_MANIFEST.txt` exists
+- [ ] `pnpm --dir apps/operator-panel exec tauri build --debug --no-bundle` PASS
+- [ ] Clean Windows VM install/open/handshake PASS before release claim
+- [ ] Authenticode signing PASS for release artifact, or release remains RC blocked
+
 ## macOS Signing + Notarization (v0.5)
 
 - [ ] GitHub Environment `release-macos` exists and required reviewers/policies are configured

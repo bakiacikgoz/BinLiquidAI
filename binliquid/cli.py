@@ -59,6 +59,7 @@ from binliquid.memory.session_store import SessionStore
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
+from binliquid.runtime.platform import current_platform
 from binliquid.schemas.models import ExpertName
 from binliquid.team.continuation import (
     ResumeContinuationError,
@@ -528,6 +529,7 @@ def doctor(
         "--hf-model-id",
         help="Override transformers model id",
     ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     """Runtime and provider health check."""
     ensure_artifact_scaffold()
@@ -563,7 +565,10 @@ def doctor(
             "config_source_model_name": source_map.get("model_name", "profile"),
             "config_source_hf_model_id": source_map.get("hf_model_id", "profile"),
         }
-        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        if json_output:
+            typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            typer.echo(f"status={payload['status']} error={payload['error_code']}")
         write_artifact("status", payload)
         raise typer.Exit(code=1)
 
@@ -593,7 +598,10 @@ def doctor(
             "config_source_model_name": source_map.get("model_name", "profile"),
             "config_source_hf_model_id": source_map.get("hf_model_id", "profile"),
         }
-        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        if json_output:
+            typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            typer.echo(f"status={payload['status']} error={payload['error_code']}")
         write_artifact("status", payload)
         raise typer.Exit(code=1) from None
 
@@ -620,7 +628,10 @@ def doctor(
             status_value = "healthy"
         status["status"] = status_value
 
-    typer.echo(json.dumps(status, indent=2, ensure_ascii=False))
+    if json_output:
+        typer.echo(json.dumps(status, indent=2, ensure_ascii=False))
+    else:
+        typer.echo(f"status={status.get('status')} provider={status.get('selected_provider')}")
     write_artifact(
         "status",
         status,
@@ -1389,6 +1400,36 @@ def operator_panel(
 def operator_capabilities(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
+    platform_info = current_platform()
+    windows_computer_use = platform_info.label == "windows"
+    computer_use_pilot = (
+        {
+            "enabled": False,
+            "stage": "not_qualified",
+            "platform": "windows",
+            "scope": "core+operator_panel+bundled_runtime",
+            "executionModes": [],
+            "replayable": True,
+            "failClosed": True,
+            "adapterStatus": "windows_scaffold",
+            "reasonCode": "WINDOWS_COMPUTER_USE_NOT_QUALIFIED",
+            "summary": (
+                "Windows core/operator support is available; Windows live computer-use "
+                "automation is not qualified."
+            ),
+        }
+        if windows_computer_use
+        else {
+            "enabled": True,
+            "stage": "execution_slice",
+            "platform": "macos",
+            "scope": "browser+desktop+file",
+            "executionModes": ["dry_run", "step_approval", "execute"],
+            "replayable": True,
+            "failClosed": True,
+            "adapterStatus": "safari_applescript",
+        }
+    )
     payload = {
         "coreVersion": __version__,
         "contractVersion": OPERATOR_PANEL_CONTRACT_VERSION,
@@ -1396,16 +1437,7 @@ def operator_capabilities(
         "features": {
             "operatorWorkflowParity": True,
             "enterpriseOpsParity": True,
-            "computerUsePilot": {
-                "enabled": True,
-                "stage": "execution_slice",
-                "platform": "macos",
-                "scope": "browser+desktop+file",
-                "executionModes": ["dry_run", "step_approval", "execute"],
-                "replayable": True,
-                "failClosed": True,
-                "adapterStatus": "safari_applescript",
-            },
+            "computerUsePilot": computer_use_pilot,
         },
         "commands": {
             "teamSubmit": True,
