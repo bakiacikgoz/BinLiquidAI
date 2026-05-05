@@ -1,90 +1,126 @@
 # BinLiquid (AegisOS)
 
-BinLiquid is a private, security-first agentic runtime designed to run fully local/offline in enterprise-controlled environments, including on-prem datacenters and edge deployments.
+**BinLiquid** is a private, security-first agentic runtime for local/offline and enterprise-controlled environments. It is designed for governed AI execution where planning, routing, memory, approvals, auditability, and operational safety matter more than unrestricted autonomy.
 
-It provides two layers:
+BinLiquid currently provides four major surfaces:
 
-- **BinLiquid Runtime (core):** the production-grade foundation for single-assistant execution, including planning, routing, specialist execution, scoped memory, and governance.
-- **Team Runtime:** a governed multi-agent execution layer that supports delegated task handoff, shared/scoped memory access, approval-gated actions, bounded-concurrency controls, and audit-grade replayable traces.
+1. **Core Runtime** — the production-grade single-assistant foundation for planning, routing, provider fallback, specialist execution, scoped memory, and governance.
+2. **Team Runtime** — a governed multi-agent execution layer with delegated handoff, bounded concurrency, shared/scoped memory, approval gates, checkpointing, and replayable audit traces.
+3. **Operator Panel** — a Tauri-based desktop control surface for monitoring, approvals, capabilities, run state, and local operator workflows.
+4. **Computer-Use Runtime** — a qualification-gated desktop/web automation foundation. The current vision-first path is designed around screenshots, visual interpretation, policy checks, approval gates, controlled action execution, verification, and replay/audit artifacts.
 
-> **Status:**
-> BinLiquid core is production-grade.
-> Team Runtime is pilot-hardened for controlled/restricted profiles, with release-blocking gates, replay verification, approval hardening, and bounded-concurrency safeguards.
-> Enterprise deployment readiness is implemented under defined constraints through secure defaults, verified identity/RBAC gates, asymmetric artifact signing, operational support bundles, and GA readiness reporting.
-> Broader GA claims still require signed qualification evidence from the documented deployment envelope.
+> **Status summary**
+>
+> BinLiquid Core Runtime is the most mature production-grade foundation of the project. Team Runtime is pilot-hardened for controlled/restricted profiles. Enterprise deployment readiness is implemented under a constrained self-hosted envelope, but broader GA claims still require signed qualification evidence. Vision-first computer-use is implemented as a fail-closed, qualification-gated foundation; live desktop automation is disabled by default and must not be described as generally available across platforms.
+
+---
 
 ## Current Status
 
-### Supported Baseline
+### Supported baseline
 
-- Linux x64: supported for the core runtime and primary server-side validation.
-- macOS: supported for operator tooling, Tauri release proof, and the existing Safari/Finder/TextEdit computer-use pilot.
-- Windows x64: supported for core CLI, operator panel, bundled runtime, and signed release-candidate evidence.
-- Windows public/enterprise release remains blocked until `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and no blocking reasons.
-- Windows live computer-use automation remains disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` unless a Windows-specific signed qualification report says otherwise.
+| Area | Status | Notes |
+|---|---:|---|
+| Linux x64 core runtime | Supported | Primary runtime and server-side validation target. |
+| macOS tooling | Supported | Operator tooling, Tauri release proof, and local validation workflows. |
+| Windows x64 tooling | Supported | Core CLI, operator panel, bundled runtime, and release-candidate validation paths. |
+| Team Runtime | Pilot-hardened | Controlled/restricted profiles only; bounded concurrency and replay verification are implemented. |
+| Enterprise profile | Constrained readiness | Self-hosted single-tenant profile with identity/RBAC, signing, baseline checks, metrics, support bundle, and GA readiness reporting. |
+| Vision-first computer-use foundation | Implemented behind gates | Platform model, policy, approval, replay, qualification schema, and fail-closed platform gates exist. |
+| Live macOS vision computer-use | Not qualified | Disabled until local provider, permissions, and qualification evidence are present. |
+| Live Windows computer-use | Not qualified | Disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`. |
+| Live Linux computer-use | Not qualified | Disabled with `LINUX_COMPUTER_USE_NOT_QUALIFIED`; Wayland/X11/session qualification is required. |
 
-### Core Runtime
+### What BinLiquid is not yet
 
-The core runtime is the most mature part of the system and should be considered the production-grade foundation of the platform.
+BinLiquid should **not** currently be marketed as:
 
-### Team Runtime
+- an unrestricted enterprise-wide multi-agent orchestration system,
+- a universally production-ready high-concurrency agent platform,
+- a fully qualified live desktop automation product across macOS, Windows, and Linux,
+- a system that can safely execute irreversible user actions without explicit approval,
+- a cloud-hosted multi-tenant control plane.
 
-Team Runtime has completed pilot-readiness hardening for restricted, controlled profiles and currently includes:
+---
 
-- deterministic release-blocking pilot gate
-- approval lifecycle hardening (`pending -> approved -> executed -> consumed`)
-- stale approval snapshot detection
-- duplicate resume suppression / idempotent resume claims
-- optimistic shared-memory conflict rejection
-- concurrency-aware audit/replay metadata
-- bounded-concurrency fallback / serialization events
-- restricted smoke scenarios and machine-readable pilot reports
-- release-gate, runbook, rollback, and messaging alignment
+## Architecture Overview
 
-Under restricted pilot profiles, Team Runtime now provides fail-closed approval handling, audit-grade event trails, replay verification, bounded-concurrency safety controls, visible fallback/serialization behavior, and conflict rejection instead of silent shared-state overwrite.
+```text
+User / Operator
+      |
+      v
+Operator Panel / CLI / Thin Shell
+      |
+      v
+Core Runtime
+  - planner
+  - router
+  - provider chain
+  - specialist experts
+  - memory
+  - governance policy
+      |
+      +--> Team Runtime
+      |      - DAG execution
+      |      - handoff
+      |      - scoped memory
+      |      - bounded concurrency
+      |      - checkpoint/replay
+      |
+      +--> Computer-Use Runtime
+             - observe
+             - interpret
+             - decide
+             - classify risk
+             - approve if needed
+             - execute
+             - verify
+             - checkpoint
+             - replay/audit
+```
 
-Team Runtime should currently be described as:
+### Core design principles
 
-- pilot-ready under controlled/restricted profiles
-- bounded-concurrency capable with safety degradation
-- governable and auditable by design
+- **Local-first and private by default**: web access and persistent traces are disabled unless explicitly configured.
+- **Fail-closed governance**: unsafe, unknown, stale, or unqualified paths stop instead of guessing.
+- **Approval lifecycle discipline**: approvals follow `pending -> approved -> executed -> consumed`; approval alone does not authorize execution.
+- **Typed contracts**: planner outputs, expert payloads, operator-panel schemas, computer-use actions, and qualification reports are validated.
+- **Replayable operations**: key runtime paths produce audit-grade traces and replay verification artifacts.
+- **Qualification before claims**: implementation alone is not enough; platform support requires executed evidence.
 
-Team Runtime should not yet be described as:
-
-- unrestricted enterprise-wide multi-agent orchestration
-- fully general high-concurrency agent execution
-- universally production-ready across arbitrary live-provider environments
-
-### Enterprise Profile
-
-The `enterprise` profile is the self-hosted secure-default path for single-tenant deployment and adds:
-
-- verified identity assertions plus RBAC checks for mutating operations
-- asymmetric signing for audit and operational artifacts
-- security baseline preflight and startup abort rules
-- backup, restore verification, migration planning, and support bundle export
-- file-based metrics snapshots and GA readiness reporting
-
-This slice formalizes the deployment contract. It does not replace qualification evidence. Enterprise positioning remains bounded by the published qualification matrix and executed drills.
+---
 
 ## Feature Status
 
 | Feature | Status | Notes |
-|---|---|---|
-| Provider chain (`auto -> ollama -> transformers`) | working | `doctor` checks active + fallback chain |
-| Planner strict schema + deterministic fallback | working | adversarial tests included |
-| Orchestrator timeout/retry/circuit-breaker/tool budget | working | limit enforcement tested |
-| Rule router (active) + sLTC shadow router | working | default in `balanced` |
-| Fast-path + realtime stream | working | regret metrics enabled |
-| Expert contracts (code/research/plan) | working | typed validation + partial failover |
-| Memory v2 (dedup + TTL + ranked retrieval) | working | privacy-safe defaults |
-| Benchmarks (smoke/ablation/energy) | working | quality suite (120 tasks) available |
-| Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
-| Governance v0.4 (policy + approval + audit) | working | fail-closed + async approvals |
-| Team Runtime v0.4 (DAG + bounded concurrency + handoff/memory governance) | pilot-hardened under restricted profile | bounded-concurrency safeguards, replay verification, and pilot usage only behind `team pilot-check` plus target-environment live-provider rehearsal |
-| Desktop UI (Tauri operator panel) | beta | `apps/operator-panel`; macOS release proof and Windows x64 smoke path |
+|---|---:|---|
+| Provider chain | Working | `auto -> ollama -> transformers`; doctor checks active/fallback chain. |
+| Planner strict schema | Working | Deterministic fallback and adversarial tests included. |
+| Orchestrator controls | Working | Timeout, retry, circuit breaker, and tool budget enforcement. |
+| Rule router | Working | Active by default in `balanced`. |
+| sLTC router | Shadow/Research | Used for research and calibration workflows. |
+| Fast-path chat | Working | Realtime stream and regret metrics enabled. |
+| Expert contracts | Working | Typed code/research/plan expert payloads with partial failover. |
+| Memory v2 | Working | Deduplication, TTL, ranked retrieval, and privacy-safe defaults. |
+| Governance | Working | Policy, approvals, audit, fail-closed handling. |
+| Team Runtime | Pilot-hardened | Restricted/controlled profiles with bounded concurrency and replay verification. |
+| Enterprise profile | Constrained readiness | Requires signed evidence and deployment drills for broader GA claims. |
+| Operator Panel | Beta | Tauri desktop surface for operator workflows. |
+| Vision-first computer-use | Gated foundation | Strict policy, replay, qualification gates, deterministic mocks; no default live OS automation. |
 
-## First 5 Minutes
+---
+
+## Quickstart
+
+### Requirements
+
+- Python `3.11`
+- [`uv`](https://github.com/astral-sh/uv)
+- Node.js + Corepack + pnpm for the operator panel
+- Rust toolchain for Tauri builds
+- Ollama or another configured local model provider when using local LLM execution
+
+### First 5 minutes
 
 ```bash
 make bootstrap
@@ -94,17 +130,53 @@ uv run pytest -q
 uv run binliquid doctor --profile balanced
 ```
 
+### Windows developer quickstart
+
+```powershell
+winget install --id=astral-sh.uv -e
+uv sync --python 3.11 --extra dev
+uv run python -m binliquid --version
+uv run python -m binliquid doctor --profile balanced --json
+uv run python -m binliquid operator capabilities --json
+```
+
+Optional Windows bootstrap:
+
+```powershell
+pwsh scripts/bootstrap_windows.ps1
+```
+
+> Windows support currently covers the core CLI, operator panel, bundled runtime, and validation workflows. Windows live computer-use remains disabled unless a signed Windows qualification report explicitly enables that surface.
+
+---
+
 ## Profiles
 
-| Profile | Router | Shadow Router | Memory | Fallback | Telemetry |
-|---|---|---|---|---|---|
-| `lite` | rule | off | off | off | minimal |
-| `balanced` (default daily) | rule | sltc | on | on | short |
-| `research` | sltc | rule | on | on | debug-friendly |
-| `restricted` (controlled pilot profile) | rule | sltc | on | on | short |
-| `enterprise` (self-hosted secure default) | rule | sltc | on | on | signed + file metrics |
+| Profile | Router | Shadow Router | Memory | Fallback | Telemetry | Intended use |
+|---|---|---|---|---|---|---|
+| `lite` | rule | off | off | off | minimal | Small/local low-overhead runs. |
+| `balanced` | rule | sLTC | on | on | short | Default daily profile. |
+| `research` | sLTC | rule | on | on | debug-friendly | Research and calibration. |
+| `restricted` | rule | sLTC | on | on | short | Controlled pilot workflows. |
+| `enterprise` | rule | sLTC | on | on | signed + file metrics | Self-hosted secure-default deployment. |
 
-## CLI Quickstart
+Config precedence:
+
+```text
+defaults < profile < environment variables < CLI flags
+```
+
+Resolve effective config:
+
+```bash
+uv run binliquid config resolve --profile balanced --json
+uv run binliquid config resolve --profile balanced --provider ollama --fallback-provider transformers
+uv run binliquid config resolve --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
+```
+
+---
+
+## CLI Usage
 
 ### Chat
 
@@ -114,7 +186,7 @@ uv run binliquid chat --profile balanced --once "kodu düzelt" --no-fast-path
 uv run binliquid chat --profile balanced --once "plan çıkar" --model qwen3.5:4b
 ```
 
-Structured output (thin-shell/UI ready):
+Structured output for UI/thin-shell integrations:
 
 ```bash
 uv run binliquid chat --profile balanced --once "selam" --json
@@ -122,7 +194,53 @@ uv run binliquid chat --profile balanced --once "selam" --json-stream --stream
 uv run binliquid chat --profile balanced --once "selam" --stdio-json --stream
 ```
 
-Governance approvals:
+### Provider recipes
+
+Default profile:
+
+```bash
+uv run binliquid chat --profile balanced --once "selam"
+```
+
+Ollama model:
+
+```bash
+ollama pull qwen3.5:4b
+uv run binliquid doctor --profile balanced --provider ollama --model qwen3.5:4b
+uv run binliquid chat --profile balanced --provider ollama --model qwen3.5:4b --once "uzun plan çıkar"
+```
+
+Transformers custom model:
+
+```bash
+uv run binliquid doctor --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct
+uv run binliquid chat --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "özetle"
+```
+
+Auto provider chain:
+
+```bash
+uv run binliquid doctor --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
+uv run binliquid chat --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "adım adım anlat"
+```
+
+Show model override source:
+
+```bash
+BINLIQUID_MODEL_NAME=qwen3.5:4b uv run binliquid config resolve --profile balanced --json
+```
+
+---
+
+## Governance and Approvals
+
+BinLiquid treats mutating or risky execution as a governed operation. Approval-gated flows must pass through the lifecycle:
+
+```text
+pending -> approved -> executed -> consumed
+```
+
+Common commands:
 
 ```bash
 uv run binliquid approval pending --json
@@ -132,53 +250,18 @@ uv run binliquid approval execute --id <approval_id> --actor ops-user
 uv run binliquid operator capabilities --json
 ```
 
-Approval lifecycle is `pending -> approved -> executed -> consumed`.
-`approved` alone does not authorize override use; team resume and pilot gate only consume `executed` approvals.
+Important invariants:
 
-Enterprise validation:
+- `approved` alone is not an execution permit.
+- Stale approval snapshots are rejected.
+- Resume and pilot gates only consume approvals that are both `executed` and not yet `consumed`.
+- Terminal, payment, password, wallet, legal-consent, security-setting, and destructive surfaces are denied or stopped unless a qualified policy explicitly allows a supervised path.
 
-```bash
-uv run python scripts/prepare_enterprise_fixture.py --root .
-uv run binliquid auth whoami --profile enterprise --json
-uv run binliquid auth check --profile enterprise --permission runtime.run --json
-uv run binliquid security baseline --profile enterprise --json
-uv run binliquid metrics snapshot --profile enterprise --json
-uv run binliquid qualification run --profile enterprise --mode mixed --soak-hours 6 --output-root artifacts/qualification --json
-uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
-```
+---
 
-`ga readiness` now evaluates signed qualification evidence from `artifacts/qualification_report.json`.
-Without the required workload set and the `6h` soak threshold, the result should remain `yellow/conditional`.
+## Team Runtime
 
-Operator panel (thin-shell terminal):
-
-```bash
-uv run binliquid operator panel --profile balanced
-```
-
-### Config resolve
-
-```bash
-uv run binliquid config resolve --profile balanced --json
-uv run binliquid config resolve --profile balanced --provider ollama --fallback-provider transformers
-uv run binliquid config resolve --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
-```
-
-Precedence order: `defaults < profile < env < CLI flags`.
-
-### Benchmarks
-
-```bash
-uv run binliquid benchmark smoke --mode all --profile balanced
-uv run binliquid benchmark team --profile balanced --suite smoke --spec team.yaml
-uv run binliquid benchmark team --profile restricted --suite smoke --spec team.yaml --deterministic-mock
-uv run binliquid benchmark ablation --mode all --profile balanced --suite smoke
-uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
-uv run binliquid benchmark energy --profile balanced --energy-mode measured
-uv run binliquid benchmark smoke --mode A --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
-```
-
-### Team Runtime
+Team Runtime adds governed multi-agent execution with DAG-style scheduling, handoff, scoped memory, checkpointing, and audit/replay support.
 
 ```bash
 uv run binliquid team init --output team.yaml
@@ -191,75 +274,163 @@ uv run binliquid team list --root-dir .binliquid/team/jobs --json
 uv run binliquid team logs --job-id <id> --root-dir .binliquid/team/jobs --json-stream
 uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs --verify --json
 uv run binliquid team artifacts --job-id <id> --root-dir .binliquid/team/jobs --export ./team-artifacts
+```
+
+Restricted pilot gates:
+
+```bash
 uv run binliquid team pilot-check --spec examples/team/restricted_pilot.yaml --profile restricted --mode deterministic --report artifacts/team_pilot_report.json --json
 uv run binliquid team pilot-check --spec examples/team/restricted_pilot_live.yaml --profile restricted --mode live-provider --provider auto --report artifacts/team_pilot_live_report.json --json
 ```
 
-### Operator Panel (v0.5.0-beta)
+Team Runtime is currently best described as:
+
+- pilot-ready under controlled/restricted profiles,
+- bounded-concurrency capable with safety degradation,
+- governable and auditable by design.
+
+It should not yet be described as unrestricted enterprise-wide orchestration.
+
+---
+
+## Vision-First Computer Use
+
+BinLiquid includes a vision-first computer-use foundation for desktop/web/file workflows. The design goal is a universal runtime that can observe the active screen, interpret UI state, decide the next safe action, execute controlled input, verify progress, and record replayable audit evidence.
+
+Current runtime loop:
+
+```text
+observe -> interpret -> decide -> classify_risk -> approve_if_needed -> execute -> verify -> checkpoint
+```
+
+### Current computer-use status
+
+| Platform | Status | Live execution | Reason code |
+|---|---:|---:|---|
+| macOS | Not qualified | `false` | `MACOS_COMPUTER_USE_NOT_QUALIFIED` |
+| Windows | Not qualified | `false` | `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` |
+| Linux | Not qualified | `false` | `LINUX_COMPUTER_USE_NOT_QUALIFIED` |
+
+### Safety defaults
+
+```toml
+[computer_use]
+vision_enabled = false
+vision_provider = "none"
+raw_screenshot_persistence = false
+raw_screenshot_max_count = 0
+terminal_policy = "deny"
+macos_live_enabled = false
+windows_live_enabled = false
+linux_live_enabled = false
+```
+
+### Computer-use commands
+
+Doctor:
+
+```bash
+uv run binliquid computer-use doctor --json
+uv run python -m binliquid computer-use doctor --json
+```
+
+Qualification fixture/schema verification:
+
+```bash
+uv run python -m binliquid computer-use qualification verify \
+  --schema contracts/computer_use/platform_qualification.schema.json \
+  --input contracts/computer_use/fixtures/windows_platform_qualification_pass_fixture.json \
+  --json
+```
+
+Platform matrix evaluation:
+
+```bash
+uv run python scripts/evaluate_computer_use_platform_matrix.py \
+  --profile balanced \
+  --output artifacts/computer_use_platform_matrix.json \
+  --markdown artifacts/COMPUTER_USE_PLATFORM_MATRIX.md
+```
+
+### Computer-use safety boundaries
+
+- Screen text is treated as **untrusted observed content**, not as an instruction.
+- Raw screenshots are not persisted by default.
+- Sensitive surfaces stop or deny before execution.
+- Risky actions require fresh matching approval snapshots.
+- Terminal control is denied by default.
+- Replay verifies trace integrity, not business correctness.
+- Deterministic mock qualification is useful for regression testing, but it is not proof of real-world desktop reliability.
+
+### Platform qualification requirement
+
+A platform may only claim live computer-use support after a platform-specific qualification report proves:
+
+- required permissions are granted manually,
+- capture and input backends behave as expected,
+- sensitive/risky surfaces fail closed,
+- approval freshness is enforced,
+- replay integrity passes,
+- raw screenshot persistence remains disabled unless explicitly configured,
+- destructive or irreversible actions do not execute without a valid approval path,
+- signed or otherwise trusted evidence is available for the target release envelope.
+
+---
+
+## Operator Panel
+
+The Operator Panel is a Tauri-based beta desktop UI located under:
+
+```text
+apps/operator-panel
+```
+
+Common commands:
 
 ```bash
 make ui-install
 make ui-dev
+make ui-build
+make ui-tauri-build
 ```
 
-Packaging and release scripts live under `apps/operator-panel/scripts/`.
-Windows release hardening evidence is documented in
-`docs/WINDOWS_RELEASE_HARDENING_REPORT.md`, `docs/WINDOWS_INSTALLER_SMOKE.md`,
-`docs/WINDOWS_SIGNED_RC_GATE_REPORT.md`, and
-`docs/WINDOWS_PUBLIC_RELEASE_EVIDENCE_CLOSURE_REPORT.md`. Final signed gate
-closure status is tracked in `docs/WINDOWS_RELEASE_FINALIZATION_REPORT.md`.
-
-## Model Recipes
-
-### 1) Varsayılan LFM (profile ile)
+Direct pnpm usage:
 
 ```bash
-uv run binliquid chat --profile balanced --once "selam"
+corepack pnpm --dir apps/operator-panel test
+corepack pnpm --dir apps/operator-panel lint
+corepack pnpm --dir apps/operator-panel build
 ```
 
-### 2) Ollama Qwen modeli
+Tauri checks:
 
 ```bash
-ollama pull qwen3.5:4b
-uv run binliquid doctor --profile balanced --provider ollama --model qwen3.5:4b
-uv run binliquid chat --profile balanced --provider ollama --model qwen3.5:4b --once "uzun plan çıkar"
+cargo test --manifest-path apps/operator-panel/src-tauri/Cargo.toml
+cargo fmt --manifest-path apps/operator-panel/src-tauri/Cargo.toml --check
 ```
 
-### 3) Transformers custom model
+Packaging and release scripts live under:
+
+```text
+apps/operator-panel/scripts/
+```
+
+---
+
+## Benchmarks and Research
+
+Smoke, team, ablation, and energy benchmarks:
 
 ```bash
-uv run binliquid doctor --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct
-uv run binliquid chat --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "özetle"
+uv run binliquid benchmark smoke --mode all --profile balanced
+uv run binliquid benchmark team --profile balanced --suite smoke --spec team.yaml
+uv run binliquid benchmark team --profile restricted --suite smoke --spec team.yaml --deterministic-mock
+uv run binliquid benchmark ablation --mode all --profile balanced --suite smoke
+uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
+uv run binliquid benchmark energy --profile balanced --energy-mode measured
 ```
 
-### 4) Auto dual-target (Ollama primary + Transformers fallback)
-
-```bash
-uv run binliquid doctor --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
-uv run binliquid chat --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "adım adım anlat"
-```
-
-### 5) Model yoksa teşhis
-
-```bash
-uv run binliquid doctor --profile balanced --provider ollama --model qwen3.5:4b
-# model_present=false ise önce: ollama pull qwen3.5:4b
-```
-
-### 6) Override kaynağını görme
-
-```bash
-BINLIQUID_MODEL_NAME=qwen3.5:4b uv run binliquid config resolve --profile balanced --json
-# source_map.model_name alanı env/cli/profile kaynağını gösterir
-```
-
-### Memory
-
-```bash
-uv run binliquid memory stats --profile balanced
-```
-
-### Research
+Router research workflows:
 
 ```bash
 uv run binliquid research train-router \
@@ -278,70 +449,190 @@ uv run binliquid research calibrate-router \
   --seed 42
 ```
 
-Calibration outputs:
+Generated research artifacts include:
 
-- `research/sltc_experiments/artifacts/router_calibration_candidates.json`
-- `research/sltc_experiments/artifacts/router_calibration_report.json`
-- `research/sltc_experiments/artifacts/router_calibration_report.md`
+```text
+research/sltc_experiments/artifacts/router_calibration_candidates.json
+research/sltc_experiments/artifacts/router_calibration_report.json
+research/sltc_experiments/artifacts/router_calibration_report.md
+```
+
+---
+
+## Enterprise Profile
+
+The `enterprise` profile is the secure-default self-hosted deployment path. It adds:
+
+- verified identity assertions,
+- RBAC checks for mutating operations,
+- asymmetric signing for audit and operational artifacts,
+- security baseline preflight and startup abort rules,
+- backup and restore verification,
+- migration planning,
+- support bundle export,
+- file-based metrics snapshots,
+- GA readiness reporting.
+
+Prepare a local enterprise fixture:
+
+```bash
+uv run python scripts/prepare_enterprise_fixture.py --root .
+```
+
+Validation commands:
+
+```bash
+uv run binliquid auth whoami --profile enterprise --json
+uv run binliquid auth check --profile enterprise --permission runtime.run --json
+uv run binliquid security baseline --profile enterprise --json
+uv run binliquid metrics snapshot --profile enterprise --json
+uv run binliquid qualification run --profile enterprise --mode mixed --soak-hours 6 --output-root artifacts/qualification --json
+uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
+```
+
+`ga readiness` evaluates signed qualification evidence from `artifacts/qualification_report.json`. Without the required workload set and soak threshold, the result should remain conditional.
+
+---
 
 ## Artifacts
 
-`artifacts/` altında makine-okunur özetler yazılır:
+Machine-readable outputs are written under `artifacts/`, including:
 
-- `status.json`
-- `test_summary.json`
-- `benchmark_summary.json`
-- `router_shadow_summary.json`
-- `research_summary.json`
-- `governance_summary.json`
-- `team_summary.json`
-- `security_posture.json`
-- `metrics_snapshot.json`
-- `ga_readiness_report.json`
+```text
+status.json
+test_summary.json
+benchmark_summary.json
+router_shadow_summary.json
+research_summary.json
+governance_summary.json
+team_summary.json
+security_posture.json
+metrics_snapshot.json
+ga_readiness_report.json
+computer_use_platform_matrix.json
+COMPUTER_USE_PLATFORM_MATRIX.md
+```
 
-## Privacy and Debug
+Computer-use contracts and fixtures live under:
 
-- Default: `privacy_mode=true`
-- Persistent traces only when debug is on and privacy is explicitly off
-- Web access default: off
+```text
+contracts/computer_use/
+contracts/operator_panel/schemas/
+```
 
-## Known Limits (v0.4.1)
+---
+
+## Privacy and Security Defaults
+
+Default posture:
+
+- `privacy_mode=true`
+- web access off by default
+- persistent traces disabled unless debug is enabled and privacy is explicitly off
+- raw screenshots not persisted by default
+- terminal control denied by default
+- risky actions approval-gated
+- sensitive surfaces fail closed
+- enterprise artifacts require asymmetric signing
+
+`BINLIQUID_AUDIT_SIGNING_KEY` is compatibility-only and is not acceptable for enterprise artifact signing.
+
+---
+
+## Development and Validation
+
+Recommended local validation before PR/merge:
+
+```bash
+uv run ruff check .
+uv run python -m pytest -q
+uv run python -m compileall binliquid
+uv run python scripts/generate_operator_contract_schemas.py
+corepack pnpm --dir apps/operator-panel test
+corepack pnpm --dir apps/operator-panel lint
+corepack pnpm --dir apps/operator-panel build
+cargo test --manifest-path apps/operator-panel/src-tauri/Cargo.toml
+cargo fmt --manifest-path apps/operator-panel/src-tauri/Cargo.toml --check
+git diff --check
+```
+
+Computer-use-specific validation:
+
+```bash
+uv run python -m binliquid computer-use doctor --json
+uv run python -m binliquid operator capabilities --json
+uv run python scripts/evaluate_computer_use_platform_matrix.py \
+  --profile balanced \
+  --output artifacts/computer_use_platform_matrix.json \
+  --markdown artifacts/COMPUTER_USE_PLATFORM_MATRIX.md
+```
+
+---
+
+## Release and Qualification Notes
+
+Windows public/enterprise release remains blocked until the release gate proves:
+
+- Authenticode signing,
+- timestamp verification,
+- clean VM installer smoke evidence,
+- installed runtime/capabilities/doctor evidence,
+- runtime manifest and bundle hash evidence,
+- `windows-public-release-gate.json` pass status,
+- no blocking reasons.
+
+Computer-use live automation remains blocked per platform until platform qualification passes and signed/trusted evidence exists.
+
+---
+
+## Known Limits
 
 - `transformers` fallback is for continuity, not quality parity.
-- Measured energy depends on platform permissions (`powermetrics`).
+- Measured energy depends on platform permissions such as macOS `powermetrics`.
 - sLTC gains vary by workload distribution.
-- Operator Panel is available as a v0.5 beta surface on top of BinLiquid core v0.4.1;
-  notarized macOS release artifacts remain gated by Apple signing/notary credentials.
-- Windows public/enterprise release remains blocked until Authenticode signing,
-  timestamp verification, clean VM installer smoke evidence, installed
-  runtime/capabilities/doctor evidence, runtime manifest and bundle hash
-  evidence, and `windows-public-release-gate.json` pass.
-- Model assets are not auto-installed (`ollama pull` remains operator-driven).
-- Team runs intentionally fail-closed when governance requires approval in a blocking dependency chain.
-- `team resume` and `team pilot-check` only consume approvals that are both `executed` and not yet `consumed`.
-- approval-gated resume now freezes the execution contract; context drift raises `STALE_APPROVAL_SNAPSHOT` instead of silently continuing.
-- shared `memory_target` writes use optimistic version checks and reject on conflict; there is no last-write-wins path in restricted pilot mode.
-- approval-gated subtrees may serialize themselves under bounded fallback; those decisions are visible in audit/replay artifacts.
-- `team replay --verify` checks event ordering, causal continuity, handoff consistency, and trace integrity; it does not guarantee business correctness or external side-effect validation.
-- Enterprise deployment is scoped to self-hosted single-tenant environments; multi-tenant control plane and broad cloud-native integrations remain deferred.
-- Enterprise artifacts require asymmetric signing; `BINLIQUID_AUDIT_SIGNING_KEY` remains compatibility-only and is not acceptable for enterprise mode.
+- Operator Panel is beta and release artifacts may depend on signing/notary credentials.
+- Model assets are not auto-installed; `ollama pull` remains operator-driven.
+- Team runs intentionally fail closed when governance requires approval in a blocking dependency chain.
+- `team replay --verify` checks ordering, causal continuity, handoff consistency, and trace integrity; it does not guarantee external business correctness.
+- Enterprise deployment is scoped to self-hosted single-tenant environments; multi-tenant control plane work is deferred.
+- Vision-first computer-use is not generally available live automation; it is qualification-gated and disabled by default.
 
-## Documentation
+---
 
-- `docs/RELEASE_GATE_v0.5.md`
-- `docs/RELEASE_CHECKLIST.md`
-- `docs/WINDOWS_RELEASE_HARDENING_REPORT.md`
-- `docs/WINDOWS_INSTALLER_SMOKE.md`
-- `docs/WINDOWS_SIGNED_RC_GATE_REPORT.md`
-- `docs/WINDOWS_PUBLIC_RELEASE_EVIDENCE_CLOSURE_REPORT.md`
-- `docs/WINDOWS_RELEASE_FINALIZATION_REPORT.md`
-- `docs/RFC_COMPUTER_USE_WINDOWS_QUALIFICATION.md`
-- `docs/OPERATIONS_RUNBOOK.md`
-- `SECURITY_BASELINE.md`
-- `KEY_MANAGEMENT.md`
-- `UPGRADE_AND_RECOVERY.md`
-- `OBSERVABILITY_AND_SLO.md`
-- `QUALIFICATION_MATRIX.md`
-- `INSTALL.md`
-- `DEPLOYMENT_GUIDE.md`
-- `SUPPORT_BUNDLE.md`
+## Documentation Index
+
+Key documents:
+
+```text
+docs/ARCHITECTURE.md
+docs/CONFIGURATION.md
+docs/OPERATIONS_RUNBOOK.md
+docs/OPERATOR_CONTRACT_BEHAVIOR.md
+docs/PRIVACY_MODEL.md
+docs/PRODUCT_BOUNDARY_NOTE.md
+docs/RELEASE_CHECKLIST.md
+docs/RELEASE_GATE_v0.5.md
+docs/SECURITY_MODEL.md
+docs/RFC_COMPUTER_USE_001.md
+docs/RFC_COMPUTER_USE_002_full_runtime_foundation.md
+docs/RFC_COMPUTER_USE_WINDOWS_QUALIFICATION.md
+docs/WINDOWS_RELEASE_HARDENING_REPORT.md
+docs/WINDOWS_INSTALLER_SMOKE.md
+docs/WINDOWS_SIGNED_RC_GATE_REPORT.md
+docs/WINDOWS_PUBLIC_RELEASE_EVIDENCE_CLOSURE_REPORT.md
+docs/WINDOWS_RELEASE_FINALIZATION_REPORT.md
+SECURITY_BASELINE.md
+KEY_MANAGEMENT.md
+UPGRADE_AND_RECOVERY.md
+OBSERVABILITY_AND_SLO.md
+QUALIFICATION_MATRIX.md
+INSTALL.md
+DEPLOYMENT_GUIDE.md
+SUPPORT_BUNDLE.md
+```
+
+---
+
+## Suggested Project Description
+
+> BinLiquid is a private, local-first, security-governed agentic runtime for enterprise-controlled environments. It combines a production-grade core assistant runtime, pilot-hardened multi-agent Team Runtime, beta operator panel, and qualification-gated vision-first computer-use foundation with strict approval, replay, audit, and fail-closed safety controls.
