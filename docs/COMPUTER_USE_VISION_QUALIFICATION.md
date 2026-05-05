@@ -6,7 +6,7 @@
 : CI-friendly mock qualification using `benchmarks/tasks/computer_use_vision/smoke_tasks.jsonl`.
 
 `live`
-: Opt-in macOS local qualification. It requires `BINLIQUID_ENABLE_REAL_VISION_COMPUTER_USE_TESTS=1`, Screen Recording, Accessibility, `macos_live_enabled=true`, and a configured local vision provider.
+: Opt-in macOS local qualification. It requires `BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC`, `BINLIQUID_COMPUTER_USE_LIVE_MACOS=1`, Screen Recording, Accessibility, `macos_live_enabled=true`, and a configured local vision provider.
 
 ## Report Contract
 
@@ -51,5 +51,16 @@ uv run python scripts/evaluate_computer_use_platform_matrix.py --profile balance
 Live macOS qualification is intentionally skipped unless explicitly opted in:
 
 ```bash
-BINLIQUID_ENABLE_REAL_VISION_COMPUTER_USE_TESTS=1 uv run python -m pytest tests/test_computer_use_vision_acceptance.py -q
+BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC \
+BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 \
+uv run binliquid computer-use qualification run \
+  --platform macos \
+  --suite live-fixture-smoke \
+  --mode supervised \
+  --output artifacts/computer_use/macos_qualification_report.json \
+  --json
 ```
+
+Without the exact opt-in, the Phase 4B macOS report is `blocked`, not a
+qualification pass, and replay verification exits non-zero because
+`report_status_pass=false`.

@@ -126,6 +126,7 @@ class MacOSVisionReadiness:
                     present=False,
                     valid=False,
                     fresh=False,
+                    status="missing",
                     report_path=self.config.macos_qualification_report,
                     reason_code="MACOS_QUALIFICATION_REPORT_MISSING",
                 ),
@@ -453,6 +454,7 @@ def _evaluate_qualification(
             present=False,
             valid=True,
             fresh=True,
+            status="not_required",
             report_path=config.macos_qualification_report,
             reason_code=None,
         )
@@ -462,6 +464,7 @@ def _evaluate_qualification(
             present=False,
             valid=False,
             fresh=False,
+            status="missing",
             report_path=config.macos_qualification_report,
             reason_code="MACOS_QUALIFICATION_REPORT_MISSING",
         )
@@ -477,6 +480,7 @@ def _evaluate_qualification(
         present=True,
         valid=validation.status != "invalid",
         fresh=validation.allowed,
+        status=validation.status,
         report_path=config.macos_qualification_report,
         reason_code=reason_code,
     )
@@ -488,6 +492,7 @@ def _qualification_payload(
     present: bool,
     valid: bool,
     fresh: bool,
+    status: str,
     report_path: str,
     reason_code: str | None = None,
 ) -> dict[str, Any]:
@@ -496,6 +501,7 @@ def _qualification_payload(
         "present": present,
         "valid": valid,
         "fresh": fresh,
+        "status": status,
         "reportPath": report_path,
         "reasonCode": reason_code,
     }
@@ -531,25 +537,25 @@ def _derive_stage(
     if config.sensitive_surface_policy != "stop":
         return "blocked", False, "SENSITIVE_SURFACE_BLOCKED"
     if not config.macos_live_enabled:
-        stage = "qualified_available" if qualification.get("fresh") else "not_configured"
+        stage = "fixture_qualified" if qualification.get("fresh") else "not_configured"
         return stage, False, "MACOS_LIVE_FLAG_DISABLED"
     if not config.vision_enabled:
         return "not_configured", False, "VISION_RUNTIME_DISABLED"
-    if capture.get("reasonCode") == "MACOS_CAPTURE_BACKEND_DISABLED":
-        return "not_configured", False, "MACOS_CAPTURE_BACKEND_DISABLED"
-    if input_state.get("reasonCode") == "MACOS_INPUT_BACKEND_DISABLED":
-        return "not_configured", False, "MACOS_INPUT_BACKEND_DISABLED"
+    if not capture.get("ready"):
+        return "blocked", False, str(capture.get("reasonCode"))
+    if not input_state.get("ready"):
+        return "blocked", False, str(input_state.get("reasonCode"))
     if screen_recording != "granted":
-        return "missing_permission", False, "MACOS_SCREEN_RECORDING_PERMISSION_MISSING"
+        return "blocked", False, "MACOS_SCREEN_RECORDING_PERMISSION_MISSING"
     if accessibility != "granted":
-        return "missing_permission", False, "MACOS_ACCESSIBILITY_PERMISSION_MISSING"
+        return "blocked", False, "MACOS_ACCESSIBILITY_PERMISSION_MISSING"
     if not provider.get("ready"):
-        return "provider_unavailable", False, str(provider.get("reasonCode"))
+        return "permission_ready", False, str(provider.get("reasonCode"))
     if qualification.get("required") and not qualification.get("fresh"):
-        return "not_qualified", False, str(qualification.get("reasonCode"))
+        return "provider_ready", False, str(qualification.get("reasonCode"))
     if not config.macos_live_enabled:
-        return "qualified_available", False, "MACOS_LIVE_FLAG_DISABLED"
-    return "enabled", True, None
+        return "fixture_qualified", False, "MACOS_LIVE_FLAG_DISABLED"
+    return "qualified_limited", True, None
 
 
 class MacOSScreenCaptureProvider:

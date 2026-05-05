@@ -31,6 +31,26 @@ uv run binliquid computer-use qualification verify \
   --json
 ```
 
+Replay/audit verification for the Phase 4B macOS report is separate:
+
+```bash
+uv run binliquid computer-use replay \
+  --report artifacts/computer_use/macos_qualification_report.json \
+  --verify \
+  --json
+```
+
+The live fixture command requires both:
+
+```text
+BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC
+BINLIQUID_COMPUTER_USE_LIVE_MACOS=1
+```
+
+Without those values and a ready local provider, permissions, backends, matching
+commit/config hash, and safety defaults, macOS remains blocked and
+`liveEnabled=false`.
+
 ## Stop Conditions
 
 Stop the run if a sensitive surface appears, an approval is stale, terminal control is requested, or raw screenshot persistence would be required by default.

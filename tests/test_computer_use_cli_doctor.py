@@ -121,7 +121,7 @@ def test_computer_use_qualification_verify_accepts_schema_input_fixture() -> Non
     assert payload["checks"]["replay_integrity_verified"] is True
 
 
-def test_macos_live_qualification_run_is_opt_in_and_does_not_enable_runtime(tmp_path) -> None:
+def test_macos_live_qualification_run_blocks_without_explicit_opt_in(tmp_path) -> None:
     output = tmp_path / "macos_qualification_report.json"
     result = runner.invoke(
         app,
@@ -146,10 +146,64 @@ def test_macos_live_qualification_run_is_opt_in_and_does_not_enable_runtime(tmp_
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     report = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["status"] == "skipped"
-    assert report["status"] == "skipped"
-    assert report["stage"] == "not_qualified"
+    assert payload["status"] == "blocked"
+    assert report["status"] == "blocked"
+    assert report["stage"] == "blocked"
+    assert report["scope"] == "supervised_local_fixtures"
+    assert report["safety"]["rawScreenshotPersistedCount"] == 0
     assert report["artifacts"]["rawScreenshotCount"] == 0
+    assert "MACOS_LIVE_OPT_IN_MISSING" in report["blockers"]
+    assert {fixture["id"] for fixture in report["fixtures"]} == {
+        "local_browser_form",
+        "textedit_safe_typing",
+        "finder_fixture_file",
+        "sensitive_surface_stop",
+        "terminal_deny",
+    }
+    assert all(fixture["status"] == "skipped" for fixture in report["fixtures"])
+
+
+def test_macos_qualification_replay_verify_fails_closed_for_blocked_report(tmp_path) -> None:
+    output = tmp_path / "macos_qualification_report.json"
+    run_result = runner.invoke(
+        app,
+        [
+            "computer-use",
+            "qualification",
+            "run",
+            "--profile",
+            "balanced",
+            "--platform",
+            "macos",
+            "--suite",
+            "live-fixture-smoke",
+            "--mode",
+            "supervised",
+            "--output",
+            str(output),
+            "--json",
+        ],
+    )
+    assert run_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "computer-use",
+            "replay",
+            "--report",
+            str(output),
+            "--verify",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload["verified"] is False
+    assert payload["checks"]["raw_screenshot_policy"] is True
+    assert payload["checks"]["hash_chain_verified"] is True
+    assert payload["checks"]["report_status_pass"] is False
 
 
 def test_all_profiles_keep_computer_use_defaults_fail_closed() -> None:

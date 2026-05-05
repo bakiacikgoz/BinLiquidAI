@@ -24,17 +24,24 @@
         "provider_unavailable",
         "not_qualified",
         "qualified_available",
+        "permission_ready",
+        "provider_ready",
+        "fixture_qualified",
+        "qualified_limited",
         "enabled",
         "blocked"
       ]
     },
+    "scope": { "type": "string" },
     "sessionType": { "type": "string" },
     "commit": { "type": "string", "minLength": 1 },
     "commitSha": { "type": "string", "minLength": 1 },
     "configHash": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "createdAt": { "type": "string", "minLength": 1 },
     "generatedAt": { "type": "string", "minLength": 1 },
     "expiresAt": { "type": "string", "minLength": 1 },
     "runtimeVersion": { "type": "string" },
+    "host": { "type": "object" },
     "provider": { "type": "object" },
     "permissions": { "type": "object" },
     "backends": { "type": "object" },
@@ -42,9 +49,11 @@
     "machine": { "type": "object" },
     "taskSuite": { "type": "object" },
     "tasks": { "type": "array", "items": { "type": "object" } },
+    "fixtures": { "type": "array", "items": { "type": "object" } },
     "safety": { "type": "object" },
     "evidence": { "type": "array" },
     "artifacts": { "type": "object" },
+    "limitations": { "type": "array", "items": { "type": "string" } },
     "blockers": { "type": "array", "items": { "type": "string" } }
   }
 }

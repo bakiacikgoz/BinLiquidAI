@@ -26,7 +26,11 @@ from binliquid.computer_use.vision_runtime.qualification import (
     run_vision_qualification,
     validate_platform_qualification_report,
 )
-from binliquid.computer_use.vision_runtime.replay import load_replay_summary, verify_replay
+from binliquid.computer_use.vision_runtime.replay import (
+    load_replay_summary,
+    verify_qualification_report_replay,
+    verify_replay,
+)
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
@@ -1894,12 +1898,28 @@ def _qualification_fixture_checks(fixture: dict[str, Any]) -> dict[str, bool]:
 
 @computer_use_app.command("replay")
 def computer_use_replay(
-    job_id: str = typer.Option(..., "--job-id", help="Vision computer-use job id"),
+    job_id: str | None = typer.Option(None, "--job-id", help="Vision computer-use job id"),
+    report: str | None = typer.Option(
+        None,
+        "--report",
+        help="macOS qualification report JSON path",
+    ),
     root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
     profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
     verify: bool = typer.Option(False, "--verify/--no-verify", help="Verify replay integrity"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
+    if report is not None:
+        payload = _with_contract_version(verify_qualification_report_replay(Path(report)))
+        if json_output:
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            typer.echo(f"report={report} verified={payload.get('verified')}")
+        if verify and not payload.get("verified"):
+            raise typer.Exit(code=1)
+        return
+    if job_id is None:
+        raise typer.BadParameter("provide --job-id or --report")
     config = RuntimeConfig.from_profile(profile)
     job_dir = Path(root_dir or config.team.artifact_dir) / job_id
     payload = load_replay_summary(job_dir)

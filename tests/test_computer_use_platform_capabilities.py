@@ -38,7 +38,7 @@ def test_platform_capability_serializes_with_operator_contract_aliases() -> None
     assert payload["failClosed"] is True
 
 
-def test_macos_qualified_report_without_live_flag_is_qualified_available() -> None:
+def test_macos_qualified_report_without_live_flag_is_fixture_qualified() -> None:
     config = ComputerUseRuntimeConfig(
         vision_enabled=True,
         vision_provider="ollama",
@@ -51,7 +51,7 @@ def test_macos_qualified_report_without_live_flag_is_qualified_available() -> No
         "schemaVersion": "1.0",
         "platform": "macos",
         "status": "pass",
-        "stage": "qualified_available",
+        "stage": "fixture_qualified",
         "commitSha": "abc123",
         "configHash": platform_config_hash(config, platform="macos"),
         "generatedAt": "2026-05-05T00:00:00+00:00",
@@ -77,6 +77,6 @@ def test_macos_qualified_report_without_live_flag_is_qualified_available() -> No
         commit="abc123",
     )["macos"]
 
-    assert capability.stage == "qualified_available"
+    assert capability.stage == "fixture_qualified"
     assert capability.live_enabled is False
     assert capability.reason_code == "MACOS_LIVE_FLAG_DISABLED"

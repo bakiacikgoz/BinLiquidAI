@@ -117,27 +117,39 @@ def _valid_macos_report(
         "schemaVersion": "1.0",
         "platform": "macos",
         "status": "pass",
-        "stage": "qualified_available",
+        "scope": "supervised_local_fixtures",
+        "stage": "fixture_qualified",
+        "commit": commit,
         "commitSha": commit,
         "configHash": platform_config_hash(runtime_config, platform="macos"),
+        "createdAt": now.isoformat(),
         "generatedAt": now.isoformat(),
         "expiresAt": (expires_at or (now + timedelta(hours=1))).isoformat(),
+        "host": {"os": "macos", "version": "test", "arch": "arm64"},
         "machine": {
             "osVersion": "test",
             "arch": "arm64",
             "displayCount": 1,
             "scaleFactors": [2.0],
         },
-        "provider": {"name": "ollama", "model": "llava", "strictJson": True},
-        "permissions": {"screenRecording": True, "accessibility": True},
+        "provider": {"name": "ollama", "model": "llava", "strictJson": True, "ready": True},
+        "permissions": {
+            "screenRecording": "granted",
+            "accessibility": "granted",
+            "inputMonitoring": "not_required",
+        },
         "backends": {"capture": "screencapture", "input": "quartz"},
         "safety": {
             "visionEnabledDefault": False,
+            "rawScreenshotPersistence": False,
             "rawScreenshotPersistenceDefault": False,
+            "rawScreenshotRetention": "disabled",
             "rawScreenshotMaxCountDefault": 0,
+            "rawScreenshotPersistedCount": 0,
             "terminalPolicy": "deny",
             "sensitiveSurfacePolicy": "stop",
             "approvalFreshnessEnforced": True,
+            "replayIntegrityVerified": True,
             "replayIntegrityEnforced": True,
         },
         "tasks": [
@@ -149,11 +161,23 @@ def _valid_macos_report(
                 "approvalStops": 0,
             }
         ],
+        "fixtures": [
+            {
+                "id": "local_browser_form",
+                "status": "pass",
+                "stepsAttempted": 1,
+                "stepsSucceeded": 1,
+                "reasonCode": None,
+            }
+        ],
         "artifacts": {
             "replayPath": "artifacts/replay.jsonl",
             "auditPath": "artifacts/audit.json",
+            "eventLogPath": "artifacts/events.jsonl",
             "rawScreenshotCount": 0,
+            "screenshotHashesOnly": True,
         },
+        "limitations": ["supervised local fixtures only"],
         "blockers": [],
     }
 

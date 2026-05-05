@@ -42,6 +42,7 @@ The doctor is CI-safe and does not request, grant, or bypass macOS TCC permissio
 ## Qualification Command
 
 ```bash
+BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC \
 BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 \
 uv run binliquid computer-use qualification run \
   --platform macos \
@@ -51,4 +52,7 @@ uv run binliquid computer-use qualification run \
   --json
 ```
 
-Without `BINLIQUID_COMPUTER_USE_LIVE_MACOS=1`, the command writes a skipped report and does not mark macOS qualified.
+Without the exact opt-in and `BINLIQUID_COMPUTER_USE_LIVE_MACOS=1`, the command
+writes a blocked report and does not mark macOS qualified. A passing local
+fixture report can show `fixture_qualified` while the live flag remains off;
+`qualified_limited` is the only live-enabled macOS stage.

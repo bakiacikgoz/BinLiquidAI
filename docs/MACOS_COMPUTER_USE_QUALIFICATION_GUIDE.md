@@ -44,6 +44,7 @@ uv run binliquid computer-use doctor --platform macos --json
 Run live qualification only on a prepared, supervised local desktop:
 
 ```bash
+BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC \
 BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 \
 uv run binliquid computer-use qualification run \
   --platform macos \
@@ -53,4 +54,19 @@ uv run binliquid computer-use qualification run \
   --json
 ```
 
-If live qualification is not run, macOS remains not qualified.
+If the explicit opt-in or any readiness gate is missing, the command writes a
+blocked report with local fixture metadata only. It does not request permissions,
+grant permissions, persist raw screenshots, or enable live runtime execution.
+
+Verify report replay integrity separately:
+
+```bash
+uv run binliquid computer-use replay \
+  --report artifacts/computer_use/macos_qualification_report.json \
+  --verify \
+  --json
+```
+
+A fresh passing report without `macos_live_enabled=true` may report
+`fixture_qualified`; `liveEnabled=true` is limited to `qualified_limited` after
+all local fixture, provider, permission, config, commit, and safety gates pass.

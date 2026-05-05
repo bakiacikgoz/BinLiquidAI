@@ -183,4 +183,7 @@ The v0.5 release gate must not present vision-first computer-use as unrestricted
 - replay verification passes hash-chain and policy invariant checks;
 - Windows live execution remains `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.
 
-Live macOS qualification is a separate opt-in gate and requires local Screen Recording, Accessibility, provider, and `macos_live_enabled=true`.
+Live macOS qualification is a separate opt-in gate and requires the exact
+`BINLIQUID_COMPUTER_USE_LIVE_OPT_IN` token, `BINLIQUID_COMPUTER_USE_LIVE_MACOS=1`,
+local Screen Recording, Accessibility, provider readiness, replay verification,
+zero raw screenshots, and `macos_live_enabled=true`.

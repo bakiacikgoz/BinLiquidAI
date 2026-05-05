@@ -57,3 +57,7 @@ Windows and Linux live execution are not qualified. Windows must continue to rep
 - `liveEnabled=true` requires a valid platform qualification report matching platform, commit, and config hash.
 - Windows UAC secure desktop and Linux Wayland/X11 live input remain blocked until future signed evidence changes the gate.
 - The public platform matrix fails if any profile appears live-ready without valid evidence.
+- macOS Phase 4B live qualification requires the exact local opt-in token,
+  `BINLIQUID_COMPUTER_USE_LIVE_MACOS=1`, ready Screen Recording and
+  Accessibility states, provider readiness, local fixture pass evidence, replay
+  verification, and zero persisted raw screenshots before `qualified_limited`.

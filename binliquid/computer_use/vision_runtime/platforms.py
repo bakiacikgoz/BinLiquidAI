@@ -28,6 +28,10 @@ PlatformStage = Literal[
     "provider_unavailable",
     "not_qualified",
     "qualified_available",
+    "permission_ready",
+    "provider_ready",
+    "fixture_qualified",
+    "qualified_limited",
     "enabled",
     "blocked",
     "ready_for_dry_run",
@@ -141,14 +145,14 @@ def build_platform_capability(
         and safety_defaults_ok
     )
     if live_enabled:
-        stage: PlatformStage = "enabled"
+        stage: PlatformStage = "qualified_limited"
         reason_code = None
     elif (
         normalized_platform == ComputerUsePlatform.MACOS
         and qualification_allowed
         and not _platform_live_flag(config, normalized_platform)
     ):
-        stage = "qualified_available"
+        stage = "fixture_qualified"
         reason_code = "MACOS_LIVE_FLAG_DISABLED"
     else:
         stage = "not_qualified"
