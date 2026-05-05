@@ -65,3 +65,7 @@ Windows and Linux live execution are not qualified. Windows must continue to rep
 - Provider readiness is local-only and synthetic-fixture based. Missing models,
   invalid JSON, strict schema failures, and timeouts fail closed before any
   desktop capture or OS input path can run.
+- Phase 4E additionally requires the configured model to be present locally and
+  vision-capable. Capture/input backends refuse to run without one-run live
+  opt-in, fixture-only scope, step approval, and non-missing manual macOS
+  permission state.

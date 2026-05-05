@@ -60,3 +60,7 @@ Provider output is treated as untrusted observed content. Screen text is not acc
 - Phase 4D provider readiness uses a generated synthetic local fixture image
   and validates strict JSON before any desktop capture or input. The synthetic
   image is not persisted as raw screenshot evidence.
+- Phase 4E preserves that boundary: provider checks use synthetic image bytes
+  only for local inference, live capture uses temporary files only when all
+  one-run gates pass, and default qualification artifacts keep
+  `rawScreenshotPersistedCount=0`.

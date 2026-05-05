@@ -1738,6 +1738,8 @@ def computer_use_qualification_run(
     platform: str = typer.Option("macos", "--platform", help="macos"),
     suite: str = typer.Option("live-fixture-smoke", "--suite", help="Qualification suite"),
     mode: str = typer.Option("supervised", "--mode", help="preflight|supervised"),
+    provider: str | None = typer.Option(None, "--provider", help="Override vision provider"),
+    model: str | None = typer.Option(None, "--model", help="Override vision model"),
     output: str = typer.Option(
         "artifacts/computer_use/macos_qualification_report.json",
         "--output",
@@ -1762,8 +1764,16 @@ def computer_use_qualification_run(
     if mode.strip().lower() not in {"preflight", "supervised"}:
         raise typer.BadParameter("mode must be preflight or supervised for macOS qualification")
     config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
+    computer_use_config = config.computer_use
+    if provider is not None or model is not None:
+        updates: dict[str, Any] = {}
+        if provider is not None:
+            updates["vision_provider"] = provider
+        if model is not None:
+            updates["vision_model"] = model
+        computer_use_config = computer_use_config.model_copy(update=updates)
     report_payload = run_macos_live_qualification(
-        config=config.computer_use,
+        config=computer_use_config,
         suite=suite,
         mode=mode,
         output_path=Path(output),

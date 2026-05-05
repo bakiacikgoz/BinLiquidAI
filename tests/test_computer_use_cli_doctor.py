@@ -55,6 +55,8 @@ def test_computer_use_doctor_macos_shape_reports_exact_fail_closed_blockers() ->
     assert payload["optIn"]["present"] is False
     assert payload["optIn"]["required"] is True
     assert payload["nextActions"]
+    assert payload["permissionSubjects"]
+    assert payload["manualInstructions"]
     assert payload["permissions"]["screenRecording"]["status"] in {
         "granted",
         "missing",
@@ -186,10 +188,31 @@ def test_macos_live_qualification_run_blocks_without_explicit_opt_in(tmp_path) -
     assert report["artifacts"]["phase4dFlagInventoryPath"].endswith(
         "macos_phase4d_flag_inventory.json"
     )
+    assert report["artifacts"]["phase4ePreflightPath"].endswith(
+        "macos_phase4e_preflight.json"
+    )
+    assert report["artifacts"]["phase4eFlagInventoryPath"].endswith(
+        "macos_phase4e_flag_inventory.json"
+    )
+    assert report["artifacts"]["phase4ePermissionReadinessPath"].endswith(
+        "macos_phase4e_permission_readiness.json"
+    )
     assert report["provider"]["strictJsonValidated"] is False
     assert report["capture"]["rawPersistedCount"] == 0
     assert (output.parent / "macos_phase4d_preflight.json").exists()
     assert (output.parent / "macos_phase4d_flag_inventory.json").exists()
+    phase4e_preflight = output.parent / "macos_phase4e_preflight.json"
+    phase4e_inventory = output.parent / "macos_phase4e_flag_inventory.json"
+    phase4e_permissions = output.parent / "macos_phase4e_permission_readiness.json"
+    assert phase4e_preflight.exists()
+    assert phase4e_inventory.exists()
+    assert phase4e_permissions.exists()
+    permission_payload = json.loads(phase4e_permissions.read_text(encoding="utf-8"))
+    assert permission_payload["autoGrantAttempted"] is False
+    assert permission_payload["manualInstructions"]
+    inventory_payload = json.loads(phase4e_inventory.read_text(encoding="utf-8"))
+    assert inventory_payload["vision_enabled"]["default"] is False
+    assert inventory_payload["ollama_model_pull_opt_in"]["default"] is False
     assert "MACOS_LIVE_OPT_IN_MISSING" in report["blockers"]
     assert "MACOS_LIVE_ACK_MISSING" in report["blockers"]
     assert "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED" in report["blockers"]

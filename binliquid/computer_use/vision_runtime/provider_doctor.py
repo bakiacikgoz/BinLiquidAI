@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import struct
+import subprocess
 import zlib
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -17,6 +18,7 @@ from binliquid.computer_use.vision_runtime.providers.ollama_vision import (
 )
 
 ProviderClient = Callable[..., Any]
+ModelLister = Callable[[], set[str]]
 
 
 def doctor_vision_provider(
@@ -27,6 +29,7 @@ def doctor_vision_provider(
     timeout_s: float = 30.0,
     max_retries: int = 1,
     client: ProviderClient | None = None,
+    model_lister: ModelLister | None = None,
     which: Callable[[str], str | None] = shutil.which,
     environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
@@ -38,6 +41,13 @@ def doctor_vision_provider(
         "provider": normalized_provider,
         "kind": normalized_provider,
         "model": model,
+        "modelConfigured": bool(model),
+        "modelPresent": False,
+        "visionInputAccepted": False,
+        "strictJsonPass": False,
+        "schemaValidationPass": False,
+        "timeoutMs": int(timeout_s * 1000),
+        "stage": "blocked",
         "ready": False,
         "strictJsonValidated": False,
         "syntheticFixture": fixture["public"],
@@ -58,11 +68,24 @@ def doctor_vision_provider(
     if not model:
         return _blocked(base, "VISION_PROVIDER_MODEL_NOT_CONFIGURED")
     if not synthetic_fixture:
-        return _blocked(base, "VISION_PROVIDER_STRICT_JSON_CONTRACT_FAILED")
+        return _blocked(base, "VISION_PROVIDER_INVALID_RESPONSE")
     if not base["checks"]["local_endpoint"]:
         return _blocked(base, "VISION_PROVIDER_UNAVAILABLE")
     if client is None and which("ollama") is None:
         return _blocked(base, "VISION_PROVIDER_UNAVAILABLE")
+
+    models = (
+        model_lister()
+        if model_lister is not None
+        else {model}
+        if client is not None
+        else _list_ollama_models()
+    )
+    model_present = _model_present(model, models)
+    base["modelPresent"] = model_present
+    base["checks"]["model_present"] = model_present
+    if not model_present:
+        return _blocked(base, "VISION_PROVIDER_MODEL_NOT_FOUND")
 
     active_client = client or _ollama_generate_client
     prompt = _synthetic_provider_prompt(fixture["public"])
@@ -77,7 +100,13 @@ def doctor_vision_provider(
             )
             parsed = _parse_provider_doctor_response(raw)
             base["status"] = "pass"
+            base["stage"] = "ready"
             base["ready"] = True
+            base["modelConfigured"] = True
+            base["modelPresent"] = True
+            base["visionInputAccepted"] = True
+            base["strictJsonPass"] = True
+            base["schemaValidationPass"] = True
             base["strictJsonValidated"] = True
             base["checks"]["strict_json_contract"] = True
             base["reasonCode"] = None
@@ -90,14 +119,18 @@ def doctor_vision_provider(
             return base
         except TimeoutError:
             return _blocked(base, "VISION_PROVIDER_TIMEOUT")
+        except _ProviderNotVisionCapable:
+            return _blocked(base, "VISION_PROVIDER_NOT_VISION_CAPABLE")
         except _ProviderInvalidResponse:
             return _blocked(base, "VISION_PROVIDER_INVALID_RESPONSE")
-        except _ProviderStrictContractFailed:
-            return _blocked(base, "VISION_PROVIDER_STRICT_JSON_CONTRACT_FAILED")
         except Exception as exc:  # noqa: BLE001
             last_error = exc
             if _looks_like_timeout(exc):
                 return _blocked(base, "VISION_PROVIDER_TIMEOUT")
+            if _looks_like_model_not_found(exc):
+                return _blocked(base, "VISION_PROVIDER_MODEL_NOT_FOUND")
+            if _looks_like_vision_rejection(exc):
+                return _blocked(base, "VISION_PROVIDER_NOT_VISION_CAPABLE")
             continue
     payload = _blocked(base, "VISION_PROVIDER_UNAVAILABLE")
     payload["errorType"] = type(last_error).__name__ if last_error is not None else None
@@ -107,7 +140,11 @@ def doctor_vision_provider(
 def _blocked(payload: dict[str, Any], reason_code: str) -> dict[str, Any]:
     payload = dict(payload)
     payload["status"] = "blocked"
+    payload["stage"] = "blocked"
     payload["ready"] = False
+    payload["visionInputAccepted"] = False
+    payload["strictJsonPass"] = False
+    payload["schemaValidationPass"] = False
     payload["strictJsonValidated"] = False
     payload["reasonCode"] = reason_code
     return payload
@@ -117,7 +154,7 @@ class _ProviderInvalidResponse(RuntimeError):
     pass
 
 
-class _ProviderStrictContractFailed(RuntimeError):
+class _ProviderNotVisionCapable(RuntimeError):
     pass
 
 
@@ -137,11 +174,14 @@ def _parse_provider_doctor_response(raw: Any) -> OllamaVisionResponse:
         try:
             payload = {**payload, "surface_kind": SurfaceKind(str(payload["surface_kind"]))}
         except ValueError as exc:
-            raise _ProviderStrictContractFailed from exc
+            raise _ProviderInvalidResponse from exc
     try:
-        return OllamaVisionResponse.model_validate(payload)
+        parsed = OllamaVisionResponse.model_validate(payload)
     except Exception as exc:  # noqa: BLE001
-        raise _ProviderStrictContractFailed from exc
+        raise _ProviderInvalidResponse from exc
+    if not parsed.ui_elements:
+        raise _ProviderNotVisionCapable
+    return parsed
 
 
 def _ollama_generate_client(
@@ -241,7 +281,56 @@ def _local_ollama_endpoint(environment: Mapping[str, str]) -> bool:
     return allowed
 
 
+def _list_ollama_models() -> set[str]:
+    try:
+        proc = subprocess.run(
+            ["ollama", "list"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return set()
+    if proc.returncode != 0:
+        return set()
+    models: set[str] = set()
+    for line in proc.stdout.splitlines()[1:]:
+        parts = line.split()
+        if parts:
+            models.add(parts[0])
+    return models
+
+
+def _model_present(model: str, models: set[str]) -> bool:
+    normalized = model.strip()
+    if normalized in models:
+        return True
+    if ":" not in normalized and f"{normalized}:latest" in models:
+        return True
+    return any(candidate.split(":", maxsplit=1)[0] == normalized for candidate in models)
+
+
 def _looks_like_timeout(exc: BaseException) -> bool:
     name = type(exc).__name__.lower()
     message = str(exc).lower()
     return "timeout" in name or "timed out" in message or "timeout" in message
+
+
+def _looks_like_model_not_found(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return "not found" in message or "model not found" in message or "pull model" in message
+
+
+def _looks_like_vision_rejection(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return (
+        "image" in message
+        and (
+            "unsupported" in message
+            or "does not support" in message
+            or "vision" in message
+            or "multi-modal" in message
+            or "multimodal" in message
+        )
+    )

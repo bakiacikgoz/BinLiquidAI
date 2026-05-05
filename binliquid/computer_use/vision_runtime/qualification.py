@@ -283,6 +283,11 @@ def run_macos_live_qualification(
         report=report,
         readiness=readiness,
     )
+    _write_phase4e_artifacts(
+        output_path=output_path,
+        report=report,
+        readiness=readiness,
+    )
     return report
 
 
@@ -563,6 +568,15 @@ def _macos_qualification_report(
         ),
         "phase4dFlagInventoryPath": _safe_artifact_path(
             output_path.parent / "macos_phase4d_flag_inventory.json"
+        ),
+        "phase4ePreflightPath": _safe_artifact_path(
+            output_path.parent / "macos_phase4e_preflight.json"
+        ),
+        "phase4eFlagInventoryPath": _safe_artifact_path(
+            output_path.parent / "macos_phase4e_flag_inventory.json"
+        ),
+        "phase4ePermissionReadinessPath": _safe_artifact_path(
+            output_path.parent / "macos_phase4e_permission_readiness.json"
         ),
         "rawScreenshotCount": screenshot_persisted_count,
         "screenshotHashesOnly": True,
@@ -925,6 +939,10 @@ def _macos_next_actions(blockers: list[str]) -> list[dict[str, Any]]:
         "VISION_RUNTIME_DISABLED": "Enable computer_use.vision_enabled for the supervised run.",
         "VISION_PROVIDER_UNAVAILABLE": "Configure a local Ollama vision model; do not auto-pull.",
         "VISION_PROVIDER_MODEL_NOT_CONFIGURED": "Set computer_use.vision_model for this run.",
+        "VISION_PROVIDER_MODEL_NOT_FOUND": (
+            "Install the configured local model manually; do not auto-pull."
+        ),
+        "VISION_PROVIDER_NOT_VISION_CAPABLE": "Select a local model that accepts image input.",
         "VISION_PROVIDER_TIMEOUT": "Start or inspect the local provider; do not auto-pull models.",
         "VISION_PROVIDER_INVALID_RESPONSE": "Use a local provider/model that returns JSON.",
         "VISION_PROVIDER_STRICT_JSON_CONTRACT_FAILED": (
@@ -1132,6 +1150,75 @@ def _write_phase4d_artifacts(
     )
 
 
+def _write_phase4e_artifacts(
+    *,
+    output_path: Path,
+    report: Mapping[str, Any],
+    readiness: Mapping[str, Any],
+) -> None:
+    output_dir = output_path.parent
+    flag_inventory = _phase4e_flag_inventory()
+    flag_path = output_dir / "macos_phase4e_flag_inventory.json"
+    permission_path = output_dir / "macos_phase4e_permission_readiness.json"
+    preflight_path = output_dir / "macos_phase4e_preflight.json"
+    flag_path.write_text(
+        json.dumps(flag_inventory, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    permission_readiness = _phase4e_permission_readiness(readiness)
+    permission_path.write_text(
+        json.dumps(permission_readiness, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    provider = readiness.get("provider") if isinstance(readiness.get("provider"), dict) else {}
+    preflight = {
+        "artifactVersion": "computer_use_phase4e_preflight/v1",
+        "platform": "macos",
+        "suite": report.get("suite"),
+        "mode": report.get("mode"),
+        "status": report.get("status"),
+        "stage": report.get("stage"),
+        "reasonCode": report.get("reasonCode"),
+        "blockers": report.get("blockers", []),
+        "providerDoctor": provider.get("doctor")
+        or {
+            "provider": provider.get("kind"),
+            "model": provider.get("model"),
+            "ready": provider.get("ready") is True,
+            "reasonCode": provider.get("reasonCode"),
+        },
+        "permissionReadinessPath": _safe_artifact_path(permission_path),
+        "flagInventoryPath": _safe_artifact_path(flag_path),
+        "permissions": permission_readiness["permissions"],
+        "capture": readiness.get("capture", {}),
+        "input": readiness.get("input", {}),
+        "safety": {
+            "rawScreenshotPersistedCount": 0,
+            "terminalPolicy": report.get("safety", {}).get("terminalPolicy"),
+            "sensitiveSurfacePolicy": report.get("safety", {}).get(
+                "sensitiveSurfacePolicy"
+            ),
+            "stepApprovalRequired": report.get("safety", {}).get("stepApprovalRequired"),
+            "approvalFreshnessEnforced": report.get("safety", {}).get(
+                "approvalFreshnessEnforced"
+            ),
+            "replayIntegrityVerified": report.get("safety", {}).get(
+                "replayIntegrityVerified"
+            ),
+            "auditHashChainVerified": report.get("safety", {}).get(
+                "auditHashChainVerified"
+            ),
+        },
+        "rawScreenshotPersistedCount": 0,
+    }
+    preflight_path.write_text(
+        json.dumps(preflight, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
 def _phase4d_flag_inventory() -> dict[str, str]:
     return {
         "vision_enabled_key": "computer_use.vision_enabled",
@@ -1156,6 +1243,135 @@ def _phase4d_flag_inventory() -> dict[str, str]:
             "BINLIQUID_COMPUTER_USE_RAW_SCREENSHOT_PERSISTENCE"
         ),
     }
+
+
+def _phase4e_flag_inventory() -> dict[str, Any]:
+    return {
+        "vision_enabled": {
+            "key": "computer_use.vision_enabled",
+            "env": "BINLIQUID_COMPUTER_USE_VISION_ENABLED",
+            "source": "config/env/cli",
+            "default": False,
+        },
+        "vision_provider": {
+            "key": "computer_use.vision_provider",
+            "env": "BINLIQUID_COMPUTER_USE_VISION_PROVIDER",
+            "source": "config/env/cli",
+            "default": "none",
+        },
+        "vision_model": {
+            "key": "computer_use.vision_model",
+            "env": "BINLIQUID_COMPUTER_USE_VISION_MODEL",
+            "source": "config/env/cli",
+            "default": None,
+        },
+        "macos_live_enabled": {
+            "key": "computer_use.macos_live_enabled",
+            "env": "BINLIQUID_COMPUTER_USE_MACOS_LIVE_ENABLED",
+            "source": "config/env/cli",
+            "default": False,
+        },
+        "macos_capture_backend": {
+            "key": "computer_use.macos_capture_backend",
+            "env": "BINLIQUID_COMPUTER_USE_MACOS_CAPTURE_BACKEND",
+            "source": "config/env/cli",
+            "default": "disabled",
+        },
+        "macos_input_backend": {
+            "key": "computer_use.macos_input_backend",
+            "env": "BINLIQUID_COMPUTER_USE_MACOS_INPUT_BACKEND",
+            "source": "config/env/cli",
+            "default": "disabled",
+        },
+        "one_run_live_opt_in": {
+            "env": "BINLIQUID_COMPUTER_USE_LIVE_MACOS",
+            "source": "env",
+            "required_for_live": True,
+        },
+        "live_ack": {
+            "env": "BINLIQUID_COMPUTER_USE_ACK",
+            "source": "env",
+            "required_for_live": True,
+        },
+        "legacy_live_ack": {
+            "env": "BINLIQUID_COMPUTER_USE_LIVE_OPT_IN",
+            "source": "env",
+            "required_for_live": False,
+        },
+        "supervised_fixture_only": {
+            "env": "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
+            "source": "env",
+            "required_for_live": True,
+        },
+        "step_approval_required": {
+            "env": "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
+            "source": "env/config",
+            "config_key": "computer_use.macos_require_step_approval",
+            "required_for_live": True,
+        },
+        "raw_screenshot_persistence": {
+            "key": "computer_use.raw_screenshot_persistence",
+            "env": "BINLIQUID_COMPUTER_USE_RAW_SCREENSHOT_PERSISTENCE",
+            "source": "config/env/cli",
+            "default": False,
+        },
+        "ollama_model_pull_opt_in": {
+            "env": "BINLIQUID_ALLOW_OLLAMA_MODEL_PULL",
+            "source": "env",
+            "required_for_live": False,
+            "default": False,
+            "implemented_behavior": "documented_fail_closed_no_auto_pull",
+        },
+    }
+
+
+def _phase4e_permission_readiness(readiness: Mapping[str, Any]) -> dict[str, Any]:
+    permissions = readiness.get("permissions")
+    permission_map = permissions if isinstance(permissions, Mapping) else {}
+    screen = str(permission_map.get("screenRecording", "unknown"))
+    accessibility = str(permission_map.get("accessibility", "unknown"))
+    input_monitoring = str(permission_map.get("inputMonitoring", "not_required"))
+    reason_code = None
+    if screen != "granted":
+        reason_code = "MACOS_SCREEN_RECORDING_PERMISSION_MISSING"
+    elif accessibility != "granted":
+        reason_code = "MACOS_ACCESSIBILITY_PERMISSION_MISSING"
+    return {
+        "artifactVersion": "computer_use_phase4e_permission_readiness/v1",
+        "platform": "macos",
+        "stage": "ready" if reason_code is None else "blocked",
+        "reasonCode": reason_code,
+        "permissions": {
+            "screenRecording": screen,
+            "accessibility": accessibility,
+            "inputMonitoring": input_monitoring,
+        },
+        "permissionSubjects": _macos_permission_subjects(),
+        "manualInstructions": _macos_permission_manual_instructions(),
+        "autoGrantAttempted": False,
+    }
+
+
+def _macos_permission_subjects() -> list[str]:
+    return [
+        "Terminal.app or the terminal app running uv/python",
+        "Visual Studio Code if launching the runtime from VS Code",
+        "BinLiquid operator shell if bundled",
+    ]
+
+
+def _macos_permission_manual_instructions() -> list[str]:
+    return [
+        (
+            "Open System Settings -> Privacy & Security -> Screen Recording and "
+            "grant access to the process that runs BinLiquid."
+        ),
+        (
+            "Open System Settings -> Privacy & Security -> Accessibility and "
+            "grant access to the process that sends input events."
+        ),
+        "Quit and reopen the terminal/app after changing permissions.",
+    ]
 
 
 def _macos_operator_checklist() -> list[str]:

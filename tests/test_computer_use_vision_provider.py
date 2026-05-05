@@ -152,7 +152,34 @@ def test_provider_doctor_blocks_when_model_is_missing() -> None:
 
     assert payload["status"] == "blocked"
     assert payload["reasonCode"] == "VISION_PROVIDER_MODEL_NOT_CONFIGURED"
+    assert payload["modelConfigured"] is False
     assert payload["syntheticFixture"]["rawPersisted"] is False
+
+
+def test_provider_doctor_blocks_when_ollama_is_unavailable() -> None:
+    payload = doctor_vision_provider(
+        provider="ollama",
+        model="llava",
+        synthetic_fixture=True,
+        which=lambda _: None,
+    )
+
+    assert payload["status"] == "blocked"
+    assert payload["reasonCode"] == "VISION_PROVIDER_UNAVAILABLE"
+
+
+def test_provider_doctor_blocks_when_configured_model_is_not_present() -> None:
+    payload = doctor_vision_provider(
+        provider="ollama",
+        model="llava",
+        synthetic_fixture=True,
+        model_lister=lambda: {"other:latest"},
+        which=lambda _: "/usr/local/bin/ollama",
+    )
+
+    assert payload["status"] == "blocked"
+    assert payload["reasonCode"] == "VISION_PROVIDER_MODEL_NOT_FOUND"
+    assert payload["modelPresent"] is False
 
 
 def test_provider_doctor_maps_non_json_response() -> None:
@@ -168,7 +195,7 @@ def test_provider_doctor_maps_non_json_response() -> None:
     assert payload["reasonCode"] == "VISION_PROVIDER_INVALID_RESPONSE"
 
 
-def test_provider_doctor_maps_strict_contract_failure() -> None:
+def test_provider_doctor_maps_schema_invalid_response() -> None:
     payload = doctor_vision_provider(
         provider="ollama",
         model="llava",
@@ -178,7 +205,34 @@ def test_provider_doctor_maps_strict_contract_failure() -> None:
     )
 
     assert payload["status"] == "blocked"
-    assert payload["reasonCode"] == "VISION_PROVIDER_STRICT_JSON_CONTRACT_FAILED"
+    assert payload["reasonCode"] == "VISION_PROVIDER_INVALID_RESPONSE"
+
+
+def test_provider_doctor_maps_text_only_response_to_not_vision_capable() -> None:
+    payload = doctor_vision_provider(
+        provider="ollama",
+        model="llava",
+        synthetic_fixture=True,
+        client=lambda **_: {
+            "response": json.dumps(
+                {
+                    "surface_kind": "browser",
+                    "active_app_guess": "Synthetic",
+                    "active_window_title_guess": "Local fixture",
+                    "visible_text_redacted": [],
+                    "ui_elements": [],
+                    "sensitive_indicators": [],
+                    "summary": "Text-only response did not inspect the fixture image.",
+                    "confidence": 0.9,
+                }
+            )
+        },
+        which=lambda _: "/usr/local/bin/ollama",
+    )
+
+    assert payload["status"] == "blocked"
+    assert payload["reasonCode"] == "VISION_PROVIDER_NOT_VISION_CAPABLE"
+    assert payload["visionInputAccepted"] is False
 
 
 def test_provider_doctor_success_validates_synthetic_strict_json() -> None:
@@ -193,7 +247,15 @@ def test_provider_doctor_success_validates_synthetic_strict_json() -> None:
                     "active_app_guess": "Synthetic",
                     "active_window_title_guess": "Local fixture",
                     "visible_text_redacted": ["Local fixture"],
-                    "ui_elements": [],
+                    "ui_elements": [
+                        {
+                            "element_id": "submit",
+                            "role": "button",
+                            "label": "Submit",
+                            "bbox": {"x": 0.6, "y": 0.45, "w": 0.2, "h": 0.15},
+                            "confidence": 0.87,
+                        }
+                    ],
                     "sensitive_indicators": [],
                     "summary": "A safe synthetic fixture is visible.",
                     "confidence": 0.9,
@@ -204,6 +266,12 @@ def test_provider_doctor_success_validates_synthetic_strict_json() -> None:
     )
 
     assert payload["status"] == "pass"
+    assert payload["stage"] == "ready"
     assert payload["ready"] is True
+    assert payload["modelConfigured"] is True
+    assert payload["modelPresent"] is True
+    assert payload["visionInputAccepted"] is True
+    assert payload["strictJsonPass"] is True
+    assert payload["schemaValidationPass"] is True
     assert payload["strictJsonValidated"] is True
     assert payload["syntheticFixture"]["screenshotHash"].startswith("sha256:")

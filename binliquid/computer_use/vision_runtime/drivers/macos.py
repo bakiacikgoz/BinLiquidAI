@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
@@ -348,6 +349,8 @@ class MacOSVisionReadiness:
             "liveEnabled": live_enabled,
             "reasonCode": reason_code,
             "permissions": permissions,
+            "permissionSubjects": _permission_subjects(),
+            "manualInstructions": _permission_manual_instructions(),
             "provider": provider,
             "capture": capture,
             "input": input_state,
@@ -626,6 +629,28 @@ def _permission_subject() -> dict[str, str]:
     }
 
 
+def _permission_subjects() -> list[str]:
+    return [
+        "Terminal.app or the terminal app running uv/python",
+        "Visual Studio Code if launching the runtime from VS Code",
+        "BinLiquid operator shell if bundled",
+    ]
+
+
+def _permission_manual_instructions() -> list[str]:
+    return [
+        (
+            "Open System Settings -> Privacy & Security -> Screen Recording and "
+            "grant access to the process that runs BinLiquid."
+        ),
+        (
+            "Open System Settings -> Privacy & Security -> Accessibility and "
+            "grant access to the process that sends input events."
+        ),
+        "Quit and reopen the terminal/app after changing permissions.",
+    ]
+
+
 def _derive_stage(
     *,
     config: ComputerUseRuntimeConfig,
@@ -707,6 +732,8 @@ def _next_actions(blockers: list[str]) -> list[dict[str, Any]]:
         "VISION_RUNTIME_DISABLED": "Enable computer_use.vision_enabled for the run.",
         "VISION_PROVIDER_UNAVAILABLE": "Configure a local Ollama vision model.",
         "VISION_PROVIDER_MODEL_NOT_CONFIGURED": "Set computer_use.vision_model for the run.",
+        "VISION_PROVIDER_MODEL_NOT_FOUND": "Install the configured local model manually.",
+        "VISION_PROVIDER_NOT_VISION_CAPABLE": "Select a local model that accepts image input.",
         "MACOS_LIVE_FLAG_DISABLED": "Set computer_use.macos_live_enabled=true for the run.",
         "MACOS_CAPTURE_BACKEND_DISABLED": "Select an explicit macOS capture backend.",
         "MACOS_INPUT_BACKEND_DISABLED": "Select the quartz macOS input backend.",
@@ -734,12 +761,14 @@ class MacOSScreenCaptureProvider:
         config: ComputerUseRuntimeConfig,
         job_dir: Path,
         raw_screenshot_opt_in: bool = False,
+        environment: Mapping[str, str] | None = None,
         runner: Callable[..., Any] = subprocess.run,
         now: Callable[[], str] | None = None,
     ) -> None:
         self.config = config
         self.job_dir = Path(job_dir)
         self.raw_screenshot_opt_in = raw_screenshot_opt_in
+        self.environment = dict(environment or os.environ)
         self.runner = runner
         self.now = now or (lambda: datetime.now(UTC).isoformat())
         self._persisted_count = 0
@@ -754,6 +783,27 @@ class MacOSScreenCaptureProvider:
             raise VisionRuntimeError(
                 reason,
                 "Only the screencapture backend is currently implemented.",
+            )
+        opt_in = macos_opt_in_state(self.environment)
+        if not self.config.macos_live_enabled:
+            raise VisionRuntimeError(
+                "MACOS_LIVE_FLAG_DISABLED",
+                "macOS capture requires one-run live enablement.",
+            )
+        if not opt_in["present"]:
+            raise VisionRuntimeError(
+                "MACOS_LIVE_OPT_IN_MISSING",
+                "macOS capture requires exact one-run opt-in.",
+            )
+        screen_recording = _env_permission_status(
+            self.environment,
+            "BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING",
+            "BINLIQUID_TEST_MACOS_SCREEN_RECORDING",
+        )
+        if screen_recording == "missing":
+            raise VisionRuntimeError(
+                "MACOS_SCREEN_RECORDING_PERMISSION_MISSING",
+                "Screen Recording permission is missing.",
             )
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             capture_path = Path(tmp.name)
@@ -817,16 +867,40 @@ class MacOSInputExecutor:
         *,
         config: ComputerUseRuntimeConfig,
         display_bounds: DisplayBounds | None = None,
+        environment: Mapping[str, str] | None = None,
         quartz_backend: Any | None = None,
         sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
         self.config = config
         self.display_bounds = display_bounds or DisplayBounds(width=1440, height=900)
+        self.environment = dict(environment or os.environ)
         self.quartz_backend = quartz_backend
         self.sleeper = sleeper
 
     def execute(self, action: VisionAction) -> ExecutionResult:
         started = time.perf_counter()
+        if self.config.macos_input_backend == "disabled":
+            return self._failed(action, "MACOS_INPUT_BACKEND_DISABLED", started)
+        if not self.config.macos_live_enabled:
+            return self._blocked(action, "MACOS_LIVE_FLAG_DISABLED", started)
+        opt_in = macos_opt_in_state(self.environment)
+        if not opt_in["present"]:
+            return self._blocked(action, "MACOS_LIVE_OPT_IN_MISSING", started)
+        if not opt_in["supervisedFixtureOnly"]:
+            return self._blocked(action, "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED", started)
+        if not opt_in["stepApprovalRequired"]:
+            return self._blocked(action, "MACOS_STEP_APPROVAL_REQUIRED", started)
+        accessibility = _env_permission_status(
+            self.environment,
+            "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY",
+            "BINLIQUID_TEST_MACOS_ACCESSIBILITY",
+        )
+        if accessibility == "missing":
+            return self._blocked(
+                action,
+                "MACOS_ACCESSIBILITY_PERMISSION_MISSING",
+                started,
+            )
         if action.action_type.value not in self.config.action_set:
             return self._blocked(action, "COMPUTER_USE_APPROVAL_REQUIRED", started)
         if action.action_type in {

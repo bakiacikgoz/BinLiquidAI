@@ -20,6 +20,21 @@ from binliquid.computer_use.vision_runtime.models import (
 from binliquid.runtime.config import ComputerUseRuntimeConfig
 from binliquid.runtime.platform import PlatformInfo
 
+ACK = "I understand BinLiquid will control my macOS desktop only for local supervised fixtures."
+
+
+def _live_env(**updates: str) -> dict[str, str]:
+    values = {
+        "BINLIQUID_COMPUTER_USE_LIVE_MACOS": "1",
+        "BINLIQUID_COMPUTER_USE_ACK": ACK,
+        "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY": "1",
+        "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL": "1",
+        "BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING": "granted",
+        "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY": "granted",
+    }
+    values.update(updates)
+    return values
+
 
 def _action(action_type: InputActionType = InputActionType.CLICK) -> VisionAction:
     return VisionAction(
@@ -64,9 +79,13 @@ def test_screencapture_hashes_bytes_and_deletes_temp_by_default(tmp_path: Path) 
         return SimpleNamespace(returncode=0, stderr="")
 
     provider = MacOSScreenCaptureProvider(
-        config=ComputerUseRuntimeConfig(macos_capture_backend="screencapture"),
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_capture_backend="screencapture",
+        ),
         job_dir=tmp_path / "job",
         raw_screenshot_opt_in=False,
+        environment=_live_env(),
         runner=fake_runner,
         now=lambda: "2026-05-05T00:00:00+00:00",
     )
@@ -84,8 +103,12 @@ def test_capture_backend_unavailable_fails_closed(tmp_path: Path) -> None:
         raise FileNotFoundError("screencapture")
 
     provider = MacOSScreenCaptureProvider(
-        config=ComputerUseRuntimeConfig(macos_capture_backend="screencapture"),
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_capture_backend="screencapture",
+        ),
         job_dir=tmp_path / "job",
+        environment=_live_env(),
         runner=missing_runner,
     )
 
@@ -95,6 +118,42 @@ def test_capture_backend_unavailable_fails_closed(tmp_path: Path) -> None:
         assert exc.reason_code == "MACOS_CAPTURE_BACKEND_UNAVAILABLE"
     else:  # pragma: no cover
         raise AssertionError("expected fail-closed capture error")
+
+
+def test_capture_backend_requires_live_opt_in(tmp_path: Path) -> None:
+    provider = MacOSScreenCaptureProvider(
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_capture_backend="screencapture",
+        ),
+        job_dir=tmp_path / "job",
+        environment={},
+    )
+
+    try:
+        provider.capture()
+    except VisionRuntimeError as exc:
+        assert exc.reason_code == "MACOS_LIVE_OPT_IN_MISSING"
+    else:  # pragma: no cover
+        raise AssertionError("expected live opt-in capture error")
+
+
+def test_capture_backend_blocks_missing_screen_recording(tmp_path: Path) -> None:
+    provider = MacOSScreenCaptureProvider(
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_capture_backend="screencapture",
+        ),
+        job_dir=tmp_path / "job",
+        environment=_live_env(BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING="missing"),
+    )
+
+    try:
+        provider.capture()
+    except VisionRuntimeError as exc:
+        assert exc.reason_code == "MACOS_SCREEN_RECORDING_PERMISSION_MISSING"
+    else:  # pragma: no cover
+        raise AssertionError("expected screen recording permission error")
 
 
 def test_capture_backend_disabled_fails_closed(tmp_path: Path) -> None:
@@ -122,7 +181,11 @@ def test_normalized_bbox_to_pixel_clamps_to_display_bounds() -> None:
 
 def test_macos_input_executor_requires_quartz_backend() -> None:
     executor = MacOSInputExecutor(
-        config=ComputerUseRuntimeConfig(macos_input_backend="quartz"),
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_input_backend="quartz",
+        ),
+        environment=_live_env(),
         quartz_backend=None,
     )
 
@@ -134,7 +197,11 @@ def test_macos_input_executor_requires_quartz_backend() -> None:
 
 def test_macos_input_executor_blocks_out_of_bounds_target() -> None:
     executor = MacOSInputExecutor(
-        config=ComputerUseRuntimeConfig(macos_input_backend="quartz"),
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_input_backend="quartz",
+        ),
+        environment=_live_env(),
         quartz_backend=SimpleNamespace(move_mouse=lambda *_: None, click=lambda *_: None),
     )
     action = _action().model_copy(
@@ -149,7 +216,11 @@ def test_macos_input_executor_blocks_out_of_bounds_target() -> None:
 
 def test_macos_input_executor_blocks_risky_hotkey_even_with_backend() -> None:
     executor = MacOSInputExecutor(
-        config=ComputerUseRuntimeConfig(macos_input_backend="quartz"),
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_input_backend="quartz",
+        ),
+        environment=_live_env(),
         quartz_backend=SimpleNamespace(move_mouse=lambda *_: None, click=lambda *_: None),
     )
 
@@ -157,3 +228,35 @@ def test_macos_input_executor_blocks_risky_hotkey_even_with_backend() -> None:
 
     assert result.status == "blocked"
     assert result.details["reason_code"] == "COMPUTER_USE_APPROVAL_REQUIRED"
+
+
+def test_macos_input_executor_requires_live_opt_in() -> None:
+    executor = MacOSInputExecutor(
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_input_backend="quartz",
+        ),
+        environment={},
+        quartz_backend=SimpleNamespace(move_mouse=lambda *_: None, click=lambda *_: None),
+    )
+
+    result = executor.execute(_action())
+
+    assert result.status == "blocked"
+    assert result.details["reason_code"] == "MACOS_LIVE_OPT_IN_MISSING"
+
+
+def test_macos_input_executor_blocks_missing_accessibility() -> None:
+    executor = MacOSInputExecutor(
+        config=ComputerUseRuntimeConfig(
+            macos_live_enabled=True,
+            macos_input_backend="quartz",
+        ),
+        environment=_live_env(BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY="missing"),
+        quartz_backend=SimpleNamespace(move_mouse=lambda *_: None, click=lambda *_: None),
+    )
+
+    result = executor.execute(_action())
+
+    assert result.status == "blocked"
+    assert result.details["reason_code"] == "MACOS_ACCESSIBILITY_PERMISSION_MISSING"
