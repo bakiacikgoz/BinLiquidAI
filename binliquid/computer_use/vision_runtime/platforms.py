@@ -24,7 +24,12 @@ PlatformStage = Literal[
     "unavailable",
     "disabled",
     "not_configured",
+    "missing_permission",
+    "provider_unavailable",
     "not_qualified",
+    "qualified_available",
+    "enabled",
+    "blocked",
     "ready_for_dry_run",
     "ready_for_step_approval",
     "qualified_supervised_pilot",
@@ -123,15 +128,31 @@ def build_platform_capability(
     elif live_requested and config.platform_qualification_required:
         blockers.append("VISION_PLATFORM_QUALIFICATION_MISSING")
 
-    live_enabled = (
-        live_requested
-        and (qualification_allowed or not config.platform_qualification_required)
+    safety_defaults_ok = (
+        config.raw_screenshot_persistence is False
         and config.raw_screenshot_retention == "disabled"
         and config.raw_screenshot_max_count == 0
         and config.terminal_control == "deny"
+        and config.sensitive_surface_policy == "stop"
     )
-    stage: PlatformStage = "qualified_supervised_pilot" if live_enabled else "not_qualified"
-    reason_code = None if live_enabled else PLATFORM_REASON_CODES[normalized_platform]
+    live_enabled = (
+        live_requested
+        and (qualification_allowed or not config.platform_qualification_required)
+        and safety_defaults_ok
+    )
+    if live_enabled:
+        stage: PlatformStage = "enabled"
+        reason_code = None
+    elif (
+        normalized_platform == ComputerUsePlatform.MACOS
+        and qualification_allowed
+        and not _platform_live_flag(config, normalized_platform)
+    ):
+        stage = "qualified_available"
+        reason_code = "MACOS_LIVE_FLAG_DISABLED"
+    else:
+        stage = "not_qualified"
+        reason_code = PLATFORM_REASON_CODES[normalized_platform]
     execution_modes = ["dry_run", "step_approval"]
     if live_enabled:
         execution_modes.append("execute")
@@ -246,10 +267,16 @@ def _base_blockers(
         blockers.append(CAPTURE_DISABLED_CODES[platform])
     if _input_backend(config, platform) == "disabled":
         blockers.append(INPUT_DISABLED_CODES[platform])
-    if config.raw_screenshot_retention != "disabled" or config.raw_screenshot_max_count > 0:
+    if (
+        config.raw_screenshot_persistence
+        or config.raw_screenshot_retention != "disabled"
+        or config.raw_screenshot_max_count > 0
+    ):
         blockers.append("COMPUTER_USE_RAW_SCREENSHOT_DENIED")
     if config.terminal_control != "deny":
         blockers.append("COMPUTER_USE_TERMINAL_CONTROL_DENIED")
+    if config.sensitive_surface_policy != "stop":
+        blockers.append("COMPUTER_USE_SENSITIVE_SURFACE_DETECTED")
     if platform == ComputerUsePlatform.WINDOWS:
         blockers.append("WINDOWS_UAC_SECURE_DESKTOP_BLOCKED")
     if platform == ComputerUsePlatform.LINUX:
@@ -306,7 +333,7 @@ def _summary(
     provider_configured: bool,
 ) -> str:
     if live_enabled:
-        return f"{platform.value} supervised computer-use is qualified for live pilot use."
+        return f"{platform.value} supervised computer-use is qualification-gated and enabled."
     if not provider_configured:
         return (
             f"{platform.value} vision runtime is fail-closed until a provider "

@@ -4,7 +4,7 @@ import json
 import os
 import subprocess
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -29,17 +29,24 @@ class PlatformQualificationReport(BaseModel):
     schema_version: str = Field(alias="schemaVersion")
     status: str
     platform: str
-    session_type: str = Field(alias="sessionType")
-    commit: str
+    session_type: str | None = Field(default=None, alias="sessionType")
+    stage: str | None = None
+    commit: str | None = None
+    commit_sha: str | None = Field(default=None, alias="commitSha")
     config_hash: str = Field(alias="configHash")
-    runtime_version: str = Field(alias="runtimeVersion")
+    generated_at: str | None = Field(default=None, alias="generatedAt")
+    expires_at: str | None = Field(default=None, alias="expiresAt")
+    runtime_version: str | None = Field(default=None, alias="runtimeVersion")
     provider: dict[str, Any]
-    permissions: dict[str, str]
-    backends: dict[str, str]
-    environment: dict[str, Any]
-    task_suite: dict[str, Any] = Field(alias="taskSuite")
+    permissions: dict[str, Any]
+    backends: dict[str, str] = Field(default_factory=dict)
+    environment: dict[str, Any] = Field(default_factory=dict)
+    machine: dict[str, Any] = Field(default_factory=dict)
+    task_suite: dict[str, Any] = Field(default_factory=dict, alias="taskSuite")
+    tasks: list[dict[str, Any]] = Field(default_factory=list)
     safety: dict[str, Any]
     evidence: list[Any] = Field(default_factory=list)
+    artifacts: dict[str, Any] = Field(default_factory=dict)
     blockers: list[str] = Field(default_factory=list)
 
 
@@ -107,9 +114,11 @@ def platform_config_hash(config: ComputerUseRuntimeConfig, *, platform: str) -> 
         "require_approval_for_download": config.require_approval_for_download,
         "require_approval_for_upload": config.require_approval_for_upload,
         "approval_snapshot_max_age_ms": config.approval_snapshot_max_age_ms,
+        "raw_screenshot_persistence": config.raw_screenshot_persistence,
         "raw_screenshot_retention": config.raw_screenshot_retention,
         "raw_screenshot_max_count": config.raw_screenshot_max_count,
         "terminal_control": config.terminal_control,
+        "sensitive_surface_policy": config.sensitive_surface_policy,
         "platform_qualification_required": config.platform_qualification_required,
         "live_enabled": getattr(config, f"{normalized_platform}_live_enabled", False),
         "capture_backend": getattr(config, f"{normalized_platform}_capture_backend", "disabled"),
@@ -117,6 +126,11 @@ def platform_config_hash(config: ComputerUseRuntimeConfig, *, platform: str) -> 
     }
     if normalized_platform == "macos":
         payload["primary_display_only"] = config.macos_primary_display_only
+        payload["require_fresh_qualification"] = config.macos_require_fresh_qualification
+        payload["qualification_report"] = config.macos_qualification_report
+        payload["max_steps"] = config.macos_max_steps
+        payload["step_delay_ms"] = config.macos_step_delay_ms
+        payload["require_step_approval"] = config.macos_require_step_approval
     return _stable_json_hash(payload)
 
 
@@ -132,29 +146,33 @@ def validate_platform_qualification_report(
     try:
         parsed = PlatformQualificationReport.model_validate(report)
     except ValidationError as exc:
+        schema_reason = _schema_invalid_reason(expected_platform)
         return PlatformQualificationValidation(
             allowed=False,
             status="invalid",
             platform=expected_platform,
             blockers=[
+                schema_reason,
                 "VISION_PLATFORM_QUALIFICATION_SCHEMA_INVALID",
                 *[error["type"] for error in exc.errors()],
             ],
         )
 
-    if parsed.schema_version != "computer-use-platform-qualification/v1":
-        blockers.append("VISION_PLATFORM_QUALIFICATION_SCHEMA_INVALID")
+    if parsed.schema_version not in _supported_schema_versions(expected_platform):
+        blockers.append(_schema_invalid_reason(expected_platform))
     if parsed.status != "pass":
-        blockers.append("VISION_PLATFORM_QUALIFICATION_FAILED")
+        blockers.append(_failed_reason(expected_platform))
     if parsed.platform != expected_platform:
-        blockers.append("VISION_PLATFORM_QUALIFICATION_PLATFORM_MISMATCH")
-    if commit is not None and parsed.commit != commit:
-        blockers.append("VISION_PLATFORM_QUALIFICATION_STALE")
+        blockers.append(_platform_mismatch_reason(expected_platform))
+    report_commit = parsed.commit_sha or parsed.commit
+    if commit is not None and report_commit != commit:
+        blockers.append(_commit_mismatch_reason(expected_platform))
     if parsed.config_hash != platform_config_hash(config, platform=expected_platform):
-        blockers.append("VISION_PLATFORM_QUALIFICATION_CONFIG_MISMATCH")
-    blockers.extend(_permission_blockers(parsed.permissions))
-    blockers.extend(_task_suite_blockers(parsed.task_suite))
-    blockers.extend(_safety_blockers(parsed.safety))
+        blockers.append(_config_mismatch_reason(expected_platform))
+    blockers.extend(_freshness_blockers(parsed, platform=expected_platform, config=config))
+    blockers.extend(_permission_blockers(parsed.permissions, platform=expected_platform))
+    blockers.extend(_task_suite_blockers(parsed.task_suite, parsed.tasks))
+    blockers.extend(_safety_blockers(parsed.safety, platform=expected_platform))
     blockers.extend(parsed.blockers)
 
     return PlatformQualificationValidation(
@@ -166,12 +184,56 @@ def validate_platform_qualification_report(
 
 
 def missing_platform_qualification_result(platform: str) -> PlatformQualificationValidation:
+    normalized = platform.strip().lower()
     return PlatformQualificationValidation(
         allowed=False,
         status="missing",
-        platform=platform,
-        blockers=["VISION_PLATFORM_QUALIFICATION_MISSING"],
+        platform=normalized,
+        blockers=[_missing_report_reason(normalized), "VISION_PLATFORM_QUALIFICATION_MISSING"],
     )
+
+
+def run_macos_live_qualification(
+    *,
+    config: ComputerUseRuntimeConfig,
+    suite: str,
+    mode: str,
+    output_path: Path,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    values = env if env is not None else os.environ
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if values.get("BINLIQUID_COMPUTER_USE_LIVE_MACOS") != "1":
+        report = _macos_qualification_report(
+            config=config,
+            suite=suite,
+            mode=mode,
+            status="skipped",
+            stage="not_qualified",
+            blockers=[
+                (
+                    "SKIPPED: live macOS computer-use qualification is opt-in and "
+                    "requires Screen Recording, Accessibility, and local provider"
+                )
+            ],
+            task_results=[],
+        )
+        output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        return report
+
+    report = _macos_qualification_report(
+        config=config,
+        suite=suite,
+        mode=mode,
+        status="blocked",
+        stage="not_qualified",
+        blockers=[
+            "LIVE_MACOS_QUALIFICATION_RUNNER_REQUIRES_OPERATOR_SUPERVISED_FIXTURE_IMPLEMENTATION"
+        ],
+        task_results=[],
+    )
+    output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return report
 
 
 def _load_tasks(task_path: Path) -> list[dict[str, Any]]:
@@ -246,7 +308,17 @@ def _stable_json_hash(payload: object) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _permission_blockers(permissions: Mapping[str, str]) -> list[str]:
+def _permission_blockers(permissions: Mapping[str, Any], *, platform: str) -> list[str]:
+    if platform == "macos":
+        blockers: list[str] = []
+        screen = permissions.get("screenRecording", permissions.get("screenCapture"))
+        accessibility = permissions.get("accessibility", permissions.get("accessibilityOrInput"))
+        if screen not in {True, "granted", "not_applicable"}:
+            blockers.append("MACOS_SCREEN_RECORDING_PERMISSION_MISSING")
+        if accessibility not in {True, "granted", "not_applicable"}:
+            blockers.append("MACOS_ACCESSIBILITY_PERMISSION_MISSING")
+        return blockers
+
     blockers: list[str] = []
     for key in ("screenCapture", "accessibilityOrInput"):
         if permissions.get(key) not in {"granted", "not_applicable"}:
@@ -254,7 +326,14 @@ def _permission_blockers(permissions: Mapping[str, str]) -> list[str]:
     return blockers
 
 
-def _task_suite_blockers(task_suite: Mapping[str, Any]) -> list[str]:
+def _task_suite_blockers(
+    task_suite: Mapping[str, Any],
+    tasks: list[Mapping[str, Any]],
+) -> list[str]:
+    if tasks:
+        if any(task.get("status") != "pass" for task in tasks):
+            return ["VISION_PLATFORM_QUALIFICATION_TASKS_FAILED"]
+        return []
     failed = int(task_suite.get("failed", 0))
     total = int(task_suite.get("total", 0))
     passed = int(task_suite.get("passed", 0))
@@ -263,7 +342,27 @@ def _task_suite_blockers(task_suite: Mapping[str, Any]) -> list[str]:
     return []
 
 
-def _safety_blockers(safety: Mapping[str, Any]) -> list[str]:
+def _safety_blockers(safety: Mapping[str, Any], *, platform: str) -> list[str]:
+    if platform == "macos":
+        checks = {
+            "approvalFreshnessEnforced": "STALE_APPROVAL_SNAPSHOT",
+            "replayIntegrityEnforced": "REPLAY_BLOCKED",
+            "replayIntegrityVerified": "REPLAY_BLOCKED",
+        }
+        blockers = [reason for key, reason in checks.items() if safety.get(key) is False]
+        if safety.get("sensitiveSurfacePolicy") not in {None, "stop"}:
+            blockers.append("SENSITIVE_SURFACE_BLOCKED")
+        if safety.get("sensitiveSurfaceBlocked") is False:
+            blockers.append("SENSITIVE_SURFACE_BLOCKED")
+        if safety.get("terminalPolicy") not in {None, "deny"}:
+            blockers.append("TERMINAL_CONTROL_DENIED")
+        if safety.get("terminalDeniedByDefault") is False:
+            blockers.append("TERMINAL_CONTROL_DENIED")
+        raw_default = safety.get("rawScreenshotPersistenceDefault")
+        if raw_default is True or int(safety.get("rawScreenshotsPersisted", 0)) > 0:
+            blockers.append("RAW_SCREENSHOT_PERSISTENCE_DENIED")
+        return blockers
+
     checks = {
         "sensitiveSurfaceBlocked": "SENSITIVE_SURFACE_DETECTED",
         "terminalDeniedByDefault": "TERMINAL_CONTROL_DENIED",
@@ -274,6 +373,125 @@ def _safety_blockers(safety: Mapping[str, Any]) -> list[str]:
     if int(safety.get("rawScreenshotsPersisted", 0)) > 0:
         blockers.append("COMPUTER_USE_RAW_SCREENSHOT_DENIED")
     return blockers
+
+
+def _supported_schema_versions(platform: str) -> set[str]:
+    if platform == "macos":
+        return {"computer-use-platform-qualification/v1", "1.0"}
+    return {"computer-use-platform-qualification/v1"}
+
+
+def _freshness_blockers(
+    parsed: PlatformQualificationReport,
+    *,
+    platform: str,
+    config: ComputerUseRuntimeConfig,
+) -> list[str]:
+    if platform != "macos" or not config.macos_require_fresh_qualification:
+        return []
+    if not parsed.expires_at:
+        return ["MACOS_QUALIFICATION_REPORT_STALE"]
+    try:
+        expires_at = datetime.fromisoformat(parsed.expires_at.replace("Z", "+00:00"))
+    except ValueError:
+        return ["MACOS_QUALIFICATION_REPORT_INVALID"]
+    if expires_at < datetime.now(UTC):
+        return ["MACOS_QUALIFICATION_REPORT_STALE"]
+    return []
+
+
+def _schema_invalid_reason(platform: str) -> str:
+    return "MACOS_QUALIFICATION_REPORT_INVALID" if platform == "macos" else (
+        "VISION_PLATFORM_QUALIFICATION_SCHEMA_INVALID"
+    )
+
+
+def _failed_reason(platform: str) -> str:
+    return "MACOS_QUALIFICATION_REPORT_INVALID" if platform == "macos" else (
+        "VISION_PLATFORM_QUALIFICATION_FAILED"
+    )
+
+
+def _platform_mismatch_reason(platform: str) -> str:
+    return "MACOS_QUALIFICATION_REPORT_INVALID" if platform == "macos" else (
+        "VISION_PLATFORM_QUALIFICATION_PLATFORM_MISMATCH"
+    )
+
+
+def _commit_mismatch_reason(platform: str) -> str:
+    return "MACOS_QUALIFICATION_COMMIT_MISMATCH" if platform == "macos" else (
+        "VISION_PLATFORM_QUALIFICATION_STALE"
+    )
+
+
+def _config_mismatch_reason(platform: str) -> str:
+    return "MACOS_QUALIFICATION_CONFIG_MISMATCH" if platform == "macos" else (
+        "VISION_PLATFORM_QUALIFICATION_CONFIG_MISMATCH"
+    )
+
+
+def _missing_report_reason(platform: str) -> str:
+    return "MACOS_QUALIFICATION_REPORT_MISSING" if platform == "macos" else (
+        "VISION_PLATFORM_QUALIFICATION_MISSING"
+    )
+
+
+def _macos_qualification_report(
+    *,
+    config: ComputerUseRuntimeConfig,
+    suite: str,
+    mode: str,
+    status: str,
+    stage: str,
+    blockers: list[str],
+    task_results: list[dict[str, Any]],
+) -> dict[str, Any]:
+    generated_at = datetime.now(UTC)
+    return {
+        "schemaVersion": "1.0",
+        "platform": "macos",
+        "status": status,
+        "stage": stage,
+        "commitSha": _git_sha(),
+        "configHash": platform_config_hash(config, platform="macos"),
+        "generatedAt": generated_at.isoformat(),
+        "expiresAt": (generated_at + timedelta(hours=24)).isoformat(),
+        "machine": {
+            "osVersion": "unknown",
+            "arch": "unknown",
+            "displayCount": 0,
+            "scaleFactors": [],
+        },
+        "provider": {
+            "name": config.vision_provider,
+            "model": config.vision_model or "",
+            "strictJson": config.vision_provider != "none",
+        },
+        "permissions": {
+            "screenRecording": False,
+            "accessibility": False,
+        },
+        "backends": {
+            "capture": config.macos_capture_backend,
+            "input": config.macos_input_backend,
+        },
+        "safety": {
+            "visionEnabledDefault": False,
+            "rawScreenshotPersistenceDefault": config.raw_screenshot_persistence,
+            "rawScreenshotMaxCountDefault": config.raw_screenshot_max_count,
+            "terminalPolicy": config.terminal_control,
+            "sensitiveSurfacePolicy": config.sensitive_surface_policy,
+            "approvalFreshnessEnforced": True,
+            "replayIntegrityEnforced": True,
+        },
+        "tasks": task_results,
+        "artifacts": {
+            "replayPath": "",
+            "auditPath": "",
+            "rawScreenshotCount": 0,
+        },
+        "blockers": blockers,
+    }
 
 
 def _unique(values: list[str]) -> list[str]:

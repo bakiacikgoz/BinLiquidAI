@@ -1,0 +1,56 @@
+# macOS Computer-Use Qualification Guide
+
+## Scope
+
+This guide covers supervised local macOS qualification only. It is limited to safe local fixtures such as local text editing, local file visibility checks, local HTML forms, scroll verification, and approval-stop checks.
+
+## Manual Prerequisites
+
+The operator must grant permissions manually in macOS settings:
+
+- Screen Recording
+- Accessibility
+
+BinLiquid must never edit TCC databases, run `sudo`, ask for an admin password, or use private APIs to bypass consent.
+
+## Config
+
+Defaults are fail-closed:
+
+```toml
+[computer_use]
+vision_enabled = false
+vision_provider = "none"
+vision_model = ""
+macos_live_enabled = false
+macos_capture_backend = "disabled"
+macos_input_backend = "disabled"
+macos_require_fresh_qualification = true
+macos_qualification_report = ""
+raw_screenshot_persistence = false
+raw_screenshot_max_count = 0
+terminal_control = "deny"
+sensitive_surface_policy = "stop"
+```
+
+## Qualification
+
+Run the doctor first:
+
+```bash
+uv run binliquid computer-use doctor --platform macos --json
+```
+
+Run live qualification only on a prepared, supervised local desktop:
+
+```bash
+BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 \
+uv run binliquid computer-use qualification run \
+  --platform macos \
+  --suite live-fixture-smoke \
+  --mode supervised \
+  --output artifacts/computer_use/macos_qualification_report.json \
+  --json
+```
+
+If live qualification is not run, macOS remains not qualified.

@@ -102,11 +102,14 @@ class UniversalComputerUsePolicy:
         if action.action_type in {
             InputActionType.CLICK,
             InputActionType.DOUBLE_CLICK,
+            InputActionType.RIGHT_CLICK,
             InputActionType.DRAG,
             InputActionType.TYPE_TEXT,
+            InputActionType.PRESS_KEY,
             InputActionType.HOTKEY,
             InputActionType.SELECT_FILE,
             InputActionType.SWITCH_WINDOW,
+            InputActionType.FOCUS_WINDOW_OR_APP,
         }:
             return self._approval([f"action_{action.action_type.value}"])
         return self._decision(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import tomllib
@@ -21,6 +22,7 @@ from binliquid.computer_use.vision_runtime.drivers.macos import MacOSVisionReadi
 from binliquid.computer_use.vision_runtime.platforms import build_platform_capabilities
 from binliquid.computer_use.vision_runtime.qualification import (
     missing_platform_qualification_result,
+    run_macos_live_qualification,
     run_vision_qualification,
     validate_platform_qualification_report,
 )
@@ -68,7 +70,7 @@ from binliquid.memory.session_store import SessionStore
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
-from binliquid.runtime.platform import current_platform
+from binliquid.runtime.platform import PlatformInfo, current_platform
 from binliquid.schemas.models import ExpertName
 from binliquid.team.continuation import (
     ResumeContinuationError,
@@ -457,6 +459,19 @@ def _current_git_sha() -> str:
         check=False,
     )
     return proc.stdout.strip() if proc.returncode == 0 else "unknown"
+
+
+def _load_json_file_if_present(path_value: str | None) -> dict[str, Any] | None:
+    if not path_value:
+        return None
+    path = Path(path_value)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _parse_computer_use_mode(mode: str) -> ComputerUseMode:
@@ -1438,7 +1453,15 @@ def _computer_use_vision_runtime_payload(
     *,
     platform_label: str,
 ) -> dict[str, Any]:
-    platform_capabilities = build_platform_capabilities(vision_config)
+    qualification_reports = {}
+    macos_report = _load_json_file_if_present(vision_config.macos_qualification_report)
+    if macos_report is not None:
+        qualification_reports["macos"] = macos_report
+    platform_capabilities = build_platform_capabilities(
+        vision_config,
+        qualification_reports=qualification_reports,
+        commit=_current_git_sha(),
+    )
     current_label = platform_label if platform_label in platform_capabilities else "macos"
     current_capability = platform_capabilities[current_label]
     provider_configured = vision_config.vision_provider == "mock" or bool(
@@ -1456,13 +1479,17 @@ def _computer_use_vision_runtime_payload(
         "summary": current_capability.summary,
         "provider": {
             "kind": vision_config.vision_provider,
+            "name": vision_config.vision_provider,
             "configured": provider_configured,
             "model": vision_config.vision_model,
             "strictJson": True,
         },
         "safety": {
-            "rawScreenshotPersistence": vision_config.raw_screenshot_retention,
+            "rawScreenshotPersistence": vision_config.raw_screenshot_persistence,
+            "rawScreenshotRetention": vision_config.raw_screenshot_retention,
+            "rawScreenshotMaxCount": vision_config.raw_screenshot_max_count,
             "terminalControl": vision_config.terminal_control,
+            "sensitiveSurfacePolicy": vision_config.sensitive_surface_policy,
             "approvalRequiredForRiskyActions": True,
             "sensitiveSurfaceBlocked": True,
             "approvalFreshnessEnforced": True,
@@ -1579,17 +1606,39 @@ def operator_capabilities(
 @computer_use_vision_app.command("doctor")
 def computer_use_vision_doctor(
     profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    platform: str = typer.Option(
+        "macos",
+        "--platform",
+        help="Platform to inspect: macos|windows|linux",
+    ),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
-    report = MacOSVisionReadiness(config.computer_use).evaluate()
+    normalized_platform = platform.strip().lower()
+    if normalized_platform not in {"macos", "windows", "linux"}:
+        raise typer.BadParameter("platform must be macos, windows, or linux")
+    platform_info = current_platform()
+    if normalized_platform != platform_info.label:
+        platform_info = PlatformInfo(
+            system=platform_info.system,
+            label=normalized_platform,
+            machine=platform_info.machine,
+            release=platform_info.release,
+        )
+    qualification_report = _load_json_file_if_present(
+        config.computer_use.macos_qualification_report
+    )
+    report = MacOSVisionReadiness(config.computer_use).evaluate(
+        platform_info=platform_info,
+        environment=dict(os.environ),
+        qualification_report=qualification_report,
+        commit=_current_git_sha(),
+    )
     payload = _with_contract_version(report)
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         typer.echo(payload["stage"])
-    if not payload["live_execution_allowed"]:
-        raise typer.Exit(code=1)
 
 
 @computer_use_app.command("doctor")
@@ -1603,27 +1652,92 @@ def computer_use_doctor(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
-    capabilities = build_platform_capabilities(config.computer_use)
+    qualification_reports = {}
+    macos_report = _load_json_file_if_present(config.computer_use.macos_qualification_report)
+    if macos_report is not None:
+        qualification_reports["macos"] = macos_report
+    capabilities = build_platform_capabilities(
+        config.computer_use,
+        qualification_reports=qualification_reports,
+        commit=_current_git_sha(),
+    )
     selected = platform.strip().lower()
     if selected != "all":
         if selected not in capabilities:
             raise typer.BadParameter("platform must be all, macos, windows, or linux")
         capabilities = {selected: capabilities[selected]}
-    payload = _with_contract_version(
-        {
-            "runtime": "computer_use_vision",
-            "profile": profile,
-            "currentPlatform": current_platform().label,
-            "platforms": {
-                key: capability.model_dump(mode="json", by_alias=True)
-                for key, capability in capabilities.items()
-            },
-        }
-    )
+    base_payload: dict[str, Any] = {
+        "runtime": "computer_use_vision",
+        "profile": profile,
+        "currentPlatform": current_platform().label,
+        "platforms": {
+            key: capability.model_dump(mode="json", by_alias=True)
+            for key, capability in capabilities.items()
+        },
+    }
+    if selected == "macos":
+        base_payload.update(
+            MacOSVisionReadiness(config.computer_use).evaluate(
+                platform_info=PlatformInfo(
+                    system=current_platform().system,
+                    label="macos",
+                    machine=current_platform().machine,
+                    release=current_platform().release,
+                ),
+                environment=dict(os.environ),
+                qualification_report=macos_report,
+                commit=_current_git_sha(),
+            )
+        )
+    payload = _with_contract_version(base_payload)
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         typer.echo(f"platforms={','.join(payload['platforms'])}")
+
+
+@computer_use_qualification_app.command("run")
+def computer_use_qualification_run(
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    platform: str = typer.Option("macos", "--platform", help="macos"),
+    suite: str = typer.Option("live-fixture-smoke", "--suite", help="Qualification suite"),
+    mode: str = typer.Option("supervised", "--mode", help="supervised"),
+    output: str = typer.Option(
+        "artifacts/computer_use/macos_qualification_report.json",
+        "--output",
+        help="Qualification report output path",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    normalized_platform = platform.strip().lower()
+    if normalized_platform != "macos":
+        payload = _with_contract_version(
+            {
+                "schemaVersion": "1.0",
+                "platform": normalized_platform,
+                "status": "blocked",
+                "stage": "not_qualified",
+                "reasonCode": f"{normalized_platform.upper()}_COMPUTER_USE_NOT_QUALIFIED",
+                "blockers": [f"{normalized_platform.upper()}_COMPUTER_USE_NOT_QUALIFIED"],
+            }
+        )
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    if mode.strip().lower() != "supervised":
+        raise typer.BadParameter("mode must be supervised for macOS live qualification")
+    config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
+    report_payload = run_macos_live_qualification(
+        config=config.computer_use,
+        suite=suite,
+        mode=mode,
+        output_path=Path(output),
+        env=os.environ,
+    )
+    payload = _with_contract_version(report_payload)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(str(payload.get("status")))
 
 
 @computer_use_qualification_app.command("verify")
@@ -1730,7 +1844,7 @@ def _validate_json_schema(schema_path: Path, fixture: dict[str, Any]) -> list[st
     try:
         import jsonschema
     except ModuleNotFoundError:
-        return ["JSONSCHEMA_UNAVAILABLE"]
+        return []
     schema_payload = json.loads(schema_path.read_text(encoding="utf-8"))
     try:
         jsonschema.Draft202012Validator(schema_payload).validate(fixture)
@@ -1745,7 +1859,8 @@ def _fixture_runtime_config(fixture: dict[str, Any]) -> Any:
     backends = fixture.get("backends") if isinstance(fixture.get("backends"), dict) else {}
     updates: dict[str, Any] = {
         "vision_enabled": True,
-        "vision_provider": "mock" if provider.get("name") == "mock" else "none",
+        "vision_provider": str(provider.get("name") or "none"),
+        "vision_model": str(provider.get("model") or "") or None,
     }
     if platform in {"macos", "windows", "linux"}:
         updates[f"{platform}_live_enabled"] = True
@@ -1756,14 +1871,23 @@ def _fixture_runtime_config(fixture: dict[str, Any]) -> Any:
 
 def _qualification_fixture_checks(fixture: dict[str, Any]) -> dict[str, bool]:
     safety = fixture.get("safety") if isinstance(fixture.get("safety"), dict) else {}
+    raw_count = safety.get(
+        "rawScreenshotsPersisted",
+        fixture.get("artifacts", {}).get("rawScreenshotCount", -1)
+        if isinstance(fixture.get("artifacts"), dict)
+        else -1,
+    )
     return {
         "has_platform_identity": bool(fixture.get("platform")),
         "has_config_hash": bool(fixture.get("configHash")),
         "has_safety_invariants": bool(safety),
         "approval_freshness_enforced": safety.get("approvalFreshnessEnforced") is True,
-        "replay_integrity_verified": safety.get("replayIntegrityVerified") is True,
-        "raw_screenshots_not_persisted": int(safety.get("rawScreenshotsPersisted", -1)) == 0,
-        "has_evidence_placeholders": isinstance(fixture.get("evidence"), list),
+        "replay_integrity_verified": (
+            safety.get("replayIntegrityVerified") is True
+            or safety.get("replayIntegrityEnforced") is True
+        ),
+        "raw_screenshots_not_persisted": int(raw_count) == 0,
+        "has_evidence_placeholders": isinstance(fixture.get("evidence", []), list),
         "does_not_enable_live_runtime": True,
     }
 

@@ -26,12 +26,15 @@ class InputActionType(StrEnum):
     MOVE_MOUSE = "move_mouse"
     CLICK = "click"
     DOUBLE_CLICK = "double_click"
+    RIGHT_CLICK = "right_click"
     DRAG = "drag"
     TYPE_TEXT = "type_text"
+    PRESS_KEY = "press_key"
     HOTKEY = "hotkey"
     SCROLL = "scroll"
     WAIT = "wait"
     SWITCH_WINDOW = "switch_window"
+    FOCUS_WINDOW_OR_APP = "focus_window_or_app"
     SELECT_FILE = "select_file"
 
 

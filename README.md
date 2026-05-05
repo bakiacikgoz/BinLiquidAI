@@ -22,7 +22,7 @@ It provides two layers:
 - Windows x64: supported for core CLI, operator panel, bundled runtime, and signed release-candidate evidence.
 - Windows public/enterprise release remains blocked until `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and no blocking reasons.
 - Windows live computer-use automation remains disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` unless a Windows-specific signed qualification report says otherwise.
-- Vision-first computer-use runtime foundation is available behind `[computer_use]` feature gates; live execution remains disabled until a vision provider and platform qualification are explicitly configured.
+- Vision-first computer-use runtime foundation is available behind `[computer_use]` feature gates. macOS has a supervised local qualification path, but live execution remains disabled by default until a local strict-JSON provider, current permissions, explicit config, and fresh matching qualification evidence are present.
 
 ### Core Runtime
 

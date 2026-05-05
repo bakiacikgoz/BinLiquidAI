@@ -64,7 +64,7 @@ def test_screencapture_hashes_bytes_and_deletes_temp_by_default(tmp_path: Path) 
         return SimpleNamespace(returncode=0, stderr="")
 
     provider = MacOSScreenCaptureProvider(
-        config=ComputerUseRuntimeConfig(),
+        config=ComputerUseRuntimeConfig(macos_capture_backend="screencapture"),
         job_dir=tmp_path / "job",
         raw_screenshot_opt_in=False,
         runner=fake_runner,
@@ -84,7 +84,7 @@ def test_capture_backend_unavailable_fails_closed(tmp_path: Path) -> None:
         raise FileNotFoundError("screencapture")
 
     provider = MacOSScreenCaptureProvider(
-        config=ComputerUseRuntimeConfig(),
+        config=ComputerUseRuntimeConfig(macos_capture_backend="screencapture"),
         job_dir=tmp_path / "job",
         runner=missing_runner,
     )
@@ -95,6 +95,20 @@ def test_capture_backend_unavailable_fails_closed(tmp_path: Path) -> None:
         assert exc.reason_code == "MACOS_CAPTURE_BACKEND_UNAVAILABLE"
     else:  # pragma: no cover
         raise AssertionError("expected fail-closed capture error")
+
+
+def test_capture_backend_disabled_fails_closed(tmp_path: Path) -> None:
+    provider = MacOSScreenCaptureProvider(
+        config=ComputerUseRuntimeConfig(),
+        job_dir=tmp_path / "job",
+    )
+
+    try:
+        provider.capture()
+    except VisionRuntimeError as exc:
+        assert exc.reason_code == "MACOS_CAPTURE_BACKEND_DISABLED"
+    else:  # pragma: no cover
+        raise AssertionError("expected disabled capture backend error")
 
 
 def test_normalized_bbox_to_pixel_clamps_to_display_bounds() -> None:

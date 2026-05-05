@@ -7,34 +7,44 @@
     "schemaVersion",
     "status",
     "platform",
-    "sessionType",
-    "commit",
     "configHash",
-    "runtimeVersion",
     "provider",
     "permissions",
-    "backends",
-    "environment",
-    "taskSuite",
     "safety",
-    "evidence",
     "blockers"
   ],
   "properties": {
-    "schemaVersion": { "const": "computer-use-platform-qualification/v1" },
+    "schemaVersion": { "enum": ["computer-use-platform-qualification/v1", "1.0"] },
     "status": { "enum": ["pass", "fail", "blocked", "skipped"] },
     "platform": { "enum": ["macos", "windows", "linux"] },
+    "stage": {
+      "enum": [
+        "not_configured",
+        "missing_permission",
+        "provider_unavailable",
+        "not_qualified",
+        "qualified_available",
+        "enabled",
+        "blocked"
+      ]
+    },
     "sessionType": { "type": "string" },
     "commit": { "type": "string", "minLength": 1 },
+    "commitSha": { "type": "string", "minLength": 1 },
     "configHash": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "generatedAt": { "type": "string", "minLength": 1 },
+    "expiresAt": { "type": "string", "minLength": 1 },
     "runtimeVersion": { "type": "string" },
     "provider": { "type": "object" },
     "permissions": { "type": "object" },
     "backends": { "type": "object" },
     "environment": { "type": "object" },
+    "machine": { "type": "object" },
     "taskSuite": { "type": "object" },
+    "tasks": { "type": "array", "items": { "type": "object" } },
     "safety": { "type": "object" },
     "evidence": { "type": "array" },
+    "artifacts": { "type": "object" },
     "blockers": { "type": "array", "items": { "type": "string" } }
   }
 }

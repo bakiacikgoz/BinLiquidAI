@@ -4,6 +4,7 @@ from binliquid.computer_use.vision_runtime.platforms import (
     ComputerUsePlatform,
     build_platform_capabilities,
 )
+from binliquid.computer_use.vision_runtime.qualification import platform_config_hash
 from binliquid.runtime.config import ComputerUseRuntimeConfig
 
 
@@ -35,3 +36,47 @@ def test_platform_capability_serializes_with_operator_contract_aliases() -> None
     assert payload["inputBackend"] == "disabled"
     assert payload["reasonCode"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
     assert payload["failClosed"] is True
+
+
+def test_macos_qualified_report_without_live_flag_is_qualified_available() -> None:
+    config = ComputerUseRuntimeConfig(
+        vision_enabled=True,
+        vision_provider="ollama",
+        vision_model="llava",
+        macos_capture_backend="screencapture",
+        macos_input_backend="quartz",
+        macos_live_enabled=False,
+    )
+    report = {
+        "schemaVersion": "1.0",
+        "platform": "macos",
+        "status": "pass",
+        "stage": "qualified_available",
+        "commitSha": "abc123",
+        "configHash": platform_config_hash(config, platform="macos"),
+        "generatedAt": "2026-05-05T00:00:00+00:00",
+        "expiresAt": "2099-05-05T00:00:00+00:00",
+        "provider": {"name": "ollama", "model": "llava", "strictJson": True},
+        "permissions": {"screenRecording": True, "accessibility": True},
+        "backends": {"capture": "screencapture", "input": "quartz"},
+        "safety": {
+            "rawScreenshotPersistenceDefault": False,
+            "rawScreenshotMaxCountDefault": 0,
+            "terminalPolicy": "deny",
+            "sensitiveSurfacePolicy": "stop",
+            "approvalFreshnessEnforced": True,
+            "replayIntegrityEnforced": True,
+        },
+        "tasks": [{"id": "fixture", "status": "pass"}],
+        "blockers": [],
+    }
+
+    capability = build_platform_capabilities(
+        config,
+        qualification_reports={"macos": report},
+        commit="abc123",
+    )["macos"]
+
+    assert capability.stage == "qualified_available"
+    assert capability.live_enabled is False
+    assert capability.reason_code == "MACOS_LIVE_FLAG_DISABLED"

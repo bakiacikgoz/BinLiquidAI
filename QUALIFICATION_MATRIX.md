@@ -59,6 +59,21 @@ It does not claim that evidence already exists.
   `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` unless a separate signed Windows
   qualification report explicitly enables that surface.
 
+## Phase 4A Platform Status
+
+| Platform | Stage | Live Enabled | Reason |
+|---|---:|---:|---|
+| macOS | not_qualified until fresh supervised local evidence exists | false by default | `MACOS_COMPUTER_USE_NOT_QUALIFIED` |
+| Windows | not_qualified | false | `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` |
+| Linux | not_qualified | false | `LINUX_COMPUTER_USE_NOT_QUALIFIED` |
+
+macOS can move to `qualified_available` after a fresh matching local qualification
+report, but live execution still remains off until explicit config enablement and
+current doctor pass.
+
+Deterministic mock qualification is useful for CI contracts. It is not proof of
+real-world desktop reliability.
+
 ## Required Report Outputs
 
 At minimum publish:
@@ -98,4 +113,6 @@ This publishes:
 - `artifacts/qualification/<run_id>/QUALIFICATION_REPORT.md`
 - latest pointers at `artifacts/qualification_report.json` and `artifacts/QUALIFICATION_REPORT.md`
 
-The JSON artifact is signed. `ga readiness` must verify that signature, require the mandatory workload set, enforce the `6h` soak threshold for `green/go`, and use the published support-boundary table before any enterprise-ready claim.
+The JSON artifact is signed. `ga readiness` must verify that signature, require
+the mandatory workload set, enforce the `6h` soak threshold for `green/go`, and
+use the published support-boundary table before any enterprise-ready claim.

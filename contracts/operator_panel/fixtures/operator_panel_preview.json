@@ -56,7 +56,7 @@
               "platform": "macos",
               "stage": "not_qualified",
               "liveEnabled": false,
-              "captureBackend": "screencapture",
+              "captureBackend": "disabled",
               "inputBackend": "disabled",
               "provider": "none",
               "permissions": ["screen_recording", "accessibility"],
@@ -65,7 +65,12 @@
               "failClosed": true,
               "reasonCode": "MACOS_COMPUTER_USE_NOT_QUALIFIED",
               "summary": "macOS vision runtime is fail-closed until qualification passes.",
-              "blockers": ["VISION_PROVIDER_UNAVAILABLE", "MACOS_INPUT_BACKEND_DISABLED"],
+              "blockers": [
+                "VISION_RUNTIME_DISABLED",
+                "VISION_PROVIDER_UNAVAILABLE",
+                "MACOS_CAPTURE_BACKEND_DISABLED",
+                "MACOS_INPUT_BACKEND_DISABLED"
+              ],
               "qualificationStatus": "missing",
               "environment": {}
             },

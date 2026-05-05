@@ -4,7 +4,7 @@
   "platform": "windows",
   "sessionType": "windows",
   "commit": "fixture",
-  "configHash": "6b41557cb5dea4837ec53c68b11f18ee163ae1d59b46b23f8405b765131609f3",
+  "configHash": "1fb43d1adc742579033e53b5a629acf2842acc8ee139b5df8fdba82c46662eea",
   "runtimeVersion": "fixture",
   "provider": {
     "name": "mock",

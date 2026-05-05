@@ -24,6 +24,9 @@ from binliquid.computer_use.vision_runtime.platforms import (
     PlatformCapability,
     build_platform_capability,
 )
+from binliquid.computer_use.vision_runtime.qualification import (
+    validate_platform_qualification_report,
+)
 from binliquid.runtime.config import ComputerUseRuntimeConfig
 from binliquid.runtime.platform import PlatformInfo, current_platform
 
@@ -73,17 +76,21 @@ class MacOSVisionReadiness:
         self,
         *,
         platform_info: PlatformInfo | None = None,
+        environment: Mapping[str, str] | None = None,
+        qualification_report: Mapping[str, Any] | None = None,
+        commit: str | None = None,
         which: Callable[[str], str | None] = shutil.which,
         input_backend_available: bool | None = None,
     ) -> dict[str, Any]:
         platform = platform_info or current_platform()
+        env = dict(environment or {})
         checks: list[dict[str, Any]] = []
         if platform.label != "macos":
             reason = (
-                    "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
-                    if platform.label == "windows"
-                    else "COMPUTER_USE_PLATFORM_NOT_QUALIFIED"
-                )
+                "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+                if platform.label == "windows"
+                else "LINUX_COMPUTER_USE_NOT_QUALIFIED"
+            )
             checks.append(
                 _check(
                     "platform",
@@ -93,13 +100,69 @@ class MacOSVisionReadiness:
                     "Use live vision computer-use only with valid macOS qualification evidence.",
                 )
             )
-            return self._report(platform.label, checks)
+            return self._report(
+                platform.label,
+                checks,
+                stage="not_qualified",
+                live_enabled=False,
+                reason_code=reason,
+                permissions=_permissions_payload(
+                    screen_recording="unknown",
+                    accessibility="unknown",
+                    input_monitoring="not_required",
+                ),
+                provider=_provider_payload(
+                    configured=False,
+                    name=self.config.vision_provider,
+                    model=self.config.vision_model or "",
+                    strict_json=False,
+                    ready=False,
+                    reason_code="VISION_PROVIDER_UNAVAILABLE",
+                ),
+                capture={"backend": "disabled", "ready": False},
+                input_state={"backend": "disabled", "ready": False},
+                qualification=_qualification_payload(
+                    required=True,
+                    present=False,
+                    valid=False,
+                    fresh=False,
+                    report_path=self.config.macos_qualification_report,
+                    reason_code="MACOS_QUALIFICATION_REPORT_MISSING",
+                ),
+            )
+
+        screen_recording = _env_permission_status(
+            env,
+            "BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING",
+            "BINLIQUID_TEST_MACOS_SCREEN_RECORDING",
+        )
+        accessibility = _env_permission_status(
+            env,
+            "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY",
+            "BINLIQUID_TEST_MACOS_ACCESSIBILITY",
+        )
+        provider = _evaluate_provider(self.config, which=which)
+        capture = _evaluate_capture(
+            self.config,
+            which=which,
+            screen_recording=screen_recording,
+        )
+        input_state = _evaluate_input(
+            self.config,
+            accessibility=accessibility,
+            input_backend_available=input_backend_available,
+        )
+        qualification = _evaluate_qualification(
+            self.config,
+            qualification_report=qualification_report,
+            commit=commit,
+        )
 
         checks.append(
             _check(
                 "vision_enabled",
                 self.config.vision_enabled,
-                None if self.config.vision_enabled else "VISION_RUNTIME_NOT_CONFIGURED",
+                None if self.config.vision_enabled else "VISION_RUNTIME_DISABLED",
                 "Vision runtime feature flag is enabled."
                 if self.config.vision_enabled
                 else "Vision runtime feature flag is disabled.",
@@ -110,53 +173,42 @@ class MacOSVisionReadiness:
             _check(
                 "macos_live_enabled",
                 self.config.macos_live_enabled,
-                None if self.config.macos_live_enabled else "MACOS_COMPUTER_USE_NOT_ENABLED",
+                None if self.config.macos_live_enabled else "MACOS_LIVE_FLAG_DISABLED",
                 "macOS live execution flag is enabled."
                 if self.config.macos_live_enabled
                 else "macOS live execution flag is disabled.",
                 "Set computer_use.macos_live_enabled=true after local qualification.",
             )
         )
-        provider_configured = self.config.vision_provider != "none" and bool(
-            self.config.vision_model or self.config.vision_provider == "mock"
-        )
         checks.append(
             _check(
                 "vision_provider",
-                provider_configured,
-                None if provider_configured else "VISION_PROVIDER_UNAVAILABLE",
-                "Vision provider is configured."
-                if provider_configured
-                else "Vision provider is not configured.",
+                bool(provider["ready"]),
+                None if provider["ready"] else str(provider["reasonCode"]),
+                "Vision provider is configured and ready."
+                if provider["ready"]
+                else "Vision provider is not ready.",
                 "Configure computer_use.vision_provider and computer_use.vision_model.",
             )
-        )
-        capture_available = self.config.macos_capture_backend == "screencapture" and bool(
-            which("screencapture")
         )
         checks.append(
             _check(
                 "screen_capture",
-                capture_available,
-                None if capture_available else "MACOS_CAPTURE_BACKEND_UNAVAILABLE",
-                "screencapture backend is available."
-                if capture_available
-                else "screencapture backend is unavailable.",
+                bool(capture["ready"]),
+                None if capture["ready"] else str(capture["reasonCode"]),
+                "macOS capture backend is ready."
+                if capture["ready"]
+                else "macOS capture backend is unavailable or disabled.",
                 "Verify macOS Screen Recording permission and system capture tooling manually.",
             )
-        )
-        input_available = (
-            input_backend_available
-            if input_backend_available is not None
-            else self.config.macos_input_backend == "quartz"
         )
         checks.append(
             _check(
                 "accessibility_input",
-                input_available,
-                None if input_available else "MACOS_INPUT_BACKEND_UNAVAILABLE",
+                bool(input_state["ready"]),
+                None if input_state["ready"] else str(input_state["reasonCode"]),
                 "Quartz input backend is configured."
-                if input_available
+                if input_state["ready"]
                 else "Quartz input backend is unavailable or disabled.",
                 (
                     "Install optional macOS computer-use dependencies and grant "
@@ -167,12 +219,14 @@ class MacOSVisionReadiness:
         checks.append(
             _check(
                 "raw_screenshot_policy",
-                self.config.raw_screenshot_retention == "disabled"
+                self.config.raw_screenshot_persistence is False
+                and self.config.raw_screenshot_retention == "disabled"
                 and self.config.raw_screenshot_max_count == 0,
                 None
-                if self.config.raw_screenshot_retention == "disabled"
+                if self.config.raw_screenshot_persistence is False
+                and self.config.raw_screenshot_retention == "disabled"
                 and self.config.raw_screenshot_max_count == 0
-                else "COMPUTER_USE_RAW_SCREENSHOT_DENIED",
+                else "RAW_SCREENSHOT_PERSISTENCE_DENIED",
                 "Raw screenshot persistence is disabled by default.",
                 (
                     "Keep raw_screenshot_retention=disabled unless using explicit "
@@ -184,23 +238,318 @@ class MacOSVisionReadiness:
             checks.append(
                 _check(
                     "qualification",
-                    False,
-                    "MACOS_COMPUTER_USE_QUALIFICATION_REQUIRED",
-                    "Live execution requires signed local qualification evidence.",
+                    bool(qualification["fresh"]),
+                    None if qualification["fresh"] else str(qualification["reasonCode"]),
+                    "Fresh macOS qualification evidence is present."
+                    if qualification["fresh"]
+                    else "Live execution requires fresh local qualification evidence.",
                     "Run deterministic qualification, then opt-in live macOS qualification.",
                 )
             )
-        return self._report(platform.label, checks)
+        stage, live_enabled, reason_code = _derive_stage(
+            config=self.config,
+            provider=provider,
+            capture=capture,
+            input_state=input_state,
+            qualification=qualification,
+            screen_recording=screen_recording,
+            accessibility=accessibility,
+        )
+        return self._report(
+            platform.label,
+            checks,
+            stage=stage,
+            live_enabled=live_enabled,
+            reason_code=reason_code,
+            permissions=_permissions_payload(
+                screen_recording=screen_recording,
+                accessibility=accessibility,
+                input_monitoring="not_required",
+            ),
+            provider=provider,
+            capture=capture,
+            input_state=input_state,
+            qualification=qualification,
+        )
 
     @staticmethod
-    def _report(platform: str, checks: list[dict[str, Any]]) -> dict[str, Any]:
+    def _report(
+        platform: str,
+        checks: list[dict[str, Any]],
+        *,
+        stage: str,
+        live_enabled: bool,
+        reason_code: str | None,
+        permissions: dict[str, str],
+        provider: dict[str, Any],
+        capture: dict[str, Any],
+        input_state: dict[str, Any],
+        qualification: dict[str, Any],
+    ) -> dict[str, Any]:
         return {
             "runtime": "computer_use_vision",
             "platform": platform,
-            "stage": "configured" if all(item["ok"] for item in checks) else "blocked",
-            "live_execution_allowed": all(item["ok"] for item in checks),
+            "stage": stage,
+            "liveEnabled": live_enabled,
+            "reasonCode": reason_code,
+            "permissions": permissions,
+            "provider": provider,
+            "capture": capture,
+            "input": input_state,
+            "qualification": qualification,
+            "safety": {
+                "privacyMode": True,
+                "rawScreenshotPersistence": False,
+                "rawScreenshotMaxCount": 0,
+                "terminalPolicy": "deny",
+                "sensitiveSurfacePolicy": "stop",
+                "approvalFreshnessEnforced": True,
+                "replayIntegrityEnforced": True,
+            },
+            "live_execution_allowed": live_enabled,
             "checks": checks,
         }
+
+
+def _env_permission_status(
+    environment: Mapping[str, str],
+    *keys: str,
+) -> str:
+    for key in keys:
+        value = environment.get(key)
+        if value is None:
+            continue
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "granted"}:
+            return "granted"
+        if normalized in {"0", "false", "no", "missing", "denied"}:
+            return "missing"
+        if normalized == "unknown":
+            return "unknown"
+    return "unknown"
+
+
+def _provider_payload(
+    *,
+    configured: bool,
+    name: str,
+    model: str,
+    strict_json: bool,
+    ready: bool,
+    reason_code: str | None,
+) -> dict[str, Any]:
+    return {
+        "configured": configured,
+        "name": name,
+        "model": model,
+        "strictJson": strict_json,
+        "ready": ready,
+        "reasonCode": reason_code,
+    }
+
+
+def _evaluate_provider(
+    config: ComputerUseRuntimeConfig,
+    *,
+    which: Callable[[str], str | None],
+) -> dict[str, Any]:
+    configured = config.vision_enabled and config.vision_provider != "none" and bool(
+        config.vision_model
+    )
+    if not configured:
+        return _provider_payload(
+            configured=False,
+            name=config.vision_provider,
+            model=config.vision_model or "",
+            strict_json=False,
+            ready=False,
+            reason_code="VISION_PROVIDER_UNAVAILABLE",
+        )
+    if config.vision_provider != "ollama":
+        return _provider_payload(
+            configured=True,
+            name=config.vision_provider,
+            model=config.vision_model or "",
+            strict_json=True,
+            ready=False,
+            reason_code="MACOS_PROVIDER_NOT_READY",
+        )
+    ready = bool(which("ollama"))
+    return _provider_payload(
+        configured=True,
+        name="ollama",
+        model=config.vision_model or "",
+        strict_json=True,
+        ready=ready,
+        reason_code=None if ready else "VISION_PROVIDER_UNAVAILABLE",
+    )
+
+
+def _evaluate_capture(
+    config: ComputerUseRuntimeConfig,
+    *,
+    which: Callable[[str], str | None],
+    screen_recording: str,
+) -> dict[str, Any]:
+    backend = config.macos_capture_backend
+    if backend == "disabled":
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_CAPTURE_BACKEND_DISABLED",
+        }
+    tooling_ready = backend != "screencapture" or bool(which("screencapture"))
+    if not tooling_ready:
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_CAPTURE_BACKEND_UNAVAILABLE",
+        }
+    if screen_recording != "granted":
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_SCREEN_RECORDING_PERMISSION_MISSING",
+        }
+    return {"backend": backend, "ready": True, "reasonCode": None}
+
+
+def _evaluate_input(
+    config: ComputerUseRuntimeConfig,
+    *,
+    accessibility: str,
+    input_backend_available: bool | None,
+) -> dict[str, Any]:
+    backend = config.macos_input_backend
+    if backend == "disabled":
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_INPUT_BACKEND_DISABLED",
+        }
+    if accessibility != "granted":
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_ACCESSIBILITY_PERMISSION_MISSING",
+        }
+    ready = input_backend_available if input_backend_available is not None else backend == "quartz"
+    return {
+        "backend": backend,
+        "ready": bool(ready),
+        "reasonCode": None if ready else "MACOS_INPUT_BACKEND_UNAVAILABLE",
+    }
+
+
+def _evaluate_qualification(
+    config: ComputerUseRuntimeConfig,
+    *,
+    qualification_report: Mapping[str, Any] | None,
+    commit: str | None,
+) -> dict[str, Any]:
+    if not config.platform_qualification_required:
+        return _qualification_payload(
+            required=False,
+            present=False,
+            valid=True,
+            fresh=True,
+            report_path=config.macos_qualification_report,
+            reason_code=None,
+        )
+    if qualification_report is None:
+        return _qualification_payload(
+            required=True,
+            present=False,
+            valid=False,
+            fresh=False,
+            report_path=config.macos_qualification_report,
+            reason_code="MACOS_QUALIFICATION_REPORT_MISSING",
+        )
+    validation = validate_platform_qualification_report(
+        qualification_report,
+        platform="macos",
+        config=config,
+        commit=commit,
+    )
+    reason_code = validation.blockers[0] if validation.blockers else None
+    return _qualification_payload(
+        required=True,
+        present=True,
+        valid=validation.status != "invalid",
+        fresh=validation.allowed,
+        report_path=config.macos_qualification_report,
+        reason_code=reason_code,
+    )
+
+
+def _qualification_payload(
+    *,
+    required: bool,
+    present: bool,
+    valid: bool,
+    fresh: bool,
+    report_path: str,
+    reason_code: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "required": required,
+        "present": present,
+        "valid": valid,
+        "fresh": fresh,
+        "reportPath": report_path,
+        "reasonCode": reason_code,
+    }
+
+
+def _permissions_payload(
+    *,
+    screen_recording: str,
+    accessibility: str,
+    input_monitoring: str,
+) -> dict[str, str]:
+    return {
+        "screenRecording": screen_recording,
+        "accessibility": accessibility,
+        "inputMonitoring": input_monitoring,
+    }
+
+
+def _derive_stage(
+    *,
+    config: ComputerUseRuntimeConfig,
+    provider: Mapping[str, Any],
+    capture: Mapping[str, Any],
+    input_state: Mapping[str, Any],
+    qualification: Mapping[str, Any],
+    screen_recording: str,
+    accessibility: str,
+) -> tuple[str, bool, str | None]:
+    if config.raw_screenshot_persistence or config.raw_screenshot_max_count != 0:
+        return "blocked", False, "RAW_SCREENSHOT_PERSISTENCE_DENIED"
+    if config.terminal_control != "deny":
+        return "blocked", False, "TERMINAL_CONTROL_DENIED"
+    if config.sensitive_surface_policy != "stop":
+        return "blocked", False, "SENSITIVE_SURFACE_BLOCKED"
+    if not config.macos_live_enabled:
+        stage = "qualified_available" if qualification.get("fresh") else "not_configured"
+        return stage, False, "MACOS_LIVE_FLAG_DISABLED"
+    if not config.vision_enabled:
+        return "not_configured", False, "VISION_RUNTIME_DISABLED"
+    if capture.get("reasonCode") == "MACOS_CAPTURE_BACKEND_DISABLED":
+        return "not_configured", False, "MACOS_CAPTURE_BACKEND_DISABLED"
+    if input_state.get("reasonCode") == "MACOS_INPUT_BACKEND_DISABLED":
+        return "not_configured", False, "MACOS_INPUT_BACKEND_DISABLED"
+    if screen_recording != "granted":
+        return "missing_permission", False, "MACOS_SCREEN_RECORDING_PERMISSION_MISSING"
+    if accessibility != "granted":
+        return "missing_permission", False, "MACOS_ACCESSIBILITY_PERMISSION_MISSING"
+    if not provider.get("ready"):
+        return "provider_unavailable", False, str(provider.get("reasonCode"))
+    if qualification.get("required") and not qualification.get("fresh"):
+        return "not_qualified", False, str(qualification.get("reasonCode"))
+    if not config.macos_live_enabled:
+        return "qualified_available", False, "MACOS_LIVE_FLAG_DISABLED"
+    return "enabled", True, None
 
 
 class MacOSScreenCaptureProvider:
@@ -222,8 +571,13 @@ class MacOSScreenCaptureProvider:
 
     def capture(self) -> VisionObservation:
         if self.config.macos_capture_backend != "screencapture":
+            reason = (
+                "MACOS_CAPTURE_BACKEND_DISABLED"
+                if self.config.macos_capture_backend == "disabled"
+                else "MACOS_CAPTURE_BACKEND_UNAVAILABLE"
+            )
             raise VisionRuntimeError(
-                "MACOS_CAPTURE_BACKEND_UNAVAILABLE",
+                reason,
                 "Only the screencapture backend is currently implemented.",
             )
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
@@ -251,12 +605,15 @@ class MacOSScreenCaptureProvider:
                 raise VisionRuntimeError(reason, stderr or "screencapture failed")
             data = capture_path.read_bytes()
             screenshot_hash = hashlib.sha256(data).hexdigest()
+            dimensions = _png_dimensions(data)
             persisted_path = self._maybe_persist(data)
             return VisionObservation(
                 screenshot_hash=screenshot_hash,
                 raw_screenshot_path=str(persisted_path) if persisted_path else None,
                 captured_at=self.now(),
                 platform="macos",
+                image_width=dimensions[0] if dimensions else None,
+                image_height=dimensions[1] if dimensions else None,
                 confidence=1.0,
             )
         finally:
@@ -265,6 +622,7 @@ class MacOSScreenCaptureProvider:
     def _maybe_persist(self, data: bytes) -> Path | None:
         allowed = (
             self.raw_screenshot_opt_in
+            and self.config.raw_screenshot_persistence
             and self.config.raw_screenshot_retention == "explicit_opt_in"
             and self.config.raw_screenshot_max_count > self._persisted_count
         )
@@ -296,7 +654,12 @@ class MacOSInputExecutor:
         started = time.perf_counter()
         if action.action_type.value not in self.config.action_set:
             return self._blocked(action, "COMPUTER_USE_APPROVAL_REQUIRED", started)
-        if action.action_type in {InputActionType.TYPE_TEXT, InputActionType.HOTKEY}:
+        if action.action_type in {
+            InputActionType.TYPE_TEXT,
+            InputActionType.PRESS_KEY,
+            InputActionType.HOTKEY,
+            InputActionType.FOCUS_WINDOW_OR_APP,
+        }:
             return self._blocked(action, "COMPUTER_USE_APPROVAL_REQUIRED", started)
         if action.action_type == InputActionType.WAIT:
             wait_ms = min(action.wait_ms or 250, self.config.max_action_duration_ms)
@@ -308,6 +671,7 @@ class MacOSInputExecutor:
             InputActionType.MOVE_MOUSE,
             InputActionType.CLICK,
             InputActionType.DOUBLE_CLICK,
+            InputActionType.RIGHT_CLICK,
         }:
             return self._blocked(action, "VISION_CONFIDENCE_BELOW_THRESHOLD", started)
         if action.action_type == InputActionType.HOTKEY and _hotkey_denied(action.hotkey):
@@ -324,6 +688,8 @@ class MacOSInputExecutor:
             self.quartz_backend.click(*point, clicks=1)
         elif action.action_type == InputActionType.DOUBLE_CLICK:
             self.quartz_backend.click(*point, clicks=2)
+        elif action.action_type == InputActionType.RIGHT_CLICK:
+            self.quartz_backend.click(*point, clicks=1, button="right")
         elif action.action_type == InputActionType.SCROLL:
             delta = max(min(action.scroll_delta or 0, 1200), -1200)
             if hasattr(self.quartz_backend, "scroll"):
@@ -402,6 +768,12 @@ def _check(
 
 def _duration_ms(started: float) -> int:
     return int((time.perf_counter() - started) * 1000)
+
+
+def _png_dimensions(data: bytes) -> tuple[int, int] | None:
+    if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
 
 
 def _hotkey_denied(keys: list[str]) -> bool:

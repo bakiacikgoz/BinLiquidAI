@@ -187,9 +187,19 @@ class ComputerUseRuntimeConfig(BaseModel):
     min_action_confidence: float = Field(default=0.82, ge=0.0, le=1.0)
     min_verification_confidence: float = Field(default=0.80, ge=0.0, le=1.0)
     macos_live_enabled: bool = False
-    macos_capture_backend: Literal["screencapture", "quartz"] = "screencapture"
+    macos_capture_backend: Literal[
+        "disabled",
+        "screencapture",
+        "quartz",
+        "screencapturekit",
+    ] = "disabled"
     macos_input_backend: Literal["quartz", "disabled"] = "disabled"
     macos_primary_display_only: bool = True
+    macos_require_fresh_qualification: bool = True
+    macos_qualification_report: str = ""
+    macos_max_steps: int = Field(default=25, ge=1, le=100)
+    macos_step_delay_ms: int = Field(default=150, ge=0, le=10000)
+    macos_require_step_approval: bool = True
     windows_live_enabled: bool = False
     windows_capture_backend: Literal["disabled", "mock", "gdi", "windows_graphics_capture"] = (
         "disabled"
@@ -205,11 +215,14 @@ class ComputerUseRuntimeConfig(BaseModel):
             "move_mouse",
             "click",
             "double_click",
+            "right_click",
             "scroll",
             "type_text",
+            "press_key",
             "hotkey",
             "wait",
             "switch_window",
+            "focus_window_or_app",
         ]
     ] = Field(default_factory=lambda: ["move_mouse", "click", "double_click", "scroll", "wait"])
     require_approval_for_type_text: bool = True
@@ -219,6 +232,7 @@ class ComputerUseRuntimeConfig(BaseModel):
     max_action_duration_ms: int = Field(default=5000, ge=100, le=30000)
     post_action_observe_delay_ms: int = Field(default=500, ge=100, le=5000)
     approval_snapshot_max_age_ms: int = Field(default=10000, ge=1000, le=120000)
+    raw_screenshot_persistence: bool = False
     raw_screenshot_retention: Literal["disabled", "debug_only", "explicit_opt_in"] = "disabled"
     raw_screenshot_max_count: int = Field(default=0, ge=0, le=100)
     allowed_apps: list[str] = Field(default_factory=list)
@@ -231,6 +245,7 @@ class ComputerUseRuntimeConfig(BaseModel):
         ]
     )
     terminal_control: Literal["deny", "approval_required", "allow_read_only"] = "deny"
+    sensitive_surface_policy: Literal["stop", "approval_required"] = "stop"
     platform_qualification_required: bool = True
 
     @field_validator("vision_model", mode="before")
@@ -497,11 +512,22 @@ class RuntimeConfig(BaseModel):
                 ),
                 macos_live_enabled=computer_use_data.get("macos_live_enabled", False),
                 macos_capture_backend=computer_use_data.get(
-                    "macos_capture_backend", "screencapture"
+                    "macos_capture_backend", "disabled"
                 ),
                 macos_input_backend=computer_use_data.get("macos_input_backend", "disabled"),
                 macos_primary_display_only=computer_use_data.get(
                     "macos_primary_display_only", True
+                ),
+                macos_require_fresh_qualification=computer_use_data.get(
+                    "macos_require_fresh_qualification", True
+                ),
+                macos_qualification_report=computer_use_data.get(
+                    "macos_qualification_report", ""
+                ),
+                macos_max_steps=computer_use_data.get("macos_max_steps", 25),
+                macos_step_delay_ms=computer_use_data.get("macos_step_delay_ms", 150),
+                macos_require_step_approval=computer_use_data.get(
+                    "macos_require_step_approval", True
                 ),
                 windows_live_enabled=computer_use_data.get("windows_live_enabled", False),
                 windows_capture_backend=computer_use_data.get(
@@ -538,6 +564,9 @@ class RuntimeConfig(BaseModel):
                 approval_snapshot_max_age_ms=computer_use_data.get(
                     "approval_snapshot_max_age_ms", 10000
                 ),
+                raw_screenshot_persistence=computer_use_data.get(
+                    "raw_screenshot_persistence", False
+                ),
                 raw_screenshot_retention=computer_use_data.get(
                     "raw_screenshot_retention", "disabled"
                 ),
@@ -548,6 +577,9 @@ class RuntimeConfig(BaseModel):
                     ComputerUseRuntimeConfig().blocked_apps,
                 ),
                 terminal_control=computer_use_data.get("terminal_control", "deny"),
+                sensitive_surface_policy=computer_use_data.get(
+                    "sensitive_surface_policy", "stop"
+                ),
                 platform_qualification_required=computer_use_data.get(
                     "platform_qualification_required", True
                 ),
@@ -676,6 +708,15 @@ ENV_PATHS: dict[str, str] = {
     "COMPUTER_USE_MACOS_CAPTURE_BACKEND": "computer_use.macos_capture_backend",
     "COMPUTER_USE_MACOS_INPUT_BACKEND": "computer_use.macos_input_backend",
     "COMPUTER_USE_MACOS_PRIMARY_DISPLAY_ONLY": "computer_use.macos_primary_display_only",
+    "COMPUTER_USE_MACOS_REQUIRE_FRESH_QUALIFICATION": (
+        "computer_use.macos_require_fresh_qualification"
+    ),
+    "COMPUTER_USE_MACOS_QUALIFICATION_REPORT": "computer_use.macos_qualification_report",
+    "COMPUTER_USE_MACOS_MAX_STEPS": "computer_use.macos_max_steps",
+    "COMPUTER_USE_MACOS_STEP_DELAY_MS": "computer_use.macos_step_delay_ms",
+    "COMPUTER_USE_MACOS_REQUIRE_STEP_APPROVAL": (
+        "computer_use.macos_require_step_approval"
+    ),
     "COMPUTER_USE_WINDOWS_LIVE_ENABLED": "computer_use.windows_live_enabled",
     "COMPUTER_USE_WINDOWS_CAPTURE_BACKEND": "computer_use.windows_capture_backend",
     "COMPUTER_USE_WINDOWS_INPUT_BACKEND": "computer_use.windows_input_backend",
@@ -694,11 +735,13 @@ ENV_PATHS: dict[str, str] = {
     "COMPUTER_USE_APPROVAL_SNAPSHOT_MAX_AGE_MS": (
         "computer_use.approval_snapshot_max_age_ms"
     ),
+    "COMPUTER_USE_RAW_SCREENSHOT_PERSISTENCE": "computer_use.raw_screenshot_persistence",
     "COMPUTER_USE_RAW_SCREENSHOT_RETENTION": "computer_use.raw_screenshot_retention",
     "COMPUTER_USE_RAW_SCREENSHOT_MAX_COUNT": "computer_use.raw_screenshot_max_count",
     "COMPUTER_USE_ALLOWED_APPS": "computer_use.allowed_apps",
     "COMPUTER_USE_BLOCKED_APPS": "computer_use.blocked_apps",
     "COMPUTER_USE_TERMINAL_CONTROL": "computer_use.terminal_control",
+    "COMPUTER_USE_SENSITIVE_SURFACE_POLICY": "computer_use.sensitive_surface_policy",
     "COMPUTER_USE_PLATFORM_QUALIFICATION_REQUIRED": (
         "computer_use.platform_qualification_required"
     ),

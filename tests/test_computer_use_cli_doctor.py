@@ -40,6 +40,31 @@ def test_computer_use_doctor_can_scope_to_windows() -> None:
     assert payload["platforms"]["windows"]["stage"] == "not_qualified"
 
 
+def test_computer_use_doctor_macos_shape_reports_exact_fail_closed_blockers() -> None:
+    result = runner.invoke(
+        app,
+        ["computer-use", "doctor", "--profile", "balanced", "--platform", "macos", "--json"],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["platform"] == "macos"
+    assert payload["stage"] == "not_configured"
+    assert payload["liveEnabled"] is False
+    assert payload["reasonCode"] == "MACOS_LIVE_FLAG_DISABLED"
+    assert payload["permissions"]["screenRecording"] in {"granted", "missing", "unknown"}
+    assert payload["permissions"]["accessibility"] in {"granted", "missing", "unknown"}
+    assert payload["provider"]["ready"] is False
+    assert payload["capture"]["backend"] == "disabled"
+    assert payload["capture"]["reasonCode"] == "MACOS_CAPTURE_BACKEND_DISABLED"
+    assert payload["input"]["backend"] == "disabled"
+    assert payload["input"]["reasonCode"] == "MACOS_INPUT_BACKEND_DISABLED"
+    assert payload["qualification"]["reasonCode"] == "MACOS_QUALIFICATION_REPORT_MISSING"
+    assert payload["safety"]["rawScreenshotPersistence"] is False
+    assert payload["safety"]["terminalPolicy"] == "deny"
+    assert payload["safety"]["sensitiveSurfacePolicy"] == "stop"
+
+
 def test_computer_use_qualification_verify_fails_closed_when_report_is_missing(
     tmp_path,
 ) -> None:
@@ -96,15 +121,49 @@ def test_computer_use_qualification_verify_accepts_schema_input_fixture() -> Non
     assert payload["checks"]["replay_integrity_verified"] is True
 
 
+def test_macos_live_qualification_run_is_opt_in_and_does_not_enable_runtime(tmp_path) -> None:
+    output = tmp_path / "macos_qualification_report.json"
+    result = runner.invoke(
+        app,
+        [
+            "computer-use",
+            "qualification",
+            "run",
+            "--profile",
+            "balanced",
+            "--platform",
+            "macos",
+            "--suite",
+            "live-fixture-smoke",
+            "--mode",
+            "supervised",
+            "--output",
+            str(output),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["status"] == "skipped"
+    assert report["status"] == "skipped"
+    assert report["stage"] == "not_qualified"
+    assert report["artifacts"]["rawScreenshotCount"] == 0
+
+
 def test_all_profiles_keep_computer_use_defaults_fail_closed() -> None:
     for profile in ("balanced", "default", "enterprise", "lite", "research", "restricted"):
         config = RuntimeConfig.from_profile(profile, root_dir=REPO_ROOT).computer_use
 
         assert config.vision_enabled is False
         assert config.vision_provider == "none"
+        assert config.raw_screenshot_persistence is False
         assert config.raw_screenshot_retention == "disabled"
         assert config.raw_screenshot_max_count == 0
         assert config.terminal_control == "deny"
+        assert config.sensitive_surface_policy == "stop"
         assert config.macos_live_enabled is False
+        assert config.macos_capture_backend == "disabled"
         assert config.windows_live_enabled is False
         assert config.linux_live_enabled is False
