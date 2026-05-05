@@ -19,6 +19,7 @@ dependencies = [
   "ollama>=0.5.0,<1.0.0",
   "psutil>=6.1.0,<7.0.0",
   "cryptography>=44.0.0,<46.0.0",
+  "editables>=0.3,<1.0",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +36,10 @@ hf = [
 [project.scripts]
 binliquid = "binliquid.cli:app"
 aegis = "binliquid.cli:app"
+
+[tool.hatch.build.targets.wheel]
+dev-mode-exact = true
+packages = ["binliquid", "benchmarks", "research"]
 
 [tool.ruff]
 line-length = 100
