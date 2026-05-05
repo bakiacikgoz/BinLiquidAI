@@ -27,7 +27,14 @@ class ComputerUseCapabilityContract(ContractModel):
 
 class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
     enabled: bool
-    stage: Literal["configured", "not_configured", "not_qualified", "qualified"]
+    stage: Literal[
+        "configured",
+        "not_configured",
+        "provider_unavailable",
+        "not_qualified",
+        "qualified",
+        "blocked",
+    ]
     platform: Literal["macos", "windows", "linux", "unknown"]
     scope: Literal["vision_first_desktop_web_file"]
     execution_modes: list[str] = Field(alias="executionModes")
@@ -35,6 +42,8 @@ class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
     fail_closed: bool = Field(alias="failClosed")
     reason_code: str | None = Field(default=None, alias="reasonCode")
     summary: str | None = None
+    provider: dict[str, Any] = Field(default_factory=dict)
+    safety: dict[str, Any] = Field(default_factory=dict)
 
 
 class OperatorFeatureFlagsContract(ContractModel):

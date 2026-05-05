@@ -64,6 +64,16 @@ const visionRuntime = {
   failClosed: true,
   reasonCode: 'WINDOWS_COMPUTER_USE_NOT_QUALIFIED',
   summary: 'Vision runtime is not qualified on Windows.',
+  provider: {
+    kind: 'none',
+    configured: false,
+    model: null,
+  },
+  safety: {
+    rawScreenshotPersistence: 'disabled',
+    terminalControl: 'deny',
+    approvalRequiredForRiskyActions: true,
+  },
 };
 
 describe('capability handshake validation', () => {

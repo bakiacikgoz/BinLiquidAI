@@ -18,6 +18,7 @@ It does not claim that evidence already exists.
 - conflict-heavy shared-state workflow
 - long-running workflow
 - provider transient-failure workflow
+- supervised macOS vision-first computer-use deterministic smoke
 
 ## Qualification Windows
 
@@ -38,6 +39,15 @@ It does not claim that evidence already exists.
   manifest verification, external and bundled bridge handshake proof, clean VM
   install/open/handshake smoke, no shell passthrough, no path traversal or symlink
   escape, no unsupported computer-use overclaim, and signed release gate before
+  any public release. Windows live computer-use remains disabled until signed
+  qualification evidence exists.
+
+## Computer-Use Vision Pilot
+
+- `deterministic` qualification uses `computer_use_vision_qualification/v1`.
+- `live` qualification is macOS-only and opt-in.
+- Raw screenshots must remain disabled by default with persisted count `0`.
+- Replay verifies integrity and policy invariants, not business correctness.
   any public or enterprise Windows release claim.
 - Windows release evidence additionally requires schema drift gate PASS,
   recursive resource bundle proof, runtime hash manifest, signed RC release

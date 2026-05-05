@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RuntimeLimits(BaseModel):
@@ -176,13 +176,41 @@ class ComputerUseRuntimeConfig(BaseModel):
     enabled: bool = True
     runtime_mode: Literal["legacy_pilot", "vision_first", "auto"] = "legacy_pilot"
     vision_enabled: bool = False
+    vision_provider: Literal["mock", "ollama", "none"] = "none"
+    vision_model: str | None = None
+    vision_provider_timeout_s: float = Field(default=30.0, ge=1.0, le=120.0)
+    vision_provider_max_retries: int = Field(default=1, ge=0, le=3)
     default_mode: Literal["dry_run", "step_approval", "execute"] = "step_approval"
     max_steps: int = Field(default=50, ge=1, le=300)
     max_recovery_attempts: int = Field(default=3, ge=0, le=10)
     screenshot_interval_ms: int = Field(default=750, ge=100, le=10000)
     min_action_confidence: float = Field(default=0.82, ge=0.0, le=1.0)
     min_verification_confidence: float = Field(default=0.80, ge=0.0, le=1.0)
+    macos_live_enabled: bool = False
+    macos_capture_backend: Literal["screencapture", "quartz"] = "screencapture"
+    macos_input_backend: Literal["quartz", "disabled"] = "disabled"
+    macos_primary_display_only: bool = True
+    action_set: list[
+        Literal[
+            "move_mouse",
+            "click",
+            "double_click",
+            "scroll",
+            "type_text",
+            "hotkey",
+            "wait",
+            "switch_window",
+        ]
+    ] = Field(default_factory=lambda: ["move_mouse", "click", "double_click", "scroll", "wait"])
+    require_approval_for_type_text: bool = True
+    require_approval_for_hotkey: bool = True
+    require_approval_for_download: bool = True
+    require_approval_for_upload: bool = True
+    max_action_duration_ms: int = Field(default=5000, ge=100, le=30000)
+    post_action_observe_delay_ms: int = Field(default=500, ge=100, le=5000)
+    approval_snapshot_max_age_ms: int = Field(default=10000, ge=1000, le=120000)
     raw_screenshot_retention: Literal["disabled", "debug_only", "explicit_opt_in"] = "disabled"
+    raw_screenshot_max_count: int = Field(default=0, ge=0, le=100)
     allowed_apps: list[str] = Field(default_factory=list)
     blocked_apps: list[str] = Field(
         default_factory=lambda: [
@@ -194,6 +222,13 @@ class ComputerUseRuntimeConfig(BaseModel):
     )
     terminal_control: Literal["deny", "approval_required", "allow_read_only"] = "deny"
     platform_qualification_required: bool = True
+
+    @field_validator("vision_model", mode="before")
+    @classmethod
+    def _empty_vision_model_as_none(cls, value: object) -> object:
+        if value == "":
+            return None
+        return value
 
 
 class RuntimeConfig(BaseModel):
@@ -434,6 +469,14 @@ class RuntimeConfig(BaseModel):
                 enabled=computer_use_data.get("enabled", True),
                 runtime_mode=computer_use_data.get("runtime_mode", "legacy_pilot"),
                 vision_enabled=computer_use_data.get("vision_enabled", False),
+                vision_provider=computer_use_data.get("vision_provider", "none"),
+                vision_model=computer_use_data.get("vision_model") or None,
+                vision_provider_timeout_s=computer_use_data.get(
+                    "vision_provider_timeout_s", 30.0
+                ),
+                vision_provider_max_retries=computer_use_data.get(
+                    "vision_provider_max_retries", 1
+                ),
                 default_mode=computer_use_data.get("default_mode", "step_approval"),
                 max_steps=computer_use_data.get("max_steps", 50),
                 max_recovery_attempts=computer_use_data.get("max_recovery_attempts", 3),
@@ -442,9 +485,41 @@ class RuntimeConfig(BaseModel):
                 min_verification_confidence=computer_use_data.get(
                     "min_verification_confidence", 0.80
                 ),
+                macos_live_enabled=computer_use_data.get("macos_live_enabled", False),
+                macos_capture_backend=computer_use_data.get(
+                    "macos_capture_backend", "screencapture"
+                ),
+                macos_input_backend=computer_use_data.get("macos_input_backend", "disabled"),
+                macos_primary_display_only=computer_use_data.get(
+                    "macos_primary_display_only", True
+                ),
+                action_set=computer_use_data.get(
+                    "action_set",
+                    ComputerUseRuntimeConfig().action_set,
+                ),
+                require_approval_for_type_text=computer_use_data.get(
+                    "require_approval_for_type_text", True
+                ),
+                require_approval_for_hotkey=computer_use_data.get(
+                    "require_approval_for_hotkey", True
+                ),
+                require_approval_for_download=computer_use_data.get(
+                    "require_approval_for_download", True
+                ),
+                require_approval_for_upload=computer_use_data.get(
+                    "require_approval_for_upload", True
+                ),
+                max_action_duration_ms=computer_use_data.get("max_action_duration_ms", 5000),
+                post_action_observe_delay_ms=computer_use_data.get(
+                    "post_action_observe_delay_ms", 500
+                ),
+                approval_snapshot_max_age_ms=computer_use_data.get(
+                    "approval_snapshot_max_age_ms", 10000
+                ),
                 raw_screenshot_retention=computer_use_data.get(
                     "raw_screenshot_retention", "disabled"
                 ),
+                raw_screenshot_max_count=computer_use_data.get("raw_screenshot_max_count", 0),
                 allowed_apps=computer_use_data.get("allowed_apps", []),
                 blocked_apps=computer_use_data.get(
                     "blocked_apps",
@@ -565,13 +640,34 @@ ENV_PATHS: dict[str, str] = {
     "COMPUTER_USE_ENABLED": "computer_use.enabled",
     "COMPUTER_USE_RUNTIME_MODE": "computer_use.runtime_mode",
     "COMPUTER_USE_VISION_ENABLED": "computer_use.vision_enabled",
+    "COMPUTER_USE_VISION_PROVIDER": "computer_use.vision_provider",
+    "COMPUTER_USE_VISION_MODEL": "computer_use.vision_model",
+    "COMPUTER_USE_VISION_PROVIDER_TIMEOUT_S": "computer_use.vision_provider_timeout_s",
+    "COMPUTER_USE_VISION_PROVIDER_MAX_RETRIES": "computer_use.vision_provider_max_retries",
     "COMPUTER_USE_DEFAULT_MODE": "computer_use.default_mode",
     "COMPUTER_USE_MAX_STEPS": "computer_use.max_steps",
     "COMPUTER_USE_MAX_RECOVERY_ATTEMPTS": "computer_use.max_recovery_attempts",
     "COMPUTER_USE_SCREENSHOT_INTERVAL_MS": "computer_use.screenshot_interval_ms",
     "COMPUTER_USE_MIN_ACTION_CONFIDENCE": "computer_use.min_action_confidence",
     "COMPUTER_USE_MIN_VERIFICATION_CONFIDENCE": "computer_use.min_verification_confidence",
+    "COMPUTER_USE_MACOS_LIVE_ENABLED": "computer_use.macos_live_enabled",
+    "COMPUTER_USE_MACOS_CAPTURE_BACKEND": "computer_use.macos_capture_backend",
+    "COMPUTER_USE_MACOS_INPUT_BACKEND": "computer_use.macos_input_backend",
+    "COMPUTER_USE_MACOS_PRIMARY_DISPLAY_ONLY": "computer_use.macos_primary_display_only",
+    "COMPUTER_USE_ACTION_SET": "computer_use.action_set",
+    "COMPUTER_USE_REQUIRE_APPROVAL_FOR_TYPE_TEXT": (
+        "computer_use.require_approval_for_type_text"
+    ),
+    "COMPUTER_USE_REQUIRE_APPROVAL_FOR_HOTKEY": "computer_use.require_approval_for_hotkey",
+    "COMPUTER_USE_REQUIRE_APPROVAL_FOR_DOWNLOAD": "computer_use.require_approval_for_download",
+    "COMPUTER_USE_REQUIRE_APPROVAL_FOR_UPLOAD": "computer_use.require_approval_for_upload",
+    "COMPUTER_USE_MAX_ACTION_DURATION_MS": "computer_use.max_action_duration_ms",
+    "COMPUTER_USE_POST_ACTION_OBSERVE_DELAY_MS": "computer_use.post_action_observe_delay_ms",
+    "COMPUTER_USE_APPROVAL_SNAPSHOT_MAX_AGE_MS": (
+        "computer_use.approval_snapshot_max_age_ms"
+    ),
     "COMPUTER_USE_RAW_SCREENSHOT_RETENTION": "computer_use.raw_screenshot_retention",
+    "COMPUTER_USE_RAW_SCREENSHOT_MAX_COUNT": "computer_use.raw_screenshot_max_count",
     "COMPUTER_USE_ALLOWED_APPS": "computer_use.allowed_apps",
     "COMPUTER_USE_BLOCKED_APPS": "computer_use.blocked_apps",
     "COMPUTER_USE_TERMINAL_CONTROL": "computer_use.terminal_control",

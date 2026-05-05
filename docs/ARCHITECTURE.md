@@ -58,3 +58,13 @@ observe -> interpret -> decide -> policy -> approval -> execute -> verify -> che
 Production defaults keep this path fail-closed: `runtime_mode="legacy_pilot"`, `vision_enabled=false`, raw screenshot retention disabled, terminal control denied, and platform qualification required.
 
 The operator panel receives an additive `computerUseVisionRuntime` capability next to the existing `computerUsePilot` field, allowing the UI to surface readiness without enabling live execution.
+## Vision-First Computer-Use Phase 2
+
+The vision-first runtime lives under `binliquid/computer_use/vision_runtime/`. Phase 2 adds macOS-specific readiness, screenshot capture, guarded input execution, an Ollama-compatible strict JSON vision interpreter, approval snapshot validation, replay verification, and qualification reporting. These components are additive to the legacy Safari/Finder/TextEdit pilot and do not enable Windows or Linux live execution.
+
+Default architecture remains fail-closed:
+
+- `vision_provider="none"` blocks runtime execution.
+- `macos_input_backend="disabled"` blocks OS input.
+- `raw_screenshot_max_count=0` prevents raw screenshot persistence.
+- operator panel reads the additive `computerUseVisionRuntime` capability.

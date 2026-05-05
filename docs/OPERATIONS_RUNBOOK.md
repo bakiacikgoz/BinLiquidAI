@@ -271,3 +271,18 @@ Expected result without a configured vision provider: fail-closed with `VISION_R
 - terminal control is enabled outside a reviewed policy change
 - sensitive surface detection does not stop execution
 - replay hash-chain verification fails
+## Supervised macOS Vision Pilot
+
+Use the vision-first runtime only as a supervised macOS pilot. Start with deterministic qualification:
+
+```bash
+uv run binliquid computer-use qualify --runtime vision-first --suite smoke --mode deterministic --json
+```
+
+Before any live macOS run, inspect readiness:
+
+```bash
+uv run binliquid computer-use vision doctor --profile balanced --json
+```
+
+Do not automate macOS Screen Recording or Accessibility permission grants. If readiness reports missing permissions, the operator must grant them manually in macOS Privacy & Security. Windows live computer-use remains disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.

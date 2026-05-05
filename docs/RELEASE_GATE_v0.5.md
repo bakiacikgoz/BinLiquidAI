@@ -173,3 +173,14 @@ No-Ship if any of the following are true:
 - updater defaults to `off`
 - remote telemetry defaults to `off`
 - no background network call in off mode
+## Computer-Use Vision Gate
+
+The v0.5 release gate must not present vision-first computer-use as unrestricted automation. Public release notes may mention the supervised macOS vision-first pilot only when:
+
+- deterministic qualification report exists;
+- raw screenshot persisted count is `0` under defaults;
+- operator capability exposes `computerUseVisionRuntime` as additive;
+- replay verification passes hash-chain and policy invariant checks;
+- Windows live execution remains `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.
+
+Live macOS qualification is a separate opt-in gate and requires local Screen Recording, Accessibility, provider, and `macos_live_enabled=true`.

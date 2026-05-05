@@ -60,3 +60,6 @@ It must not be described as:
 - reliable across arbitrary real-world apps without platform qualification evidence
 
 The safe product claim is: the runtime can observe via hash-addressed visual contracts, plan typed actions, classify risk, require approval, record redacted replay evidence, and fail closed when a provider or qualification is missing.
+## Vision-First Computer-Use Boundary
+
+The current claim is limited to a supervised macOS vision-first pilot in step-approval mode. Deterministic mock qualification supports development confidence, not a broad real-world reliability claim. Live macOS qualification requires local permissions and a configured provider. Windows live computer-use remains disabled until signed qualification evidence exists.

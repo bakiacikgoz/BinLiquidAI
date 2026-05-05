@@ -177,6 +177,6 @@ def test_runtime_stops_after_verification_failure_budget(tmp_path) -> None:
     )
 
     assert artifact.status == "failed"
-    assert artifact.stop_reason == "VERIFICATION_FAILED"
+    assert artifact.stop_reason == "COMPUTER_USE_RECOVERY_BUDGET_EXCEEDED"
     assert artifact.steps[0].verification is not None
     assert artifact.steps[0].verification.verified is False

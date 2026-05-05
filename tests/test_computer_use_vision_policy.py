@@ -59,7 +59,7 @@ def test_sensitive_surface_stops_fail_closed() -> None:
     assert decision is not None
     assert decision.allowed is False
     assert decision.denied is True
-    assert decision.reason_code == "SENSITIVE_SURFACE_DETECTED"
+    assert decision.reason_code == "COMPUTER_USE_SENSITIVE_SURFACE_DETECTED"
 
 
 def test_terminal_surface_is_denied_by_default() -> None:
@@ -72,7 +72,7 @@ def test_terminal_surface_is_denied_by_default() -> None:
     )
 
     assert decision.denied is True
-    assert decision.reason_code == "TERMINAL_CONTROL_DENIED"
+    assert decision.reason_code == "COMPUTER_USE_TERMINAL_CONTROL_DENIED"
 
 
 def test_low_confidence_action_is_denied() -> None:
@@ -85,7 +85,7 @@ def test_low_confidence_action_is_denied() -> None:
     )
 
     assert decision.denied is True
-    assert decision.reason_code == "CONFIDENCE_BELOW_THRESHOLD"
+    assert decision.reason_code == "VISION_CONFIDENCE_BELOW_THRESHOLD"
 
 
 def test_step_approval_mode_requires_approval_for_clicks() -> None:
@@ -99,7 +99,7 @@ def test_step_approval_mode_requires_approval_for_clicks() -> None:
 
     assert decision.allowed is False
     assert decision.requires_approval is True
-    assert decision.reason_code == "POLICY_REQUIRE_APPROVAL"
+    assert decision.reason_code == "COMPUTER_USE_APPROVAL_REQUIRED"
 
 
 def test_read_only_wait_can_run_without_approval_in_execute_mode() -> None:

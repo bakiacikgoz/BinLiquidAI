@@ -47,6 +47,29 @@ class DeterministicActionPlanner:
         return action
 
 
+class MockVisionInterpreter:
+    def interpret(
+        self,
+        *,
+        objective: str,
+        observation: VisionObservation,
+        world,
+    ) -> VisionInterpretation:
+        del world
+        return VisionInterpretation(
+            observation_hash=observation.screenshot_hash,
+            summary=f"Mock interpretation for: {objective}",
+            candidate_actions=[],
+            surface_kind=observation.surface_kind,
+            active_app_guess=observation.active_app,
+            active_window_title_guess=observation.active_window_title,
+            visible_text_redacted=observation.visible_text_redacted,
+            ui_elements=observation.ui_elements,
+            sensitive_indicators=observation.sensitive_indicators,
+            confidence=observation.confidence,
+        )
+
+
 class DeterministicStepVerifier:
     def __init__(self, results: Iterable[VerificationResult]) -> None:
         self._results = list(results)

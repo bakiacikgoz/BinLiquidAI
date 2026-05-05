@@ -42,3 +42,8 @@ Covered by tests:
 - Raw screenshot persistence requires explicit runtime configuration and request opt-in; current foundation tests assert zero persisted screenshots.
 - Replay artifacts expose redacted event summaries and hash-chain integrity, not raw screen content.
 - Secret-like, password, payment, and security indicators trigger fail-closed policy decisions instead of logging or typing sensitive data.
+## Vision Runtime Privacy
+
+Vision-first computer-use stores screenshot hashes and redacted event metadata by default. Raw screenshot persistence is disabled by default, `raw_screenshot_max_count=0`, and replay/audit artifacts must report `raw_screenshot_persisted_count=0` unless an explicit local debug policy is enabled.
+
+Provider output is treated as untrusted observed content. Screen text is not accepted as an instruction, and sensitive indicators are propagated to policy stops rather than recorded as raw secrets.

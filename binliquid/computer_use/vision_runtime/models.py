@@ -55,6 +55,8 @@ class VisionObservation(VisionModel):
     raw_screenshot_path: str | None = None
     captured_at: str
     platform: str
+    image_width: int | None = Field(default=None, ge=1)
+    image_height: int | None = Field(default=None, ge=1)
     active_app: str | None = None
     active_window_title: str | None = None
     surface_kind: SurfaceKind = SurfaceKind.UNKNOWN
@@ -68,6 +70,12 @@ class VisionInterpretation(VisionModel):
     observation_hash: str = Field(min_length=64, max_length=64)
     summary: str
     candidate_actions: list[VisionAction] = Field(default_factory=list)
+    surface_kind: SurfaceKind = SurfaceKind.UNKNOWN
+    active_app_guess: str | None = None
+    active_window_title_guess: str | None = None
+    visible_text_redacted: list[str] = Field(default_factory=list)
+    ui_elements: list[UiElement] = Field(default_factory=list)
+    sensitive_indicators: list[str] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0)
 
 
@@ -102,7 +110,7 @@ class VisionPolicyDecision(VisionModel):
 
 
 class ExecutionResult(VisionModel):
-    status: Literal["executed", "skipped", "failed"]
+    status: Literal["executed", "skipped", "blocked", "failed"]
     message: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
 

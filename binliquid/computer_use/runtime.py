@@ -62,6 +62,10 @@ from binliquid.computer_use.perception import build_perception_fingerprint
 from binliquid.computer_use.policy import BrowserAllowlistPolicy
 from binliquid.computer_use.prompt_parser import parse_prompt_to_actions
 from binliquid.computer_use.recorder import build_recorder_artifact
+from binliquid.computer_use.vision_runtime.drivers.macos import (
+    MacOSInputExecutor,
+    MacOSScreenCaptureProvider,
+)
 from binliquid.computer_use.vision_runtime.models import (
     ExecutionResult as VisionExecutionResult,
 )
@@ -83,7 +87,9 @@ from binliquid.computer_use.vision_runtime.providers.mock_vision import (
     DeterministicActionPlanner,
     DeterministicScreenCapture,
     DeterministicStepVerifier,
+    MockVisionInterpreter,
 )
+from binliquid.computer_use.vision_runtime.providers.ollama_vision import OllamaVisionInterpreter
 from binliquid.computer_use.vision_runtime.recorder import RedactedVisionAuditRecorder
 from binliquid.computer_use.vision_runtime.runtime import VisionComputerUseRuntime
 from binliquid.governance.runtime import GovernanceRuntime
@@ -1595,6 +1601,35 @@ end tell
             return self._vision_payload(artifact)
 
         platform_info = current_platform()
+        if vision_config.vision_provider != "mock" and platform_info.label != "macos":
+            envelope = recorder.finalize("failed")
+            artifact = VisionRunArtifact(
+                job_id=job_id,
+                status="failed",
+                objective=prompt,
+                steps=[],
+                redaction_report=envelope.get("redaction_report", {}),
+                integrity=envelope.get("integrity", {}),
+                stop_reason=(
+                    "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+                    if platform_info.label == "windows"
+                    else "COMPUTER_USE_PLATFORM_NOT_QUALIFIED"
+                ),
+            )
+            return self._vision_payload(artifact)
+        if vision_config.vision_provider == "none":
+            envelope = recorder.finalize("failed")
+            artifact = VisionRunArtifact(
+                job_id=job_id,
+                status="failed",
+                objective=prompt,
+                steps=[],
+                redaction_report=envelope.get("redaction_report", {}),
+                integrity=envelope.get("integrity", {}),
+                stop_reason="VISION_PROVIDER_UNAVAILABLE",
+            )
+            return self._vision_payload(artifact)
+
         observation = VisionObservation(
             screenshot_hash=hashlib.sha256(f"{job_id}:{prompt}".encode()).hexdigest(),
             captured_at=datetime.now(UTC).isoformat(),
@@ -1603,15 +1638,35 @@ end tell
             confidence=1.0,
             raw_screenshot_path=None if not raw_screenshots else None,
         )
+        if vision_config.vision_provider == "mock":
+            capture = DeterministicScreenCapture([observation])
+            vision = MockVisionInterpreter()
+            executor = _NoopVisionExecutor()
+        elif vision_config.vision_provider == "ollama":
+            capture = MacOSScreenCaptureProvider(
+                config=vision_config,
+                job_dir=job_dir,
+                raw_screenshot_opt_in=raw_screenshots,
+            )
+            vision = OllamaVisionInterpreter(
+                model=vision_config.vision_model,
+                timeout_s=vision_config.vision_provider_timeout_s,
+                max_retries=vision_config.vision_provider_max_retries,
+            )
+            executor = MacOSInputExecutor(config=vision_config)
+        else:
+            capture = DeterministicScreenCapture([observation])
+            vision = None
+            executor = _NoopVisionExecutor()
         runtime = VisionComputerUseRuntime(
             config=vision_config,
             artifact_root=self._root_dir,
-            capture=DeterministicScreenCapture([observation]),
-            vision=None,
+            capture=capture,
+            vision=vision,
             planner=DeterministicActionPlanner(
-                [VisionStopDecision(reason="VISION_PROVIDER_UNAVAILABLE")]
+                [VisionStopDecision(reason="done")]
             ),
-            executor=_NoopVisionExecutor(),
+            executor=executor,
             verifier=DeterministicStepVerifier(
                 [VisionVerificationResult(verified=False, confidence=0.0)]
             ),

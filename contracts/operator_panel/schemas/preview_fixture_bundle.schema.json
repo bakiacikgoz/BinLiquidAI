@@ -568,6 +568,11 @@
           "title": "Platform",
           "type": "string"
         },
+        "provider": {
+          "additionalProperties": true,
+          "title": "Provider",
+          "type": "object"
+        },
         "reasonCode": {
           "anyOf": [
             {
@@ -584,6 +589,11 @@
           "title": "Replayable",
           "type": "boolean"
         },
+        "safety": {
+          "additionalProperties": true,
+          "title": "Safety",
+          "type": "object"
+        },
         "scope": {
           "const": "vision_first_desktop_web_file",
           "title": "Scope",
@@ -593,8 +603,10 @@
           "enum": [
             "configured",
             "not_configured",
+            "provider_unavailable",
             "not_qualified",
-            "qualified"
+            "qualified",
+            "blocked"
           ],
           "title": "Stage",
           "type": "string"

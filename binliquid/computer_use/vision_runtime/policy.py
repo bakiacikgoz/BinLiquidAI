@@ -31,7 +31,7 @@ class UniversalComputerUsePolicy:
                 allowed=False,
                 denied=True,
                 requires_approval=False,
-                reason_code="SENSITIVE_SURFACE_DETECTED",
+                reason_code="COMPUTER_USE_SENSITIVE_SURFACE_DETECTED",
                 risk_reasons=list(observation.sensitive_indicators),
             )
         active_app = (observation.active_app or "").casefold()
@@ -41,7 +41,7 @@ class UniversalComputerUsePolicy:
                 allowed=False,
                 denied=True,
                 requires_approval=False,
-                reason_code="BLOCKED_APP_SURFACE",
+                reason_code="COMPUTER_USE_BLOCKED_APP_DETECTED",
                 risk_reasons=[observation.active_app or "blocked_app"],
             )
         if observation.confidence < self.config.min_verification_confidence:
@@ -49,7 +49,7 @@ class UniversalComputerUsePolicy:
                 allowed=False,
                 denied=True,
                 requires_approval=False,
-                reason_code="UNKNOWN_VISUAL",
+                reason_code="VISION_CONFIDENCE_BELOW_THRESHOLD",
                 risk_reasons=["observation_confidence_below_threshold"],
             )
         return None
@@ -70,7 +70,7 @@ class UniversalComputerUsePolicy:
                     allowed=False,
                     denied=True,
                     requires_approval=False,
-                    reason_code="TERMINAL_CONTROL_DENIED",
+                    reason_code="COMPUTER_USE_TERMINAL_CONTROL_DENIED",
                     risk_reasons=["terminal_surface"],
                 )
             if self.config.terminal_control == "approval_required":
@@ -80,7 +80,7 @@ class UniversalComputerUsePolicy:
                 allowed=False,
                 denied=True,
                 requires_approval=False,
-                reason_code="CONFIDENCE_BELOW_THRESHOLD",
+                reason_code="VISION_CONFIDENCE_BELOW_THRESHOLD",
                 risk_reasons=["action_confidence_below_threshold"],
             )
         if mode == ComputerUseMode.DRY_RUN:
@@ -122,7 +122,7 @@ class UniversalComputerUsePolicy:
             allowed=False,
             denied=False,
             requires_approval=True,
-            reason_code="POLICY_REQUIRE_APPROVAL",
+            reason_code="COMPUTER_USE_APPROVAL_REQUIRED",
             risk_reasons=risk_reasons,
         )
 

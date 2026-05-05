@@ -54,6 +54,16 @@ export type ComputerUseVisionRuntimeCapability = {
   failClosed: boolean;
   reasonCode: string | null;
   summary: string | null;
+  provider: {
+    kind: string;
+    configured: boolean;
+    model: string | null;
+  };
+  safety: {
+    rawScreenshotPersistence: string;
+    terminalControl: string;
+    approvalRequiredForRiskyActions: boolean;
+  };
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -117,6 +127,8 @@ export function getComputerUseVisionRuntimeCapability(
   const capabilities = asRecord(handshake.capabilities);
   const features = asRecord(capabilities.features);
   const computerUse = asRecord(features.computerUseVisionRuntime);
+  const provider = asRecord(computerUse.provider);
+  const safety = asRecord(computerUse.safety);
 
   return {
     enabled: readBoolean(computerUse, 'enabled'),
@@ -128,6 +140,16 @@ export function getComputerUseVisionRuntimeCapability(
     failClosed: readBoolean(computerUse, 'failClosed'),
     reasonCode: readString(computerUse, 'reasonCode'),
     summary: readString(computerUse, 'summary'),
+    provider: {
+      kind: readString(provider, 'kind') ?? 'none',
+      configured: readBoolean(provider, 'configured'),
+      model: readString(provider, 'model'),
+    },
+    safety: {
+      rawScreenshotPersistence: readString(safety, 'rawScreenshotPersistence') ?? 'disabled',
+      terminalControl: readString(safety, 'terminalControl') ?? 'deny',
+      approvalRequiredForRiskyActions: readBoolean(safety, 'approvalRequiredForRiskyActions'),
+    },
   };
 }
 

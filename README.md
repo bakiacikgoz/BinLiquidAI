@@ -347,3 +347,13 @@ Calibration outputs:
 - `INSTALL.md`
 - `DEPLOYMENT_GUIDE.md`
 - `SUPPORT_BUNDLE.md`
+## Computer-Use Vision Pilot
+
+BinLiquid includes a supervised macOS vision-first computer-use pilot behind fail-closed flags. It supports deterministic mock qualification, redacted replay/audit artifacts, strict local vision-provider parsing, and approval-gated risky actions. Raw screenshots are not persisted by default.
+
+Windows live computer-use is not qualified and remains disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.
+
+```bash
+uv run binliquid computer-use qualify --runtime vision-first --suite smoke --mode deterministic --json
+uv run binliquid computer-use vision doctor --profile balanced --json
+```

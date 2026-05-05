@@ -45,3 +45,8 @@ Commands outside allowlist are rejected with deterministic error (`exit_code=126
 - Universal policy denies sensitive surfaces, blocked apps, low-confidence actions, and terminal control by default.
 - Approval snapshots contain hashes, target geometry, expected effect, risk reasons, policy hash, and action hash; they do not contain raw screenshots.
 - Windows live execution remains blocked with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` until signed qualification evidence exists.
+## Vision-First Computer-Use Security Boundary
+
+The Phase 2 vision-first runtime is fail-closed by default. Sensitive surfaces such as passwords, MFA, payment, wallet, private-key, system/security settings, legal-consent, and terminal/shell contexts are denied or stopped before OS input execution. Risky click/type/hotkey/file actions require approval and a fresh approval snapshot matching action hash, policy hash, active app/window, surface kind, and screenshot hash.
+
+Windows and Linux live execution are not qualified. Windows must continue to report `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.

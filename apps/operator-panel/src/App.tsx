@@ -39,7 +39,12 @@ import {
   verifySignedArtifact,
   showApproval,
 } from './bridge';
-import { getComputerUseCapability, hasContractMismatch, isComputerUseLiveEnabled } from './capabilities';
+import {
+  getComputerUseCapability,
+  getComputerUseVisionRuntimeCapability,
+  hasContractMismatch,
+  isComputerUseLiveEnabled,
+} from './capabilities';
 import { ThemeProvider } from './context/ThemeContext';
 import { dictionaries } from './i18n';
 import { actorForOperator, canMutateWithOperatorId } from './operator';
@@ -262,6 +267,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const supportedProfiles = readArray(capabilities, 'profiles');
   const contractMismatch = hasContractMismatch(handshakeData);
   const computerUseCapability = getComputerUseCapability(handshakeData);
+  const computerUseVisionCapability = getComputerUseVisionRuntimeCapability(handshakeData);
   const computerUseLiveEnabled = isComputerUseLiveEnabled(handshakeData);
   const computerUseDisabledReason =
     computerUseLiveEnabled
@@ -1251,6 +1257,26 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                   <div className="metric-row">
                     <span>Reason code</span>
                     <strong>{computerUseCapability.reasonCode || '-'}</strong>
+                  </div>
+                  <div className="metric-row">
+                    <span>Vision runtime</span>
+                    <strong>{computerUseVisionCapability.stage}</strong>
+                  </div>
+                  <div className="metric-row">
+                    <span>Vision provider</span>
+                    <strong>
+                      {computerUseVisionCapability.provider.kind}
+                      {computerUseVisionCapability.provider.model
+                        ? ` / ${computerUseVisionCapability.provider.model}`
+                        : ''}
+                    </strong>
+                  </div>
+                  <div className="metric-row">
+                    <span>Vision safety</span>
+                    <strong>
+                      {computerUseVisionCapability.safety.rawScreenshotPersistence} /{' '}
+                      {computerUseVisionCapability.safety.terminalControl}
+                    </strong>
                   </div>
                 </div>
                 {!computerUseLiveEnabled ? (

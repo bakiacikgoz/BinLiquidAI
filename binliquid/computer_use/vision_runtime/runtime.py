@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-import hashlib
-import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from binliquid.computer_use.vision_runtime.approval import hash_json
+from binliquid.computer_use.vision_runtime.errors import VisionRuntimeError
 from binliquid.computer_use.vision_runtime.models import (
     StopDecision,
     VerificationResult,
     VisionAction,
+    VisionObservation,
     VisionPolicyDecision,
     VisionRunArtifact,
     VisionRunRequest,
@@ -70,7 +72,17 @@ class VisionComputerUseRuntime:
         steps: list[VisionStepResult] = []
         recovery_attempts = 0
         for step_index in range(self.config.max_steps):
-            before = self.capture.capture()
+            try:
+                before = self.capture.capture()
+            except VisionRuntimeError as exc:
+                envelope = recorder.finalize("failed")
+                return self._artifact(
+                    request=request,
+                    status="failed",
+                    steps=steps,
+                    envelope=envelope,
+                    stop_reason=exc.reason_code,
+                )
             surface_stop = self.policy.detect_surface_stop(before, objective=request.objective)
             if surface_stop is not None:
                 step = self._blocked_step(step_index, before.screenshot_hash, surface_stop)
@@ -85,11 +97,44 @@ class VisionComputerUseRuntime:
                     stop_reason=surface_stop.reason_code,
                 )
 
-            interpretation = self.vision.interpret(
-                objective=request.objective,
-                observation=before,
-                world=None,
-            )
+            try:
+                interpretation = self.vision.interpret(
+                    objective=request.objective,
+                    observation=before,
+                    world=None,
+                )
+            except VisionRuntimeError as exc:
+                envelope = recorder.finalize("failed")
+                return self._artifact(
+                    request=request,
+                    status="failed",
+                    steps=steps,
+                    envelope=envelope,
+                    stop_reason=exc.reason_code,
+                )
+            if interpretation.confidence < self.config.min_verification_confidence:
+                envelope = recorder.finalize("failed")
+                return self._artifact(
+                    request=request,
+                    status="failed",
+                    steps=steps,
+                    envelope=envelope,
+                    stop_reason="VISION_CONFIDENCE_BELOW_THRESHOLD",
+                )
+            before = self._enrich_observation(before, interpretation)
+            surface_stop = self.policy.detect_surface_stop(before, objective=request.objective)
+            if surface_stop is not None:
+                step = self._blocked_step(step_index, before.screenshot_hash, surface_stop)
+                steps.append(step)
+                recorder.record_step(step)
+                envelope = recorder.finalize("failed")
+                return self._artifact(
+                    request=request,
+                    status="failed",
+                    steps=steps,
+                    envelope=envelope,
+                    stop_reason=surface_stop.reason_code,
+                )
             action_or_stop = self.planner.next_action(
                 objective=request.objective,
                 interpretation=interpretation,
@@ -135,7 +180,7 @@ class VisionComputerUseRuntime:
                     approval_snapshot=self._approval_snapshot(
                         request=request,
                         step_index=step_index,
-                        before_hash=before.screenshot_hash,
+                        before=before,
                         action=action,
                         decision=decision,
                     ),
@@ -151,6 +196,34 @@ class VisionComputerUseRuntime:
                 )
 
             execution = self.executor.execute(action)
+            if execution.status == "blocked":
+                reason = str(
+                    execution.details.get("reason_code") or "COMPUTER_USE_APPROVAL_REQUIRED"
+                )
+                step = self._step(
+                    step_index=step_index,
+                    before_hash=before.screenshot_hash,
+                    action=action,
+                    decision=VisionPolicyDecision(
+                        allowed=False,
+                        denied=True,
+                        requires_approval=False,
+                        reason_code=reason,
+                        risk_reasons=[reason],
+                        policy_hash=self.policy.policy_hash,
+                    ),
+                    execution_status="blocked",
+                )
+                steps.append(step)
+                recorder.record_step(step)
+                envelope = recorder.finalize("failed")
+                return self._artifact(
+                    request=request,
+                    status="failed",
+                    steps=steps,
+                    envelope=envelope,
+                    stop_reason=reason,
+                )
             if execution.status == "failed":
                 verification = VerificationResult(
                     verified=False,
@@ -173,10 +246,22 @@ class VisionComputerUseRuntime:
                     status="failed",
                     steps=steps,
                     envelope=envelope,
-                    stop_reason="EXECUTION_FAILED",
+                    stop_reason=str(
+                        execution.details.get("reason_code") or "EXECUTION_FAILED"
+                    ),
                 )
 
-            after = self.capture.capture()
+            try:
+                after = self.capture.capture()
+            except VisionRuntimeError as exc:
+                envelope = recorder.finalize("failed")
+                return self._artifact(
+                    request=request,
+                    status="failed",
+                    steps=steps,
+                    envelope=envelope,
+                    stop_reason=exc.reason_code,
+                )
             verification = self.verifier.verify(before=before, action=action, after=after)
             step = self._step(
                 step_index=step_index,
@@ -198,7 +283,7 @@ class VisionComputerUseRuntime:
                         status="failed",
                         steps=steps,
                         envelope=envelope,
-                        stop_reason="VERIFICATION_FAILED",
+                        stop_reason="COMPUTER_USE_RECOVERY_BUDGET_EXCEEDED",
                     )
                 recovery_attempts += 1
 
@@ -208,7 +293,7 @@ class VisionComputerUseRuntime:
             status="failed",
             steps=steps,
             envelope=envelope,
-            stop_reason="MAX_STEPS_EXCEEDED",
+            stop_reason="COMPUTER_USE_MAX_STEPS_EXCEEDED",
         )
 
     def _blocked_step(
@@ -263,31 +348,37 @@ class VisionComputerUseRuntime:
         *,
         request: VisionRunRequest,
         step_index: int,
-        before_hash: str,
+        before: VisionObservation,
         action: VisionAction,
         decision: VisionPolicyDecision,
     ) -> dict[str, Any]:
-        action_payload = action.model_dump(mode="json", exclude_none=True)
-        action_hash = _hash_json(action_payload)
-        return {
-            "kind": "computer_use_vision_action",
-            "job_id": request.job_id,
-            "step_index": step_index,
-            "objective": request.objective,
-            "before_screenshot_hash": before_hash,
-            "target_bbox": action.target_bbox.model_dump(mode="json")
-            if action.target_bbox is not None
-            else None,
-            "action_type": action.action_type.value,
-            "expected_effect": action.expected_effect,
-            "risk_class": action.risk_class.value,
-            "risk_reasons": decision.risk_reasons,
-            "policy_hash": decision.policy_hash,
-            "execution_contract": {
-                "action_hash": action_hash,
-                "max_age_ms": 5000,
-            },
+        return build_approval_snapshot(
+            job_id=request.job_id,
+            step_index=step_index,
+            objective=request.objective,
+            observation=before,
+            action=action,
+            policy_hash=decision.policy_hash,
+            risk_reasons=decision.risk_reasons,
+            max_age_ms=5000,
+        )
+
+    @staticmethod
+    def _enrich_observation(
+        observation,
+        interpretation,
+    ):
+        updates: dict[str, Any] = {
+            "surface_kind": interpretation.surface_kind,
+            "visible_text_redacted": interpretation.visible_text_redacted,
+            "ui_elements": interpretation.ui_elements,
+            "sensitive_indicators": interpretation.sensitive_indicators,
         }
+        if interpretation.active_app_guess:
+            updates["active_app"] = interpretation.active_app_guess
+        if interpretation.active_window_title_guess:
+            updates["active_window_title"] = interpretation.active_window_title_guess
+        return observation.model_copy(update=updates)
 
     @staticmethod
     def _artifact(
@@ -310,5 +401,46 @@ class VisionComputerUseRuntime:
 
 
 def _hash_json(payload: object) -> str:
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    return hash_json(payload)
+
+
+def build_approval_snapshot(
+    *,
+    job_id: str,
+    step_index: int,
+    objective: str,
+    observation: VisionObservation,
+    action: VisionAction,
+    policy_hash: str,
+    risk_reasons: list[str],
+    max_age_ms: int,
+    created_at: str | None = None,
+) -> dict[str, Any]:
+    action_payload = action.model_dump(mode="json", exclude_none=True)
+    action_hash = hash_json(action_payload)
+    return {
+        "kind": "computer_use_vision_action",
+        "job_id": job_id,
+        "step_index": step_index,
+        "objective_hash": hash_json({"objective": objective}),
+        "before_screenshot_hash": observation.screenshot_hash,
+        "action_hash": action_hash,
+        "policy_hash": policy_hash,
+        "active_app": observation.active_app,
+        "active_window_title": observation.active_window_title,
+        "surface_kind": observation.surface_kind.value,
+        "target_bbox": action.target_bbox.model_dump(mode="json")
+        if action.target_bbox is not None
+        else None,
+        "action_type": action.action_type.value,
+        "expected_effect": action.expected_effect,
+        "risk_class": action.risk_class.value,
+        "risk_reasons": risk_reasons,
+        "created_at": created_at or datetime.now(UTC).isoformat(),
+        "max_age_ms": max_age_ms,
+        "raw_screenshot_path": None,
+        "execution_contract": {
+            "action_hash": action_hash,
+            "max_age_ms": max_age_ms,
+        },
+    }

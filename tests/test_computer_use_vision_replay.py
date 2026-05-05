@@ -11,7 +11,7 @@ from binliquid.computer_use.vision_runtime.models import (
     VisionStepResult,
 )
 from binliquid.computer_use.vision_runtime.recorder import RedactedVisionAuditRecorder
-from binliquid.computer_use.vision_runtime.replay import load_replay_summary
+from binliquid.computer_use.vision_runtime.replay import load_replay_summary, verify_replay
 
 
 def _step(step_index: int) -> VisionStepResult:
@@ -65,3 +65,25 @@ def test_recorder_writes_redacted_hash_chain_and_replay_summary(tmp_path: Path) 
     assert replay["status"] == "completed"
     assert replay["event_count"] == 1
     assert replay["redacted"] is True
+    assert replay["checks"]["hash_chain_verified"] is True
+
+
+def test_replay_verifier_detects_tampered_event_hash(tmp_path: Path) -> None:
+    recorder = RedactedVisionAuditRecorder(
+        job_id="job-tamper",
+        job_dir=tmp_path / "job-tamper",
+        runtime_config_hash="runtime-hash",
+        policy_hash="policy-hash",
+    )
+    recorder.record_step(_step(0))
+    recorder.finalize("completed")
+
+    events_path = tmp_path / "job-tamper" / "events.jsonl"
+    event = json.loads(events_path.read_text(encoding="utf-8").splitlines()[0])
+    event["payload"]["execution_status"] = "executed_after_tamper"
+    events_path.write_text(json.dumps(event, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    verification = verify_replay(tmp_path / "job-tamper")
+
+    assert verification["verified"] is False
+    assert "hash_chain" in verification["errors"][0]

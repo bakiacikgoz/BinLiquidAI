@@ -16,6 +16,9 @@ from benchmarks.run_team import run_team_benchmark
 from binliquid import __version__
 from binliquid.computer_use import ComputerUseMode
 from binliquid.computer_use.runtime import ComputerUseRunner, SessionCommand
+from binliquid.computer_use.vision_runtime.drivers.macos import MacOSVisionReadiness
+from binliquid.computer_use.vision_runtime.qualification import run_vision_qualification
+from binliquid.computer_use.vision_runtime.replay import load_replay_summary, verify_replay
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
@@ -83,6 +86,7 @@ config_app = typer.Typer(help="Config commands")
 approval_app = typer.Typer(help="Governance approval commands")
 operator_app = typer.Typer(help="Operator panel commands")
 computer_use_app = typer.Typer(help="Computer use execution commands")
+computer_use_vision_app = typer.Typer(help="Vision-first computer use commands")
 team_app = typer.Typer(help="Team runtime commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
@@ -102,6 +106,7 @@ app.add_typer(config_app, name="config")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
 app.add_typer(computer_use_app, name="computer-use")
+computer_use_app.add_typer(computer_use_vision_app, name="vision")
 app.add_typer(team_app, name="team")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
@@ -1416,6 +1421,7 @@ def operator_capabilities(
 ) -> None:
     platform_info = current_platform()
     windows_computer_use = platform_info.label == "windows"
+    vision_config = RuntimeConfig.from_profile("balanced").computer_use
     computer_use_pilot = (
         {
             "enabled": False,
@@ -1460,11 +1466,27 @@ def operator_capabilities(
                 "Vision-first runtime foundation is present, but Windows live execution "
                 "is not qualified."
             ),
+            "provider": {
+                "kind": vision_config.vision_provider,
+                "configured": False,
+                "model": vision_config.vision_model,
+            },
+            "safety": {
+                "rawScreenshotPersistence": vision_config.raw_screenshot_retention,
+                "terminalControl": vision_config.terminal_control,
+                "approvalRequiredForRiskyActions": True,
+            },
         }
         if windows_computer_use
         else {
-            "enabled": False,
-            "stage": "not_configured",
+            "enabled": vision_config.vision_enabled
+            and vision_config.vision_provider != "none"
+            and platform_info.label == "macos",
+            "stage": (
+                "configured"
+                if vision_config.vision_enabled and vision_config.vision_provider != "none"
+                else "not_configured"
+            ),
             "platform": platform_info.label
             if platform_info.label in {"macos", "linux"}
             else "unknown",
@@ -1477,6 +1499,16 @@ def operator_capabilities(
                 "Vision-first runtime foundation is available for deterministic tests; "
                 "live execution requires an explicitly configured vision provider."
             ),
+            "provider": {
+                "kind": vision_config.vision_provider,
+                "configured": vision_config.vision_provider != "none",
+                "model": vision_config.vision_model,
+            },
+            "safety": {
+                "rawScreenshotPersistence": vision_config.raw_screenshot_retention,
+                "terminalControl": vision_config.terminal_control,
+                "approvalRequiredForRiskyActions": True,
+            },
         }
     )
     payload = {
@@ -1534,6 +1566,85 @@ def operator_capabilities(
         typer.echo(
             f"coreVersion={payload['coreVersion']} contractVersion={payload['contractVersion']}"
         )
+
+
+@computer_use_vision_app.command("doctor")
+def computer_use_vision_doctor(
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
+    report = MacOSVisionReadiness(config.computer_use).evaluate()
+    payload = _with_contract_version(report)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload["stage"])
+    if not payload["live_execution_allowed"]:
+        raise typer.Exit(code=1)
+
+
+@computer_use_app.command("replay")
+def computer_use_replay(
+    job_id: str = typer.Option(..., "--job-id", help="Vision computer-use job id"),
+    root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    verify: bool = typer.Option(False, "--verify/--no-verify", help="Verify replay integrity"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    job_dir = Path(root_dir or config.team.artifact_dir) / job_id
+    payload = load_replay_summary(job_dir)
+    if verify:
+        payload["verification"] = verify_replay(job_dir)
+    payload = _with_contract_version(payload)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"job_id={job_id} verified={payload.get('verified')}")
+
+
+@computer_use_app.command("qualify")
+def computer_use_qualify(
+    runtime: str = typer.Option("vision-first", "--runtime", help="vision-first"),
+    suite: str = typer.Option("smoke", "--suite", help="Qualification suite"),
+    mode: str = typer.Option("deterministic", "--mode", help="deterministic|live"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    task_path: str = typer.Option(
+        "benchmarks/tasks/computer_use_vision/smoke_tasks.jsonl",
+        "--task-path",
+        help="Qualification task JSONL path",
+    ),
+    output_root: str = typer.Option(
+        "artifacts/computer_use_vision_qualification",
+        "--output-root",
+        help="Qualification output root",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    if _parse_computer_use_runtime(runtime) != "vision_first":
+        payload = _with_contract_version(
+            {
+                "artifact_version": "computer_use_vision_qualification/v1",
+                "status": "blocked",
+                "blocking_reasons": ["UNSUPPORTED_RUNTIME"],
+            }
+        )
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        raise typer.Exit(code=1)
+    config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
+    payload = run_vision_qualification(
+        config=config.computer_use,
+        mode=mode,
+        suite=suite,
+        task_path=Path(task_path),
+        output_root=Path(output_root),
+    )
+    payload = _with_contract_version(payload)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(payload["status"])
 
 
 @computer_use_app.command("run")

@@ -22,8 +22,13 @@ def test_computer_use_runtime_config_defaults_are_safe() -> None:
     assert config.enabled is True
     assert config.runtime_mode == "legacy_pilot"
     assert config.vision_enabled is False
+    assert config.vision_provider == "none"
+    assert config.vision_model is None
+    assert config.macos_live_enabled is False
+    assert config.macos_input_backend == "disabled"
     assert config.default_mode == "step_approval"
     assert config.raw_screenshot_retention == "disabled"
+    assert config.raw_screenshot_max_count == 0
     assert config.terminal_control == "deny"
     assert config.platform_qualification_required is True
 
@@ -35,6 +40,8 @@ def test_runtime_config_loads_computer_use_profile_block_and_env_override() -> N
         env={
             "BINLIQUID_COMPUTER_USE_RUNTIME_MODE": "vision_first",
             "BINLIQUID_COMPUTER_USE_VISION_ENABLED": "true",
+            "BINLIQUID_COMPUTER_USE_VISION_PROVIDER": "mock",
+            "BINLIQUID_COMPUTER_USE_MACOS_LIVE_ENABLED": "true",
             "BINLIQUID_COMPUTER_USE_MAX_STEPS": "12",
         },
     )
@@ -42,6 +49,8 @@ def test_runtime_config_loads_computer_use_profile_block_and_env_override() -> N
     assert isinstance(resolved, RuntimeConfig)
     assert resolved.computer_use.runtime_mode == "vision_first"
     assert resolved.computer_use.vision_enabled is True
+    assert resolved.computer_use.vision_provider == "mock"
+    assert resolved.computer_use.macos_live_enabled is True
     assert resolved.computer_use.max_steps == 12
     assert source_map["computer_use.runtime_mode"] == "env"
     assert source_map["computer_use.vision_enabled"] == "env"
