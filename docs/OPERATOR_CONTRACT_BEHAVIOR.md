@@ -34,6 +34,6 @@
 
 ## Source Of Truth
 
-- Contract schemas live under [contracts/operator_panel/schemas](/Users/baki/Desktop/lnn/contracts/operator_panel/schemas).
-- Preview fixtures live in [operator_panel_preview.json](/Users/baki/Desktop/lnn/contracts/operator_panel/fixtures/operator_panel_preview.json).
-- The schema generator is [generate_operator_contract_schemas.py](/Users/baki/Desktop/lnn/scripts/generate_operator_contract_schemas.py).
+- Contract schemas live under `contracts/operator_panel/schemas`.
+- Preview fixtures live in `contracts/operator_panel/fixtures/operator_panel_preview.json`.
+- The schema generator is `scripts/generate_operator_contract_schemas.py`.

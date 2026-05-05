@@ -80,17 +80,17 @@ class MacOSVisionReadiness:
         checks: list[dict[str, Any]] = []
         if platform.label != "macos":
             reason = (
-                "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
-                if platform.label == "windows"
-                else "COMPUTER_USE_PLATFORM_NOT_QUALIFIED"
-            )
+                    "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+                    if platform.label == "windows"
+                    else "COMPUTER_USE_PLATFORM_NOT_QUALIFIED"
+                )
             checks.append(
                 _check(
                     "platform",
                     False,
                     reason,
-                    "Vision live execution is qualified only for supervised macOS pilots.",
-                    "Run live vision computer-use on a qualified macOS pilot host.",
+                    "Vision live execution remains gated to supervised macOS qualification.",
+                    "Use live vision computer-use only with valid macOS qualification evidence.",
                 )
             )
             return self._report(platform.label, checks)

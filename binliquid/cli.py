@@ -1509,7 +1509,10 @@ def operator_capabilities(
             "failClosed": True,
             "adapterStatus": "safari_applescript",
             "reasonCode": "MACOS_COMPUTER_USE_PILOT",
-            "summary": "macOS computer-use pilot is enabled behind fail-closed controls.",
+            "summary": (
+                "macOS computer-use pilot is qualification-gated behind "
+                "fail-closed controls."
+            ),
         }
     )
     computer_use_vision_runtime = _computer_use_vision_runtime_payload(
@@ -1626,10 +1629,36 @@ def computer_use_doctor(
 @computer_use_qualification_app.command("verify")
 def computer_use_qualification_verify(
     profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
-    platform: str = typer.Option(..., "--platform", help="macos|windows|linux"),
-    report: str = typer.Option(..., "--report", help="Qualification report JSON path"),
+    platform: str | None = typer.Option(None, "--platform", help="macos|windows|linux"),
+    report: str | None = typer.Option(None, "--report", help="Qualification report JSON path"),
+    schema: str | None = typer.Option(
+        None,
+        "--schema",
+        help="Qualification JSON schema path for fixture validation",
+    ),
+    input_path: str | None = typer.Option(
+        None,
+        "--input",
+        help="Qualification fixture JSON path for static validation",
+    ),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
+    if input_path is not None:
+        payload = _verify_computer_use_qualification_fixture(
+            schema_path=Path(schema) if schema else None,
+            input_path=Path(input_path),
+        )
+        if json_output:
+            typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            typer.echo(payload["status"])
+        if payload["status"] != "pass":
+            raise typer.Exit(code=1)
+        return
+
+    if platform is None or report is None:
+        raise typer.BadParameter("provide either --schema/--input or --platform/--report")
+
     config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
     normalized_platform = platform.strip().lower()
     report_path = Path(report)
@@ -1649,6 +1678,94 @@ def computer_use_qualification_verify(
         typer.echo(validation.status)
     if not validation.allowed:
         raise typer.Exit(code=1)
+
+
+def _verify_computer_use_qualification_fixture(
+    *,
+    schema_path: Path | None,
+    input_path: Path,
+) -> dict[str, Any]:
+    blockers: list[str] = []
+    if not input_path.exists():
+        return {
+            "status": "fail",
+            "allowed": False,
+            "blockers": ["VISION_PLATFORM_QUALIFICATION_MISSING"],
+            "inputPath": str(input_path),
+        }
+    fixture = json.loads(input_path.read_text(encoding="utf-8"))
+    if schema_path is not None:
+        if not schema_path.exists():
+            blockers.append("VISION_PLATFORM_QUALIFICATION_SCHEMA_MISSING")
+        else:
+            blockers.extend(_validate_json_schema(schema_path, fixture))
+
+    fixture_platform = str(fixture.get("platform", "")).strip().lower()
+    fixture_config = _fixture_runtime_config(fixture)
+    validation = validate_platform_qualification_report(
+        fixture,
+        platform=fixture_platform,
+        config=fixture_config,
+        commit=str(fixture.get("commit", "")),
+    )
+    blockers.extend(validation.blockers)
+    checks = _qualification_fixture_checks(fixture)
+    blockers.extend(reason for reason, ok in checks.items() if not ok)
+
+    return {
+        "status": "pass" if not blockers else "fail",
+        "allowed": False,
+        "reviewOnly": True,
+        "runtimeLiveEnabled": False,
+        "schemaPath": str(schema_path) if schema_path else None,
+        "inputPath": str(input_path),
+        "platform": fixture_platform or None,
+        "fixtureStatus": validation.status,
+        "checks": checks,
+        "blockers": blockers,
+    }
+
+
+def _validate_json_schema(schema_path: Path, fixture: dict[str, Any]) -> list[str]:
+    try:
+        import jsonschema
+    except ModuleNotFoundError:
+        return ["JSONSCHEMA_UNAVAILABLE"]
+    schema_payload = json.loads(schema_path.read_text(encoding="utf-8"))
+    try:
+        jsonschema.Draft202012Validator(schema_payload).validate(fixture)
+    except jsonschema.ValidationError as exc:
+        return [f"VISION_PLATFORM_QUALIFICATION_SCHEMA_INVALID:{exc.json_path}"]
+    return []
+
+
+def _fixture_runtime_config(fixture: dict[str, Any]) -> Any:
+    platform = str(fixture.get("platform", "")).strip().lower()
+    provider = fixture.get("provider") if isinstance(fixture.get("provider"), dict) else {}
+    backends = fixture.get("backends") if isinstance(fixture.get("backends"), dict) else {}
+    updates: dict[str, Any] = {
+        "vision_enabled": True,
+        "vision_provider": "mock" if provider.get("name") == "mock" else "none",
+    }
+    if platform in {"macos", "windows", "linux"}:
+        updates[f"{platform}_live_enabled"] = True
+        updates[f"{platform}_capture_backend"] = str(backends.get("capture", "disabled"))
+        updates[f"{platform}_input_backend"] = str(backends.get("input", "disabled"))
+    return RuntimeConfig().computer_use.model_copy(update=updates)
+
+
+def _qualification_fixture_checks(fixture: dict[str, Any]) -> dict[str, bool]:
+    safety = fixture.get("safety") if isinstance(fixture.get("safety"), dict) else {}
+    return {
+        "has_platform_identity": bool(fixture.get("platform")),
+        "has_config_hash": bool(fixture.get("configHash")),
+        "has_safety_invariants": bool(safety),
+        "approval_freshness_enforced": safety.get("approvalFreshnessEnforced") is True,
+        "replay_integrity_verified": safety.get("replayIntegrityVerified") is True,
+        "raw_screenshots_not_persisted": int(safety.get("rawScreenshotsPersisted", -1)) == 0,
+        "has_evidence_placeholders": isinstance(fixture.get("evidence"), list),
+        "does_not_enable_live_runtime": True,
+    }
 
 
 @computer_use_app.command("replay")

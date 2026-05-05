@@ -12,10 +12,10 @@ Bu doküman, BinLiquid / AegisOS arayüz brief'ini üretime uygun bir tema siste
 
 Bu sistemin kod karşılığı ağırlıklı olarak:
 
-- `/Users/baki/Desktop/lnn/apps/operator-panel/src/styles/tokens.css`
-- `/Users/baki/Desktop/lnn/apps/operator-panel/src/styles/themes/light.css`
-- `/Users/baki/Desktop/lnn/apps/operator-panel/src/styles/themes/dark.css`
-- `/Users/baki/Desktop/lnn/apps/operator-panel/src/index.css`
+- `apps/operator-panel/src/styles/tokens.css`
+- `apps/operator-panel/src/styles/themes/light.css`
+- `apps/operator-panel/src/styles/themes/dark.css`
+- `apps/operator-panel/src/index.css`
 
 ## 1. Design Token Set
 

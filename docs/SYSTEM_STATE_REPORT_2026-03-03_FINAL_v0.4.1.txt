@@ -1,7 +1,7 @@
 AegisOS / BinLiquid
 Final Technical System State Report (v0.4.1 Hardening)
 Date: 2026-03-03 (Europe/Istanbul)
-Repository: /Users/baki/Desktop/lnn
+Repository: repo root
 Branch: main
 Head Commit: 314d8dc
 

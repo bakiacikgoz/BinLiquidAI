@@ -1,7 +1,7 @@
 AegisOS / BinLiquid v0.4.0
 Comprehensive System State Report
 Date: 2026-03-03
-Repository: /Users/baki/Desktop/lnn
+Repository: repo root
 
 ====================================================================
 1) Executive Summary
@@ -274,7 +274,7 @@ Files:
 - tests/test_runtime_config.py (team config assertions)
 
 9.4 Gates run and status
-- uv run ruff check /Users/baki/Desktop/lnn -> PASS
+- uv run ruff check . -> PASS
 - uv run pytest -q -> PASS
 
 ====================================================================

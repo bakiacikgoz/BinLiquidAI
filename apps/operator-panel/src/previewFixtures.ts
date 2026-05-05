@@ -43,7 +43,7 @@ export function previewHandshake(settings: PanelSettings) {
     failClosed: true,
     adapterStatus: 'safari_applescript',
     reasonCode: 'MACOS_COMPUTER_USE_PILOT',
-    summary: 'macOS pilot preview is enabled; Windows live computer-use remains disabled until qualification.',
+    summary: 'macOS pilot preview is qualification-gated; Windows live computer-use remains disabled.',
   };
   payload.capabilities.commands.computerUseSubmit = true;
   payload.capabilities.commands.computerUsePause = true;
