@@ -32,6 +32,7 @@ PlatformStage = Literal[
     "provider_ready",
     "ready_for_live_fixture",
     "fixture_qualified",
+    "fixture_qualified_default_disabled",
     "qualified_limited",
     "enabled",
     "blocked",
@@ -159,12 +160,14 @@ def build_platform_capability(
         and qualification_allowed
         and not _platform_live_flag(config, normalized_platform)
     ):
-        stage = "fixture_qualified"
+        stage = "fixture_qualified_default_disabled"
         reason_code = "MACOS_FIXTURE_QUALIFIED_DEFAULT_DISABLED"
     else:
         stage = "not_qualified"
         reason_code = PLATFORM_REASON_CODES[normalized_platform]
     execution_modes = ["dry_run", "step_approval"]
+    if stage == "fixture_qualified_default_disabled":
+        execution_modes.append("supervised_fixture")
     if live_enabled:
         execution_modes.append("execute")
 

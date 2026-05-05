@@ -57,3 +57,6 @@ Provider output is treated as untrusted observed content. Screen text is not acc
   hash-chain audit metadata, opt-in metadata, and
   `rawScreenshotPersistedCount=0`; they do not store raw screenshots by
   default.
+- Phase 4D provider readiness uses a generated synthetic local fixture image
+  and validates strict JSON before any desktop capture or input. The synthetic
+  image is not persisted as raw screenshot evidence.

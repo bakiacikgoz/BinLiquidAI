@@ -55,8 +55,25 @@ def test_computer_use_doctor_macos_shape_reports_exact_fail_closed_blockers() ->
     assert payload["optIn"]["present"] is False
     assert payload["optIn"]["required"] is True
     assert payload["nextActions"]
-    assert payload["permissions"]["screenRecording"] in {"granted", "missing", "unknown"}
-    assert payload["permissions"]["accessibility"] in {"granted", "missing", "unknown"}
+    assert payload["permissions"]["screenRecording"]["status"] in {
+        "granted",
+        "missing",
+        "unknown",
+    }
+    assert payload["permissions"]["screenRecording"]["manualGrantRequired"] is (
+        payload["permissions"]["screenRecording"]["status"] != "granted"
+    )
+    assert payload["permissions"]["screenRecording"]["autoGrantAttempted"] is False
+    assert payload["permissions"]["accessibility"]["status"] in {
+        "granted",
+        "missing",
+        "unknown",
+    }
+    assert payload["permissions"]["accessibility"]["manualGrantRequired"] is (
+        payload["permissions"]["accessibility"]["status"] != "granted"
+    )
+    assert payload["permissions"]["accessibility"]["autoGrantAttempted"] is False
+    assert payload["permissions"]["inputMonitoring"]["status"] == "not_required"
     assert payload["provider"]["ready"] is False
     assert payload["provider"]["kind"] == "none"
     assert payload["capture"]["backend"] == "disabled"
@@ -156,12 +173,23 @@ def test_macos_live_qualification_run_blocks_without_explicit_opt_in(tmp_path) -
     assert report["qualificationPassed"] is False
     assert report["fixtureQualified"] is False
     assert report["productionQualified"] is False
+    assert report["liveEnabled"] is False
     assert report["liveEnabledDefault"] is False
     assert report["stage"] == "blocked"
     assert report["scope"] == "supervised_local_fixtures"
     assert report["safety"]["rawScreenshotPersistedCount"] == 0
     assert report["safety"]["replayIntegrityVerified"] is True
     assert report["artifacts"]["rawScreenshotCount"] == 0
+    assert report["artifacts"]["phase4dPreflightPath"].endswith(
+        "macos_phase4d_preflight.json"
+    )
+    assert report["artifacts"]["phase4dFlagInventoryPath"].endswith(
+        "macos_phase4d_flag_inventory.json"
+    )
+    assert report["provider"]["strictJsonValidated"] is False
+    assert report["capture"]["rawPersistedCount"] == 0
+    assert (output.parent / "macos_phase4d_preflight.json").exists()
+    assert (output.parent / "macos_phase4d_flag_inventory.json").exists()
     assert "MACOS_LIVE_OPT_IN_MISSING" in report["blockers"]
     assert "MACOS_LIVE_ACK_MISSING" in report["blockers"]
     assert "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED" in report["blockers"]
@@ -177,6 +205,26 @@ def test_macos_live_qualification_run_blocks_without_explicit_opt_in(tmp_path) -
         "terminal_deny",
     }
     assert all(fixture["status"] == "skipped" for fixture in report["fixtures"])
+
+
+def test_computer_use_provider_doctor_command_blocks_without_model() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "computer-use",
+            "provider",
+            "doctor",
+            "--provider",
+            "ollama",
+            "--synthetic-fixture",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "blocked"
+    assert payload["reasonCode"] == "VISION_PROVIDER_MODEL_NOT_CONFIGURED"
 
 
 def test_macos_live_qualification_run_blocks_without_acknowledgment(tmp_path) -> None:

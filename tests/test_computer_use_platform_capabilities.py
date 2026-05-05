@@ -51,7 +51,7 @@ def test_macos_qualified_report_without_live_flag_is_fixture_qualified() -> None
         "schemaVersion": "1.0",
         "platform": "macos",
         "status": "pass",
-        "stage": "fixture_qualified",
+        "stage": "fixture_qualified_default_disabled",
         "commitSha": "abc123",
         "configHash": platform_config_hash(config, platform="macos"),
         "generatedAt": "2026-05-05T00:00:00+00:00",
@@ -77,8 +77,9 @@ def test_macos_qualified_report_without_live_flag_is_fixture_qualified() -> None
         commit="abc123",
     )["macos"]
 
-    assert capability.stage == "fixture_qualified"
+    assert capability.stage == "fixture_qualified_default_disabled"
     assert capability.live_enabled is False
+    assert capability.execution_modes == ["dry_run", "step_approval", "supervised_fixture"]
     assert capability.fixture_qualified is True
     assert capability.production_qualified is False
     assert capability.reason_code == "MACOS_FIXTURE_QUALIFIED_DEFAULT_DISABLED"

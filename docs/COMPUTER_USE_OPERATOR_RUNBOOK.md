@@ -55,6 +55,18 @@ commit/config hash, and safety defaults, macOS remains blocked and
 successfully for audit integrity; qualification pass/fail is reported
 separately as `qualificationPassed`.
 
+Provider readiness is checked with a synthetic non-sensitive fixture image:
+
+```bash
+uv run binliquid computer-use provider doctor \
+  --provider ollama \
+  --model <local-vision-model> \
+  --synthetic-fixture \
+  --json
+```
+
+Do not run `ollama pull` automatically from the agent. The operator may run `ollama --version`, `ollama list`, `ollama serve`, and model pulls manually. A passing macOS fixture report means `fixtureQualified=true`, `productionQualified=false`, and `liveEnabled=false` by default; Windows and Linux remain unqualified.
+
 ## Stop Conditions
 
 Stop the run if a sensitive surface appears, an approval is stale, terminal control is requested, or raw screenshot persistence would be required by default.

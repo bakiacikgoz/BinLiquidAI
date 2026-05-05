@@ -28,6 +28,7 @@
         "provider_ready",
         "ready_for_live_fixture",
         "fixture_qualified",
+        "fixture_qualified_default_disabled",
         "qualified_limited",
         "enabled",
         "blocked"
@@ -40,6 +41,7 @@
     "qualificationPassed": { "type": "boolean" },
     "fixtureQualified": { "type": "boolean" },
     "productionQualified": { "type": "boolean" },
+    "liveEnabled": { "type": "boolean" },
     "liveEnabledDefault": { "type": "boolean" },
     "replayIntegrityStatus": { "enum": ["passed", "failed", "not_applicable"] },
     "replayIntegrityVerified": { "type": "boolean" },
@@ -58,6 +60,8 @@
     "host": { "type": "object" },
     "provider": { "type": "object" },
     "permissions": { "type": "object" },
+    "capture": { "type": "object" },
+    "input": { "type": "object" },
     "backends": { "type": "object" },
     "environment": { "type": "object" },
     "machine": { "type": "object" },
@@ -67,6 +71,7 @@
     "safety": { "type": "object" },
     "evidence": { "type": "array" },
     "artifacts": { "type": "object" },
+    "operatorChecklist": { "type": "array", "items": { "type": "string" } },
     "limitations": { "type": "array", "items": { "type": "string" } },
     "blockers": { "type": "array", "items": { "type": "string" } }
   }

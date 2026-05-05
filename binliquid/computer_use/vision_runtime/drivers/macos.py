@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping
@@ -332,7 +333,7 @@ class MacOSVisionReadiness:
         stage: str,
         live_enabled: bool,
         reason_code: str | None,
-        permissions: dict[str, str],
+        permissions: dict[str, Any],
         provider: dict[str, Any],
         capture: dict[str, Any],
         input_state: dict[str, Any],
@@ -412,9 +413,7 @@ def _evaluate_provider(
     *,
     which: Callable[[str], str | None],
 ) -> dict[str, Any]:
-    configured = config.vision_enabled and config.vision_provider != "none" and bool(
-        config.vision_model
-    )
+    configured = config.vision_enabled and config.vision_provider != "none"
     if not configured:
         return _provider_payload(
             configured=False,
@@ -423,6 +422,15 @@ def _evaluate_provider(
             strict_json=False,
             ready=False,
             reason_code="VISION_PROVIDER_UNAVAILABLE",
+        )
+    if not config.vision_model:
+        return _provider_payload(
+            configured=True,
+            name=config.vision_provider,
+            model="",
+            strict_json=False,
+            ready=False,
+            reason_code="VISION_PROVIDER_MODEL_NOT_CONFIGURED",
         )
     if config.vision_provider != "ollama":
         return _provider_payload(
@@ -570,11 +578,51 @@ def _permissions_payload(
     screen_recording: str,
     accessibility: str,
     input_monitoring: str,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     return {
-        "screenRecording": screen_recording,
-        "accessibility": accessibility,
-        "inputMonitoring": input_monitoring,
+        "screenRecording": _permission_detail(
+            status=screen_recording,
+            required=True,
+            reason_code="MACOS_SCREEN_RECORDING_PERMISSION_MISSING",
+        ),
+        "accessibility": _permission_detail(
+            status=accessibility,
+            required=True,
+            reason_code="MACOS_ACCESSIBILITY_PERMISSION_MISSING",
+        ),
+        "inputMonitoring": _permission_detail(
+            status=input_monitoring,
+            required=False,
+            reason_code=None,
+        ),
+        "permissionSubject": _permission_subject(),
+    }
+
+
+def _permission_detail(
+    *,
+    status: str,
+    required: bool,
+    reason_code: str | None,
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "required": required,
+        "manualGrantRequired": required and status != "granted",
+        "autoGrantAttempted": False,
+        "reasonCode": None if status in {"granted", "not_required"} else reason_code,
+    }
+
+
+def _permission_subject() -> dict[str, str]:
+    executable = Path(sys.executable)
+    return {
+        "process": executable.name or "python",
+        "binary": str(executable),
+        "note": (
+            "Grant the app or terminal process that launches BinLiquid; this command "
+            "does not grant permissions."
+        ),
     }
 
 
@@ -608,7 +656,11 @@ def _derive_stage(
     if not opt_in.get("stepApprovalRequired"):
         return "blocked", False, "MACOS_STEP_APPROVAL_REQUIRED"
     if not config.macos_live_enabled:
-        stage = "fixture_qualified" if qualification.get("fresh") else "not_configured"
+        stage = (
+            "fixture_qualified_default_disabled"
+            if qualification.get("fresh")
+            else "not_configured"
+        )
         return stage, False, "MACOS_LIVE_FLAG_DISABLED"
     if not config.vision_enabled:
         return "not_configured", False, "VISION_RUNTIME_DISABLED"
@@ -625,7 +677,7 @@ def _derive_stage(
     if qualification.get("required") and not qualification.get("fresh"):
         return "provider_ready", False, str(qualification.get("reasonCode"))
     if not config.macos_live_enabled:
-        return "fixture_qualified", False, "MACOS_LIVE_FLAG_DISABLED"
+        return "fixture_qualified_default_disabled", False, "MACOS_LIVE_FLAG_DISABLED"
     return "qualified_limited", True, None
 
 
@@ -654,6 +706,7 @@ def _next_actions(blockers: list[str]) -> list[dict[str, Any]]:
         "MACOS_STEP_APPROVAL_REQUIRED": "Set BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1.",
         "VISION_RUNTIME_DISABLED": "Enable computer_use.vision_enabled for the run.",
         "VISION_PROVIDER_UNAVAILABLE": "Configure a local Ollama vision model.",
+        "VISION_PROVIDER_MODEL_NOT_CONFIGURED": "Set computer_use.vision_model for the run.",
         "MACOS_LIVE_FLAG_DISABLED": "Set computer_use.macos_live_enabled=true for the run.",
         "MACOS_CAPTURE_BACKEND_DISABLED": "Select an explicit macOS capture backend.",
         "MACOS_INPUT_BACKEND_DISABLED": "Select the quartz macOS input backend.",
@@ -796,6 +849,8 @@ class MacOSInputExecutor:
             InputActionType.RIGHT_CLICK,
         }:
             return self._blocked(action, "VISION_CONFIDENCE_BELOW_THRESHOLD", started)
+        if action.target_bbox is not None and not _bbox_within_unit_bounds(action.target_bbox):
+            return self._blocked(action, "MACOS_INPUT_TARGET_OUT_OF_BOUNDS", started)
         if action.action_type == InputActionType.HOTKEY and _hotkey_denied(action.hotkey):
             return self._blocked(action, "COMPUTER_USE_APPROVAL_REQUIRED", started)
 
@@ -870,6 +925,10 @@ def normalized_bbox_center_to_pixel(
         max(bounds.origin_x, min(bounds.origin_x + bounds.width - 1, raw_x)),
         max(bounds.origin_y, min(bounds.origin_y + bounds.height - 1, raw_y)),
     )
+
+
+def _bbox_within_unit_bounds(bbox: NormalizedBBox) -> bool:
+    return bbox.x + bbox.w <= 1.0 and bbox.y + bbox.h <= 1.0
 
 
 def _check(

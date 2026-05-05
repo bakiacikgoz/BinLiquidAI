@@ -13,6 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from binliquid.computer_use.vision_runtime.provider_doctor import doctor_vision_provider
 from binliquid.runtime.config import ComputerUseRuntimeConfig
 from binliquid.runtime.platform import current_platform
 
@@ -50,6 +51,7 @@ class PlatformQualificationReport(BaseModel):
     fixture_qualified: bool | None = Field(default=None, alias="fixtureQualified")
     production_qualified: bool | None = Field(default=None, alias="productionQualified")
     live_enabled_default: bool | None = Field(default=None, alias="liveEnabledDefault")
+    live_enabled: bool | None = Field(default=None, alias="liveEnabled")
     replay_integrity_status: str | None = Field(default=None, alias="replayIntegrityStatus")
     replay_integrity_verified: bool | None = Field(default=None, alias="replayIntegrityVerified")
     audit_hash_chain_verified: bool | None = Field(default=None, alias="auditHashChainVerified")
@@ -58,6 +60,8 @@ class PlatformQualificationReport(BaseModel):
     readiness: dict[str, Any] = Field(default_factory=dict)
     provider: dict[str, Any]
     permissions: dict[str, Any]
+    capture: dict[str, Any] = Field(default_factory=dict)
+    input: dict[str, Any] = Field(default_factory=dict)
     backends: dict[str, str] = Field(default_factory=dict)
     environment: dict[str, Any] = Field(default_factory=dict)
     machine: dict[str, Any] = Field(default_factory=dict)
@@ -67,6 +71,7 @@ class PlatformQualificationReport(BaseModel):
     safety: dict[str, Any]
     evidence: list[Any] = Field(default_factory=list)
     artifacts: dict[str, Any] = Field(default_factory=dict)
+    operator_checklist: list[str] = Field(default_factory=list, alias="operatorChecklist")
     limitations: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
 
@@ -192,7 +197,14 @@ def validate_platform_qualification_report(
         blockers.append(_config_mismatch_reason(expected_platform))
     blockers.extend(_freshness_blockers(parsed, platform=expected_platform, config=config))
     blockers.extend(_permission_blockers(parsed.permissions, platform=expected_platform))
-    blockers.extend(_task_suite_blockers(parsed.task_suite, parsed.tasks, parsed.fixtures))
+    blockers.extend(
+        _task_suite_blockers(
+            parsed.task_suite,
+            parsed.tasks,
+            parsed.fixtures,
+            platform=expected_platform,
+        )
+    )
     blockers.extend(_safety_blockers(parsed.safety, platform=expected_platform))
     blockers.extend(parsed.blockers)
 
@@ -266,6 +278,11 @@ def run_macos_live_qualification(
         fixture_paths=fixture_paths,
     )
     output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_phase4d_artifacts(
+        output_path=output_path,
+        report=report,
+        readiness=readiness,
+    )
     return report
 
 
@@ -344,8 +361,12 @@ def _stable_json_hash(payload: object) -> str:
 def _permission_blockers(permissions: Mapping[str, Any], *, platform: str) -> list[str]:
     if platform == "macos":
         blockers: list[str] = []
-        screen = permissions.get("screenRecording", permissions.get("screenCapture"))
-        accessibility = permissions.get("accessibility", permissions.get("accessibilityOrInput"))
+        screen = _permission_status(
+            permissions.get("screenRecording", permissions.get("screenCapture"))
+        )
+        accessibility = _permission_status(
+            permissions.get("accessibility", permissions.get("accessibilityOrInput"))
+        )
         if screen not in {True, "granted", "not_applicable"}:
             blockers.append("MACOS_SCREEN_RECORDING_PERMISSION_MISSING")
         if accessibility not in {True, "granted", "not_applicable"}:
@@ -363,8 +384,12 @@ def _task_suite_blockers(
     task_suite: Mapping[str, Any],
     tasks: list[Mapping[str, Any]],
     fixtures: list[Mapping[str, Any]],
+    *,
+    platform: str,
 ) -> list[str]:
     if fixtures:
+        if platform == "macos":
+            return _macos_fixture_blockers(fixtures)
         if any(fixture.get("status") != "pass" for fixture in fixtures):
             return ["VISION_PLATFORM_QUALIFICATION_TASKS_FAILED"]
         return []
@@ -376,6 +401,26 @@ def _task_suite_blockers(
     total = int(task_suite.get("total", 0))
     passed = int(task_suite.get("passed", 0))
     if failed > 0 or total <= 0 or passed < total:
+        return ["VISION_PLATFORM_QUALIFICATION_TASKS_FAILED"]
+    return []
+
+
+def _permission_status(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return value.get("status", "unknown")
+    return value
+
+
+def _macos_fixture_blockers(fixtures: list[Mapping[str, Any]]) -> list[str]:
+    by_id = {str(fixture.get("id")): fixture for fixture in fixtures}
+    positive = ("local_browser_form", "textedit_safe_typing", "finder_fixture_file")
+    negative = ("sensitive_surface_stop", "terminal_deny")
+    missing = [fixture_id for fixture_id in (*positive, *negative) if fixture_id not in by_id]
+    if missing:
+        return ["VISION_PLATFORM_QUALIFICATION_TASKS_FAILED"]
+    if any(by_id[fixture_id].get("status") != "pass" for fixture_id in positive):
+        return ["VISION_PLATFORM_QUALIFICATION_TASKS_FAILED"]
+    if any(by_id[fixture_id].get("status") != "blocked_expected" for fixture_id in negative):
         return ["VISION_PLATFORM_QUALIFICATION_TASKS_FAILED"]
     return []
 
@@ -513,6 +558,12 @@ def _macos_qualification_report(
         "replayPath": _safe_artifact_path(audit_path),
         "auditPath": _safe_artifact_path(audit_path),
         "eventLogPath": _safe_artifact_path(event_log_path),
+        "phase4dPreflightPath": _safe_artifact_path(
+            output_path.parent / "macos_phase4d_preflight.json"
+        ),
+        "phase4dFlagInventoryPath": _safe_artifact_path(
+            output_path.parent / "macos_phase4d_flag_inventory.json"
+        ),
         "rawScreenshotCount": screenshot_persisted_count,
         "screenshotHashesOnly": True,
         "fixtureRoot": _safe_artifact_path(output_path.parent / "live_fixtures"),
@@ -540,6 +591,7 @@ def _macos_qualification_report(
         "qualificationPassed": qualification_passed,
         "fixtureQualified": fixture_qualified,
         "productionQualified": production_qualified,
+        "liveEnabled": False,
         "liveEnabledDefault": False,
         "replayIntegrityStatus": "passed",
         "replayIntegrityVerified": replay_verified,
@@ -567,10 +619,22 @@ def _macos_qualification_report(
             "name": readiness["provider"]["kind"],
             "model": readiness["provider"]["model"],
             "strictJson": config.vision_provider != "none",
+            "strictJsonValidated": readiness["provider"].get("strictJsonValidated", False),
             "ready": readiness["provider"]["ready"],
             "reasonCode": readiness["provider"]["reasonCode"],
         },
         "permissions": readiness["permissions"],
+        "capture": {
+            "backend": readiness["capture"]["backend"],
+            "ready": readiness["capture"]["ready"],
+            "reasonCode": readiness["capture"]["reasonCode"],
+            "rawPersistedCount": screenshot_persisted_count,
+        },
+        "input": {
+            "backend": readiness["input"]["backend"],
+            "ready": readiness["input"]["ready"],
+            "reasonCode": readiness["input"]["reasonCode"],
+        },
         "backends": {
             "capture": config.macos_capture_backend,
             "input": config.macos_input_backend,
@@ -606,6 +670,7 @@ def _macos_qualification_report(
         ],
         "fixtures": fixture_results,
         "artifacts": artifacts,
+        "operatorChecklist": _macos_operator_checklist(),
         "limitations": [
             "Qualified only for supervised local fixture tasks.",
             "Not a production-wide unrestricted desktop automation qualification.",
@@ -648,7 +713,7 @@ def _macos_live_readiness(
         "accessibility": _env_state(env, "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY"),
         "inputMonitoring": "not_required",
     }
-    provider = _macos_provider_readiness(config)
+    provider = _macos_provider_readiness(config, env)
     capture = _macos_capture_readiness(config, permissions["screenRecording"])
     input_state = _macos_input_readiness(config, permissions["accessibility"])
     blockers: list[str] = []
@@ -745,10 +810,11 @@ def macos_opt_in_state(env: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
-def _macos_provider_readiness(config: ComputerUseRuntimeConfig) -> dict[str, Any]:
-    configured = config.vision_enabled and config.vision_provider != "none" and bool(
-        config.vision_model
-    )
+def _macos_provider_readiness(
+    config: ComputerUseRuntimeConfig,
+    env: Mapping[str, str],
+) -> dict[str, Any]:
+    configured = config.vision_enabled and config.vision_provider != "none"
     if not configured:
         return {
             "configured": False,
@@ -757,6 +823,16 @@ def _macos_provider_readiness(config: ComputerUseRuntimeConfig) -> dict[str, Any
             "ready": False,
             "strictJson": False,
             "reasonCode": "VISION_PROVIDER_UNAVAILABLE",
+        }
+    if not config.vision_model:
+        return {
+            "configured": True,
+            "kind": config.vision_provider,
+            "model": config.vision_model,
+            "ready": False,
+            "strictJson": False,
+            "strictJsonValidated": False,
+            "reasonCode": "VISION_PROVIDER_MODEL_NOT_CONFIGURED",
         }
     if config.vision_provider != "ollama":
         return {
@@ -767,14 +843,24 @@ def _macos_provider_readiness(config: ComputerUseRuntimeConfig) -> dict[str, Any
             "strictJson": True,
             "reasonCode": "VISION_PROVIDER_UNAVAILABLE",
         }
-    ready = shutil.which("ollama") is not None
+    doctor = doctor_vision_provider(
+        provider="ollama",
+        model=config.vision_model,
+        synthetic_fixture=True,
+        timeout_s=config.vision_provider_timeout_s,
+        max_retries=config.vision_provider_max_retries,
+        environment=env,
+    )
     return {
         "configured": True,
         "kind": "ollama",
         "model": config.vision_model,
-        "ready": ready,
+        "ready": bool(doctor["ready"]),
         "strictJson": True,
-        "reasonCode": None if ready else "VISION_PROVIDER_UNAVAILABLE",
+        "strictJsonValidated": bool(doctor["strictJsonValidated"]),
+        "syntheticFixture": doctor["syntheticFixture"],
+        "doctor": doctor,
+        "reasonCode": doctor["reasonCode"],
     }
 
 
@@ -838,6 +924,12 @@ def _macos_next_actions(blockers: list[str]) -> list[dict[str, Any]]:
         ),
         "VISION_RUNTIME_DISABLED": "Enable computer_use.vision_enabled for the supervised run.",
         "VISION_PROVIDER_UNAVAILABLE": "Configure a local Ollama vision model; do not auto-pull.",
+        "VISION_PROVIDER_MODEL_NOT_CONFIGURED": "Set computer_use.vision_model for this run.",
+        "VISION_PROVIDER_TIMEOUT": "Start or inspect the local provider; do not auto-pull models.",
+        "VISION_PROVIDER_INVALID_RESPONSE": "Use a local provider/model that returns JSON.",
+        "VISION_PROVIDER_STRICT_JSON_CONTRACT_FAILED": (
+            "Use a local vision model that satisfies the strict JSON schema."
+        ),
         "MACOS_LIVE_FLAG_DISABLED": "Set computer_use.macos_live_enabled=true for this run.",
         "MACOS_CAPTURE_BACKEND_DISABLED": "Select an explicit macOS capture backend.",
         "MACOS_INPUT_BACKEND_DISABLED": "Select the quartz macOS input backend.",
@@ -876,6 +968,14 @@ def _fixture_result(fixture_id: str, status: str, reason_code: str | None) -> di
         "status": status,
         "stepsAttempted": 0,
         "stepsSucceeded": 0,
+        "actionsAttempted": 0,
+        "actionsExecuted": 0,
+        "approvalsRequired": 0,
+        "approvalsGranted": 0,
+        "inputExecuted": False,
+        "osInputExecuted": False,
+        "commandExecuted": False,
+        "terminalExecuted": False,
         "reasonCode": reason_code,
     }
 
@@ -984,6 +1084,92 @@ def _write_qualification_replay(
         ),
         encoding="utf-8",
     )
+
+
+def _write_phase4d_artifacts(
+    *,
+    output_path: Path,
+    report: Mapping[str, Any],
+    readiness: Mapping[str, Any],
+) -> None:
+    output_dir = output_path.parent
+    flag_inventory = _phase4d_flag_inventory()
+    (output_dir / "macos_phase4d_flag_inventory.json").write_text(
+        json.dumps(flag_inventory, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    provider = readiness.get("provider") if isinstance(readiness.get("provider"), dict) else {}
+    preflight = {
+        "artifactVersion": "computer_use_phase4d_preflight/v1",
+        "platform": "macos",
+        "suite": report.get("suite"),
+        "mode": report.get("mode"),
+        "status": report.get("status"),
+        "stage": report.get("stage"),
+        "reasonCode": report.get("reasonCode"),
+        "blockers": report.get("blockers", []),
+        "flagInventoryPath": _safe_artifact_path(
+            output_dir / "macos_phase4d_flag_inventory.json"
+        ),
+        "providerReadiness": {
+            "kind": provider.get("kind"),
+            "model": provider.get("model"),
+            "ready": provider.get("ready") is True,
+            "strictJsonValidated": provider.get("strictJsonValidated") is True,
+            "reasonCode": provider.get("reasonCode"),
+            "syntheticFixture": provider.get("syntheticFixture"),
+        },
+        "permissions": readiness.get("permissions", {}),
+        "capture": readiness.get("capture", {}),
+        "input": readiness.get("input", {}),
+        "safety": report.get("safety", {}),
+        "operatorChecklist": _macos_operator_checklist(),
+        "rawScreenshotPersistedCount": 0,
+    }
+    (output_dir / "macos_phase4d_preflight.json").write_text(
+        json.dumps(preflight, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def _phase4d_flag_inventory() -> dict[str, str]:
+    return {
+        "vision_enabled_key": "computer_use.vision_enabled",
+        "vision_enabled_env": "BINLIQUID_COMPUTER_USE_VISION_ENABLED",
+        "vision_provider_key": "computer_use.vision_provider",
+        "vision_provider_env": "BINLIQUID_COMPUTER_USE_VISION_PROVIDER",
+        "vision_model_key": "computer_use.vision_model",
+        "vision_model_env": "BINLIQUID_COMPUTER_USE_VISION_MODEL",
+        "macos_live_enabled_key": "computer_use.macos_live_enabled",
+        "macos_live_enabled_env": "BINLIQUID_COMPUTER_USE_MACOS_LIVE_ENABLED",
+        "macos_capture_backend_key": "computer_use.macos_capture_backend",
+        "macos_capture_backend_env": "BINLIQUID_COMPUTER_USE_MACOS_CAPTURE_BACKEND",
+        "macos_input_backend_key": "computer_use.macos_input_backend",
+        "macos_input_backend_env": "BINLIQUID_COMPUTER_USE_MACOS_INPUT_BACKEND",
+        "live_opt_in_env": "BINLIQUID_COMPUTER_USE_LIVE_MACOS",
+        "legacy_live_opt_in_env": "BINLIQUID_COMPUTER_USE_LIVE_OPT_IN",
+        "live_ack_env": "BINLIQUID_COMPUTER_USE_ACK",
+        "supervised_fixture_only_env": "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
+        "step_approval_env": "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
+        "raw_screenshot_persistence_key": "computer_use.raw_screenshot_persistence",
+        "raw_screenshot_persistence_env": (
+            "BINLIQUID_COMPUTER_USE_RAW_SCREENSHOT_PERSISTENCE"
+        ),
+    }
+
+
+def _macos_operator_checklist() -> list[str]:
+    return [
+        "Run ollama --version and ollama list; do not auto-pull models from this command.",
+        "Grant Screen Recording manually in System Settings -> Privacy & Security.",
+        "Grant Accessibility manually in System Settings -> Privacy & Security.",
+        (
+            "Close password managers, banking, payment, wallet, legal, security, "
+            "and sensitive terminal windows."
+        ),
+        "Move sensitive files away from the desktop and use a clean desktop space if possible.",
+        "Keep the run supervised and ready to interrupt with Ctrl+C.",
+    ]
 
 
 def _safe_artifact_path(path: Path) -> str:

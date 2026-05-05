@@ -41,6 +41,18 @@ Run the doctor first:
 uv run binliquid computer-use doctor --platform macos --json
 ```
 
+Verify the local provider with a synthetic fixture before any desktop capture or input:
+
+```bash
+uv run binliquid computer-use provider doctor \
+  --provider ollama \
+  --model <local-vision-model> \
+  --synthetic-fixture \
+  --json
+```
+
+The provider command does not pull models or capture the real desktop. The operator owns Ollama installation, model selection, and `ollama serve` lifecycle.
+
 Run live qualification only on a prepared, supervised local desktop:
 
 ```bash
@@ -82,7 +94,9 @@ uv run binliquid computer-use replay \
 ```
 
 A fresh passing report without `macos_live_enabled=true` may report
-`fixture_qualified` with `fixtureQualified=true`, `productionQualified=false`,
-and `liveEnabled=false` by default. macOS supervised local fixture
+`fixture_qualified_default_disabled` with `fixtureQualified=true`,
+`productionQualified=false`, and `liveEnabled=false` by default. macOS supervised local fixture
 qualification is not unrestricted desktop automation, and it does not qualify
 Windows or Linux live computer-use.
+
+Replay verifies trace and audit integrity, not business correctness. Raw screenshots are not persisted by default.

@@ -62,3 +62,6 @@ Windows and Linux live execution are not qualified. Windows must continue to rep
   Recording and Accessibility states, provider readiness, local fixture pass
   evidence, replay verification, and zero persisted raw screenshots. It is not
   unrestricted desktop automation and does not qualify Windows or Linux.
+- Provider readiness is local-only and synthetic-fixture based. Missing models,
+  invalid JSON, strict schema failures, and timeouts fail closed before any
+  desktop capture or OS input path can run.

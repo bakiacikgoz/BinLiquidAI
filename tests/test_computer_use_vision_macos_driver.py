@@ -132,6 +132,21 @@ def test_macos_input_executor_requires_quartz_backend() -> None:
     assert result.details["reason_code"] == "MACOS_INPUT_BACKEND_UNAVAILABLE"
 
 
+def test_macos_input_executor_blocks_out_of_bounds_target() -> None:
+    executor = MacOSInputExecutor(
+        config=ComputerUseRuntimeConfig(macos_input_backend="quartz"),
+        quartz_backend=SimpleNamespace(move_mouse=lambda *_: None, click=lambda *_: None),
+    )
+    action = _action().model_copy(
+        update={"target_bbox": NormalizedBBox(x=0.95, y=0.95, w=0.1, h=0.1)}
+    )
+
+    result = executor.execute(action)
+
+    assert result.status == "blocked"
+    assert result.details["reason_code"] == "MACOS_INPUT_TARGET_OUT_OF_BOUNDS"
+
+
 def test_macos_input_executor_blocks_risky_hotkey_even_with_backend() -> None:
     executor = MacOSInputExecutor(
         config=ComputerUseRuntimeConfig(macos_input_backend="quartz"),

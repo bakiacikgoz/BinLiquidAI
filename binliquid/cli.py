@@ -20,6 +20,7 @@ from binliquid.computer_use import ComputerUseMode
 from binliquid.computer_use.runtime import ComputerUseRunner, SessionCommand
 from binliquid.computer_use.vision_runtime.drivers.macos import MacOSVisionReadiness
 from binliquid.computer_use.vision_runtime.platforms import build_platform_capabilities
+from binliquid.computer_use.vision_runtime.provider_doctor import doctor_vision_provider
 from binliquid.computer_use.vision_runtime.qualification import (
     missing_platform_qualification_result,
     run_macos_live_qualification,
@@ -100,6 +101,7 @@ operator_app = typer.Typer(help="Operator panel commands")
 computer_use_app = typer.Typer(help="Computer use execution commands")
 computer_use_vision_app = typer.Typer(help="Vision-first computer use commands")
 computer_use_qualification_app = typer.Typer(help="Computer-use qualification commands")
+computer_use_provider_app = typer.Typer(help="Computer-use provider readiness commands")
 team_app = typer.Typer(help="Team runtime commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
@@ -121,6 +123,7 @@ app.add_typer(operator_app, name="operator")
 app.add_typer(computer_use_app, name="computer-use")
 computer_use_app.add_typer(computer_use_vision_app, name="vision")
 computer_use_app.add_typer(computer_use_qualification_app, name="qualification")
+computer_use_app.add_typer(computer_use_provider_app, name="provider")
 app.add_typer(team_app, name="team")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
@@ -1698,6 +1701,35 @@ def computer_use_doctor(
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         typer.echo(f"platforms={','.join(payload['platforms'])}")
+
+
+@computer_use_provider_app.command("doctor")
+def computer_use_provider_doctor(
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    provider: str = typer.Option("ollama", "--provider", help="Local provider to inspect"),
+    model: str | None = typer.Option(None, "--model", help="Configured local vision model"),
+    synthetic_fixture: bool = typer.Option(
+        False,
+        "--synthetic-fixture/--no-synthetic-fixture",
+        help="Use a synthetic non-sensitive fixture image; required for readiness.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
+    selected_model = model or config.computer_use.vision_model
+    payload = doctor_vision_provider(
+        provider=provider,
+        model=selected_model,
+        synthetic_fixture=synthetic_fixture,
+        timeout_s=config.computer_use.vision_provider_timeout_s,
+        max_retries=config.computer_use.vision_provider_max_retries,
+        environment=os.environ,
+    )
+    payload = _with_contract_version(payload)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(str(payload.get("status")))
 
 
 @computer_use_qualification_app.command("run")
