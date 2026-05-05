@@ -540,6 +540,127 @@
       "title": "ComputerUseCapabilityContract",
       "type": "object"
     },
+    "ComputerUsePlatformCapabilityContract": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "captureBackend": {
+          "title": "Capturebackend",
+          "type": "string"
+        },
+        "environment": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Environment",
+          "type": "object"
+        },
+        "executionModes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Executionmodes",
+          "type": "array"
+        },
+        "failClosed": {
+          "title": "Failclosed",
+          "type": "boolean"
+        },
+        "inputBackend": {
+          "title": "Inputbackend",
+          "type": "string"
+        },
+        "liveEnabled": {
+          "title": "Liveenabled",
+          "type": "boolean"
+        },
+        "permissions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "platform": {
+          "enum": [
+            "macos",
+            "windows",
+            "linux"
+          ],
+          "title": "Platform",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "qualificationStatus": {
+          "default": "missing",
+          "title": "Qualificationstatus",
+          "type": "string"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoncode"
+        },
+        "replayable": {
+          "title": "Replayable",
+          "type": "boolean"
+        },
+        "stage": {
+          "enum": [
+            "unavailable",
+            "disabled",
+            "not_configured",
+            "not_qualified",
+            "ready_for_dry_run",
+            "ready_for_step_approval",
+            "qualified_supervised_pilot"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        }
+      },
+      "required": [
+        "platform",
+        "stage",
+        "liveEnabled",
+        "captureBackend",
+        "inputBackend",
+        "provider",
+        "executionModes",
+        "replayable",
+        "failClosed"
+      ],
+      "title": "ComputerUsePlatformCapabilityContract",
+      "type": "object"
+    },
     "ComputerUseVisionRuntimeCapabilityContract": {
       "additionalProperties": false,
       "properties": {
@@ -567,6 +688,13 @@
           ],
           "title": "Platform",
           "type": "string"
+        },
+        "platforms": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ComputerUsePlatformCapabilityContract"
+          },
+          "title": "Platforms",
+          "type": "object"
         },
         "provider": {
           "additionalProperties": true,
@@ -606,6 +734,9 @@
             "provider_unavailable",
             "not_qualified",
             "qualified",
+            "qualified_supervised_pilot",
+            "ready_for_dry_run",
+            "ready_for_step_approval",
             "blocked"
           ],
           "title": "Stage",

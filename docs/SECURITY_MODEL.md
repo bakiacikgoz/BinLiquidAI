@@ -50,3 +50,10 @@ Commands outside allowlist are rejected with deterministic error (`exit_code=126
 The Phase 2 vision-first runtime is fail-closed by default. Sensitive surfaces such as passwords, MFA, payment, wallet, private-key, system/security settings, legal-consent, and terminal/shell contexts are denied or stopped before OS input execution. Risky click/type/hotkey/file actions require approval and a fresh approval snapshot matching action hash, policy hash, active app/window, surface kind, and screenshot hash.
 
 Windows and Linux live execution are not qualified. Windows must continue to report `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.
+
+## Cross-Platform Computer-Use Gates
+
+- macOS, Windows, and Linux share the same additive platform capability contract.
+- `liveEnabled=true` requires a valid platform qualification report matching platform, commit, and config hash.
+- Windows UAC secure desktop and Linux Wayland/X11 live input remain blocked until future signed evidence changes the gate.
+- The public platform matrix fails if any profile appears live-ready without valid evidence.

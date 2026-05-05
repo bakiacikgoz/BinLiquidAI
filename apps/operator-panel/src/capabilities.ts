@@ -44,6 +44,24 @@ export type ComputerUseCapability = {
   summary: string | null;
 };
 
+export type ComputerUsePlatformStatus = {
+  platform: string;
+  stage: string;
+  liveEnabled: boolean;
+  captureBackend: string;
+  inputBackend: string;
+  provider: string;
+  permissions: string[];
+  executionModes: string[];
+  replayable: boolean;
+  failClosed: boolean;
+  reasonCode: string | null;
+  summary: string | null;
+  blockers: string[];
+  qualificationStatus: string;
+  environment: Record<string, string>;
+};
+
 export type ComputerUseVisionRuntimeCapability = {
   enabled: boolean;
   stage: string;
@@ -64,6 +82,7 @@ export type ComputerUseVisionRuntimeCapability = {
     terminalControl: string;
     approvalRequiredForRiskyActions: boolean;
   };
+  platforms: Record<string, ComputerUsePlatformStatus>;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -82,6 +101,13 @@ function readBoolean(source: Record<string, unknown>, key: string): boolean {
 function readStringArray(source: Record<string, unknown>, key: string): string[] {
   const value = source[key];
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function readStringRecord(source: Record<string, unknown>, key: string): Record<string, string> {
+  const value = asRecord(source[key]);
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
 }
 
 export function hasContractMismatch(handshakeData: unknown): boolean {
@@ -129,6 +155,7 @@ export function getComputerUseVisionRuntimeCapability(
   const computerUse = asRecord(features.computerUseVisionRuntime);
   const provider = asRecord(computerUse.provider);
   const safety = asRecord(computerUse.safety);
+  const platforms = asRecord(computerUse.platforms);
 
   return {
     enabled: readBoolean(computerUse, 'enabled'),
@@ -150,6 +177,40 @@ export function getComputerUseVisionRuntimeCapability(
       terminalControl: readString(safety, 'terminalControl') ?? 'deny',
       approvalRequiredForRiskyActions: readBoolean(safety, 'approvalRequiredForRiskyActions'),
     },
+    platforms: readComputerUsePlatformStatuses(platforms),
+  };
+}
+
+function readComputerUsePlatformStatuses(
+  platforms: Record<string, unknown>,
+): Record<string, ComputerUsePlatformStatus> {
+  return Object.fromEntries(
+    Object.entries(platforms)
+      .map(([key, value]) => [key, readComputerUsePlatformStatus(asRecord(value), key)] as const)
+      .filter(([, value]) => value.platform !== 'unknown'),
+  );
+}
+
+function readComputerUsePlatformStatus(
+  platform: Record<string, unknown>,
+  fallbackPlatform: string,
+): ComputerUsePlatformStatus {
+  return {
+    platform: readString(platform, 'platform') ?? fallbackPlatform,
+    stage: readString(platform, 'stage') ?? 'not_qualified',
+    liveEnabled: readBoolean(platform, 'liveEnabled'),
+    captureBackend: readString(platform, 'captureBackend') ?? 'disabled',
+    inputBackend: readString(platform, 'inputBackend') ?? 'disabled',
+    provider: readString(platform, 'provider') ?? 'none',
+    permissions: readStringArray(platform, 'permissions'),
+    executionModes: readStringArray(platform, 'executionModes'),
+    replayable: readBoolean(platform, 'replayable'),
+    failClosed: readBoolean(platform, 'failClosed'),
+    reasonCode: readString(platform, 'reasonCode'),
+    summary: readString(platform, 'summary'),
+    blockers: readStringArray(platform, 'blockers'),
+    qualificationStatus: readString(platform, 'qualificationStatus') ?? 'missing',
+    environment: readStringRecord(platform, 'environment'),
   };
 }
 

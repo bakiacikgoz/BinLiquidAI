@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,7 +18,12 @@ from binliquid import __version__
 from binliquid.computer_use import ComputerUseMode
 from binliquid.computer_use.runtime import ComputerUseRunner, SessionCommand
 from binliquid.computer_use.vision_runtime.drivers.macos import MacOSVisionReadiness
-from binliquid.computer_use.vision_runtime.qualification import run_vision_qualification
+from binliquid.computer_use.vision_runtime.platforms import build_platform_capabilities
+from binliquid.computer_use.vision_runtime.qualification import (
+    missing_platform_qualification_result,
+    run_vision_qualification,
+    validate_platform_qualification_report,
+)
 from binliquid.computer_use.vision_runtime.replay import load_replay_summary, verify_replay
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
@@ -87,6 +93,7 @@ approval_app = typer.Typer(help="Governance approval commands")
 operator_app = typer.Typer(help="Operator panel commands")
 computer_use_app = typer.Typer(help="Computer use execution commands")
 computer_use_vision_app = typer.Typer(help="Vision-first computer use commands")
+computer_use_qualification_app = typer.Typer(help="Computer-use qualification commands")
 team_app = typer.Typer(help="Team runtime commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
@@ -107,6 +114,7 @@ app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
 app.add_typer(computer_use_app, name="computer-use")
 computer_use_app.add_typer(computer_use_vision_app, name="vision")
+computer_use_app.add_typer(computer_use_qualification_app, name="qualification")
 app.add_typer(team_app, name="team")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
@@ -439,6 +447,16 @@ def _supported_profiles() -> list[str]:
 
 def _with_contract_version(payload: dict[str, Any]) -> dict[str, Any]:
     return {"contract_version": OPERATOR_PANEL_CONTRACT_VERSION, **payload}
+
+
+def _current_git_sha() -> str:
+    proc = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else "unknown"
 
 
 def _parse_computer_use_mode(mode: str) -> ComputerUseMode:
@@ -1415,6 +1433,48 @@ def operator_panel(
         typer.echo("Unknown command. Use /pending, /approve <id>, /reject <id>, /exit.")
 
 
+def _computer_use_vision_runtime_payload(
+    vision_config: Any,
+    *,
+    platform_label: str,
+) -> dict[str, Any]:
+    platform_capabilities = build_platform_capabilities(vision_config)
+    current_label = platform_label if platform_label in platform_capabilities else "macos"
+    current_capability = platform_capabilities[current_label]
+    provider_configured = vision_config.vision_provider == "mock" or bool(
+        vision_config.vision_provider != "none" and vision_config.vision_model
+    )
+    return {
+        "enabled": current_capability.live_enabled,
+        "stage": current_capability.stage,
+        "platform": platform_label if platform_label in platform_capabilities else "unknown",
+        "scope": "vision_first_desktop_web_file",
+        "executionModes": current_capability.execution_modes,
+        "replayable": True,
+        "failClosed": True,
+        "reasonCode": current_capability.reason_code,
+        "summary": current_capability.summary,
+        "provider": {
+            "kind": vision_config.vision_provider,
+            "configured": provider_configured,
+            "model": vision_config.vision_model,
+            "strictJson": True,
+        },
+        "safety": {
+            "rawScreenshotPersistence": vision_config.raw_screenshot_retention,
+            "terminalControl": vision_config.terminal_control,
+            "approvalRequiredForRiskyActions": True,
+            "sensitiveSurfaceBlocked": True,
+            "approvalFreshnessEnforced": True,
+            "replayIntegrityVerified": True,
+        },
+        "platforms": {
+            key: capability.model_dump(mode="json", by_alias=True)
+            for key, capability in platform_capabilities.items()
+        },
+    }
+
+
 @operator_app.command("capabilities")
 def operator_capabilities(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
@@ -1452,64 +1512,9 @@ def operator_capabilities(
             "summary": "macOS computer-use pilot is enabled behind fail-closed controls.",
         }
     )
-    computer_use_vision_runtime = (
-        {
-            "enabled": False,
-            "stage": "not_qualified",
-            "platform": "windows",
-            "scope": "vision_first_desktop_web_file",
-            "executionModes": [],
-            "replayable": True,
-            "failClosed": True,
-            "reasonCode": "WINDOWS_COMPUTER_USE_NOT_QUALIFIED",
-            "summary": (
-                "Vision-first runtime foundation is present, but Windows live execution "
-                "is not qualified."
-            ),
-            "provider": {
-                "kind": vision_config.vision_provider,
-                "configured": False,
-                "model": vision_config.vision_model,
-            },
-            "safety": {
-                "rawScreenshotPersistence": vision_config.raw_screenshot_retention,
-                "terminalControl": vision_config.terminal_control,
-                "approvalRequiredForRiskyActions": True,
-            },
-        }
-        if windows_computer_use
-        else {
-            "enabled": vision_config.vision_enabled
-            and vision_config.vision_provider != "none"
-            and platform_info.label == "macos",
-            "stage": (
-                "configured"
-                if vision_config.vision_enabled and vision_config.vision_provider != "none"
-                else "not_configured"
-            ),
-            "platform": platform_info.label
-            if platform_info.label in {"macos", "linux"}
-            else "unknown",
-            "scope": "vision_first_desktop_web_file",
-            "executionModes": ["dry_run", "step_approval"],
-            "replayable": True,
-            "failClosed": True,
-            "reasonCode": "VISION_RUNTIME_NOT_CONFIGURED",
-            "summary": (
-                "Vision-first runtime foundation is available for deterministic tests; "
-                "live execution requires an explicitly configured vision provider."
-            ),
-            "provider": {
-                "kind": vision_config.vision_provider,
-                "configured": vision_config.vision_provider != "none",
-                "model": vision_config.vision_model,
-            },
-            "safety": {
-                "rawScreenshotPersistence": vision_config.raw_screenshot_retention,
-                "terminalControl": vision_config.terminal_control,
-                "approvalRequiredForRiskyActions": True,
-            },
-        }
+    computer_use_vision_runtime = _computer_use_vision_runtime_payload(
+        vision_config,
+        platform_label=platform_info.label,
     )
     payload = {
         "coreVersion": __version__,
@@ -1581,6 +1586,68 @@ def computer_use_vision_doctor(
     else:
         typer.echo(payload["stage"])
     if not payload["live_execution_allowed"]:
+        raise typer.Exit(code=1)
+
+
+@computer_use_app.command("doctor")
+def computer_use_doctor(
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    platform: str = typer.Option(
+        "all",
+        "--platform",
+        help="Platform to inspect: all|macos|windows|linux",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
+    capabilities = build_platform_capabilities(config.computer_use)
+    selected = platform.strip().lower()
+    if selected != "all":
+        if selected not in capabilities:
+            raise typer.BadParameter("platform must be all, macos, windows, or linux")
+        capabilities = {selected: capabilities[selected]}
+    payload = _with_contract_version(
+        {
+            "runtime": "computer_use_vision",
+            "profile": profile,
+            "currentPlatform": current_platform().label,
+            "platforms": {
+                key: capability.model_dump(mode="json", by_alias=True)
+                for key, capability in capabilities.items()
+            },
+        }
+    )
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"platforms={','.join(payload['platforms'])}")
+
+
+@computer_use_qualification_app.command("verify")
+def computer_use_qualification_verify(
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    platform: str = typer.Option(..., "--platform", help="macos|windows|linux"),
+    report: str = typer.Option(..., "--report", help="Qualification report JSON path"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
+    normalized_platform = platform.strip().lower()
+    report_path = Path(report)
+    if report_path.exists():
+        validation = validate_platform_qualification_report(
+            json.loads(report_path.read_text(encoding="utf-8")),
+            platform=normalized_platform,
+            config=config.computer_use,
+            commit=_current_git_sha(),
+        )
+    else:
+        validation = missing_platform_qualification_result(normalized_platform)
+    payload = validation.model_dump(mode="json")
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(validation.status)
+    if not validation.allowed:
         raise typer.Exit(code=1)
 
 

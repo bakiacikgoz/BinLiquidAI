@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +19,10 @@ from binliquid.computer_use.vision_runtime.models import (
     NormalizedBBox,
     VisionAction,
     VisionObservation,
+)
+from binliquid.computer_use.vision_runtime.platforms import (
+    PlatformCapability,
+    build_platform_capability,
 )
 from binliquid.runtime.config import ComputerUseRuntimeConfig
 from binliquid.runtime.platform import PlatformInfo, current_platform
@@ -42,6 +46,22 @@ def readiness(*, vision_enabled: bool) -> PlatformDriverReadiness:
             if vision_enabled
             else "macOS vision-first runtime is scaffolded but no vision provider is configured."
         ),
+    )
+
+
+def readiness_report(
+    config: ComputerUseRuntimeConfig,
+    *,
+    environment: Mapping[str, str] | None = None,
+    qualification_report: Mapping[str, Any] | None = None,
+    commit: str | None = None,
+) -> PlatformCapability:
+    return build_platform_capability(
+        config,
+        platform="macos",
+        environment=environment,
+        qualification_report=qualification_report,
+        commit=commit,
     )
 
 

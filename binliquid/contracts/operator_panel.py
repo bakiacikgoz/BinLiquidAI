@@ -25,6 +25,32 @@ class ComputerUseCapabilityContract(ContractModel):
     summary: str | None = None
 
 
+class ComputerUsePlatformCapabilityContract(ContractModel):
+    platform: Literal["macos", "windows", "linux"]
+    stage: Literal[
+        "unavailable",
+        "disabled",
+        "not_configured",
+        "not_qualified",
+        "ready_for_dry_run",
+        "ready_for_step_approval",
+        "qualified_supervised_pilot",
+    ]
+    live_enabled: bool = Field(alias="liveEnabled")
+    capture_backend: str = Field(alias="captureBackend")
+    input_backend: str = Field(alias="inputBackend")
+    provider: str
+    permissions: list[str] = Field(default_factory=list)
+    execution_modes: list[str] = Field(alias="executionModes")
+    replayable: bool
+    fail_closed: bool = Field(alias="failClosed")
+    reason_code: str | None = Field(default=None, alias="reasonCode")
+    summary: str | None = None
+    blockers: list[str] = Field(default_factory=list)
+    qualification_status: str = Field(default="missing", alias="qualificationStatus")
+    environment: dict[str, str] = Field(default_factory=dict)
+
+
 class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
     enabled: bool
     stage: Literal[
@@ -33,6 +59,9 @@ class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
         "provider_unavailable",
         "not_qualified",
         "qualified",
+        "qualified_supervised_pilot",
+        "ready_for_dry_run",
+        "ready_for_step_approval",
         "blocked",
     ]
     platform: Literal["macos", "windows", "linux", "unknown"]
@@ -44,6 +73,7 @@ class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
     summary: str | None = None
     provider: dict[str, Any] = Field(default_factory=dict)
     safety: dict[str, Any] = Field(default_factory=dict)
+    platforms: dict[str, ComputerUsePlatformCapabilityContract] = Field(default_factory=dict)
 
 
 class OperatorFeatureFlagsContract(ContractModel):

@@ -29,14 +29,85 @@
         },
         "computerUseVisionRuntime": {
           "enabled": false,
-          "stage": "not_configured",
+          "stage": "not_qualified",
           "platform": "macos",
           "scope": "vision_first_desktop_web_file",
           "executionModes": ["dry_run", "step_approval"],
           "replayable": true,
           "failClosed": true,
-          "reasonCode": "VISION_RUNTIME_NOT_CONFIGURED",
-          "summary": "Vision-first runtime foundation is available for deterministic tests; live execution requires a configured vision provider."
+          "reasonCode": "MACOS_COMPUTER_USE_NOT_QUALIFIED",
+          "summary": "Vision-first runtime foundation is present; live execution requires platform qualification.",
+          "provider": {
+            "kind": "none",
+            "configured": false,
+            "model": null,
+            "strictJson": true
+          },
+          "safety": {
+            "rawScreenshotPersistence": "disabled",
+            "terminalControl": "deny",
+            "approvalRequiredForRiskyActions": true,
+            "sensitiveSurfaceBlocked": true,
+            "approvalFreshnessEnforced": true,
+            "replayIntegrityVerified": true
+          },
+          "platforms": {
+            "macos": {
+              "platform": "macos",
+              "stage": "not_qualified",
+              "liveEnabled": false,
+              "captureBackend": "screencapture",
+              "inputBackend": "disabled",
+              "provider": "none",
+              "permissions": ["screen_recording", "accessibility"],
+              "executionModes": ["dry_run", "step_approval"],
+              "replayable": true,
+              "failClosed": true,
+              "reasonCode": "MACOS_COMPUTER_USE_NOT_QUALIFIED",
+              "summary": "macOS vision runtime is fail-closed until qualification passes.",
+              "blockers": ["VISION_PROVIDER_UNAVAILABLE", "MACOS_INPUT_BACKEND_DISABLED"],
+              "qualificationStatus": "missing",
+              "environment": {}
+            },
+            "windows": {
+              "platform": "windows",
+              "stage": "not_qualified",
+              "liveEnabled": false,
+              "captureBackend": "disabled",
+              "inputBackend": "disabled",
+              "provider": "none",
+              "permissions": ["screen_capture", "input_injection", "secure_desktop_guard"],
+              "executionModes": ["dry_run", "step_approval"],
+              "replayable": true,
+              "failClosed": true,
+              "reasonCode": "WINDOWS_COMPUTER_USE_NOT_QUALIFIED",
+              "summary": "Windows vision runtime is fail-closed until qualification passes.",
+              "blockers": [
+                "WINDOWS_CAPTURE_BACKEND_DISABLED",
+                "WINDOWS_INPUT_BACKEND_DISABLED",
+                "WINDOWS_UAC_SECURE_DESKTOP_BLOCKED"
+              ],
+              "qualificationStatus": "missing",
+              "environment": {}
+            },
+            "linux": {
+              "platform": "linux",
+              "stage": "not_qualified",
+              "liveEnabled": false,
+              "captureBackend": "disabled",
+              "inputBackend": "disabled",
+              "provider": "none",
+              "permissions": ["screen_capture", "input_injection", "session_guard"],
+              "executionModes": ["dry_run", "step_approval"],
+              "replayable": true,
+              "failClosed": true,
+              "reasonCode": "LINUX_COMPUTER_USE_NOT_QUALIFIED",
+              "summary": "Linux vision runtime is fail-closed until qualification passes.",
+              "blockers": ["LINUX_CAPTURE_BACKEND_DISABLED", "LINUX_INPUT_BACKEND_DISABLED"],
+              "qualificationStatus": "missing",
+              "environment": {}
+            }
+          }
         }
       },
       "commands": {

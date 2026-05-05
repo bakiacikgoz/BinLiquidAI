@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "computer-use-platform-qualification/v1",
+  "status": "pass",
+  "platform": "windows",
+  "sessionType": "windows",
+  "commit": "fixture",
+  "configHash": "6b41557cb5dea4837ec53c68b11f18ee163ae1d59b46b23f8405b765131609f3",
+  "runtimeVersion": "fixture",
+  "provider": {
+    "name": "mock",
+    "model": null,
+    "strictJson": true
+  },
+  "permissions": {
+    "screenCapture": "granted",
+    "accessibilityOrInput": "granted"
+  },
+  "backends": {
+    "capture": "mock",
+    "input": "mock"
+  },
+  "environment": {
+    "osVersion": "fixture",
+    "architecture": "x86_64",
+    "displayScaling": "unknown",
+    "multiDisplay": "unknown"
+  },
+  "taskSuite": {
+    "name": "safe-local-fixtures",
+    "total": 1,
+    "passed": 1,
+    "failed": 0
+  },
+  "safety": {
+    "sensitiveSurfaceBlocked": true,
+    "terminalDeniedByDefault": true,
+    "rawScreenshotsPersisted": 0,
+    "approvalFreshnessEnforced": true,
+    "replayIntegrityVerified": true
+  },
+  "evidence": [],
+  "blockers": []
+}

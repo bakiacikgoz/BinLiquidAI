@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Computer-Use Platform Qualification Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "status",
+    "platform",
+    "sessionType",
+    "commit",
+    "configHash",
+    "runtimeVersion",
+    "provider",
+    "permissions",
+    "backends",
+    "environment",
+    "taskSuite",
+    "safety",
+    "evidence",
+    "blockers"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "computer-use-platform-qualification/v1" },
+    "status": { "enum": ["pass", "fail", "blocked", "skipped"] },
+    "platform": { "enum": ["macos", "windows", "linux"] },
+    "sessionType": { "type": "string" },
+    "commit": { "type": "string", "minLength": 1 },
+    "configHash": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "runtimeVersion": { "type": "string" },
+    "provider": { "type": "object" },
+    "permissions": { "type": "object" },
+    "backends": { "type": "object" },
+    "environment": { "type": "object" },
+    "taskSuite": { "type": "object" },
+    "safety": { "type": "object" },
+    "evidence": { "type": "array" },
+    "blockers": { "type": "array", "items": { "type": "string" } }
+  }
+}

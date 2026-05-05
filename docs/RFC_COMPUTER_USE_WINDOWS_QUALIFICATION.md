@@ -50,6 +50,8 @@ The runtime must stop before action when any of these conditions occur:
 - Clean Windows VM run.
 - No shell passthrough.
 - Signed qualification report attached to the release gate.
+- Matching `computer-use-platform-qualification/v1` report for platform, commit, and config hash.
+- `computer-use doctor --platform windows --json` must keep `liveEnabled=false` until that report validates.
 
 ## Product Claim Rule
 
@@ -60,3 +62,11 @@ WINDOWS_COMPUTER_USE_NOT_QUALIFIED
 ```
 
 until the signed qualification report exists and a separate release gate explicitly changes the Windows capability contract.
+
+## Phase 3 Gate Command
+
+```bash
+uv run python scripts/evaluate_computer_use_platform_matrix.py --profile balanced --output artifacts/computer_use_platform_matrix.json --markdown artifacts/COMPUTER_USE_PLATFORM_MATRIX.md
+uv run python -m binliquid computer-use doctor --profile balanced --platform windows --json
+uv run python -m binliquid computer-use qualification verify --profile balanced --platform windows --report artifacts/windows/qualification.json --json
+```

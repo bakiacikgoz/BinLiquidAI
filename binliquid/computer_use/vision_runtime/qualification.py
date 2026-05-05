@@ -8,8 +8,39 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
 from binliquid.runtime.config import ComputerUseRuntimeConfig
 from binliquid.runtime.platform import current_platform
+
+
+class PlatformQualificationValidation(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    allowed: bool
+    status: str
+    platform: str
+    blockers: list[str] = Field(default_factory=list)
+
+
+class PlatformQualificationReport(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    schema_version: str = Field(alias="schemaVersion")
+    status: str
+    platform: str
+    session_type: str = Field(alias="sessionType")
+    commit: str
+    config_hash: str = Field(alias="configHash")
+    runtime_version: str = Field(alias="runtimeVersion")
+    provider: dict[str, Any]
+    permissions: dict[str, str]
+    backends: dict[str, str]
+    environment: dict[str, Any]
+    task_suite: dict[str, Any] = Field(alias="taskSuite")
+    safety: dict[str, Any]
+    evidence: list[Any] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
 
 
 def run_vision_qualification(
@@ -60,6 +91,87 @@ def run_vision_qualification(
     )
     _write_report(output_root, report)
     return report
+
+
+def platform_config_hash(config: ComputerUseRuntimeConfig, *, platform: str) -> str:
+    normalized_platform = platform.strip().lower()
+    payload = {
+        "platform": normalized_platform,
+        "vision_enabled": config.vision_enabled,
+        "vision_provider": config.vision_provider,
+        "vision_model": config.vision_model,
+        "default_mode": config.default_mode,
+        "action_set": config.action_set,
+        "require_approval_for_type_text": config.require_approval_for_type_text,
+        "require_approval_for_hotkey": config.require_approval_for_hotkey,
+        "require_approval_for_download": config.require_approval_for_download,
+        "require_approval_for_upload": config.require_approval_for_upload,
+        "approval_snapshot_max_age_ms": config.approval_snapshot_max_age_ms,
+        "raw_screenshot_retention": config.raw_screenshot_retention,
+        "raw_screenshot_max_count": config.raw_screenshot_max_count,
+        "terminal_control": config.terminal_control,
+        "platform_qualification_required": config.platform_qualification_required,
+        "live_enabled": getattr(config, f"{normalized_platform}_live_enabled", False),
+        "capture_backend": getattr(config, f"{normalized_platform}_capture_backend", "disabled"),
+        "input_backend": getattr(config, f"{normalized_platform}_input_backend", "disabled"),
+    }
+    if normalized_platform == "macos":
+        payload["primary_display_only"] = config.macos_primary_display_only
+    return _stable_json_hash(payload)
+
+
+def validate_platform_qualification_report(
+    report: Mapping[str, Any],
+    *,
+    platform: str,
+    config: ComputerUseRuntimeConfig,
+    commit: str | None = None,
+) -> PlatformQualificationValidation:
+    expected_platform = platform.strip().lower()
+    blockers: list[str] = []
+    try:
+        parsed = PlatformQualificationReport.model_validate(report)
+    except ValidationError as exc:
+        return PlatformQualificationValidation(
+            allowed=False,
+            status="invalid",
+            platform=expected_platform,
+            blockers=[
+                "VISION_PLATFORM_QUALIFICATION_SCHEMA_INVALID",
+                *[error["type"] for error in exc.errors()],
+            ],
+        )
+
+    if parsed.schema_version != "computer-use-platform-qualification/v1":
+        blockers.append("VISION_PLATFORM_QUALIFICATION_SCHEMA_INVALID")
+    if parsed.status != "pass":
+        blockers.append("VISION_PLATFORM_QUALIFICATION_FAILED")
+    if parsed.platform != expected_platform:
+        blockers.append("VISION_PLATFORM_QUALIFICATION_PLATFORM_MISMATCH")
+    if commit is not None and parsed.commit != commit:
+        blockers.append("VISION_PLATFORM_QUALIFICATION_STALE")
+    if parsed.config_hash != platform_config_hash(config, platform=expected_platform):
+        blockers.append("VISION_PLATFORM_QUALIFICATION_CONFIG_MISMATCH")
+    blockers.extend(_permission_blockers(parsed.permissions))
+    blockers.extend(_task_suite_blockers(parsed.task_suite))
+    blockers.extend(_safety_blockers(parsed.safety))
+    blockers.extend(parsed.blockers)
+
+    return PlatformQualificationValidation(
+        allowed=not blockers,
+        status=parsed.status,
+        platform=expected_platform,
+        blockers=_unique(blockers),
+    )
+
+
+def missing_platform_qualification_result(platform: str) -> PlatformQualificationValidation:
+    return PlatformQualificationValidation(
+        allowed=False,
+        status="missing",
+        platform=platform,
+        blockers=["VISION_PLATFORM_QUALIFICATION_MISSING"],
+    )
 
 
 def _load_tasks(task_path: Path) -> list[dict[str, Any]]:
@@ -132,3 +244,44 @@ def _stable_json_hash(payload: object) -> str:
 
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _permission_blockers(permissions: Mapping[str, str]) -> list[str]:
+    blockers: list[str] = []
+    for key in ("screenCapture", "accessibilityOrInput"):
+        if permissions.get(key) not in {"granted", "not_applicable"}:
+            blockers.append(f"VISION_PLATFORM_PERMISSION_{key.upper()}_MISSING")
+    return blockers
+
+
+def _task_suite_blockers(task_suite: Mapping[str, Any]) -> list[str]:
+    failed = int(task_suite.get("failed", 0))
+    total = int(task_suite.get("total", 0))
+    passed = int(task_suite.get("passed", 0))
+    if failed > 0 or total <= 0 or passed < total:
+        return ["VISION_PLATFORM_QUALIFICATION_TASKS_FAILED"]
+    return []
+
+
+def _safety_blockers(safety: Mapping[str, Any]) -> list[str]:
+    checks = {
+        "sensitiveSurfaceBlocked": "SENSITIVE_SURFACE_DETECTED",
+        "terminalDeniedByDefault": "TERMINAL_CONTROL_DENIED",
+        "approvalFreshnessEnforced": "COMPUTER_USE_STALE_APPROVAL_SNAPSHOT",
+        "replayIntegrityVerified": "REPLAY_BLOCKED",
+    }
+    blockers = [reason for key, reason in checks.items() if safety.get(key) is not True]
+    if int(safety.get("rawScreenshotsPersisted", 0)) > 0:
+        blockers.append("COMPUTER_USE_RAW_SCREENSHOT_DENIED")
+    return blockers
+
+
+def _unique(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result

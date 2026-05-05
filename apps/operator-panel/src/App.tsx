@@ -268,6 +268,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const contractMismatch = hasContractMismatch(handshakeData);
   const computerUseCapability = getComputerUseCapability(handshakeData);
   const computerUseVisionCapability = getComputerUseVisionRuntimeCapability(handshakeData);
+  const computerUseVisionPlatformStatuses = Object.values(computerUseVisionCapability.platforms);
   const computerUseLiveEnabled = isComputerUseLiveEnabled(handshakeData);
   const computerUseDisabledReason =
     computerUseLiveEnabled
@@ -1278,6 +1279,20 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                       {computerUseVisionCapability.safety.terminalControl}
                     </strong>
                   </div>
+                  {computerUseVisionPlatformStatuses.length > 0 ? (
+                    <div className="platform-gate-list" aria-label="Computer-use platform gates">
+                      {computerUseVisionPlatformStatuses.map((platformStatus) => (
+                        <span
+                          className="platform-gate-pill"
+                          key={platformStatus.platform}
+                          title={platformStatus.reasonCode || platformStatus.stage}
+                        >
+                          <span>{platformStatus.platform}</span>
+                          <strong>{platformStatus.liveEnabled ? 'live' : platformStatus.stage}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 {!computerUseLiveEnabled ? (
                   <div className="warning-inline">{computerUseDisabledReason}</div>

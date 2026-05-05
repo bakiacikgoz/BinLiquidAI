@@ -74,6 +74,59 @@ const visionRuntime = {
     terminalControl: 'deny',
     approvalRequiredForRiskyActions: true,
   },
+  platforms: {
+    macos: {
+      platform: 'macos',
+      stage: 'not_qualified',
+      liveEnabled: false,
+      captureBackend: 'screencapture',
+      inputBackend: 'disabled',
+      provider: 'none',
+      permissions: [],
+      executionModes: ['dry_run', 'step_approval'],
+      replayable: true,
+      failClosed: true,
+      reasonCode: 'MACOS_COMPUTER_USE_NOT_QUALIFIED',
+      summary: null,
+      blockers: ['VISION_PROVIDER_UNAVAILABLE'],
+      qualificationStatus: 'missing',
+      environment: {},
+    },
+    windows: {
+      platform: 'windows',
+      stage: 'not_qualified',
+      liveEnabled: false,
+      captureBackend: 'disabled',
+      inputBackend: 'disabled',
+      provider: 'none',
+      permissions: [],
+      executionModes: ['dry_run', 'step_approval'],
+      replayable: true,
+      failClosed: true,
+      reasonCode: 'WINDOWS_COMPUTER_USE_NOT_QUALIFIED',
+      summary: null,
+      blockers: ['WINDOWS_CAPTURE_BACKEND_DISABLED'],
+      qualificationStatus: 'missing',
+      environment: {},
+    },
+    linux: {
+      platform: 'linux',
+      stage: 'not_qualified',
+      liveEnabled: false,
+      captureBackend: 'disabled',
+      inputBackend: 'disabled',
+      provider: 'none',
+      permissions: [],
+      executionModes: ['dry_run', 'step_approval'],
+      replayable: true,
+      failClosed: true,
+      reasonCode: 'LINUX_COMPUTER_USE_NOT_QUALIFIED',
+      summary: null,
+      blockers: ['LINUX_INPUT_BACKEND_DISABLED'],
+      qualificationStatus: 'missing',
+      environment: {},
+    },
+  },
 };
 
 describe('capability handshake validation', () => {
@@ -185,6 +238,8 @@ describe('capability handshake validation', () => {
     });
 
     expect(capability).toEqual(visionRuntime);
+    expect(capability.platforms.windows.reasonCode).toBe('WINDOWS_COMPUTER_USE_NOT_QUALIFIED');
+    expect(capability.platforms.linux.liveEnabled).toBe(false);
     expect(
       isComputerUseVisionRuntimeLiveEnabled({
         capabilities: { features: { computerUseVisionRuntime: visionRuntime } },

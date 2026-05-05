@@ -190,6 +190,17 @@ def test_operator_capabilities_payload_matches_contract() -> None:
     jsonschema.Draft202012Validator(schema).validate(json.loads(result.stdout))
 
     assert payload.contract_version == "2.0"
+    vision_runtime = json.loads(result.stdout)["features"]["computerUseVisionRuntime"]
+    assert set(vision_runtime["platforms"]) == {"macos", "windows", "linux"}
+    assert vision_runtime["platforms"]["windows"]["liveEnabled"] is False
+    assert (
+        vision_runtime["platforms"]["windows"]["reasonCode"]
+        == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+    )
+    assert (
+        vision_runtime["platforms"]["linux"]["reasonCode"]
+        == "LINUX_COMPUTER_USE_NOT_QUALIFIED"
+    )
     if current_platform().label == "windows":
         assert payload.features.computer_use_pilot.enabled is False
         assert (

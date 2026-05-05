@@ -362,6 +362,45 @@
   white-space: nowrap;
 }
 
+.premium-shell .platform-gate-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 0 2px;
+}
+
+.premium-shell .platform-gate-pill {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: var(--surface-control);
+}
+
+.premium-shell .platform-gate-pill span,
+.premium-shell .platform-gate-pill strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.premium-shell .platform-gate-pill span {
+  color: var(--fg-muted);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.premium-shell .platform-gate-pill strong {
+  color: var(--fg-primary);
+  font-size: 11px;
+  font-weight: 680;
+}
+
 .premium-shell .ghost-btn,
 .premium-shell .action-btn,
 .premium-shell .tab-btn,

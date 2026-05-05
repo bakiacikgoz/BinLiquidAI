@@ -190,6 +190,16 @@ class ComputerUseRuntimeConfig(BaseModel):
     macos_capture_backend: Literal["screencapture", "quartz"] = "screencapture"
     macos_input_backend: Literal["quartz", "disabled"] = "disabled"
     macos_primary_display_only: bool = True
+    windows_live_enabled: bool = False
+    windows_capture_backend: Literal["disabled", "mock", "gdi", "windows_graphics_capture"] = (
+        "disabled"
+    )
+    windows_input_backend: Literal["disabled", "mock", "win32_sendinput"] = "disabled"
+    linux_live_enabled: bool = False
+    linux_capture_backend: Literal["disabled", "mock", "x11", "wayland_portal"] = "disabled"
+    linux_input_backend: Literal["disabled", "mock", "xdotool", "ydotool", "uinput"] = (
+        "disabled"
+    )
     action_set: list[
         Literal[
             "move_mouse",
@@ -493,6 +503,18 @@ class RuntimeConfig(BaseModel):
                 macos_primary_display_only=computer_use_data.get(
                     "macos_primary_display_only", True
                 ),
+                windows_live_enabled=computer_use_data.get("windows_live_enabled", False),
+                windows_capture_backend=computer_use_data.get(
+                    "windows_capture_backend", "disabled"
+                ),
+                windows_input_backend=computer_use_data.get(
+                    "windows_input_backend", "disabled"
+                ),
+                linux_live_enabled=computer_use_data.get("linux_live_enabled", False),
+                linux_capture_backend=computer_use_data.get(
+                    "linux_capture_backend", "disabled"
+                ),
+                linux_input_backend=computer_use_data.get("linux_input_backend", "disabled"),
                 action_set=computer_use_data.get(
                     "action_set",
                     ComputerUseRuntimeConfig().action_set,
@@ -654,6 +676,12 @@ ENV_PATHS: dict[str, str] = {
     "COMPUTER_USE_MACOS_CAPTURE_BACKEND": "computer_use.macos_capture_backend",
     "COMPUTER_USE_MACOS_INPUT_BACKEND": "computer_use.macos_input_backend",
     "COMPUTER_USE_MACOS_PRIMARY_DISPLAY_ONLY": "computer_use.macos_primary_display_only",
+    "COMPUTER_USE_WINDOWS_LIVE_ENABLED": "computer_use.windows_live_enabled",
+    "COMPUTER_USE_WINDOWS_CAPTURE_BACKEND": "computer_use.windows_capture_backend",
+    "COMPUTER_USE_WINDOWS_INPUT_BACKEND": "computer_use.windows_input_backend",
+    "COMPUTER_USE_LINUX_LIVE_ENABLED": "computer_use.linux_live_enabled",
+    "COMPUTER_USE_LINUX_CAPTURE_BACKEND": "computer_use.linux_capture_backend",
+    "COMPUTER_USE_LINUX_INPUT_BACKEND": "computer_use.linux_input_backend",
     "COMPUTER_USE_ACTION_SET": "computer_use.action_set",
     "COMPUTER_USE_REQUIRE_APPROVAL_FOR_TYPE_TEXT": (
         "computer_use.require_approval_for_type_text"
