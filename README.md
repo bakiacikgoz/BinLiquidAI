@@ -22,6 +22,7 @@ It provides two layers:
 - Windows x64: supported for core CLI, operator panel, bundled runtime, and signed release-candidate evidence.
 - Windows public/enterprise release remains blocked until `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and no blocking reasons.
 - Windows live computer-use automation remains disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` unless a Windows-specific signed qualification report says otherwise.
+- Vision-first computer-use runtime foundation is available behind `[computer_use]` feature gates; live execution remains disabled until a vision provider and platform qualification are explicitly configured.
 
 ### Core Runtime
 
@@ -82,6 +83,7 @@ This slice formalizes the deployment contract. It does not replace qualification
 | Router train/eval reproducibility scripts | working | JSON + Markdown artifacts |
 | Governance v0.4 (policy + approval + audit) | working | fail-closed + async approvals |
 | Team Runtime v0.4 (DAG + bounded concurrency + handoff/memory governance) | pilot-hardened under restricted profile | bounded-concurrency safeguards, replay verification, and pilot usage only behind `team pilot-check` plus target-environment live-provider rehearsal |
+| Vision-first computer-use runtime foundation | gated foundation | typed observation/action contracts, universal policy, deterministic mock runtime, redacted replay; no default live OS automation |
 | Desktop UI (Tauri operator panel) | beta | `apps/operator-panel`; macOS release proof and Windows x64 smoke path |
 
 ## First 5 Minutes

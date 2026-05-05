@@ -170,6 +170,32 @@ class MaintenanceConfig(BaseModel):
     support_bundle_dir: str = ".binliquid/support"
 
 
+class ComputerUseRuntimeConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = True
+    runtime_mode: Literal["legacy_pilot", "vision_first", "auto"] = "legacy_pilot"
+    vision_enabled: bool = False
+    default_mode: Literal["dry_run", "step_approval", "execute"] = "step_approval"
+    max_steps: int = Field(default=50, ge=1, le=300)
+    max_recovery_attempts: int = Field(default=3, ge=0, le=10)
+    screenshot_interval_ms: int = Field(default=750, ge=100, le=10000)
+    min_action_confidence: float = Field(default=0.82, ge=0.0, le=1.0)
+    min_verification_confidence: float = Field(default=0.80, ge=0.0, le=1.0)
+    raw_screenshot_retention: Literal["disabled", "debug_only", "explicit_opt_in"] = "disabled"
+    allowed_apps: list[str] = Field(default_factory=list)
+    blocked_apps: list[str] = Field(
+        default_factory=lambda: [
+            "System Settings",
+            "Settings",
+            "Keychain Access",
+            "Password Manager",
+        ]
+    )
+    terminal_control: Literal["deny", "approval_required", "allow_read_only"] = "deny"
+    platform_qualification_required: bool = True
+
+
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -210,6 +236,7 @@ class RuntimeConfig(BaseModel):
     keys: KeyManagementConfig = Field(default_factory=KeyManagementConfig)
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
     maintenance: MaintenanceConfig = Field(default_factory=MaintenanceConfig)
+    computer_use: ComputerUseRuntimeConfig = Field(default_factory=ComputerUseRuntimeConfig)
 
     @classmethod
     def from_profile(cls, profile: str = "default", root_dir: Path | None = None) -> RuntimeConfig:
@@ -235,6 +262,7 @@ class RuntimeConfig(BaseModel):
         keys_data = data.get("keys", {})
         observability_data = data.get("observability", {})
         maintenance_data = data.get("maintenance", {})
+        computer_use_data = data.get("computer_use", {})
         return cls(
             model_name=app_data.get("model_name", "lfm2.5-thinking:1.2b"),
             profile_name=app_data.get("profile_name", "default"),
@@ -402,6 +430,31 @@ class RuntimeConfig(BaseModel):
                     "support_bundle_dir", ".binliquid/support"
                 ),
             ),
+            computer_use=ComputerUseRuntimeConfig(
+                enabled=computer_use_data.get("enabled", True),
+                runtime_mode=computer_use_data.get("runtime_mode", "legacy_pilot"),
+                vision_enabled=computer_use_data.get("vision_enabled", False),
+                default_mode=computer_use_data.get("default_mode", "step_approval"),
+                max_steps=computer_use_data.get("max_steps", 50),
+                max_recovery_attempts=computer_use_data.get("max_recovery_attempts", 3),
+                screenshot_interval_ms=computer_use_data.get("screenshot_interval_ms", 750),
+                min_action_confidence=computer_use_data.get("min_action_confidence", 0.82),
+                min_verification_confidence=computer_use_data.get(
+                    "min_verification_confidence", 0.80
+                ),
+                raw_screenshot_retention=computer_use_data.get(
+                    "raw_screenshot_retention", "disabled"
+                ),
+                allowed_apps=computer_use_data.get("allowed_apps", []),
+                blocked_apps=computer_use_data.get(
+                    "blocked_apps",
+                    ComputerUseRuntimeConfig().blocked_apps,
+                ),
+                terminal_control=computer_use_data.get("terminal_control", "deny"),
+                platform_qualification_required=computer_use_data.get(
+                    "platform_qualification_required", True
+                ),
+            ),
         )
 
 
@@ -509,6 +562,22 @@ ENV_PATHS: dict[str, str] = {
     "MAINTENANCE_RESTORE_DIR": "maintenance.restore_dir",
     "MAINTENANCE_MIGRATION_DIR": "maintenance.migration_dir",
     "MAINTENANCE_SUPPORT_BUNDLE_DIR": "maintenance.support_bundle_dir",
+    "COMPUTER_USE_ENABLED": "computer_use.enabled",
+    "COMPUTER_USE_RUNTIME_MODE": "computer_use.runtime_mode",
+    "COMPUTER_USE_VISION_ENABLED": "computer_use.vision_enabled",
+    "COMPUTER_USE_DEFAULT_MODE": "computer_use.default_mode",
+    "COMPUTER_USE_MAX_STEPS": "computer_use.max_steps",
+    "COMPUTER_USE_MAX_RECOVERY_ATTEMPTS": "computer_use.max_recovery_attempts",
+    "COMPUTER_USE_SCREENSHOT_INTERVAL_MS": "computer_use.screenshot_interval_ms",
+    "COMPUTER_USE_MIN_ACTION_CONFIDENCE": "computer_use.min_action_confidence",
+    "COMPUTER_USE_MIN_VERIFICATION_CONFIDENCE": "computer_use.min_verification_confidence",
+    "COMPUTER_USE_RAW_SCREENSHOT_RETENTION": "computer_use.raw_screenshot_retention",
+    "COMPUTER_USE_ALLOWED_APPS": "computer_use.allowed_apps",
+    "COMPUTER_USE_BLOCKED_APPS": "computer_use.blocked_apps",
+    "COMPUTER_USE_TERMINAL_CONTROL": "computer_use.terminal_control",
+    "COMPUTER_USE_PLATFORM_QUALIFICATION_REQUIRED": (
+        "computer_use.platform_qualification_required"
+    ),
 }
 
 
@@ -567,6 +636,7 @@ def _load_profile_payload(*, profile: str, root_dir: Path | None) -> dict[str, A
         "keys": dict(data.get("keys", {})),
         "observability": dict(data.get("observability", {})),
         "maintenance": dict(data.get("maintenance", {})),
+        "computer_use": dict(data.get("computer_use", {})),
     }
     return payload
 

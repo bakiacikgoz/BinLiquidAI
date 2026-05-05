@@ -44,6 +44,18 @@ export type ComputerUseCapability = {
   summary: string | null;
 };
 
+export type ComputerUseVisionRuntimeCapability = {
+  enabled: boolean;
+  stage: string;
+  platform: string;
+  scope: string;
+  executionModes: string[];
+  replayable: boolean;
+  failClosed: boolean;
+  reasonCode: string | null;
+  summary: string | null;
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }
@@ -98,7 +110,33 @@ export function getComputerUseCapability(handshakeData: unknown): ComputerUseCap
   };
 }
 
+export function getComputerUseVisionRuntimeCapability(
+  handshakeData: unknown,
+): ComputerUseVisionRuntimeCapability {
+  const handshake = asRecord(handshakeData);
+  const capabilities = asRecord(handshake.capabilities);
+  const features = asRecord(capabilities.features);
+  const computerUse = asRecord(features.computerUseVisionRuntime);
+
+  return {
+    enabled: readBoolean(computerUse, 'enabled'),
+    stage: readString(computerUse, 'stage') ?? 'not_configured',
+    platform: readString(computerUse, 'platform') ?? 'unknown',
+    scope: readString(computerUse, 'scope') ?? 'vision_first_desktop_web_file',
+    executionModes: readStringArray(computerUse, 'executionModes'),
+    replayable: readBoolean(computerUse, 'replayable'),
+    failClosed: readBoolean(computerUse, 'failClosed'),
+    reasonCode: readString(computerUse, 'reasonCode'),
+    summary: readString(computerUse, 'summary'),
+  };
+}
+
 export function isComputerUseLiveEnabled(handshakeData: unknown): boolean {
   const capability = getComputerUseCapability(handshakeData);
+  return capability.enabled === true && capability.failClosed === true;
+}
+
+export function isComputerUseVisionRuntimeLiveEnabled(handshakeData: unknown): boolean {
+  const capability = getComputerUseVisionRuntimeCapability(handshakeData);
   return capability.enabled === true && capability.failClosed === true;
 }

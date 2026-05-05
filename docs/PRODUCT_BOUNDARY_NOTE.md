@@ -47,3 +47,16 @@ The current codebase still ships a bounded browser-first foundation. The product
 Real Safari qualification is not zero-config. Local validation still requires Safari automation permissions, System Events / Accessibility access, and Safari's manual Developer setting `Allow JavaScript from Apple Events`.
 
 The currently qualified download path is scoped and fail-closed, but it is only qualified for direct-link browser artifacts. Authenticated or session-bound download flows still need deeper qualification.
+
+## Vision-First Runtime Boundary
+
+The vision-first runtime is a supervised foundation, not an unrestricted autonomous desktop agent. It may be described as a universal vision-first runtime foundation with policy, approval, replay, and deterministic test coverage.
+
+It must not be described as:
+
+- uncontrolled full-computer autonomy
+- qualified Windows live desktop automation
+- a password, payment, wallet, or MFA automation agent
+- reliable across arbitrary real-world apps without platform qualification evidence
+
+The safe product claim is: the runtime can observe via hash-addressed visual contracts, plan typed actions, classify risk, require approval, record redacted replay evidence, and fail closed when a provider or qualification is missing.

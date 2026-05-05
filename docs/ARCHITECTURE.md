@@ -44,3 +44,17 @@
 - Active (default): rule routing + sLTC shadow in balanced profile.
 - Experimental: direct sLTC active routing in research profile.
 - Deferred: desktop UI thin-shell.
+
+## Vision-First Computer-Use Foundation
+
+The existing bounded computer-use pilot remains the default runtime. A new additive package, `binliquid/computer_use/vision_runtime/`, introduces typed ports and contracts for a future vision-first desktop/web/file action loop.
+
+The foundation is structured around:
+
+```text
+observe -> interpret -> decide -> policy -> approval -> execute -> verify -> checkpoint
+```
+
+Production defaults keep this path fail-closed: `runtime_mode="legacy_pilot"`, `vision_enabled=false`, raw screenshot retention disabled, terminal control denied, and platform qualification required.
+
+The operator panel receives an additive `computerUseVisionRuntime` capability next to the existing `computerUsePilot` field, allowing the UI to surface readiness without enabling live execution.

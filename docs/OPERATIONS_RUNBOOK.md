@@ -240,3 +240,34 @@ uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readine
 - keep enterprise CLI controls read-only until identity and signing checks return to `pass`
 - do not claim GA readiness while `ga readiness` is `yellow` or `red`
 - do not promote enterprise deployment claims without a signed `qualification_report.json`
+
+## 12. Vision-First Computer-Use Operations
+
+### Default Posture
+
+The `[computer_use]` profile block defaults to:
+
+```toml
+runtime_mode = "legacy_pilot"
+vision_enabled = false
+raw_screenshot_retention = "disabled"
+terminal_control = "deny"
+platform_qualification_required = true
+```
+
+### Operator Checks
+
+```bash
+uv run binliquid operator capabilities --json
+uv run binliquid computer-use run --once "read current screen" --runtime vision-first --json
+```
+
+Expected result without a configured vision provider: fail-closed with `VISION_RUNTIME_NOT_CONFIGURED` or `VISION_PROVIDER_UNAVAILABLE`; no raw screenshots are persisted.
+
+### Stop Conditions
+
+- raw screenshots appear without explicit debug opt-in
+- Windows reports live execution enabled without signed qualification
+- terminal control is enabled outside a reviewed policy change
+- sensitive surface detection does not stop execution
+- replay hash-chain verification fails

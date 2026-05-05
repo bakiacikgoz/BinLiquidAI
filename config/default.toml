@@ -101,3 +101,19 @@ max_total_tasks = 64
 max_handoff_depth = 8
 checkpoint_db_path = ".binliquid/team/checkpoints.sqlite3"
 artifact_dir = ".binliquid/team/jobs"
+
+[computer_use]
+enabled = true
+runtime_mode = "legacy_pilot"
+vision_enabled = false
+default_mode = "step_approval"
+max_steps = 50
+max_recovery_attempts = 3
+screenshot_interval_ms = 750
+min_action_confidence = 0.82
+min_verification_confidence = 0.80
+raw_screenshot_retention = "disabled"
+allowed_apps = []
+blocked_apps = ["System Settings", "Settings", "Keychain Access", "Password Manager"]
+terminal_control = "deny"
+platform_qualification_required = true

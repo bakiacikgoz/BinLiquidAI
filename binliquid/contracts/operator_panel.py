@@ -25,10 +25,25 @@ class ComputerUseCapabilityContract(ContractModel):
     summary: str | None = None
 
 
+class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
+    enabled: bool
+    stage: Literal["configured", "not_configured", "not_qualified", "qualified"]
+    platform: Literal["macos", "windows", "linux", "unknown"]
+    scope: Literal["vision_first_desktop_web_file"]
+    execution_modes: list[str] = Field(alias="executionModes")
+    replayable: bool
+    fail_closed: bool = Field(alias="failClosed")
+    reason_code: str | None = Field(default=None, alias="reasonCode")
+    summary: str | None = None
+
+
 class OperatorFeatureFlagsContract(ContractModel):
     operator_workflow_parity: bool = Field(alias="operatorWorkflowParity")
     enterprise_ops_parity: bool = Field(alias="enterpriseOpsParity")
     computer_use_pilot: ComputerUseCapabilityContract = Field(alias="computerUsePilot")
+    computer_use_vision_runtime: ComputerUseVisionRuntimeCapabilityContract = Field(
+        alias="computerUseVisionRuntime"
+    )
 
 
 class OperatorCommandCapabilitiesContract(ContractModel):

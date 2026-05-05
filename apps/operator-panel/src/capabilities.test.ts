@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { getComputerUseCapability, hasContractMismatch, isComputerUseLiveEnabled } from './capabilities';
+import {
+  getComputerUseCapability,
+  getComputerUseVisionRuntimeCapability,
+  hasContractMismatch,
+  isComputerUseLiveEnabled,
+  isComputerUseVisionRuntimeLiveEnabled,
+} from './capabilities';
 
 const baseCommands = {
   computerUseSubmit: true,
@@ -46,6 +52,18 @@ const enabledComputerUse = {
   adapterStatus: 'safari_applescript',
   reasonCode: 'MACOS_COMPUTER_USE_PILOT',
   summary: 'macOS pilot is enabled.',
+};
+
+const visionRuntime = {
+  enabled: false,
+  stage: 'not_qualified',
+  platform: 'windows',
+  scope: 'vision_first_desktop_web_file',
+  executionModes: ['dry_run', 'step_approval'],
+  replayable: true,
+  failClosed: true,
+  reasonCode: 'WINDOWS_COMPUTER_USE_NOT_QUALIFIED',
+  summary: 'Vision runtime is not qualified on Windows.',
 };
 
 describe('capability handshake validation', () => {
@@ -145,5 +163,22 @@ describe('capability handshake validation', () => {
     expect(capability.enabled).toBe(false);
     expect(capability.reasonCode).toBe('WINDOWS_COMPUTER_USE_NOT_QUALIFIED');
     expect(isComputerUseLiveEnabled({ capabilities: { features: { computerUsePilot: capability } } })).toBe(false);
+  });
+
+  it('reads additive vision runtime capability without enabling live execution', () => {
+    const capability = getComputerUseVisionRuntimeCapability({
+      capabilities: {
+        features: {
+          computerUseVisionRuntime: visionRuntime,
+        },
+      },
+    });
+
+    expect(capability).toEqual(visionRuntime);
+    expect(
+      isComputerUseVisionRuntimeLiveEnabled({
+        capabilities: { features: { computerUseVisionRuntime: visionRuntime } },
+      }),
+    ).toBe(false);
   });
 });

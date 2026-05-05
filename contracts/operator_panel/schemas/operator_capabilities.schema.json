@@ -76,6 +76,90 @@
       "title": "ComputerUseCapabilityContract",
       "type": "object"
     },
+    "ComputerUseVisionRuntimeCapabilityContract": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "executionModes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Executionmodes",
+          "type": "array"
+        },
+        "failClosed": {
+          "title": "Failclosed",
+          "type": "boolean"
+        },
+        "platform": {
+          "enum": [
+            "macos",
+            "windows",
+            "linux",
+            "unknown"
+          ],
+          "title": "Platform",
+          "type": "string"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoncode"
+        },
+        "replayable": {
+          "title": "Replayable",
+          "type": "boolean"
+        },
+        "scope": {
+          "const": "vision_first_desktop_web_file",
+          "title": "Scope",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "configured",
+            "not_configured",
+            "not_qualified",
+            "qualified"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        }
+      },
+      "required": [
+        "enabled",
+        "stage",
+        "platform",
+        "scope",
+        "executionModes",
+        "replayable",
+        "failClosed"
+      ],
+      "title": "ComputerUseVisionRuntimeCapabilityContract",
+      "type": "object"
+    },
     "OperatorCommandCapabilitiesContract": {
       "additionalProperties": false,
       "properties": {
@@ -241,6 +325,9 @@
         "computerUsePilot": {
           "$ref": "#/$defs/ComputerUseCapabilityContract"
         },
+        "computerUseVisionRuntime": {
+          "$ref": "#/$defs/ComputerUseVisionRuntimeCapabilityContract"
+        },
         "enterpriseOpsParity": {
           "title": "Enterpriseopsparity",
           "type": "boolean"
@@ -253,7 +340,8 @@
       "required": [
         "operatorWorkflowParity",
         "enterpriseOpsParity",
-        "computerUsePilot"
+        "computerUsePilot",
+        "computerUseVisionRuntime"
       ],
       "title": "OperatorFeatureFlagsContract",
       "type": "object"

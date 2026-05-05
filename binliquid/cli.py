@@ -452,6 +452,20 @@ def _parse_computer_use_mode(mode: str) -> ComputerUseMode:
     return aliases[normalized]
 
 
+def _parse_computer_use_runtime(runtime: str) -> str:
+    normalized = runtime.strip().lower().replace("_", "-")
+    aliases = {
+        "legacy-pilot": "legacy_pilot",
+        "legacy": "legacy_pilot",
+        "vision-first": "vision_first",
+        "vision": "vision_first",
+        "auto": "auto",
+    }
+    if normalized not in aliases:
+        raise ValueError(f"unsupported computer use runtime: {runtime}")
+    return aliases[normalized]
+
+
 @config_app.command("resolve")
 def config_resolve(
     profile: str = typer.Option("balanced", help="Config profile"),
@@ -1432,6 +1446,39 @@ def operator_capabilities(
             "summary": "macOS computer-use pilot is enabled behind fail-closed controls.",
         }
     )
+    computer_use_vision_runtime = (
+        {
+            "enabled": False,
+            "stage": "not_qualified",
+            "platform": "windows",
+            "scope": "vision_first_desktop_web_file",
+            "executionModes": [],
+            "replayable": True,
+            "failClosed": True,
+            "reasonCode": "WINDOWS_COMPUTER_USE_NOT_QUALIFIED",
+            "summary": (
+                "Vision-first runtime foundation is present, but Windows live execution "
+                "is not qualified."
+            ),
+        }
+        if windows_computer_use
+        else {
+            "enabled": False,
+            "stage": "not_configured",
+            "platform": platform_info.label
+            if platform_info.label in {"macos", "linux"}
+            else "unknown",
+            "scope": "vision_first_desktop_web_file",
+            "executionModes": ["dry_run", "step_approval"],
+            "replayable": True,
+            "failClosed": True,
+            "reasonCode": "VISION_RUNTIME_NOT_CONFIGURED",
+            "summary": (
+                "Vision-first runtime foundation is available for deterministic tests; "
+                "live execution requires an explicitly configured vision provider."
+            ),
+        }
+    )
     payload = {
         "coreVersion": __version__,
         "contractVersion": OPERATOR_PANEL_CONTRACT_VERSION,
@@ -1440,6 +1487,7 @@ def operator_capabilities(
             "operatorWorkflowParity": True,
             "enterpriseOpsParity": True,
             "computerUsePilot": computer_use_pilot,
+            "computerUseVisionRuntime": computer_use_vision_runtime,
         },
         "commands": {
             "teamSubmit": True,
@@ -1496,6 +1544,17 @@ def computer_use_run(
     root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
     profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
     mode: str = typer.Option("supervised", "--mode", help="assisted|supervised|dry-run"),
+    runtime: str = typer.Option(
+        "legacy-pilot",
+        "--runtime",
+        help="legacy-pilot|vision-first|auto",
+    ),
+    max_steps: int | None = typer.Option(None, "--max-steps", help="Vision runtime step budget"),
+    raw_screenshots: bool = typer.Option(
+        False,
+        "--raw-screenshots/--no-raw-screenshots",
+        help="Persist raw screenshots only when explicitly enabled by config and request.",
+    ),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
     model: str | None = typer.Option(None, "--model", help="Override model"),
@@ -1523,6 +1582,9 @@ def computer_use_run(
             job_id=effective_job_id,
             case_id=case_id,
             mode=resolved_mode,
+            runtime_mode=_parse_computer_use_runtime(runtime),
+            max_steps=max_steps,
+            raw_screenshots=raw_screenshots,
         )
     except Exception as exc:  # noqa: BLE001
         payload = _with_contract_version(

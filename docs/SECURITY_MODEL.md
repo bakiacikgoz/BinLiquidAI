@@ -37,3 +37,11 @@ Commands outside allowlist are rejected with deterministic error (`exit_code=126
 - Document content is treated as content, never as executable shell command
 - Tool runner only accepts explicit allowlisted command arrays
 - Tool commands are policy-evaluated on canonicalized command/arg form
+
+## Vision-First Computer-Use Boundary
+
+- Vision-first desktop automation is feature-gated by `[computer_use]`.
+- Default mode is `legacy_pilot`; `vision_enabled=false` keeps live vision execution off.
+- Universal policy denies sensitive surfaces, blocked apps, low-confidence actions, and terminal control by default.
+- Approval snapshots contain hashes, target geometry, expected effect, risk reasons, policy hash, and action hash; they do not contain raw screenshots.
+- Windows live execution remains blocked with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` until signed qualification evidence exists.

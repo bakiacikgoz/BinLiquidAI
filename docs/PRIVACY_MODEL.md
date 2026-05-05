@@ -34,3 +34,11 @@ Covered by tests:
 - no persistence under privacy mode
 - memory disabled no-touch behavior
 - allowlist rejection for unsafe command roots
+
+## Vision Runtime Privacy
+
+- Vision observations always include a screenshot hash.
+- Raw screenshot paths remain `null` by default.
+- Raw screenshot persistence requires explicit runtime configuration and request opt-in; current foundation tests assert zero persisted screenshots.
+- Replay artifacts expose redacted event summaries and hash-chain integrity, not raw screen content.
+- Secret-like, password, payment, and security indicators trigger fail-closed policy decisions instead of logging or typing sensitive data.

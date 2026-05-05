@@ -26,6 +26,17 @@
           "adapterStatus": "safari_applescript",
           "reasonCode": "MACOS_COMPUTER_USE_PILOT",
           "summary": "macOS pilot preview is enabled; Windows live computer-use remains disabled until qualification."
+        },
+        "computerUseVisionRuntime": {
+          "enabled": false,
+          "stage": "not_configured",
+          "platform": "macos",
+          "scope": "vision_first_desktop_web_file",
+          "executionModes": ["dry_run", "step_approval"],
+          "replayable": true,
+          "failClosed": true,
+          "reasonCode": "VISION_RUNTIME_NOT_CONFIGURED",
+          "summary": "Vision-first runtime foundation is available for deterministic tests; live execution requires a configured vision provider."
         }
       },
       "commands": {

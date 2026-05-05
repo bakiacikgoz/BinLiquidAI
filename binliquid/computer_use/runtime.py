@@ -62,6 +62,30 @@ from binliquid.computer_use.perception import build_perception_fingerprint
 from binliquid.computer_use.policy import BrowserAllowlistPolicy
 from binliquid.computer_use.prompt_parser import parse_prompt_to_actions
 from binliquid.computer_use.recorder import build_recorder_artifact
+from binliquid.computer_use.vision_runtime.models import (
+    ExecutionResult as VisionExecutionResult,
+)
+from binliquid.computer_use.vision_runtime.models import (
+    StopDecision as VisionStopDecision,
+)
+from binliquid.computer_use.vision_runtime.models import (
+    SurfaceKind as VisionSurfaceKind,
+)
+from binliquid.computer_use.vision_runtime.models import (
+    VerificationResult as VisionVerificationResult,
+)
+from binliquid.computer_use.vision_runtime.models import (
+    VisionObservation,
+    VisionRunArtifact,
+    VisionRunRequest,
+)
+from binliquid.computer_use.vision_runtime.providers.mock_vision import (
+    DeterministicActionPlanner,
+    DeterministicScreenCapture,
+    DeterministicStepVerifier,
+)
+from binliquid.computer_use.vision_runtime.recorder import RedactedVisionAuditRecorder
+from binliquid.computer_use.vision_runtime.runtime import VisionComputerUseRuntime
 from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.runtime.platform import current_platform, default_temp_dir, safe_allowed_roots
@@ -82,6 +106,20 @@ class SessionCommand(StrEnum):
     PAUSE = "pause"
     RESUME = "resume"
     STOP = "stop"
+
+
+def _stable_hash(payload: object) -> str:
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+class _NoopVisionExecutor:
+    def execute(self, action: object) -> VisionExecutionResult:
+        del action
+        return VisionExecutionResult(
+            status="skipped",
+            message="No live vision executor configured.",
+        )
 
 
 @dataclass(slots=True)
@@ -1522,6 +1560,84 @@ end tell
             )
         return recovery
 
+    def _run_vision_first(
+        self,
+        *,
+        prompt: str,
+        job_id: str,
+        case_id: str | None,
+        mode: ComputerUseMode,
+        max_steps: int | None,
+        raw_screenshots: bool,
+    ) -> dict[str, Any]:
+        del case_id
+        vision_config = self._config.computer_use
+        if max_steps is not None:
+            vision_config = vision_config.model_copy(update={"max_steps": max_steps})
+        job_dir = self._root_dir / job_id
+        recorder = RedactedVisionAuditRecorder(
+            job_id=job_id,
+            job_dir=job_dir,
+            runtime_config_hash=_stable_hash(vision_config.model_dump(mode="json")),
+            policy_hash=_stable_hash({"runtime": "vision_first", "policy": "universal"}),
+        )
+        if not vision_config.vision_enabled:
+            envelope = recorder.finalize("failed")
+            artifact = VisionRunArtifact(
+                job_id=job_id,
+                status="failed",
+                objective=prompt,
+                steps=[],
+                redaction_report=envelope.get("redaction_report", {}),
+                integrity=envelope.get("integrity", {}),
+                stop_reason="VISION_RUNTIME_NOT_CONFIGURED",
+            )
+            return self._vision_payload(artifact)
+
+        platform_info = current_platform()
+        observation = VisionObservation(
+            screenshot_hash=hashlib.sha256(f"{job_id}:{prompt}".encode()).hexdigest(),
+            captured_at=datetime.now(UTC).isoformat(),
+            platform=platform_info.label,
+            surface_kind=VisionSurfaceKind.UNKNOWN,
+            confidence=1.0,
+            raw_screenshot_path=None if not raw_screenshots else None,
+        )
+        runtime = VisionComputerUseRuntime(
+            config=vision_config,
+            artifact_root=self._root_dir,
+            capture=DeterministicScreenCapture([observation]),
+            vision=None,
+            planner=DeterministicActionPlanner(
+                [VisionStopDecision(reason="VISION_PROVIDER_UNAVAILABLE")]
+            ),
+            executor=_NoopVisionExecutor(),
+            verifier=DeterministicStepVerifier(
+                [VisionVerificationResult(verified=False, confidence=0.0)]
+            ),
+            audit=recorder,
+        )
+        artifact = runtime.run(
+            VisionRunRequest(
+                job_id=job_id,
+                objective=prompt,
+                mode=mode,
+                raw_screenshot_opt_in=raw_screenshots,
+            )
+        )
+        return self._vision_payload(artifact)
+
+    @staticmethod
+    def _vision_payload(artifact: VisionRunArtifact) -> dict[str, Any]:
+        return {
+            "job": {
+                "job_id": artifact.job_id,
+                "status": artifact.status,
+                "request": artifact.objective,
+            },
+            "computer_use": artifact.model_dump(mode="json"),
+        }
+
     def run(
         self,
         *,
@@ -1529,7 +1645,20 @@ end tell
         job_id: str,
         case_id: str | None = None,
         mode: ComputerUseMode = ComputerUseMode.EXECUTE,
+        runtime_mode: Literal["legacy_pilot", "vision_first", "auto"] | None = None,
+        max_steps: int | None = None,
+        raw_screenshots: bool = False,
     ) -> dict[str, Any]:
+        selected_runtime = runtime_mode or self._config.computer_use.runtime_mode
+        if selected_runtime == "vision_first":
+            return self._run_vision_first(
+                prompt=prompt,
+                job_id=job_id,
+                case_id=case_id,
+                mode=mode,
+                max_steps=max_steps,
+                raw_screenshots=raw_screenshots,
+            )
         family, actions = parse_prompt_to_actions(prompt=prompt, mode=mode)
         request = SessionRequest(
             run_id=job_id,
