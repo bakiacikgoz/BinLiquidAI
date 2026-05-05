@@ -37,6 +37,7 @@ class ComputerUsePlatformCapabilityContract(ContractModel):
         "qualified_available",
         "permission_ready",
         "provider_ready",
+        "ready_for_live_fixture",
         "fixture_qualified",
         "qualified_limited",
         "enabled",
@@ -57,6 +58,8 @@ class ComputerUsePlatformCapabilityContract(ContractModel):
     summary: str | None = None
     blockers: list[str] = Field(default_factory=list)
     qualification_status: str = Field(default="missing", alias="qualificationStatus")
+    fixture_qualified: bool = Field(default=False, alias="fixtureQualified")
+    production_qualified: bool = Field(default=False, alias="productionQualified")
     environment: dict[str, str] = Field(default_factory=dict)
 
 
@@ -71,6 +74,7 @@ class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
         "qualified_available",
         "permission_ready",
         "provider_ready",
+        "ready_for_live_fixture",
         "fixture_qualified",
         "qualified_limited",
         "enabled",

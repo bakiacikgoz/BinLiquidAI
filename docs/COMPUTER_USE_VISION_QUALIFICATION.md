@@ -6,7 +6,7 @@
 : CI-friendly mock qualification using `benchmarks/tasks/computer_use_vision/smoke_tasks.jsonl`.
 
 `live`
-: Opt-in macOS local qualification. It requires `BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC`, `BINLIQUID_COMPUTER_USE_LIVE_MACOS=1`, Screen Recording, Accessibility, `macos_live_enabled=true`, and a configured local vision provider.
+: Opt-in macOS local qualification. It requires `BINLIQUID_COMPUTER_USE_LIVE_MACOS=1`, `BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1`, `BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1`, `BINLIQUID_COMPUTER_USE_ACK`, Screen Recording, Accessibility, `macos_live_enabled=true`, and a configured local vision provider.
 
 ## Report Contract
 
@@ -51,8 +51,10 @@ uv run python scripts/evaluate_computer_use_platform_matrix.py --profile balance
 Live macOS qualification is intentionally skipped unless explicitly opted in:
 
 ```bash
-BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC \
 BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 \
+BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1 \
+BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1 \
+BINLIQUID_COMPUTER_USE_ACK="I understand BinLiquid will control my macOS desktop only for local supervised fixtures." \
 uv run binliquid computer-use qualification run \
   --platform macos \
   --suite live-fixture-smoke \
@@ -61,6 +63,7 @@ uv run binliquid computer-use qualification run \
   --json
 ```
 
-Without the exact opt-in, the Phase 4B macOS report is `blocked`, not a
-qualification pass, and replay verification exits non-zero because
-`report_status_pass=false`.
+Without the exact opt-in and readiness gates, the macOS report is `blocked`,
+not a qualification pass. Replay verification checks audit integrity separately,
+so a blocked no-op report can return `replayIntegrityVerified=true` while
+`qualificationPassed=false`.

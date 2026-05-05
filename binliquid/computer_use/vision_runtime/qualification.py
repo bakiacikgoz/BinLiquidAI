@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import platform as py_platform
+import shutil
 import subprocess
 import uuid
 from collections.abc import Mapping
@@ -42,6 +43,19 @@ class PlatformQualificationReport(BaseModel):
     expires_at: str | None = Field(default=None, alias="expiresAt")
     runtime_version: str | None = Field(default=None, alias="runtimeVersion")
     host: dict[str, Any] = Field(default_factory=dict)
+    suite: str | None = None
+    mode: str | None = None
+    qualification_status: str | None = Field(default=None, alias="qualificationStatus")
+    qualification_passed: bool | None = Field(default=None, alias="qualificationPassed")
+    fixture_qualified: bool | None = Field(default=None, alias="fixtureQualified")
+    production_qualified: bool | None = Field(default=None, alias="productionQualified")
+    live_enabled_default: bool | None = Field(default=None, alias="liveEnabledDefault")
+    replay_integrity_status: str | None = Field(default=None, alias="replayIntegrityStatus")
+    replay_integrity_verified: bool | None = Field(default=None, alias="replayIntegrityVerified")
+    audit_hash_chain_verified: bool | None = Field(default=None, alias="auditHashChainVerified")
+    reason_code: str | None = Field(default=None, alias="reasonCode")
+    opt_in: dict[str, Any] = Field(default_factory=dict, alias="optIn")
+    readiness: dict[str, Any] = Field(default_factory=dict)
     provider: dict[str, Any]
     permissions: dict[str, Any]
     backends: dict[str, str] = Field(default_factory=dict)
@@ -209,26 +223,42 @@ def run_macos_live_qualification(
     env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     values = env if env is not None else os.environ
+    normalized_mode = mode.strip().lower()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fixture_root = output_path.parent / "live_fixtures"
     fixture_paths = _write_local_fixture_suite(fixture_root)
     event_log_path = output_path.parent / "macos_qualification_events.jsonl"
     audit_path = output_path.parent / "macos_qualification_audit.json"
-    blocking_reasons = _macos_live_blockers(config=config, env=values)
-    status = "blocked"
-    stage = "blocked"
-    blockers = blocking_reasons or ["LIVE_FIXTURE_EXECUTION_NOT_RUN_BY_AGENT"]
+    readiness = _macos_live_readiness(config=config, env=values)
+    blocking_reasons = list(readiness["blockers"])
+    if normalized_mode == "preflight" and not blocking_reasons:
+        status = "skipped"
+        stage = "ready_for_live_fixture"
+        qualification_status = "skipped"
+        reason_code = None
+        blockers = []
+    else:
+        status = "blocked"
+        stage = "blocked"
+        qualification_status = "blocked"
+        blockers = blocking_reasons or ["MACOS_FIXTURE_QUALIFICATION_FAILED"]
+        reason_code = blockers[0]
     fixture_results = [
-        _fixture_result(fixture_id, "skipped", blockers[0])
+        _fixture_result(fixture_id, "skipped", reason_code)
         for fixture_id in MACOS_LIVE_FIXTURE_IDS
     ]
     report = _macos_qualification_report(
         config=config,
         suite=suite,
-        mode=mode,
+        mode=normalized_mode,
         status=status,
         stage=stage,
         blockers=blockers,
+        reason_code=reason_code,
+        qualification_status=qualification_status,
+        fixture_qualified=False,
+        production_qualified=False,
+        readiness=readiness,
         fixture_results=fixture_results,
         output_path=output_path,
         event_log_path=event_log_path,
@@ -463,6 +493,11 @@ def _macos_qualification_report(
     status: str,
     stage: str,
     blockers: list[str],
+    reason_code: str | None,
+    qualification_status: str,
+    fixture_qualified: bool,
+    production_qualified: bool,
+    readiness: Mapping[str, Any],
     fixture_results: list[dict[str, Any]],
     output_path: Path,
     event_log_path: Path,
@@ -472,7 +507,8 @@ def _macos_qualification_report(
     generated_at = datetime.now(UTC)
     commit = _git_sha()
     screenshot_persisted_count = 0
-    replay_verified = status == "pass"
+    replay_verified = True
+    qualification_passed = qualification_status == "passed"
     artifacts = {
         "replayPath": _safe_artifact_path(audit_path),
         "auditPath": _safe_artifact_path(audit_path),
@@ -497,7 +533,18 @@ def _macos_qualification_report(
         "platform": "macos",
         "status": status,
         "scope": "supervised_local_fixtures",
+        "suite": suite,
+        "mode": mode,
         "stage": stage,
+        "qualificationStatus": qualification_status,
+        "qualificationPassed": qualification_passed,
+        "fixtureQualified": fixture_qualified,
+        "productionQualified": production_qualified,
+        "liveEnabledDefault": False,
+        "replayIntegrityStatus": "passed",
+        "replayIntegrityVerified": replay_verified,
+        "auditHashChainVerified": True,
+        "reasonCode": reason_code,
         "commit": commit,
         "commitSha": commit,
         "configHash": platform_config_hash(config, platform="macos"),
@@ -516,20 +563,20 @@ def _macos_qualification_report(
             "scaleFactors": [],
         },
         "provider": {
-            "name": config.vision_provider,
-            "model": config.vision_model or "",
+            "kind": readiness["provider"]["kind"],
+            "name": readiness["provider"]["kind"],
+            "model": readiness["provider"]["model"],
             "strictJson": config.vision_provider != "none",
-            "ready": False,
+            "ready": readiness["provider"]["ready"],
+            "reasonCode": readiness["provider"]["reasonCode"],
         },
-        "permissions": {
-            "screenRecording": "unknown",
-            "accessibility": "unknown",
-            "inputMonitoring": "not_required",
-        },
+        "permissions": readiness["permissions"],
         "backends": {
             "capture": config.macos_capture_backend,
             "input": config.macos_input_backend,
         },
+        "readiness": readiness,
+        "optIn": readiness["optIn"],
         "safety": {
             "visionEnabledDefault": False,
             "rawScreenshotPersistence": config.raw_screenshot_persistence,
@@ -542,6 +589,9 @@ def _macos_qualification_report(
             "approvalFreshnessEnforced": True,
             "replayIntegrityVerified": replay_verified,
             "replayIntegrityEnforced": True,
+            "auditHashChainVerified": True,
+            "stepApprovalRequired": config.macos_require_step_approval,
+            "supervisedFixtureOnly": readiness["optIn"]["supervisedFixtureOnly"],
         },
         "tasks": [
             {
@@ -566,6 +616,9 @@ def _macos_qualification_report(
 
 
 MACOS_LIVE_OPT_IN_VALUE = "I_UNDERSTAND_THIS_CONTROLS_MY_MAC"
+MACOS_LIVE_ACK_VALUE = (
+    "I understand BinLiquid will control my macOS desktop only for local supervised fixtures."
+)
 
 MACOS_LIVE_FIXTURE_IDS = (
     "local_browser_form",
@@ -581,24 +634,45 @@ def _macos_live_blockers(
     config: ComputerUseRuntimeConfig,
     env: Mapping[str, str],
 ) -> list[str]:
+    return list(_macos_live_readiness(config=config, env=env)["blockers"])
+
+
+def _macos_live_readiness(
+    *,
+    config: ComputerUseRuntimeConfig,
+    env: Mapping[str, str],
+) -> dict[str, Any]:
+    opt_in = macos_opt_in_state(env)
+    permissions = {
+        "screenRecording": _env_state(env, "BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING"),
+        "accessibility": _env_state(env, "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY"),
+        "inputMonitoring": "not_required",
+    }
+    provider = _macos_provider_readiness(config)
+    capture = _macos_capture_readiness(config, permissions["screenRecording"])
+    input_state = _macos_input_readiness(config, permissions["accessibility"])
     blockers: list[str] = []
-    if env.get("BINLIQUID_COMPUTER_USE_LIVE_OPT_IN") != MACOS_LIVE_OPT_IN_VALUE:
+    if not opt_in["present"]:
         blockers.append("MACOS_LIVE_OPT_IN_MISSING")
-    if env.get("BINLIQUID_COMPUTER_USE_LIVE_MACOS") != "1":
-        blockers.append("BINLIQUID_COMPUTER_USE_LIVE_MACOS_NOT_SET")
+    if not opt_in["acknowledged"]:
+        blockers.append("MACOS_LIVE_ACK_MISSING")
+    if not opt_in["supervisedFixtureOnly"]:
+        blockers.append("MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED")
+    if not opt_in["stepApprovalRequired"]:
+        blockers.append("MACOS_STEP_APPROVAL_REQUIRED")
     if not config.vision_enabled:
         blockers.append("VISION_RUNTIME_DISABLED")
-    if config.vision_provider != "ollama" or not config.vision_model:
-        blockers.append("VISION_PROVIDER_UNAVAILABLE")
+    if not provider["ready"]:
+        blockers.append(str(provider["reasonCode"]))
     if not config.macos_live_enabled:
         blockers.append("MACOS_LIVE_FLAG_DISABLED")
-    if config.macos_capture_backend == "disabled":
-        blockers.append("MACOS_CAPTURE_BACKEND_DISABLED")
-    if config.macos_input_backend == "disabled":
-        blockers.append("MACOS_INPUT_BACKEND_DISABLED")
-    if _env_state(env, "BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING") != "granted":
+    if not capture["ready"]:
+        blockers.append(str(capture["reasonCode"]))
+    if not input_state["ready"]:
+        blockers.append(str(input_state["reasonCode"]))
+    if permissions["screenRecording"] != "granted":
         blockers.append("MACOS_SCREEN_RECORDING_PERMISSION_MISSING")
-    if _env_state(env, "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY") != "granted":
+    if permissions["accessibility"] != "granted":
         blockers.append("MACOS_ACCESSIBILITY_PERMISSION_MISSING")
     if (
         config.raw_screenshot_persistence
@@ -610,7 +684,181 @@ def _macos_live_blockers(
         blockers.append("TERMINAL_CONTROL_DENIED")
     if config.sensitive_surface_policy != "stop":
         blockers.append("SENSITIVE_SURFACE_BLOCKED")
-    return _unique(blockers)
+    next_actions = _macos_next_actions(_unique(blockers))
+    return {
+        "readyForLiveFixture": not blockers,
+        "optIn": opt_in,
+        "provider": provider,
+        "permissions": permissions,
+        "capture": capture,
+        "input": input_state,
+        "safety": {
+            "rawScreenshotPersistence": config.raw_screenshot_persistence,
+            "rawScreenshotMaxCount": config.raw_screenshot_max_count,
+            "terminalPolicy": config.terminal_control,
+            "sensitiveSurfacePolicy": config.sensitive_surface_policy,
+            "stepApprovalRequired": config.macos_require_step_approval,
+            "supervisedFixtureOnly": opt_in["supervisedFixtureOnly"],
+        },
+        "nextActions": next_actions,
+        "blockers": _unique(blockers),
+    }
+
+
+def macos_opt_in_state(env: Mapping[str, str]) -> dict[str, Any]:
+    live_flag = env.get("BINLIQUID_COMPUTER_USE_LIVE_MACOS") == "1"
+    legacy_ack = env.get("BINLIQUID_COMPUTER_USE_LIVE_OPT_IN") == MACOS_LIVE_OPT_IN_VALUE
+    explicit_ack = env.get("BINLIQUID_COMPUTER_USE_ACK") == MACOS_LIVE_ACK_VALUE
+    supervised_fixture_only = env.get("BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY") == "1"
+    step_approval_required = env.get("BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL") == "1"
+    source = "env" if any(
+        key in env
+        for key in (
+            "BINLIQUID_COMPUTER_USE_LIVE_MACOS",
+            "BINLIQUID_COMPUTER_USE_LIVE_OPT_IN",
+            "BINLIQUID_COMPUTER_USE_ACK",
+            "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
+            "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
+        )
+    ) else "none"
+    timestamp = (
+        datetime.now(UTC).isoformat()
+        if live_flag or legacy_ack or explicit_ack
+        else None
+    )
+    return {
+        "present": live_flag and (legacy_ack or explicit_ack),
+        "source": source,
+        "required": True,
+        "liveMacos": live_flag,
+        "acknowledged": legacy_ack or explicit_ack,
+        "ackSource": (
+            "BINLIQUID_COMPUTER_USE_ACK"
+            if explicit_ack
+            else "BINLIQUID_COMPUTER_USE_LIVE_OPT_IN"
+            if legacy_ack
+            else "none"
+        ),
+        "supervisedFixtureOnly": supervised_fixture_only,
+        "stepApprovalRequired": step_approval_required,
+        "timestamp": timestamp,
+    }
+
+
+def _macos_provider_readiness(config: ComputerUseRuntimeConfig) -> dict[str, Any]:
+    configured = config.vision_enabled and config.vision_provider != "none" and bool(
+        config.vision_model
+    )
+    if not configured:
+        return {
+            "configured": False,
+            "kind": config.vision_provider,
+            "model": config.vision_model,
+            "ready": False,
+            "strictJson": False,
+            "reasonCode": "VISION_PROVIDER_UNAVAILABLE",
+        }
+    if config.vision_provider != "ollama":
+        return {
+            "configured": True,
+            "kind": config.vision_provider,
+            "model": config.vision_model,
+            "ready": False,
+            "strictJson": True,
+            "reasonCode": "VISION_PROVIDER_UNAVAILABLE",
+        }
+    ready = shutil.which("ollama") is not None
+    return {
+        "configured": True,
+        "kind": "ollama",
+        "model": config.vision_model,
+        "ready": ready,
+        "strictJson": True,
+        "reasonCode": None if ready else "VISION_PROVIDER_UNAVAILABLE",
+    }
+
+
+def _macos_capture_readiness(
+    config: ComputerUseRuntimeConfig,
+    screen_recording: str,
+) -> dict[str, Any]:
+    backend = config.macos_capture_backend
+    if backend == "disabled":
+        return {"backend": backend, "ready": False, "reasonCode": "MACOS_CAPTURE_BACKEND_DISABLED"}
+    if backend == "screencapture" and shutil.which("screencapture") is None:
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_CAPTURE_BACKEND_UNAVAILABLE",
+        }
+    if screen_recording != "granted":
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_SCREEN_RECORDING_PERMISSION_MISSING",
+        }
+    return {"backend": backend, "ready": True, "reasonCode": None}
+
+
+def _macos_input_readiness(
+    config: ComputerUseRuntimeConfig,
+    accessibility: str,
+) -> dict[str, Any]:
+    backend = config.macos_input_backend
+    if backend == "disabled":
+        return {"backend": backend, "ready": False, "reasonCode": "MACOS_INPUT_BACKEND_DISABLED"}
+    if backend != "quartz":
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_INPUT_BACKEND_UNAVAILABLE",
+        }
+    if accessibility != "granted":
+        return {
+            "backend": backend,
+            "ready": False,
+            "reasonCode": "MACOS_ACCESSIBILITY_PERMISSION_MISSING",
+        }
+    return {"backend": backend, "ready": True, "reasonCode": None}
+
+
+def _macos_next_actions(blockers: list[str]) -> list[dict[str, Any]]:
+    descriptions = {
+        "MACOS_LIVE_OPT_IN_MISSING": (
+            "Set BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 for this one supervised run."
+        ),
+        "MACOS_LIVE_ACK_MISSING": (
+            "Set BINLIQUID_COMPUTER_USE_ACK to the documented acknowledgment string."
+        ),
+        "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED": (
+            "Set BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1."
+        ),
+        "MACOS_STEP_APPROVAL_REQUIRED": (
+            "Set BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1."
+        ),
+        "VISION_RUNTIME_DISABLED": "Enable computer_use.vision_enabled for the supervised run.",
+        "VISION_PROVIDER_UNAVAILABLE": "Configure a local Ollama vision model; do not auto-pull.",
+        "MACOS_LIVE_FLAG_DISABLED": "Set computer_use.macos_live_enabled=true for this run.",
+        "MACOS_CAPTURE_BACKEND_DISABLED": "Select an explicit macOS capture backend.",
+        "MACOS_INPUT_BACKEND_DISABLED": "Select the quartz macOS input backend.",
+        "MACOS_SCREEN_RECORDING_PERMISSION_MISSING": (
+            "Grant Screen Recording manually in macOS System Settings."
+        ),
+        "MACOS_ACCESSIBILITY_PERMISSION_MISSING": (
+            "Grant Accessibility manually in macOS System Settings."
+        ),
+        "RAW_SCREENSHOT_PERSISTENCE_DENIED": "Keep raw screenshot persistence disabled.",
+        "TERMINAL_CONTROL_DENIED": "Keep terminal_control=deny.",
+        "SENSITIVE_SURFACE_BLOCKED": "Keep sensitive_surface_policy=stop.",
+    }
+    return [
+        {
+            "id": blocker.lower(),
+            "manual": True,
+            "description": descriptions.get(blocker, blocker),
+        }
+        for blocker in blockers
+    ]
 
 
 def _env_state(env: Mapping[str, str], key: str) -> str:

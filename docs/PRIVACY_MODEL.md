@@ -53,6 +53,7 @@ Provider output is treated as untrusted observed content. Screen text is not acc
 - The platform matrix requires raw screenshot persistence to remain disabled by default.
 - Platform qualification reports may reference evidence, but must not require persisted raw screenshots for the default gate.
 - Operator capability payloads expose readiness, blockers, and hashes, not screen captures.
-- Phase 4B macOS fixture reports store local fixture paths, redacted event logs,
-  hash-chain audit metadata, and `rawScreenshotPersistedCount=0`; they do not
-  store raw screenshots.
+- macOS fixture reports store local fixture paths, redacted event logs,
+  hash-chain audit metadata, opt-in metadata, and
+  `rawScreenshotPersistedCount=0`; they do not store raw screenshots by
+  default.

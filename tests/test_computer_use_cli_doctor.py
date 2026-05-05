@@ -49,12 +49,16 @@ def test_computer_use_doctor_macos_shape_reports_exact_fail_closed_blockers() ->
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["platform"] == "macos"
-    assert payload["stage"] == "not_configured"
+    assert payload["stage"] == "blocked"
     assert payload["liveEnabled"] is False
-    assert payload["reasonCode"] == "MACOS_LIVE_FLAG_DISABLED"
+    assert payload["reasonCode"] == "MACOS_LIVE_OPT_IN_MISSING"
+    assert payload["optIn"]["present"] is False
+    assert payload["optIn"]["required"] is True
+    assert payload["nextActions"]
     assert payload["permissions"]["screenRecording"] in {"granted", "missing", "unknown"}
     assert payload["permissions"]["accessibility"] in {"granted", "missing", "unknown"}
     assert payload["provider"]["ready"] is False
+    assert payload["provider"]["kind"] == "none"
     assert payload["capture"]["backend"] == "disabled"
     assert payload["capture"]["reasonCode"] == "MACOS_CAPTURE_BACKEND_DISABLED"
     assert payload["input"]["backend"] == "disabled"
@@ -148,11 +152,23 @@ def test_macos_live_qualification_run_blocks_without_explicit_opt_in(tmp_path) -
     report = json.loads(output.read_text(encoding="utf-8"))
     assert payload["status"] == "blocked"
     assert report["status"] == "blocked"
+    assert report["qualificationStatus"] == "blocked"
+    assert report["qualificationPassed"] is False
+    assert report["fixtureQualified"] is False
+    assert report["productionQualified"] is False
+    assert report["liveEnabledDefault"] is False
     assert report["stage"] == "blocked"
     assert report["scope"] == "supervised_local_fixtures"
     assert report["safety"]["rawScreenshotPersistedCount"] == 0
+    assert report["safety"]["replayIntegrityVerified"] is True
     assert report["artifacts"]["rawScreenshotCount"] == 0
     assert "MACOS_LIVE_OPT_IN_MISSING" in report["blockers"]
+    assert "MACOS_LIVE_ACK_MISSING" in report["blockers"]
+    assert "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED" in report["blockers"]
+    assert "MACOS_STEP_APPROVAL_REQUIRED" in report["blockers"]
+    assert "MACOS_CAPTURE_BACKEND_DISABLED" in report["blockers"]
+    assert "MACOS_INPUT_BACKEND_DISABLED" in report["blockers"]
+    assert report["optIn"]["present"] is False
     assert {fixture["id"] for fixture in report["fixtures"]} == {
         "local_browser_form",
         "textedit_safe_typing",
@@ -163,7 +179,40 @@ def test_macos_live_qualification_run_blocks_without_explicit_opt_in(tmp_path) -
     assert all(fixture["status"] == "skipped" for fixture in report["fixtures"])
 
 
-def test_macos_qualification_replay_verify_fails_closed_for_blocked_report(tmp_path) -> None:
+def test_macos_live_qualification_run_blocks_without_acknowledgment(tmp_path) -> None:
+    output = tmp_path / "macos_qualification_report.json"
+    result = runner.invoke(
+        app,
+        [
+            "computer-use",
+            "qualification",
+            "run",
+            "--profile",
+            "balanced",
+            "--platform",
+            "macos",
+            "--suite",
+            "live-fixture-smoke",
+            "--mode",
+            "preflight",
+            "--output",
+            str(output),
+            "--json",
+        ],
+        env={
+            "BINLIQUID_COMPUTER_USE_LIVE_MACOS": "1",
+            "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY": "1",
+            "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL": "1",
+        },
+    )
+
+    assert result.exit_code == 0
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["qualificationStatus"] == "blocked"
+    assert "MACOS_LIVE_ACK_MISSING" in report["blockers"]
+
+
+def test_macos_qualification_replay_verify_passes_integrity_for_blocked_report(tmp_path) -> None:
     output = tmp_path / "macos_qualification_report.json"
     run_result = runner.invoke(
         app,
@@ -198,12 +247,16 @@ def test_macos_qualification_replay_verify_fails_closed_for_blocked_report(tmp_p
         ],
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["verified"] is False
+    assert payload["verified"] is True
+    assert payload["qualificationStatus"] == "blocked"
+    assert payload["qualificationPassed"] is False
+    assert payload["replayIntegrityVerified"] is True
+    assert payload["auditHashChainVerified"] is True
     assert payload["checks"]["raw_screenshot_policy"] is True
     assert payload["checks"]["hash_chain_verified"] is True
-    assert payload["checks"]["report_status_pass"] is False
+    assert payload["checks"]["audit_hash_chain_verified"] is True
 
 
 def test_all_profiles_keep_computer_use_defaults_fail_closed() -> None:

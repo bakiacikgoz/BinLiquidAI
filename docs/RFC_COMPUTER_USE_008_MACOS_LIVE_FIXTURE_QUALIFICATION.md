@@ -20,15 +20,17 @@ qualified for live execution.
 
 ## Required Opt-In
 
-The live fixture command must see both environment values:
+The live fixture command must see explicit one-run opt-in values:
 
 ```text
-BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC
 BINLIQUID_COMPUTER_USE_LIVE_MACOS=1
+BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1
+BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1
+BINLIQUID_COMPUTER_USE_ACK=I understand BinLiquid will control my macOS desktop only for local supervised fixtures.
 ```
 
-Without those exact values, the report is `blocked` and all fixtures remain
-`skipped`.
+Without those exact values, the report is `blocked`, `qualificationPassed=false`,
+and all fixtures remain `skipped`.
 
 ## Report And Replay
 
@@ -52,9 +54,9 @@ uv run binliquid computer-use replay \
   --json
 ```
 
-For blocked reports this command exits non-zero because `report_status_pass` is
-false, while policy checks such as raw screenshot persistence and hash-chain
-integrity may still pass.
+For blocked reports this command may exit zero when replay/audit integrity is
+valid. Qualification status and replay integrity are separate dimensions:
+`qualificationPassed=false` can coexist with `replayIntegrityVerified=true`.
 
 ## Operator Stages
 

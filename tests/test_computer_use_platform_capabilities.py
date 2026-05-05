@@ -79,4 +79,6 @@ def test_macos_qualified_report_without_live_flag_is_fixture_qualified() -> None
 
     assert capability.stage == "fixture_qualified"
     assert capability.live_enabled is False
-    assert capability.reason_code == "MACOS_LIVE_FLAG_DISABLED"
+    assert capability.fixture_qualified is True
+    assert capability.production_qualified is False
+    assert capability.reason_code == "MACOS_FIXTURE_QUALIFIED_DEFAULT_DISABLED"

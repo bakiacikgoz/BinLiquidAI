@@ -108,6 +108,11 @@
           "title": "Failclosed",
           "type": "boolean"
         },
+        "fixtureQualified": {
+          "default": false,
+          "title": "Fixturequalified",
+          "type": "boolean"
+        },
         "inputBackend": {
           "title": "Inputbackend",
           "type": "string"
@@ -131,6 +136,11 @@
           ],
           "title": "Platform",
           "type": "string"
+        },
+        "productionQualified": {
+          "default": false,
+          "title": "Productionqualified",
+          "type": "boolean"
         },
         "provider": {
           "title": "Provider",
@@ -168,6 +178,7 @@
             "qualified_available",
             "permission_ready",
             "provider_ready",
+            "ready_for_live_fixture",
             "fixture_qualified",
             "qualified_limited",
             "enabled",
@@ -282,6 +293,7 @@
             "qualified_available",
             "permission_ready",
             "provider_ready",
+            "ready_for_live_fixture",
             "fixture_qualified",
             "qualified_limited",
             "enabled",

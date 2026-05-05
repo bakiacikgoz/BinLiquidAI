@@ -69,8 +69,10 @@ It does not claim that evidence already exists.
 
 macOS can move to `fixture_qualified` after a fresh matching supervised local
 fixture report, but live execution still remains off until explicit config
-enablement and current doctor pass. `qualified_limited` is the only macOS stage
-that may expose `liveEnabled=true`.
+enablement and current doctor pass. Phase 4C separates
+`qualificationPassed=false` from `replayIntegrityVerified=true` for blocked
+preflight reports, so no-op evidence can be audit-valid without being
+qualification-valid.
 
 Deterministic mock qualification is useful for CI contracts. It is not proof of
 real-world desktop reliability.

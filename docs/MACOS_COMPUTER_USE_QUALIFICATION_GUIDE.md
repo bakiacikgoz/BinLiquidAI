@@ -44,8 +44,10 @@ uv run binliquid computer-use doctor --platform macos --json
 Run live qualification only on a prepared, supervised local desktop:
 
 ```bash
-BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC \
 BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 \
+BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1 \
+BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1 \
+BINLIQUID_COMPUTER_USE_ACK="I understand BinLiquid will control my macOS desktop only for local supervised fixtures." \
 uv run binliquid computer-use qualification run \
   --platform macos \
   --suite live-fixture-smoke \
@@ -54,9 +56,21 @@ uv run binliquid computer-use qualification run \
   --json
 ```
 
-If the explicit opt-in or any readiness gate is missing, the command writes a
-blocked report with local fixture metadata only. It does not request permissions,
-grant permissions, persist raw screenshots, or enable live runtime execution.
+Run preflight first when preparing a host:
+
+```bash
+uv run binliquid computer-use qualification run \
+  --platform macos \
+  --suite live-fixture-smoke \
+  --mode preflight \
+  --output artifacts/computer_use/macos_qualification_report.json \
+  --json
+```
+
+If the explicit opt-in, acknowledgment, supervised-fixture scope, step approval,
+or any readiness gate is missing, the command writes a blocked report with local
+fixture metadata only. It does not request permissions, grant permissions,
+persist raw screenshots, or enable live runtime execution.
 
 Verify report replay integrity separately:
 
@@ -68,5 +82,7 @@ uv run binliquid computer-use replay \
 ```
 
 A fresh passing report without `macos_live_enabled=true` may report
-`fixture_qualified`; `liveEnabled=true` is limited to `qualified_limited` after
-all local fixture, provider, permission, config, commit, and safety gates pass.
+`fixture_qualified` with `fixtureQualified=true`, `productionQualified=false`,
+and `liveEnabled=false` by default. macOS supervised local fixture
+qualification is not unrestricted desktop automation, and it does not qualify
+Windows or Linux live computer-use.

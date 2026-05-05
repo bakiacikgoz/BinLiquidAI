@@ -30,6 +30,7 @@ PlatformStage = Literal[
     "qualified_available",
     "permission_ready",
     "provider_ready",
+    "ready_for_live_fixture",
     "fixture_qualified",
     "qualified_limited",
     "enabled",
@@ -60,6 +61,8 @@ class PlatformCapability(BaseModel):
     summary: str | None = None
     blockers: list[str] = Field(default_factory=list)
     qualification_status: str = Field(default="missing", alias="qualificationStatus")
+    fixture_qualified: bool = Field(default=False, alias="fixtureQualified")
+    production_qualified: bool = Field(default=False, alias="productionQualified")
     environment: dict[str, str] = Field(default_factory=dict)
 
 
@@ -119,6 +122,7 @@ def build_platform_capability(
 
     qualification_status = "missing"
     qualification_allowed = False
+    fixture_qualified = False
     if qualification_report is not None:
         validation = validate_platform_qualification_report(
             qualification_report,
@@ -128,6 +132,9 @@ def build_platform_capability(
         )
         qualification_status = validation.status
         qualification_allowed = validation.allowed
+        fixture_qualified = (
+            normalized_platform == ComputerUsePlatform.MACOS and validation.allowed
+        )
         blockers.extend(validation.blockers)
     elif live_requested and config.platform_qualification_required:
         blockers.append("VISION_PLATFORM_QUALIFICATION_MISSING")
@@ -153,7 +160,7 @@ def build_platform_capability(
         and not _platform_live_flag(config, normalized_platform)
     ):
         stage = "fixture_qualified"
-        reason_code = "MACOS_LIVE_FLAG_DISABLED"
+        reason_code = "MACOS_FIXTURE_QUALIFIED_DEFAULT_DISABLED"
     else:
         stage = "not_qualified"
         reason_code = PLATFORM_REASON_CODES[normalized_platform]
@@ -176,6 +183,8 @@ def build_platform_capability(
         summary=_summary(normalized_platform, live_enabled, provider_configured),
         blockers=_unique(blockers),
         qualificationStatus=qualification_status,
+        fixtureQualified=fixture_qualified,
+        productionQualified=False,
         environment=_environment_snapshot(normalized_platform, env),
     )
 

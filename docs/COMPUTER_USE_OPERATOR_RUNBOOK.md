@@ -31,7 +31,7 @@ uv run binliquid computer-use qualification verify \
   --json
 ```
 
-Replay/audit verification for the Phase 4B macOS report is separate:
+Replay/audit verification for the macOS qualification report is separate:
 
 ```bash
 uv run binliquid computer-use replay \
@@ -40,16 +40,20 @@ uv run binliquid computer-use replay \
   --json
 ```
 
-The live fixture command requires both:
+The live fixture command requires all of:
 
 ```text
-BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=I_UNDERSTAND_THIS_CONTROLS_MY_MAC
 BINLIQUID_COMPUTER_USE_LIVE_MACOS=1
+BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1
+BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1
+BINLIQUID_COMPUTER_USE_ACK=I understand BinLiquid will control my macOS desktop only for local supervised fixtures.
 ```
 
 Without those values and a ready local provider, permissions, backends, matching
 commit/config hash, and safety defaults, macOS remains blocked and
-`liveEnabled=false`.
+`liveEnabled=false`. Blocked preflight reports can still replay-verify
+successfully for audit integrity; qualification pass/fail is reported
+separately as `qualificationPassed`.
 
 ## Stop Conditions
 

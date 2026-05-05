@@ -1705,7 +1705,7 @@ def computer_use_qualification_run(
     profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
     platform: str = typer.Option("macos", "--platform", help="macos"),
     suite: str = typer.Option("live-fixture-smoke", "--suite", help="Qualification suite"),
-    mode: str = typer.Option("supervised", "--mode", help="supervised"),
+    mode: str = typer.Option("supervised", "--mode", help="preflight|supervised"),
     output: str = typer.Option(
         "artifacts/computer_use/macos_qualification_report.json",
         "--output",
@@ -1727,8 +1727,8 @@ def computer_use_qualification_run(
         )
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
         return
-    if mode.strip().lower() != "supervised":
-        raise typer.BadParameter("mode must be supervised for macOS live qualification")
+    if mode.strip().lower() not in {"preflight", "supervised"}:
+        raise typer.BadParameter("mode must be preflight or supervised for macOS qualification")
     config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
     report_payload = run_macos_live_qualification(
         config=config.computer_use,

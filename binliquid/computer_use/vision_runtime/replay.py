@@ -115,10 +115,12 @@ def verify_qualification_report_replay(report_path: Path) -> dict[str, Any]:
     checks = {
         "event_log_present": False,
         "hash_chain_verified": False,
+        "step_index_monotonic": False,
+        "audit_log_present": False,
+        "audit_hash_chain_verified": False,
         "raw_screenshot_policy": False,
         "sensitive_surface_no_input": False,
         "terminal_no_execution": False,
-        "report_status_pass": False,
     }
     if not report_path.exists():
         errors.append("qualification report missing")
@@ -126,6 +128,11 @@ def verify_qualification_report_replay(report_path: Path) -> dict[str, Any]:
             "artifact_version": "computer_use_qualification_replay_verification/v1",
             "reportPath": str(report_path),
             "verified": False,
+            "qualificationStatus": "missing",
+            "qualificationPassed": False,
+            "replayIntegrityStatus": "failed",
+            "replayIntegrityVerified": False,
+            "auditHashChainVerified": False,
             "checks": checks,
             "errors": errors,
         }
@@ -133,6 +140,8 @@ def verify_qualification_report_replay(report_path: Path) -> dict[str, Any]:
     report = json.loads(report_path.read_text(encoding="utf-8"))
     artifacts = report.get("artifacts") if isinstance(report.get("artifacts"), dict) else {}
     event_log_path = _resolve_artifact_path(report_path, artifacts.get("eventLogPath"))
+    events: list[dict[str, Any]] = []
+    last_hash = ""
     if event_log_path is None or not event_log_path.exists():
         errors.append("qualification event log missing")
     else:
@@ -150,9 +159,30 @@ def verify_qualification_report_replay(report_path: Path) -> dict[str, Any]:
                 hash_ok = False
                 break
             previous = str(event.get("hash") or "")
+        last_hash = previous
         checks["hash_chain_verified"] = hash_ok and bool(events)
         if not checks["hash_chain_verified"]:
             errors.append("qualification hash_chain verification failed")
+        indices = [int(event.get("step_index", -1)) for event in events]
+        checks["step_index_monotonic"] = indices == sorted(indices) and all(
+            index >= 0 for index in indices
+        )
+        if not checks["step_index_monotonic"]:
+            errors.append("qualification event order verification failed")
+
+    audit_path = _resolve_artifact_path(report_path, artifacts.get("auditPath"))
+    if audit_path is None or not audit_path.exists():
+        errors.append("qualification audit log missing")
+    else:
+        checks["audit_log_present"] = True
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+        checks["audit_hash_chain_verified"] = (
+            audit.get("event_count") == len(events)
+            and audit.get("last_hash") == last_hash
+            and audit.get("redacted") is True
+        )
+        if not checks["audit_hash_chain_verified"]:
+            errors.append("qualification audit hash-chain verification failed")
 
     safety = report.get("safety") if isinstance(report.get("safety"), dict) else {}
     raw_count = safety.get(
@@ -201,16 +231,26 @@ def verify_qualification_report_replay(report_path: Path) -> dict[str, Any]:
     if not checks["terminal_no_execution"]:
         errors.append("terminal fixture allowed execution")
 
-    checks["report_status_pass"] = report.get("status") == "pass"
-    if not checks["report_status_pass"]:
-        errors.append("qualification report status is not pass")
+    qualification_status = str(
+        report.get("qualificationStatus")
+        or _qualification_status_from_report_status(report.get("status"))
+    )
+    qualification_passed = bool(
+        report.get("qualificationPassed", qualification_status == "passed")
+    )
+    integrity_verified = all(checks.values())
 
     return {
         "artifact_version": "computer_use_qualification_replay_verification/v1",
         "reportPath": str(report_path),
         "status": report.get("status"),
         "stage": report.get("stage"),
-        "verified": all(checks.values()),
+        "qualificationStatus": qualification_status,
+        "qualificationPassed": qualification_passed,
+        "replayIntegrityStatus": "passed" if integrity_verified else "failed",
+        "replayIntegrityVerified": integrity_verified,
+        "auditHashChainVerified": checks["audit_hash_chain_verified"],
+        "verified": integrity_verified,
         "checks": checks,
         "errors": errors,
     }
@@ -241,3 +281,13 @@ def _resolve_artifact_path(report_path: Path, value: object) -> Path | None:
     if cwd_candidate.exists():
         return cwd_candidate
     return report_path.parent / path
+
+
+def _qualification_status_from_report_status(value: object) -> str:
+    if value == "pass":
+        return "passed"
+    if value == "fail":
+        return "failed"
+    if value == "skipped":
+        return "skipped"
+    return "blocked"

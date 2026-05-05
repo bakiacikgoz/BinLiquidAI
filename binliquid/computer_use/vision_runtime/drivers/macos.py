@@ -25,6 +25,7 @@ from binliquid.computer_use.vision_runtime.platforms import (
     build_platform_capability,
 )
 from binliquid.computer_use.vision_runtime.qualification import (
+    macos_opt_in_state,
     validate_platform_qualification_report,
 )
 from binliquid.runtime.config import ComputerUseRuntimeConfig
@@ -84,6 +85,7 @@ class MacOSVisionReadiness:
     ) -> dict[str, Any]:
         platform = platform_info or current_platform()
         env = dict(environment or {})
+        opt_in = macos_opt_in_state(env)
         checks: list[dict[str, Any]] = []
         if platform.label != "macos":
             reason = (
@@ -121,6 +123,7 @@ class MacOSVisionReadiness:
                 ),
                 capture={"backend": "disabled", "ready": False},
                 input_state={"backend": "disabled", "ready": False},
+                opt_in=opt_in,
                 qualification=_qualification_payload(
                     required=True,
                     present=False,
@@ -159,6 +162,52 @@ class MacOSVisionReadiness:
             commit=commit,
         )
 
+        checks.append(
+            _check(
+                "macos_live_opt_in",
+                bool(opt_in["present"]),
+                None if opt_in["present"] else "MACOS_LIVE_OPT_IN_MISSING",
+                "Explicit macOS live fixture opt-in is present."
+                if opt_in["present"]
+                else "Explicit macOS live fixture opt-in is missing.",
+                "Set the documented one-run macOS live fixture opt-in environment values.",
+            )
+        )
+        checks.append(
+            _check(
+                "macos_live_ack",
+                bool(opt_in["acknowledged"]),
+                None if opt_in["acknowledged"] else "MACOS_LIVE_ACK_MISSING",
+                "The operator acknowledgment is present."
+                if opt_in["acknowledged"]
+                else "The operator acknowledgment is missing.",
+                "Set BINLIQUID_COMPUTER_USE_ACK for this supervised local fixture run.",
+            )
+        )
+        checks.append(
+            _check(
+                "supervised_fixture_only",
+                bool(opt_in["supervisedFixtureOnly"]),
+                None
+                if opt_in["supervisedFixtureOnly"]
+                else "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED",
+                "The run is scoped to supervised local fixtures."
+                if opt_in["supervisedFixtureOnly"]
+                else "The run is not scoped to supervised local fixtures.",
+                "Set BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1.",
+            )
+        )
+        checks.append(
+            _check(
+                "step_approval_required",
+                bool(opt_in["stepApprovalRequired"]),
+                None if opt_in["stepApprovalRequired"] else "MACOS_STEP_APPROVAL_REQUIRED",
+                "Step approval is required for the run."
+                if opt_in["stepApprovalRequired"]
+                else "Step approval is not explicitly required for the run.",
+                "Set BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1.",
+            )
+        )
         checks.append(
             _check(
                 "vision_enabled",
@@ -255,6 +304,7 @@ class MacOSVisionReadiness:
             qualification=qualification,
             screen_recording=screen_recording,
             accessibility=accessibility,
+            opt_in=opt_in,
         )
         return self._report(
             platform.label,
@@ -270,6 +320,7 @@ class MacOSVisionReadiness:
             provider=provider,
             capture=capture,
             input_state=input_state,
+            opt_in=opt_in,
             qualification=qualification,
         )
 
@@ -285,8 +336,10 @@ class MacOSVisionReadiness:
         provider: dict[str, Any],
         capture: dict[str, Any],
         input_state: dict[str, Any],
+        opt_in: dict[str, Any],
         qualification: dict[str, Any],
     ) -> dict[str, Any]:
+        blockers = _blockers_from_checks(checks)
         return {
             "runtime": "computer_use_vision",
             "platform": platform,
@@ -297,6 +350,7 @@ class MacOSVisionReadiness:
             "provider": provider,
             "capture": capture,
             "input": input_state,
+            "optIn": opt_in,
             "qualification": qualification,
             "safety": {
                 "privacyMode": True,
@@ -304,10 +358,13 @@ class MacOSVisionReadiness:
                 "rawScreenshotMaxCount": 0,
                 "terminalPolicy": "deny",
                 "sensitiveSurfacePolicy": "stop",
+                "stepApprovalRequired": True,
+                "supervisedFixtureOnly": True,
                 "approvalFreshnessEnforced": True,
                 "replayIntegrityEnforced": True,
             },
             "live_execution_allowed": live_enabled,
+            "nextActions": _next_actions(blockers),
             "checks": checks,
         }
 
@@ -341,6 +398,7 @@ def _provider_payload(
 ) -> dict[str, Any]:
     return {
         "configured": configured,
+        "kind": name,
         "name": name,
         "model": model,
         "strictJson": strict_json,
@@ -529,13 +587,26 @@ def _derive_stage(
     qualification: Mapping[str, Any],
     screen_recording: str,
     accessibility: str,
+    opt_in: Mapping[str, Any],
 ) -> tuple[str, bool, str | None]:
-    if config.raw_screenshot_persistence or config.raw_screenshot_max_count != 0:
+    if (
+        config.raw_screenshot_persistence
+        or config.raw_screenshot_retention != "disabled"
+        or config.raw_screenshot_max_count != 0
+    ):
         return "blocked", False, "RAW_SCREENSHOT_PERSISTENCE_DENIED"
     if config.terminal_control != "deny":
         return "blocked", False, "TERMINAL_CONTROL_DENIED"
     if config.sensitive_surface_policy != "stop":
         return "blocked", False, "SENSITIVE_SURFACE_BLOCKED"
+    if not opt_in.get("present"):
+        return "blocked", False, "MACOS_LIVE_OPT_IN_MISSING"
+    if not opt_in.get("acknowledged"):
+        return "blocked", False, "MACOS_LIVE_ACK_MISSING"
+    if not opt_in.get("supervisedFixtureOnly"):
+        return "blocked", False, "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED"
+    if not opt_in.get("stepApprovalRequired"):
+        return "blocked", False, "MACOS_STEP_APPROVAL_REQUIRED"
     if not config.macos_live_enabled:
         stage = "fixture_qualified" if qualification.get("fresh") else "not_configured"
         return stage, False, "MACOS_LIVE_FLAG_DISABLED"
@@ -556,6 +627,51 @@ def _derive_stage(
     if not config.macos_live_enabled:
         return "fixture_qualified", False, "MACOS_LIVE_FLAG_DISABLED"
     return "qualified_limited", True, None
+
+
+def _blockers_from_checks(checks: list[dict[str, Any]]) -> list[str]:
+    blockers: list[str] = []
+    for check in checks:
+        if check.get("ok") is True:
+            continue
+        reason = check.get("reason_code")
+        if isinstance(reason, str) and reason not in blockers:
+            blockers.append(reason)
+    return blockers
+
+
+def _next_actions(blockers: list[str]) -> list[dict[str, Any]]:
+    descriptions = {
+        "MACOS_LIVE_OPT_IN_MISSING": (
+            "Set the documented macOS live fixture opt-in values for one supervised run."
+        ),
+        "MACOS_LIVE_ACK_MISSING": (
+            "Set BINLIQUID_COMPUTER_USE_ACK to the documented acknowledgment string."
+        ),
+        "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED": (
+            "Set BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1."
+        ),
+        "MACOS_STEP_APPROVAL_REQUIRED": "Set BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1.",
+        "VISION_RUNTIME_DISABLED": "Enable computer_use.vision_enabled for the run.",
+        "VISION_PROVIDER_UNAVAILABLE": "Configure a local Ollama vision model.",
+        "MACOS_LIVE_FLAG_DISABLED": "Set computer_use.macos_live_enabled=true for the run.",
+        "MACOS_CAPTURE_BACKEND_DISABLED": "Select an explicit macOS capture backend.",
+        "MACOS_INPUT_BACKEND_DISABLED": "Select the quartz macOS input backend.",
+        "MACOS_SCREEN_RECORDING_PERMISSION_MISSING": (
+            "Grant Screen Recording manually in macOS System Settings."
+        ),
+        "MACOS_ACCESSIBILITY_PERMISSION_MISSING": (
+            "Grant Accessibility manually in macOS System Settings."
+        ),
+    }
+    return [
+        {
+            "id": blocker.lower(),
+            "manual": True,
+            "description": descriptions.get(blocker, blocker),
+        }
+        for blocker in blockers
+    ]
 
 
 class MacOSScreenCaptureProvider:
