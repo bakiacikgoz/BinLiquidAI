@@ -1,0 +1,9 @@
+{
+  "fixture_id": "macos_supervised_v2_gate_blocked",
+  "current_platform": "windows",
+  "files": {},
+  "expected": {
+    "status": "blocked",
+    "blocking_reason": "MACOS_LIVE_QUALIFICATION_NOT_RUN_IN_THIS_ENV"
+  }
+}

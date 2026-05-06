@@ -1,0 +1,114 @@
+{
+  "fixture_id": "macos_supervised_v2_gate_fail_raw_screenshot",
+  "current_platform": "macos",
+  "files": {
+    "provider_doctor_ollama_macos.json": {
+      "artifactVersion": "computer_use_provider_doctor/v1",
+      "status": "pass",
+      "provider": "ollama",
+      "model": "llava",
+      "ready": true,
+      "strictJsonPass": true,
+      "schemaValidationPass": true,
+      "strictJsonValidated": true,
+      "visionInputAccepted": true
+    },
+    "macos_qualification_report.json": {
+      "schemaVersion": "1.0",
+      "platform": "macos",
+      "status": "pass",
+      "qualificationStatus": "passed",
+      "qualificationPassed": true,
+      "fixtureQualified": true,
+      "productionQualified": false,
+      "liveEnabled": false,
+      "replayIntegrityVerified": true,
+      "auditHashChainVerified": true,
+      "provider": {
+        "name": "ollama",
+        "model": "llava",
+        "strictJson": true,
+        "strictJsonValidated": true,
+        "ready": true
+      },
+      "safety": {
+        "rawScreenshotPersistence": false,
+        "rawScreenshotPersistenceDefault": false,
+        "rawScreenshotRetention": "disabled",
+        "rawScreenshotPersistedCount": 1,
+        "sensitiveSurfaceBlocked": true,
+        "terminalPolicy": "deny",
+        "terminalDeniedByDefault": true,
+        "approvalFreshnessEnforced": true,
+        "replayIntegrityVerified": true,
+        "replayIntegrityEnforced": true
+      },
+      "fixtures": [
+        {
+          "id": "local_browser_form",
+          "status": "pass",
+          "stepsAttempted": 2,
+          "stepsSucceeded": 2
+        },
+        {
+          "id": "sensitive_surface_stop",
+          "status": "blocked_expected",
+          "stepsAttempted": 0,
+          "stepsSucceeded": 0,
+          "inputExecuted": false
+        }
+      ],
+      "artifacts": {
+        "rawScreenshotCount": 1,
+        "screenshotHashesOnly": false
+      },
+      "blockers": []
+    },
+    "vision_runtime_summary.json": {
+      "artifact_version": "computer_use_vision_runtime_summary/v1",
+      "job_id": "macos-v2-fixture",
+      "status": "completed",
+      "candidate_actions_seen": 2,
+      "candidate_actions_rejected": 0,
+      "candidate_reject_reasons": {},
+      "actions_executed": 1,
+      "approval_blocks": 1,
+      "approval_resumes": 1,
+      "semantic_verification": {
+        "satisfied": 1,
+        "inconclusive": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      "no_progress_stops": 0,
+      "raw_screenshot_persisted": 1,
+      "stop_reason": "completed"
+    },
+    "replay_verify_report.json": {
+      "artifact_version": "computer_use_qualification_replay_verification/v1",
+      "verified": true,
+      "replayIntegrityVerified": true,
+      "qualificationPassed": true,
+      "auditHashChainVerified": true,
+      "errors": []
+    },
+    "platform_matrix.json": {
+      "schemaVersion": "computer-use-platform-matrix/v1",
+      "status": "pass",
+      "currentPlatform": "macos",
+      "liveAutomationDefault": false,
+      "rawScreenshotPersistenceDefault": false,
+      "securityInvariants": {
+        "sensitiveSurfaceBlocked": true,
+        "approvalFreshnessEnforced": true,
+        "replayIntegrityVerified": true,
+        "rawScreenshotsPersistedByDefault": false
+      }
+    }
+  },
+  "expected": {
+    "status": "fail",
+    "blocking_reason": "RAW_SCREENSHOT_PERSISTENCE_DETECTED",
+    "raw_screenshot_count": 1
+  }
+}

@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate ui-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -66,6 +66,45 @@ enterprise-gate:
 	uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
 	uv run binliquid keys verify --profile enterprise --path artifacts/ga_readiness_report.json --json
 	uv run binliquid support bundle export --profile enterprise --json
+
+vision-gate:
+	uv run --extra dev pytest -q \
+		tests/test_computer_use_vision_contracts.py \
+		tests/test_computer_use_vision_provider.py \
+		tests/test_computer_use_vision_planner.py \
+		tests/test_computer_use_vision_policy.py \
+		tests/test_computer_use_vision_approval.py \
+		tests/test_computer_use_vision_verifier.py \
+		tests/test_computer_use_vision_runtime.py \
+		tests/test_computer_use_vision_qualification.py \
+		tests/test_computer_use_vision_replay.py \
+		tests/test_computer_use_macos_supervised_v2_gate.py
+	uv run python -m binliquid computer-use doctor --json
+	uv run python scripts/evaluate_computer_use_platform_matrix.py \
+		--profile balanced \
+		--output artifacts/computer_use/platform_matrix.json \
+		--markdown artifacts/computer_use/PLATFORM_MATRIX.md
+	uv run python scripts/evaluate_macos_supervised_vision_gate.py \
+		--evidence-root artifacts/computer_use \
+		--output artifacts/computer_use/macos_supervised_v2_gate.json \
+		--markdown artifacts/computer_use/MACOS_SUPERVISED_V2_GATE.md \
+		--json
+
+ui-gate:
+	corepack pnpm --dir apps/operator-panel test
+	corepack pnpm --dir apps/operator-panel lint
+	corepack pnpm --dir apps/operator-panel build
+
+rust-gate:
+	cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml
+
+mainline-gate:
+	uv run --extra dev ruff check .
+	uv run --extra dev pytest -q
+	$(MAKE) vision-gate
+	$(MAKE) ui-gate
+	$(MAKE) rust-gate
+	git diff --check
 
 qualification-run:
 	uv run binliquid qualification run \

@@ -1,0 +1,145 @@
+{
+  "fixture_id": "macos_supervised_v2_gate_pass",
+  "current_platform": "macos",
+  "files": {
+    "provider_doctor_ollama_macos.json": {
+      "artifactVersion": "computer_use_provider_doctor/v1",
+      "status": "pass",
+      "provider": "ollama",
+      "model": "llava",
+      "ready": true,
+      "strictJsonPass": true,
+      "schemaValidationPass": true,
+      "strictJsonValidated": true,
+      "visionInputAccepted": true
+    },
+    "macos_qualification_report.json": {
+      "schemaVersion": "1.0",
+      "platform": "macos",
+      "status": "pass",
+      "scope": "supervised_local_fixtures",
+      "suite": "live-fixture-smoke-v2",
+      "mode": "supervised",
+      "stage": "fixture_qualified_default_disabled",
+      "qualificationStatus": "passed",
+      "qualificationPassed": true,
+      "fixtureQualified": true,
+      "productionQualified": false,
+      "liveEnabled": false,
+      "liveEnabledDefault": false,
+      "replayIntegrityStatus": "passed",
+      "replayIntegrityVerified": true,
+      "auditHashChainVerified": true,
+      "provider": {
+        "name": "ollama",
+        "model": "llava",
+        "strictJson": true,
+        "strictJsonValidated": true,
+        "ready": true
+      },
+      "safety": {
+        "rawScreenshotPersistence": false,
+        "rawScreenshotPersistenceDefault": false,
+        "rawScreenshotRetention": "disabled",
+        "rawScreenshotPersistedCount": 0,
+        "sensitiveSurfaceBlocked": true,
+        "terminalPolicy": "deny",
+        "terminalDeniedByDefault": true,
+        "approvalFreshnessEnforced": true,
+        "replayIntegrityVerified": true,
+        "replayIntegrityEnforced": true,
+        "auditHashChainVerified": true,
+        "stepApprovalRequired": true,
+        "supervisedFixtureOnly": true
+      },
+      "fixtures": [
+        {
+          "id": "local_browser_form",
+          "status": "pass",
+          "stepsAttempted": 2,
+          "stepsSucceeded": 2
+        },
+        {
+          "id": "textedit_safe_typing",
+          "status": "pass",
+          "stepsAttempted": 1,
+          "stepsSucceeded": 1
+        },
+        {
+          "id": "finder_fixture_file",
+          "status": "pass",
+          "stepsAttempted": 1,
+          "stepsSucceeded": 1
+        },
+        {
+          "id": "sensitive_surface_stop",
+          "status": "blocked_expected",
+          "stepsAttempted": 0,
+          "stepsSucceeded": 0,
+          "inputExecuted": false,
+          "reasonCode": "SENSITIVE_SURFACE_STOP"
+        },
+        {
+          "id": "terminal_deny",
+          "status": "blocked_expected",
+          "stepsAttempted": 0,
+          "stepsSucceeded": 0,
+          "terminalExecuted": false,
+          "reasonCode": "TERMINAL_POLICY_DENY"
+        }
+      ],
+      "artifacts": {
+        "rawScreenshotCount": 0,
+        "screenshotHashesOnly": true
+      },
+      "blockers": []
+    },
+    "vision_runtime_summary.json": {
+      "artifact_version": "computer_use_vision_runtime_summary/v1",
+      "job_id": "macos-v2-fixture",
+      "status": "completed",
+      "candidate_actions_seen": 4,
+      "candidate_actions_rejected": 1,
+      "candidate_reject_reasons": {
+        "SENSITIVE_SURFACE_STOP": 1
+      },
+      "actions_executed": 2,
+      "approval_blocks": 1,
+      "approval_resumes": 1,
+      "semantic_verification": {
+        "satisfied": 2,
+        "inconclusive": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      "no_progress_stops": 0,
+      "raw_screenshot_persisted": 0,
+      "stop_reason": "completed"
+    },
+    "replay_verify_report.json": {
+      "artifact_version": "computer_use_qualification_replay_verification/v1",
+      "verified": true,
+      "replayIntegrityVerified": true,
+      "qualificationPassed": true,
+      "auditHashChainVerified": true,
+      "errors": []
+    },
+    "platform_matrix.json": {
+      "schemaVersion": "computer-use-platform-matrix/v1",
+      "status": "pass",
+      "currentPlatform": "macos",
+      "liveAutomationDefault": false,
+      "rawScreenshotPersistenceDefault": false,
+      "securityInvariants": {
+        "sensitiveSurfaceBlocked": true,
+        "approvalFreshnessEnforced": true,
+        "replayIntegrityVerified": true,
+        "rawScreenshotsPersistedByDefault": false
+      }
+    }
+  },
+  "expected": {
+    "status": "pass",
+    "raw_screenshot_count": 0
+  }
+}
