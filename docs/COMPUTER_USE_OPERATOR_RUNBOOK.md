@@ -76,6 +76,11 @@ approval before execution.
 The frozen provider response schema is
 `contracts/computer_use/vision_provider_response.schema.json`.
 
+The vision-first loop stops before input execution if the same normalized action
+digest is selected again or if consecutive `wait` actions exceed
+`max_consecutive_wait_actions`. The stop reasons are
+`VISION_REPEATED_ACTION_REJECTED` and `VISION_WAIT_BUDGET_EXCEEDED`.
+
 Preflight writes Phase 4E readiness artifacts:
 
 ```text
@@ -86,4 +91,4 @@ artifacts/computer_use/macos_phase4e_permission_readiness.json
 
 ## Stop Conditions
 
-Stop the run if a sensitive surface appears, an approval is stale, terminal control is requested, or raw screenshot persistence would be required by default.
+Stop the run if a sensitive surface appears, an approval is stale, terminal control is requested, a no-progress loop is detected, or raw screenshot persistence would be required by default.

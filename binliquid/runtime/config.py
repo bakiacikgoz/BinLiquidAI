@@ -183,6 +183,7 @@ class ComputerUseRuntimeConfig(BaseModel):
     default_mode: Literal["dry_run", "step_approval", "execute"] = "step_approval"
     max_steps: int = Field(default=50, ge=1, le=300)
     max_recovery_attempts: int = Field(default=3, ge=0, le=10)
+    max_consecutive_wait_actions: int = Field(default=3, ge=1, le=50)
     screenshot_interval_ms: int = Field(default=750, ge=100, le=10000)
     min_action_confidence: float = Field(default=0.82, ge=0.0, le=1.0)
     min_verification_confidence: float = Field(default=0.80, ge=0.0, le=1.0)
@@ -505,6 +506,9 @@ class RuntimeConfig(BaseModel):
                 default_mode=computer_use_data.get("default_mode", "step_approval"),
                 max_steps=computer_use_data.get("max_steps", 50),
                 max_recovery_attempts=computer_use_data.get("max_recovery_attempts", 3),
+                max_consecutive_wait_actions=computer_use_data.get(
+                    "max_consecutive_wait_actions", 3
+                ),
                 screenshot_interval_ms=computer_use_data.get("screenshot_interval_ms", 750),
                 min_action_confidence=computer_use_data.get("min_action_confidence", 0.82),
                 min_verification_confidence=computer_use_data.get(
@@ -701,6 +705,9 @@ ENV_PATHS: dict[str, str] = {
     "COMPUTER_USE_DEFAULT_MODE": "computer_use.default_mode",
     "COMPUTER_USE_MAX_STEPS": "computer_use.max_steps",
     "COMPUTER_USE_MAX_RECOVERY_ATTEMPTS": "computer_use.max_recovery_attempts",
+    "COMPUTER_USE_MAX_CONSECUTIVE_WAIT_ACTIONS": (
+        "computer_use.max_consecutive_wait_actions"
+    ),
     "COMPUTER_USE_SCREENSHOT_INTERVAL_MS": "computer_use.screenshot_interval_ms",
     "COMPUTER_USE_MIN_ACTION_CONFIDENCE": "computer_use.min_action_confidence",
     "COMPUTER_USE_MIN_VERIFICATION_CONFIDENCE": "computer_use.min_verification_confidence",

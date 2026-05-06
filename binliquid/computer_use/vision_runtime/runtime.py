@@ -7,6 +7,7 @@ from typing import Any
 from binliquid.computer_use.vision_runtime.approval import hash_json
 from binliquid.computer_use.vision_runtime.errors import VisionRuntimeError
 from binliquid.computer_use.vision_runtime.models import (
+    InputActionType,
     StopDecision,
     VerificationResult,
     VisionAction,
@@ -71,6 +72,8 @@ class VisionComputerUseRuntime:
 
         steps: list[VisionStepResult] = []
         recovery_attempts = 0
+        seen_action_digests: set[str] = set()
+        consecutive_wait_actions = 0
         for step_index in range(self.config.max_steps):
             try:
                 before = self.capture.capture()
@@ -151,6 +154,45 @@ class VisionComputerUseRuntime:
                 )
 
             action = action_or_stop
+            action_digest = _hash_json(action.model_dump(mode="json", exclude_none=True))
+            if action_digest in seen_action_digests:
+                step = self._loop_guard_step(
+                    step_index=step_index,
+                    before_hash=before.screenshot_hash,
+                    action=action,
+                    reason_code="VISION_REPEATED_ACTION_REJECTED",
+                )
+                steps.append(step)
+                recorder.record_step(step)
+                envelope = recorder.finalize("failed")
+                return self._artifact(
+                    request=request,
+                    status="failed",
+                    steps=steps,
+                    envelope=envelope,
+                    stop_reason="VISION_REPEATED_ACTION_REJECTED",
+                )
+            if (
+                action.action_type == InputActionType.WAIT
+                and consecutive_wait_actions >= self.config.max_consecutive_wait_actions
+            ):
+                step = self._loop_guard_step(
+                    step_index=step_index,
+                    before_hash=before.screenshot_hash,
+                    action=action,
+                    reason_code="VISION_WAIT_BUDGET_EXCEEDED",
+                )
+                steps.append(step)
+                recorder.record_step(step)
+                envelope = recorder.finalize("failed")
+                return self._artifact(
+                    request=request,
+                    status="failed",
+                    steps=steps,
+                    envelope=envelope,
+                    stop_reason="VISION_WAIT_BUDGET_EXCEEDED",
+                )
+            seen_action_digests.add(action_digest)
             decision = self.policy.classify(action, before, mode=request.mode)
             if decision.denied:
                 step = self._step(
@@ -275,6 +317,10 @@ class VisionComputerUseRuntime:
             )
             steps.append(step)
             recorder.record_step(step)
+            if action.action_type == InputActionType.WAIT:
+                consecutive_wait_actions += 1
+            else:
+                consecutive_wait_actions = 0
             if not verification.verified:
                 if recovery_attempts >= self.config.max_recovery_attempts:
                     envelope = recorder.finalize("failed")
@@ -318,6 +364,29 @@ class VisionComputerUseRuntime:
                 confidence=1.0,
             ),
             decision=decision,
+            execution_status="blocked",
+        )
+
+    def _loop_guard_step(
+        self,
+        *,
+        step_index: int,
+        before_hash: str,
+        action: VisionAction,
+        reason_code: str,
+    ) -> VisionStepResult:
+        return self._step(
+            step_index=step_index,
+            before_hash=before_hash,
+            action=action,
+            decision=VisionPolicyDecision(
+                allowed=False,
+                denied=True,
+                requires_approval=False,
+                reason_code=reason_code,
+                risk_reasons=[reason_code],
+                policy_hash=self.policy.policy_hash,
+            ),
             execution_status="blocked",
         )
 

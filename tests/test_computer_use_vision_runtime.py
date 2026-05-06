@@ -39,12 +39,13 @@ def _observation(hash_char: str = "c") -> VisionObservation:
 
 def _action(
     *,
+    action_id: str = "act-1",
     action_type: InputActionType = InputActionType.WAIT,
     risk_class: RiskClass = RiskClass.LOW,
     requires_approval: bool = False,
 ) -> VisionAction:
     return VisionAction(
-        action_id="act-1",
+        action_id=action_id,
         action_type=action_type,
         target_bbox=NormalizedBBox(x=0.1, y=0.1, w=0.2, h=0.2),
         rationale="Advance deterministic test.",
@@ -234,6 +235,93 @@ def test_runtime_stops_on_semantic_verification_inconclusive(tmp_path) -> None:
     assert artifact.stop_reason == "VISION_VERIFICATION_INCONCLUSIVE"
     assert artifact.steps[0].verification is not None
     assert artifact.steps[0].verification.status == VisionVerificationStatus.INCONCLUSIVE
+
+
+def test_runtime_rejects_repeated_action_digest_before_second_execution(tmp_path) -> None:
+    executor = _Executor()
+    action = _action(action_type=InputActionType.MOVE_MOUSE, risk_class=RiskClass.LOW)
+    runtime = VisionComputerUseRuntime(
+        config=ComputerUseRuntimeConfig(
+            runtime_mode="vision_first",
+            vision_enabled=True,
+            max_steps=3,
+        ),
+        artifact_root=tmp_path,
+        capture=DeterministicScreenCapture(
+            [_observation("c"), _observation("d"), _observation("e")]
+        ),
+        vision=_Interpreter(),
+        planner=DeterministicActionPlanner([action, action]),
+        executor=executor,
+        verifier=DeterministicStepVerifier(
+            [
+                VerificationResult(
+                    verified=True,
+                    confidence=0.9,
+                    status=VisionVerificationStatus.SATISFIED,
+                    reason_code="VISION_VERIFICATION_SATISFIED",
+                )
+            ]
+        ),
+    )
+
+    artifact = runtime.run(
+        VisionRunRequest(
+            job_id="job-repeated-action",
+            objective="Click once",
+            mode=ComputerUseMode.EXECUTE,
+        )
+    )
+
+    assert artifact.status == "failed"
+    assert artifact.stop_reason == "VISION_REPEATED_ACTION_REJECTED"
+    assert len(executor.executed) == 1
+
+
+def test_runtime_stops_when_wait_budget_is_exceeded(tmp_path) -> None:
+    executor = _Executor()
+    runtime = VisionComputerUseRuntime(
+        config=ComputerUseRuntimeConfig(
+            runtime_mode="vision_first",
+            vision_enabled=True,
+            max_steps=3,
+            max_consecutive_wait_actions=1,
+        ),
+        artifact_root=tmp_path,
+        capture=DeterministicScreenCapture(
+            [_observation("c"), _observation("c"), _observation("c")]
+        ),
+        vision=_Interpreter(),
+        planner=DeterministicActionPlanner(
+            [
+                _action(action_id="wait-1", action_type=InputActionType.WAIT),
+                _action(action_id="wait-2", action_type=InputActionType.WAIT),
+            ]
+        ),
+        executor=executor,
+        verifier=DeterministicStepVerifier(
+            [
+                VerificationResult(
+                    verified=True,
+                    confidence=0.75,
+                    status=VisionVerificationStatus.SKIPPED,
+                    reason_code="VISION_VERIFICATION_SKIPPED",
+                )
+            ]
+        ),
+    )
+
+    artifact = runtime.run(
+        VisionRunRequest(
+            job_id="job-wait-budget",
+            objective="Wait until stable",
+            mode=ComputerUseMode.EXECUTE,
+        )
+    )
+
+    assert artifact.status == "failed"
+    assert artifact.stop_reason == "VISION_WAIT_BUDGET_EXCEEDED"
+    assert len(executor.executed) == 1
 
 
 def test_runner_ollama_vision_first_uses_candidate_action_planner(
