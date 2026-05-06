@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Computer-Use Qualification Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_kind",
+    "platform",
+    "runtime",
+    "suite",
+    "status",
+    "reason_codes",
+    "generated_at",
+    "expires_at",
+    "source_commit",
+    "profile",
+    "provider",
+    "backends",
+    "permissions",
+    "safety",
+    "claim",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": { "const": "computer-use-qualification-evidence/v1" },
+    "artifact_kind": { "const": "computer_use_qualification_evidence" },
+    "platform": { "enum": ["macos", "windows", "linux"] },
+    "runtime": { "const": "vision-first" },
+    "suite": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pass", "blocked", "fail"] },
+    "reason_codes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "expires_at": { "type": "string", "minLength": 1 },
+    "source_commit": { "type": "string", "minLength": 1 },
+    "profile": { "type": "string", "minLength": 1 },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "model", "strict_json", "synthetic_doctor_passed"],
+      "properties": {
+        "name": { "enum": ["ollama", "mock", "none"] },
+        "model": { "type": ["string", "null"] },
+        "strict_json": { "type": "boolean" },
+        "synthetic_doctor_passed": { "type": "boolean" }
+      }
+    },
+    "backends": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture", "input"],
+      "properties": {
+        "capture": { "type": "string", "minLength": 1 },
+        "input": { "type": "string", "minLength": 1 }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["screen_recording", "accessibility"],
+      "properties": {
+        "screen_recording": { "enum": ["granted", "missing", "unknown"] },
+        "accessibility": { "enum": ["granted", "missing", "unknown"] }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_screenshot_persistence",
+        "raw_screenshot_count",
+        "sensitive_surface_stop_passed",
+        "approval_snapshot_binding_passed",
+        "semantic_verifier_passed",
+        "replay_verified"
+      ],
+      "properties": {
+        "raw_screenshot_persistence": { "type": "boolean" },
+        "raw_screenshot_count": { "type": "integer", "minimum": 0 },
+        "sensitive_surface_stop_passed": { "type": "boolean" },
+        "approval_snapshot_binding_passed": { "type": "boolean" },
+        "semantic_verifier_passed": { "type": "boolean" },
+        "replay_verified": { "type": "boolean" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supervised_live_claim_allowed",
+        "public_live_claim_allowed",
+        "claim_scope"
+      ],
+      "properties": {
+        "supervised_live_claim_allowed": { "type": "boolean" },
+        "public_live_claim_allowed": { "type": "boolean" },
+        "claim_scope": {
+          "enum": ["none", "local_supervised_fixture_only", "supervised_preview"]
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_hash_sha256", "signed", "signature_key_id"],
+      "properties": {
+        "artifact_hash_sha256": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "signed": { "type": "boolean" },
+        "signature_key_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

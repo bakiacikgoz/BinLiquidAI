@@ -1,0 +1,45 @@
+{
+  "schema_version": "computer-use-qualification-evidence/v1",
+  "artifact_kind": "computer_use_qualification_evidence",
+  "platform": "macos",
+  "runtime": "vision-first",
+  "suite": "macos-supervised-v2",
+  "status": "pass",
+  "reason_codes": [],
+  "generated_at": "2026-05-06T09:00:00+00:00",
+  "expires_at": "2099-01-01T00:00:00+00:00",
+  "source_commit": "different-commit",
+  "profile": "balanced",
+  "provider": {
+    "name": "ollama",
+    "model": "llava",
+    "strict_json": true,
+    "synthetic_doctor_passed": true
+  },
+  "backends": {
+    "capture": "screencapture",
+    "input": "quartz"
+  },
+  "permissions": {
+    "screen_recording": "granted",
+    "accessibility": "granted"
+  },
+  "safety": {
+    "raw_screenshot_persistence": false,
+    "raw_screenshot_count": 0,
+    "sensitive_surface_stop_passed": true,
+    "approval_snapshot_binding_passed": true,
+    "semantic_verifier_passed": true,
+    "replay_verified": true
+  },
+  "claim": {
+    "supervised_live_claim_allowed": false,
+    "public_live_claim_allowed": false,
+    "claim_scope": "none"
+  },
+  "integrity": {
+    "artifact_hash_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "signed": false,
+    "signature_key_id": null
+  }
+}

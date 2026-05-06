@@ -1,0 +1,47 @@
+{
+  "schema_version": "computer-use-qualification-evidence/v1",
+  "artifact_kind": "computer_use_qualification_evidence",
+  "platform": "macos",
+  "runtime": "vision-first",
+  "suite": "macos-supervised-v2",
+  "status": "blocked",
+  "reason_codes": [
+    "MACOS_LIVE_QUALIFICATION_NOT_RUN_IN_THIS_ENV"
+  ],
+  "generated_at": "2026-05-06T09:00:00+00:00",
+  "expires_at": "2099-01-01T00:00:00+00:00",
+  "source_commit": "fixture-commit",
+  "profile": "balanced",
+  "provider": {
+    "name": "none",
+    "model": null,
+    "strict_json": false,
+    "synthetic_doctor_passed": false
+  },
+  "backends": {
+    "capture": "disabled",
+    "input": "disabled"
+  },
+  "permissions": {
+    "screen_recording": "unknown",
+    "accessibility": "unknown"
+  },
+  "safety": {
+    "raw_screenshot_persistence": false,
+    "raw_screenshot_count": 0,
+    "sensitive_surface_stop_passed": false,
+    "approval_snapshot_binding_passed": false,
+    "semantic_verifier_passed": false,
+    "replay_verified": false
+  },
+  "claim": {
+    "supervised_live_claim_allowed": false,
+    "public_live_claim_allowed": false,
+    "claim_scope": "none"
+  },
+  "integrity": {
+    "artifact_hash_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "signed": false,
+    "signature_key_id": null
+  }
+}
