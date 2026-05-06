@@ -1,0 +1,60 @@
+{
+  "surface_kind": "browser",
+  "active_app_guess": "Safari",
+  "active_window_title_guess": "Local Fixture - Modal",
+  "visible_text_redacted": [
+    "Open details",
+    "Details modal closed"
+  ],
+  "ui_elements": [
+    {
+      "element_id": "open_details",
+      "label": "Open details",
+      "role": "button",
+      "bbox": {
+        "x": 0.34,
+        "y": 0.44,
+        "w": 0.2,
+        "h": 0.08
+      },
+      "confidence": 0.92
+    },
+    {
+      "element_id": "close_details",
+      "label": "Close",
+      "role": "button",
+      "bbox": {
+        "x": 0.62,
+        "y": 0.24,
+        "w": 0.1,
+        "h": 0.06
+      },
+      "confidence": 0.87
+    }
+  ],
+  "sensitive_indicators": [],
+  "candidate_actions": [
+    {
+      "action_id": "open_details_modal",
+      "action_type": "click",
+      "target_element_id": "open_details",
+      "target_bbox": {
+        "x": 0.34,
+        "y": 0.44,
+        "w": 0.2,
+        "h": 0.08
+      },
+      "text": null,
+      "hotkey": [],
+      "scroll_delta": null,
+      "wait_ms": null,
+      "rationale": "The objective asks to open the local details modal.",
+      "expected_effect": "The details modal is visible.",
+      "risk_class": "medium",
+      "requires_approval": true,
+      "confidence": 0.91
+    }
+  ],
+  "summary": "A local modal fixture is ready for the open step.",
+  "confidence": 0.91
+}

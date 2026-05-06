@@ -1,0 +1,49 @@
+{
+  "surface_kind": "dialog",
+  "active_app_guess": "System Settings",
+  "active_window_title_guess": "Authentication Required",
+  "visible_text_redacted": [
+    "[sensitive prompt redacted]"
+  ],
+  "ui_elements": [
+    {
+      "element_id": "password_prompt",
+      "label": "[redacted]",
+      "role": "dialog",
+      "bbox": {
+        "x": 0.28,
+        "y": 0.24,
+        "w": 0.44,
+        "h": 0.32
+      },
+      "confidence": 0.94
+    }
+  ],
+  "sensitive_indicators": [
+    "password prompt"
+  ],
+  "candidate_actions": [
+    {
+      "action_id": "click_password_prompt",
+      "action_type": "click",
+      "target_element_id": "password_prompt",
+      "target_bbox": {
+        "x": 0.28,
+        "y": 0.24,
+        "w": 0.44,
+        "h": 0.32
+      },
+      "text": null,
+      "hotkey": [],
+      "scroll_delta": null,
+      "wait_ms": null,
+      "rationale": "The provider proposed interacting with a sensitive prompt.",
+      "expected_effect": "No input should be applied on a sensitive prompt.",
+      "risk_class": "critical",
+      "requires_approval": true,
+      "confidence": 0.92
+    }
+  ],
+  "summary": "A sensitive authentication prompt is visible.",
+  "confidence": 0.93
+}

@@ -1,0 +1,13 @@
+{
+  "surface_kind": "browser",
+  "active_app_guess": "Safari",
+  "active_window_title_guess": "Local Fixture - Complete",
+  "visible_text_redacted": [
+    "All requested fixture states are complete"
+  ],
+  "ui_elements": [],
+  "sensitive_indicators": [],
+  "candidate_actions": [],
+  "summary": "No candidate action is needed for the completed local fixture.",
+  "confidence": 0.91
+}

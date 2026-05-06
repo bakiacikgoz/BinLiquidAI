@@ -39,6 +39,13 @@ invariants before a platform can report `liveEnabled=true`.
 - Raw screenshot persistence must remain `0` unless an explicit local debug policy is enabled.
 - Replay verification checks event integrity and policy invariants only; it does not prove task correctness.
 
+## Deterministic Provider Fixtures
+
+Schema-validated local provider-response fixtures live in
+`contracts/computer_use/fixtures/vision_*.json`. They cover safe click, type
+text, scroll, modal open, denied hotkey, sensitive surface, and empty candidate
+paths without storing raw screenshots.
+
 ## Commands
 
 ```bash

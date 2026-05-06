@@ -1,0 +1,43 @@
+{
+  "surface_kind": "browser",
+  "active_app_guess": "Safari",
+  "active_window_title_guess": "Local Fixture - Scroll",
+  "visible_text_redacted": [
+    "Section A",
+    "Target section below"
+  ],
+  "ui_elements": [
+    {
+      "element_id": "scroll_container",
+      "label": "Fixture content",
+      "role": "region",
+      "bbox": {
+        "x": 0.08,
+        "y": 0.12,
+        "w": 0.84,
+        "h": 0.72
+      },
+      "confidence": 0.88
+    }
+  ],
+  "sensitive_indicators": [],
+  "candidate_actions": [
+    {
+      "action_id": "scroll_to_target",
+      "action_type": "scroll",
+      "target_element_id": "scroll_container",
+      "target_bbox": null,
+      "text": null,
+      "hotkey": [],
+      "scroll_delta": 520,
+      "wait_ms": null,
+      "rationale": "The target section is below the visible viewport.",
+      "expected_effect": "The target section becomes visible.",
+      "risk_class": "low",
+      "requires_approval": false,
+      "confidence": 0.89
+    }
+  ],
+  "summary": "The target section is below the current viewport.",
+  "confidence": 0.9
+}

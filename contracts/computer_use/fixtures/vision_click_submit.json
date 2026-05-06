@@ -1,0 +1,48 @@
+{
+  "surface_kind": "browser",
+  "active_app_guess": "Safari",
+  "active_window_title_guess": "Local Fixture - Submit",
+  "visible_text_redacted": [
+    "Submit",
+    "Status: ready"
+  ],
+  "ui_elements": [
+    {
+      "element_id": "submit_button",
+      "label": "Submit",
+      "role": "button",
+      "bbox": {
+        "x": 0.42,
+        "y": 0.54,
+        "w": 0.16,
+        "h": 0.08
+      },
+      "confidence": 0.94
+    }
+  ],
+  "sensitive_indicators": [],
+  "candidate_actions": [
+    {
+      "action_id": "click_submit_button",
+      "action_type": "click",
+      "target_element_id": "submit_button",
+      "target_bbox": {
+        "x": 0.42,
+        "y": 0.54,
+        "w": 0.16,
+        "h": 0.08
+      },
+      "text": null,
+      "hotkey": [],
+      "scroll_delta": null,
+      "wait_ms": null,
+      "rationale": "The objective asks to click the local fixture submit button.",
+      "expected_effect": "The fixture status changes to submitted.",
+      "risk_class": "medium",
+      "requires_approval": true,
+      "confidence": 0.93
+    }
+  ],
+  "summary": "A local fixture submit button is visible.",
+  "confidence": 0.92
+}

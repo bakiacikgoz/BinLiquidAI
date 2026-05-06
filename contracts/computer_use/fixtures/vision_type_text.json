@@ -1,0 +1,48 @@
+{
+  "surface_kind": "browser",
+  "active_app_guess": "Safari",
+  "active_window_title_guess": "Local Fixture - Notes",
+  "visible_text_redacted": [
+    "Note",
+    "[empty field]"
+  ],
+  "ui_elements": [
+    {
+      "element_id": "note_field",
+      "label": "Note",
+      "role": "textbox",
+      "bbox": {
+        "x": 0.18,
+        "y": 0.38,
+        "w": 0.42,
+        "h": 0.1
+      },
+      "confidence": 0.91
+    }
+  ],
+  "sensitive_indicators": [],
+  "candidate_actions": [
+    {
+      "action_id": "type_note_text",
+      "action_type": "type_text",
+      "target_element_id": "note_field",
+      "target_bbox": {
+        "x": 0.18,
+        "y": 0.38,
+        "w": 0.42,
+        "h": 0.1
+      },
+      "text": "hello fixture",
+      "hotkey": [],
+      "scroll_delta": null,
+      "wait_ms": null,
+      "rationale": "The objective asks to enter fixture-safe text in the note field.",
+      "expected_effect": "The note field contains hello fixture.",
+      "risk_class": "medium",
+      "requires_approval": true,
+      "confidence": 0.9
+    }
+  ],
+  "summary": "A local note field is visible without secrets.",
+  "confidence": 0.91
+}

@@ -1,0 +1,32 @@
+{
+  "surface_kind": "browser",
+  "active_app_guess": "Safari",
+  "active_window_title_guess": "Local Fixture - Hotkey",
+  "visible_text_redacted": [
+    "Fixture remains open"
+  ],
+  "ui_elements": [],
+  "sensitive_indicators": [],
+  "candidate_actions": [
+    {
+      "action_id": "quit_app_hotkey",
+      "action_type": "hotkey",
+      "target_element_id": null,
+      "target_bbox": null,
+      "text": null,
+      "hotkey": [
+        "cmd",
+        "q"
+      ],
+      "scroll_delta": null,
+      "wait_ms": null,
+      "rationale": "The provider proposed an application quit hotkey.",
+      "expected_effect": "The application would close, which is not allowed.",
+      "risk_class": "critical",
+      "requires_approval": true,
+      "confidence": 0.93
+    }
+  ],
+  "summary": "The provider proposed a denied quit hotkey.",
+  "confidence": 0.9
+}
