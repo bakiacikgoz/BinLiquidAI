@@ -29,6 +29,11 @@ from binliquid.computer_use.vision_runtime.ports import (
     VisionInterpreterPort,
 )
 from binliquid.computer_use.vision_runtime.recorder import RedactedVisionAuditRecorder
+from binliquid.computer_use.vision_runtime.runtime_gate import (
+    ResolverSnapshotCallable,
+    RuntimePreflightContext,
+    evaluate_runtime_preflight,
+)
 from binliquid.runtime.config import ComputerUseRuntimeConfig
 
 
@@ -44,6 +49,8 @@ class VisionComputerUseRuntime:
         executor: InputExecutorPort,
         verifier: StepVerifierPort,
         audit: VisionAuditSink | None = None,
+        runtime_preflight_context: RuntimePreflightContext | None = None,
+        runtime_preflight_resolver: ResolverSnapshotCallable | None = None,
     ) -> None:
         self.config = config
         self.artifact_root = Path(artifact_root)
@@ -52,16 +59,47 @@ class VisionComputerUseRuntime:
         self.planner = planner
         self.executor = executor
         self.verifier = verifier
-        self.policy = UniversalComputerUsePolicy(config)
+        self._policy: UniversalComputerUsePolicy | None = None
         self.audit = audit
+        self.runtime_preflight_context = runtime_preflight_context
+        self.runtime_preflight_resolver = runtime_preflight_resolver
+
+    @property
+    def policy(self) -> UniversalComputerUsePolicy:
+        if self._policy is None:
+            self._policy = UniversalComputerUsePolicy(self.config)
+        return self._policy
 
     def run(self, request: VisionRunRequest) -> VisionRunArtifact:
-        recorder = self.audit or RedactedVisionAuditRecorder(
-            job_id=request.job_id,
-            job_dir=self.artifact_root / request.job_id,
-            runtime_config_hash=_hash_json(self.config.model_dump(mode="json")),
-            policy_hash=self.policy.policy_hash,
-        )
+        if self.runtime_preflight_context is not None:
+            preflight = evaluate_runtime_preflight(
+                context=self.runtime_preflight_context,
+                resolver=self.runtime_preflight_resolver,
+            )
+            if not preflight.allowed:
+                runtime_preflight = preflight.to_payload()["runtimePreflight"]
+                recorder = self._recorder(
+                    request,
+                    policy_hash=_hash_json(
+                        {
+                            "runtime": "vision_first",
+                            "policy": "runtime_preflight_blocked",
+                        }
+                    ),
+                )
+                envelope = recorder.finalize("blocked")
+                return self._artifact(
+                    request=request,
+                    status="blocked",
+                    steps=[],
+                    envelope=envelope,
+                    stop_reason=preflight.reason_code,
+                    runtime_preflight=runtime_preflight
+                    if isinstance(runtime_preflight, dict)
+                    else None,
+                )
+        policy = self.policy
+        recorder = self._recorder(request, policy_hash=policy.policy_hash)
         if self.vision is None:
             envelope = recorder.finalize("failed")
             return self._artifact(
@@ -88,7 +126,7 @@ class VisionComputerUseRuntime:
                     envelope=envelope,
                     stop_reason=exc.reason_code,
                 )
-            surface_stop = self.policy.detect_surface_stop(before, objective=request.objective)
+            surface_stop = policy.detect_surface_stop(before, objective=request.objective)
             if surface_stop is not None:
                 step = self._blocked_step(step_index, before.screenshot_hash, surface_stop)
                 steps.append(step)
@@ -127,7 +165,7 @@ class VisionComputerUseRuntime:
                     stop_reason="VISION_CONFIDENCE_BELOW_THRESHOLD",
                 )
             before = self._enrich_observation(before, interpretation)
-            surface_stop = self.policy.detect_surface_stop(before, objective=request.objective)
+            surface_stop = policy.detect_surface_stop(before, objective=request.objective)
             if surface_stop is not None:
                 step = self._blocked_step(step_index, before.screenshot_hash, surface_stop)
                 steps.append(step)
@@ -195,7 +233,7 @@ class VisionComputerUseRuntime:
                     stop_reason="VISION_WAIT_BUDGET_EXCEEDED",
                 )
             seen_action_digests.add(action_digest)
-            decision = self.policy.classify(action, before, mode=request.mode)
+            decision = policy.classify(action, before, mode=request.mode)
             if decision.denied:
                 step = self._step(
                     step_index=step_index,
@@ -454,6 +492,19 @@ class VisionComputerUseRuntime:
             updates["active_window_title"] = interpretation.active_window_title_guess
         return observation.model_copy(update=updates)
 
+    def _recorder(
+        self,
+        request: VisionRunRequest,
+        *,
+        policy_hash: str,
+    ) -> VisionAuditSink:
+        return self.audit or RedactedVisionAuditRecorder(
+            job_id=request.job_id,
+            job_dir=self.artifact_root / request.job_id,
+            runtime_config_hash=_hash_json(self.config.model_dump(mode="json")),
+            policy_hash=policy_hash,
+        )
+
     def _artifact(
         self,
         *,
@@ -462,6 +513,7 @@ class VisionComputerUseRuntime:
         steps: list[VisionStepResult],
         envelope: dict[str, Any],
         stop_reason: str | None = None,
+        runtime_preflight: dict[str, Any] | None = None,
     ) -> VisionRunArtifact:
         artifact = VisionRunArtifact(
             job_id=request.job_id,
@@ -471,6 +523,7 @@ class VisionComputerUseRuntime:
             redaction_report=envelope.get("redaction_report", {}),
             integrity=envelope.get("integrity", {}),
             stop_reason=stop_reason,
+            runtime_preflight=runtime_preflight,
         )
         summary = _build_runtime_safety_summary(
             request=request,
@@ -478,6 +531,7 @@ class VisionComputerUseRuntime:
             steps=steps,
             envelope=envelope,
             stop_reason=stop_reason,
+            runtime_preflight=runtime_preflight,
         )
         summary_path = self.artifact_root / request.job_id / "vision_runtime_summary.json"
         summary_path.parent.mkdir(parents=True, exist_ok=True)
@@ -499,6 +553,7 @@ def _build_runtime_safety_summary(
     steps: list[VisionStepResult],
     envelope: dict[str, Any],
     stop_reason: str | None,
+    runtime_preflight: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     reject_reasons: Counter[str] = Counter()
     semantic_counts: Counter[str] = Counter(
@@ -535,7 +590,7 @@ def _build_runtime_safety_summary(
         "VISION_REPEATED_ACTION_REJECTED",
         "VISION_WAIT_BUDGET_EXCEEDED",
     }
-    return {
+    summary = {
         "artifact_version": "computer_use_vision_runtime_summary/v1",
         "job_id": request.job_id,
         "status": status,
@@ -553,6 +608,9 @@ def _build_runtime_safety_summary(
         "raw_screenshot_persisted": raw_screenshot_count,
         "stop_reason": effective_stop_reason,
     }
+    if runtime_preflight is not None:
+        summary["runtimePreflight"] = runtime_preflight
+    return summary
 
 
 def _verification_status_key(verification: VerificationResult) -> str:

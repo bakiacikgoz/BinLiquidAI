@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import binliquid.computer_use.runtime as computer_use_runtime
+import binliquid.computer_use.vision_runtime.runtime as vision_runtime_module
 from binliquid.computer_use.models import ComputerUseMode, RiskClass
 from binliquid.computer_use.vision_runtime.models import (
     ExecutionResult,
@@ -24,7 +26,14 @@ from binliquid.computer_use.vision_runtime.providers.mock_vision import (
     DeterministicStepVerifier,
 )
 from binliquid.computer_use.vision_runtime.runtime import VisionComputerUseRuntime
+from binliquid.computer_use.vision_runtime.runtime_gate import (
+    ComputerUseOperationIntent,
+    RuntimePreflightContext,
+)
 from binliquid.runtime.config import ComputerUseRuntimeConfig, RuntimeConfig
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+FIXTURE_ROOT = REPO_ROOT / "contracts" / "computer_use" / "fixtures"
 
 
 def _observation(hash_char: str = "c") -> VisionObservation:
@@ -77,11 +86,247 @@ class _Executor:
         return ExecutionResult(status="executed", message="ok")
 
 
+class _CountingCapture:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def capture(self) -> VisionObservation:
+        self.calls += 1
+        return _observation()
+
+
+class _CountingInterpreter:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def interpret(self, *, objective, observation, world):  # noqa: ANN001
+        self.calls += 1
+        return _Interpreter().interpret(
+            objective=objective,
+            observation=observation,
+            world=world,
+        )
+
+
+class _CountingPlanner:
+    def __init__(self, action: VisionAction | None = None) -> None:
+        self.calls = 0
+        self.action = action or _action()
+
+    def next_action(self, *, objective, interpretation, world):  # noqa: ANN001
+        del objective, interpretation, world
+        self.calls += 1
+        return self.action
+
+
 class _MacOSPlatform:
     label = "macos"
     system = "Darwin"
     machine = "arm64"
     release = "test"
+
+
+class _WindowsPlatform:
+    label = "windows"
+    system = "Windows"
+    machine = "AMD64"
+    release = "test"
+
+
+def _blocked_preflight_context() -> RuntimePreflightContext:
+    return RuntimePreflightContext(
+        profile="balanced",
+        platform="windows",
+        operation_intent=ComputerUseOperationIntent.NORMAL_RUNTIME_LIVE,
+        config=ComputerUseRuntimeConfig(runtime_mode="vision_first", vision_enabled=True),
+        current_commit="fixture-commit",
+    )
+
+
+def test_runtime_preflight_block_stops_before_capture_provider_planner_and_executor(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    class UnexpectedPolicy:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("policy must not be constructed when preflight blocks")
+
+    capture = _CountingCapture()
+    vision = _CountingInterpreter()
+    planner = _CountingPlanner()
+    executor = _Executor()
+    monkeypatch.setattr(
+        vision_runtime_module,
+        "UniversalComputerUsePolicy",
+        UnexpectedPolicy,
+    )
+    runtime = VisionComputerUseRuntime(
+        config=ComputerUseRuntimeConfig(runtime_mode="vision_first", vision_enabled=True),
+        artifact_root=tmp_path,
+        capture=capture,
+        vision=vision,
+        planner=planner,
+        executor=executor,
+        verifier=DeterministicStepVerifier([VerificationResult(verified=True, confidence=0.9)]),
+        runtime_preflight_context=_blocked_preflight_context(),
+    )
+
+    artifact = runtime.run(
+        VisionRunRequest(
+            job_id="job-preflight-blocked",
+            objective="Click export",
+            mode=ComputerUseMode.EXECUTE,
+        )
+    )
+
+    assert artifact.status == "blocked"
+    assert artifact.stop_reason == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+    assert artifact.steps == []
+    assert artifact.runtime_preflight is not None
+    assert artifact.runtime_preflight["allowed"] is False
+    assert artifact.runtime_preflight["publicLiveClaimAllowed"] is False
+    assert capture.calls == 0
+    assert vision.calls == 0
+    assert planner.calls == 0
+    assert executor.executed == []
+    summary = json.loads(
+        (tmp_path / "job-preflight-blocked" / "vision_runtime_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert summary["runtimePreflight"]["allowed"] is False
+    assert summary["runtimePreflight"]["captureAttempted"] is False
+    assert summary["runtimePreflight"]["providerAttempted"] is False
+    assert summary["runtimePreflight"]["executorAttempted"] is False
+    assert summary["runtimePreflight"]["approvalCreated"] is False
+    assert summary["approval_blocks"] == 0
+
+
+def test_runtime_preflight_block_does_not_create_approval_snapshot(tmp_path) -> None:
+    capture = _CountingCapture()
+    vision = _CountingInterpreter()
+    planner = _CountingPlanner(
+        _action(action_type=InputActionType.CLICK, risk_class=RiskClass.MEDIUM)
+    )
+    executor = _Executor()
+    runtime = VisionComputerUseRuntime(
+        config=ComputerUseRuntimeConfig(runtime_mode="vision_first", vision_enabled=True),
+        artifact_root=tmp_path,
+        capture=capture,
+        vision=vision,
+        planner=planner,
+        executor=executor,
+        verifier=DeterministicStepVerifier([]),
+        runtime_preflight_context=_blocked_preflight_context(),
+    )
+
+    artifact = runtime.run(
+        VisionRunRequest(
+            job_id="job-preflight-approval-block",
+            objective="Click export",
+            mode=ComputerUseMode.STEP_APPROVAL,
+        )
+    )
+
+    assert artifact.status == "blocked"
+    assert artifact.steps == []
+    assert capture.calls == 0
+    assert planner.calls == 0
+    assert executor.executed == []
+
+
+def test_runtime_preflight_resolver_exception_blocks_without_leaking_details(tmp_path) -> None:
+    def _raise_resolution_error(**_kwargs: object) -> dict[str, object]:
+        raise RuntimeError("boom C:/Users/duzey/private/rawScreenshotPath.png")
+
+    runtime = VisionComputerUseRuntime(
+        config=ComputerUseRuntimeConfig(runtime_mode="vision_first", vision_enabled=True),
+        artifact_root=tmp_path,
+        capture=_CountingCapture(),
+        vision=_CountingInterpreter(),
+        planner=_CountingPlanner(),
+        executor=_Executor(),
+        verifier=DeterministicStepVerifier([]),
+        runtime_preflight_context=_blocked_preflight_context(),
+        runtime_preflight_resolver=_raise_resolution_error,
+    )
+
+    artifact = runtime.run(
+        VisionRunRequest(
+            job_id="job-preflight-resolver-error",
+            objective="Click export",
+            mode=ComputerUseMode.EXECUTE,
+        )
+    )
+
+    encoded = json.dumps(artifact.model_dump(mode="json"), sort_keys=True)
+    assert artifact.status == "blocked"
+    assert artifact.stop_reason == "COMPUTER_USE_RUNTIME_RESOLUTION_FAILED"
+    assert "COMPUTER_USE_RUNTIME_RESOLUTION_FAILED" in encoded
+    assert "boom" not in encoded
+    assert "C:/Users" not in encoded
+    assert "rawScreenshotPath" not in encoded
+
+
+def test_runner_live_preflight_blocks_before_provider_construction(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    def _unexpected_constructor(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("provider/capture/executor must not be constructed when blocked")
+
+    monkeypatch.setattr(computer_use_runtime, "current_platform", lambda: _WindowsPlatform())
+    monkeypatch.setattr(
+        computer_use_runtime,
+        "MacOSScreenCaptureProvider",
+        _unexpected_constructor,
+    )
+    monkeypatch.setattr(
+        computer_use_runtime,
+        "OllamaVisionInterpreter",
+        _unexpected_constructor,
+    )
+    monkeypatch.setattr(
+        computer_use_runtime,
+        "MacOSInputExecutor",
+        _unexpected_constructor,
+    )
+    monkeypatch.setattr(computer_use_runtime, "_current_git_sha", lambda: "fixture-commit")
+
+    runner = computer_use_runtime.ComputerUseRunner(
+        config=RuntimeConfig(
+            computer_use=ComputerUseRuntimeConfig(
+                runtime_mode="vision_first",
+                vision_enabled=True,
+                vision_provider="ollama",
+                vision_model="llava",
+                max_steps=1,
+            )
+        ),
+        root_dir=tmp_path,
+    )
+
+    payload = runner.run(
+        prompt="Click export",
+        job_id="job-runner-preflight-blocked",
+        mode=ComputerUseMode.EXECUTE,
+        runtime_mode="vision_first",
+    )
+
+    runtime_preflight = payload["computer_use"]["runtimePreflight"]
+    encoded = json.dumps(payload, sort_keys=True)
+    assert payload["job"]["status"] == "blocked"
+    assert payload["computer_use"]["status"] == "blocked"
+    assert payload["computer_use"]["stop_reason"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+    assert runtime_preflight["allowed"] is False
+    assert runtime_preflight["publicLiveClaimAllowed"] is False
+    assert runtime_preflight["captureAttempted"] is False
+    assert runtime_preflight["providerAttempted"] is False
+    assert runtime_preflight["executorAttempted"] is False
+    assert runtime_preflight["approvalCreated"] is False
+    assert "rawScreenshotPath" not in encoded
+    assert "providerRawResponse" not in encoded
+    assert "approvalSnapshotBody" not in encoded
 
 
 def test_runtime_blocks_when_vision_provider_missing(tmp_path) -> None:
@@ -383,6 +628,7 @@ def test_runner_ollama_vision_first_uses_candidate_action_planner(
     monkeypatch.setattr(computer_use_runtime, "MacOSScreenCaptureProvider", FakeCapture)
     monkeypatch.setattr(computer_use_runtime, "OllamaVisionInterpreter", FakeOllamaVision)
     monkeypatch.setattr(computer_use_runtime, "MacOSInputExecutor", FakeMacOSExecutor)
+    monkeypatch.setattr(computer_use_runtime, "_current_git_sha", lambda: "fixture-commit")
 
     runner = computer_use_runtime.ComputerUseRunner(
         config=RuntimeConfig(
@@ -391,6 +637,12 @@ def test_runner_ollama_vision_first_uses_candidate_action_planner(
                 vision_enabled=True,
                 vision_provider="ollama",
                 vision_model="llava",
+                macos_live_enabled=True,
+                macos_capture_backend="screencapture",
+                macos_input_backend="quartz",
+                macos_qualification_report=str(
+                    FIXTURE_ROOT / "macos_supervised_v2_evidence_pass.json"
+                ),
                 action_set=["click"],
                 max_steps=1,
             )

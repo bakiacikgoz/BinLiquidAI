@@ -66,6 +66,9 @@ from binliquid.computer_use.vision_runtime.drivers.macos import (
     MacOSInputExecutor,
     MacOSScreenCaptureProvider,
 )
+from binliquid.computer_use.vision_runtime.drivers.macos import (
+    readiness as macos_driver_readiness,
+)
 from binliquid.computer_use.vision_runtime.models import (
     ExecutionResult as VisionExecutionResult,
 )
@@ -96,6 +99,12 @@ from binliquid.computer_use.vision_runtime.providers.mock_vision import (
 from binliquid.computer_use.vision_runtime.providers.ollama_vision import OllamaVisionInterpreter
 from binliquid.computer_use.vision_runtime.recorder import RedactedVisionAuditRecorder
 from binliquid.computer_use.vision_runtime.runtime import VisionComputerUseRuntime
+from binliquid.computer_use.vision_runtime.runtime_gate import (
+    ComputerUseOperationIntent,
+    RuntimePreflightContext,
+    RuntimePreflightDecision,
+    evaluate_runtime_preflight,
+)
 from binliquid.computer_use.vision_runtime.verifier import ConservativeVisionStepVerifier
 from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.runtime.config import RuntimeConfig
@@ -122,6 +131,42 @@ class SessionCommand(StrEnum):
 def _stable_hash(payload: object) -> str:
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _current_git_sha() -> str:
+    proc = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else "unknown"
+
+
+def _load_json_file_if_present(path_value: str | None) -> dict[str, Any] | None:
+    if not path_value:
+        return None
+    path = Path(path_value)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _computer_use_evidence_payloads(
+    computer_use_config: Any,
+) -> tuple[dict[str, object], dict[str, str]]:
+    evidence_by_platform: dict[str, object] = {}
+    evidence_paths: dict[str, str] = {}
+    macos_path_value = getattr(computer_use_config, "macos_qualification_report", "")
+    macos_payload = _load_json_file_if_present(macos_path_value)
+    if macos_payload is not None:
+        evidence_by_platform["macos"] = macos_payload
+        evidence_paths["macos"] = str(Path(macos_path_value))
+    return evidence_by_platform, evidence_paths
 
 
 class _NoopVisionExecutor:
@@ -1606,22 +1651,6 @@ end tell
             return self._vision_payload(artifact)
 
         platform_info = current_platform()
-        if vision_config.vision_provider != "mock" and platform_info.label != "macos":
-            envelope = recorder.finalize("failed")
-            artifact = VisionRunArtifact(
-                job_id=job_id,
-                status="failed",
-                objective=prompt,
-                steps=[],
-                redaction_report=envelope.get("redaction_report", {}),
-                integrity=envelope.get("integrity", {}),
-                stop_reason=(
-                    "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
-                    if platform_info.label == "windows"
-                    else "COMPUTER_USE_PLATFORM_NOT_QUALIFIED"
-                ),
-            )
-            return self._vision_payload(artifact)
         if vision_config.vision_provider == "none":
             envelope = recorder.finalize("failed")
             artifact = VisionRunArtifact(
@@ -1634,6 +1663,19 @@ end tell
                 stop_reason="VISION_PROVIDER_UNAVAILABLE",
             )
             return self._vision_payload(artifact)
+
+        preflight_context = self._vision_runtime_preflight_context(
+            vision_config=vision_config,
+            platform_label=platform_info.label,
+        )
+        preflight = evaluate_runtime_preflight(context=preflight_context)
+        if not preflight.allowed:
+            return self._blocked_vision_preflight_payload(
+                job_id=job_id,
+                prompt=prompt,
+                recorder=recorder,
+                preflight=preflight,
+            )
 
         observation = VisionObservation(
             screenshot_hash=hashlib.sha256(f"{job_id}:{prompt}".encode()).hexdigest(),
@@ -1702,6 +1744,7 @@ end tell
             executor=executor,
             verifier=verifier,
             audit=recorder,
+            runtime_preflight_context=preflight_context,
         )
         artifact = runtime.run(
             VisionRunRequest(
@@ -1721,8 +1764,71 @@ end tell
                 "status": artifact.status,
                 "request": artifact.objective,
             },
-            "computer_use": artifact.model_dump(mode="json"),
+            "computer_use": artifact.model_dump(mode="json", by_alias=True),
         }
+
+    def _vision_runtime_preflight_context(
+        self,
+        *,
+        vision_config: Any,
+        platform_label: str,
+    ) -> RuntimePreflightContext:
+        evidence_by_platform, evidence_paths = _computer_use_evidence_payloads(
+            vision_config
+        )
+        driver_readiness_by_platform = (
+            {
+                "macos": macos_driver_readiness(
+                    vision_enabled=(
+                        vision_config.vision_enabled
+                        and vision_config.vision_provider != "none"
+                    )
+                ).model_dump(mode="json")
+            }
+            if platform_label == "macos"
+            else {}
+        )
+        return RuntimePreflightContext(
+            profile=self._config.profile_name,
+            platform=platform_label,
+            operation_intent=(
+                ComputerUseOperationIntent.DETERMINISTIC_MOCK
+                if vision_config.vision_provider == "mock"
+                else ComputerUseOperationIntent.NORMAL_RUNTIME_LIVE
+            ),
+            config=vision_config,
+            current_commit=_current_git_sha(),
+            evidence_by_platform=evidence_by_platform,
+            evidence_paths=evidence_paths,
+            driver_readiness_by_platform=driver_readiness_by_platform,
+            provider=vision_config.vision_provider,
+            model=vision_config.vision_model,
+            capture_backend=str(getattr(vision_config, f"{platform_label}_capture_backend", "")),
+            input_backend=str(getattr(vision_config, f"{platform_label}_input_backend", "")),
+            root_dir=self._root_dir,
+        )
+
+    def _blocked_vision_preflight_payload(
+        self,
+        *,
+        job_id: str,
+        prompt: str,
+        recorder: RedactedVisionAuditRecorder,
+        preflight: RuntimePreflightDecision,
+    ) -> dict[str, Any]:
+        runtime_preflight = preflight.to_payload()["runtimePreflight"]
+        envelope = recorder.finalize("blocked")
+        artifact = VisionRunArtifact(
+            job_id=job_id,
+            status="blocked",
+            objective=prompt,
+            steps=[],
+            redaction_report=envelope.get("redaction_report", {}),
+            integrity=envelope.get("integrity", {}),
+            stop_reason=preflight.reason_code,
+            runtime_preflight=runtime_preflight if isinstance(runtime_preflight, dict) else None,
+        )
+        return self._vision_payload(artifact)
 
     def run(
         self,

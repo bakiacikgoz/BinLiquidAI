@@ -9,7 +9,7 @@ from binliquid.computer_use.models import ComputerUseMode, RiskClass
 
 
 class VisionModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
 
 
 class SurfaceKind(StrEnum):
@@ -160,9 +160,10 @@ class VisionStepResult(VisionModel):
 class VisionRunArtifact(VisionModel):
     artifact_version: Literal["computer_use_vision/v1"] = "computer_use_vision/v1"
     job_id: str
-    status: Literal["running", "awaiting_approval", "completed", "failed", "stopped"]
+    status: Literal["running", "awaiting_approval", "completed", "failed", "stopped", "blocked"]
     objective: str
     steps: list[VisionStepResult]
     redaction_report: dict[str, Any]
     integrity: dict[str, Any]
     stop_reason: str | None = None
+    runtime_preflight: dict[str, Any] | None = Field(default=None, alias="runtimePreflight")
