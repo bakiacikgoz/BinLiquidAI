@@ -50,6 +50,32 @@ def test_recorder_writes_redacted_hash_chain_and_replay_summary(tmp_path: Path) 
 
     recorder.record_step(_step(0))
     envelope = recorder.finalize("completed")
+    (tmp_path / "job-replay" / "vision_runtime_summary.json").write_text(
+        json.dumps(
+            {
+                "artifact_version": "computer_use_vision_runtime_summary/v1",
+                "job_id": "job-replay",
+                "status": "completed",
+                "candidate_actions_seen": 1,
+                "candidate_actions_rejected": 0,
+                "candidate_reject_reasons": {},
+                "actions_executed": 1,
+                "approval_blocks": 0,
+                "approval_resumes": 0,
+                "semantic_verification": {
+                    "satisfied": 0,
+                    "inconclusive": 0,
+                    "failed": 0,
+                    "skipped": 0,
+                },
+                "no_progress_stops": 0,
+                "raw_screenshot_persisted": 0,
+                "stop_reason": "completed",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
 
     events_path = tmp_path / "job-replay" / "events.jsonl"
     events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
@@ -66,6 +92,8 @@ def test_recorder_writes_redacted_hash_chain_and_replay_summary(tmp_path: Path) 
     assert replay["event_count"] == 1
     assert replay["redacted"] is True
     assert replay["checks"]["hash_chain_verified"] is True
+    assert replay["safety_summary"]["actions_executed"] == 1
+    assert replay["safety_summary"]["raw_screenshot_persisted"] == 0
 
 
 def test_replay_verifier_detects_tampered_event_hash(tmp_path: Path) -> None:

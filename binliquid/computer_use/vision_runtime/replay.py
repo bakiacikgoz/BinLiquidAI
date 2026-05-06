@@ -15,6 +15,12 @@ def load_replay_summary(job_dir: Path) -> dict[str, Any]:
         if line.strip()
     ]
     verification = verify_replay(job_dir)
+    safety_summary_path = job_dir / "vision_runtime_summary.json"
+    safety_summary = (
+        json.loads(safety_summary_path.read_text(encoding="utf-8"))
+        if safety_summary_path.exists()
+        else None
+    )
     return {
         "artifact_version": "computer_use_vision_replay/v1",
         "job_id": envelope["job_id"],
@@ -36,6 +42,7 @@ def load_replay_summary(job_dir: Path) -> dict[str, Any]:
         "verified": verification["verified"],
         "checks": verification["checks"],
         "errors": verification["errors"],
+        "safety_summary": safety_summary,
     }
 
 

@@ -25,6 +25,12 @@ Qualification writes a machine-readable report:
 
 The default output path is `artifacts/computer_use_vision_qualification/qualification.json`.
 
+Each vision-first runtime job also writes `vision_runtime_summary.json` beside
+the redacted audit envelope. That summary contains safety counters such as
+candidate actions seen/rejected, approval blocks, semantic verifier counts,
+no-progress stops, stop reason, and `raw_screenshot_persisted`. The privacy
+gate remains `raw_screenshot_persisted == 0` for default qualification runs.
+
 Platform live evidence uses the additive `computer-use-platform-qualification/v1` schema
 at `contracts/computer_use/platform_qualification.schema.json`. That report is validated
 against platform, commit, config hash, backend, permission, task-suite, and safety

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -452,8 +454,8 @@ class VisionComputerUseRuntime:
             updates["active_window_title"] = interpretation.active_window_title_guess
         return observation.model_copy(update=updates)
 
-    @staticmethod
     def _artifact(
+        self,
         *,
         request: VisionRunRequest,
         status: str,
@@ -461,7 +463,7 @@ class VisionComputerUseRuntime:
         envelope: dict[str, Any],
         stop_reason: str | None = None,
     ) -> VisionRunArtifact:
-        return VisionRunArtifact(
+        artifact = VisionRunArtifact(
             job_id=request.job_id,
             status=status,
             objective=request.objective,
@@ -470,10 +472,103 @@ class VisionComputerUseRuntime:
             integrity=envelope.get("integrity", {}),
             stop_reason=stop_reason,
         )
+        summary = _build_runtime_safety_summary(
+            request=request,
+            status=status,
+            steps=steps,
+            envelope=envelope,
+            stop_reason=stop_reason,
+        )
+        summary_path = self.artifact_root / request.job_id / "vision_runtime_summary.json"
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        return artifact
 
 
 def _hash_json(payload: object) -> str:
     return hash_json(payload)
+
+
+def _build_runtime_safety_summary(
+    *,
+    request: VisionRunRequest,
+    status: str,
+    steps: list[VisionStepResult],
+    envelope: dict[str, Any],
+    stop_reason: str | None,
+) -> dict[str, Any]:
+    reject_reasons: Counter[str] = Counter()
+    semantic_counts: Counter[str] = Counter(
+        {
+            "satisfied": 0,
+            "inconclusive": 0,
+            "failed": 0,
+            "skipped": 0,
+        }
+    )
+    approval_blocks = 0
+    actions_executed = 0
+
+    for step in steps:
+        decision = step.policy_decision
+        if step.execution_status == "executed":
+            actions_executed += 1
+        if step.execution_status == "approval_required" or decision.requires_approval:
+            approval_blocks += 1
+        if decision.denied:
+            reject_reasons[decision.reason_code] += 1
+        if step.verification is not None:
+            verification_status = _verification_status_key(step.verification)
+            semantic_counts[verification_status] += 1
+
+    redaction_report = envelope.get("redaction_report", {})
+    raw_screenshot_count = _safe_int(
+        redaction_report.get("raw_screenshot_persisted_count"),
+        default=0,
+    )
+    effective_stop_reason = stop_reason or status
+    no_progress_reasons = {
+        "VISION_NO_PROGRESS_DETECTED",
+        "VISION_REPEATED_ACTION_REJECTED",
+        "VISION_WAIT_BUDGET_EXCEEDED",
+    }
+    return {
+        "artifact_version": "computer_use_vision_runtime_summary/v1",
+        "job_id": request.job_id,
+        "status": status,
+        "candidate_actions_seen": len(steps),
+        "candidate_actions_rejected": sum(reject_reasons.values()),
+        "candidate_reject_reasons": dict(sorted(reject_reasons.items())),
+        "actions_executed": actions_executed,
+        "approval_blocks": approval_blocks,
+        "approval_resumes": 0,
+        "semantic_verification": {
+            key: int(semantic_counts[key])
+            for key in ("satisfied", "inconclusive", "failed", "skipped")
+        },
+        "no_progress_stops": 1 if effective_stop_reason in no_progress_reasons else 0,
+        "raw_screenshot_persisted": raw_screenshot_count,
+        "stop_reason": effective_stop_reason,
+    }
+
+
+def _verification_status_key(verification: VerificationResult) -> str:
+    status = verification.status
+    if status is not None:
+        return str(getattr(status, "value", status))
+    if verification.verified:
+        return "satisfied"
+    return "failed"
+
+
+def _safe_int(value: object, *, default: int) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
 
 
 def build_approval_snapshot(

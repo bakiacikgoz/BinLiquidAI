@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 import binliquid.computer_use.runtime as computer_use_runtime
@@ -131,6 +132,16 @@ def test_runtime_completes_safe_mock_task_and_records_hash_chain(tmp_path) -> No
     assert len(artifact.steps) == 1
     assert executor.executed[0].action_type == InputActionType.WAIT
     assert artifact.integrity["hash_chain_verified"] is True
+    summary = json.loads(
+        (tmp_path / "job-complete" / "vision_runtime_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert summary["actions_executed"] == 1
+    assert summary["approval_blocks"] == 0
+    assert summary["semantic_verification"]["skipped"] == 0
+    assert summary["raw_screenshot_persisted"] == 0
+    assert summary["stop_reason"] == "done"
 
 
 def test_runtime_returns_awaiting_approval_without_executing(tmp_path) -> None:
@@ -276,6 +287,14 @@ def test_runtime_rejects_repeated_action_digest_before_second_execution(tmp_path
     assert artifact.status == "failed"
     assert artifact.stop_reason == "VISION_REPEATED_ACTION_REJECTED"
     assert len(executor.executed) == 1
+    summary = json.loads(
+        (tmp_path / "job-repeated-action" / "vision_runtime_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert summary["no_progress_stops"] == 1
+    assert summary["stop_reason"] == "VISION_REPEATED_ACTION_REJECTED"
+    assert summary["raw_screenshot_persisted"] == 0
 
 
 def test_runtime_stops_when_wait_budget_is_exceeded(tmp_path) -> None:
