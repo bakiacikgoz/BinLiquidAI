@@ -24,6 +24,12 @@ The supported default path remains fail-closed:
 
 ## Provider Contract
 
+The frozen JSON Schema for provider responses lives at:
+
+```text
+contracts/computer_use/vision_provider_response.schema.json
+```
+
 Provider responses may include:
 
 ```json
@@ -46,6 +52,10 @@ Provider responses may include:
 
 `candidate_actions` may be omitted or empty. Omission is treated as an empty
 list so older synthetic doctor fixtures remain compatible.
+
+`hotkey` may be omitted, an array, or `null` on the wire. The runtime normalizes
+`null` to an empty list before strict model validation. Extra top-level fields
+or extra candidate action fields remain invalid and fail closed.
 
 ## Planner Rules
 

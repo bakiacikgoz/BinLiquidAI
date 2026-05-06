@@ -160,6 +160,8 @@ def _normalize_ollama_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 "Vision provider returned invalid candidate action items.",
             )
         normalized_action = dict(action)
+        if normalized_action.get("hotkey") is None:
+            normalized_action["hotkey"] = []
         if isinstance(normalized_action.get("action_type"), str):
             try:
                 normalized_action["action_type"] = InputActionType(

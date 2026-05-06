@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Computer-Use Vision Provider Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "surface_kind",
+    "summary",
+    "confidence"
+  ],
+  "properties": {
+    "surface_kind": {
+      "enum": [
+        "desktop",
+        "browser",
+        "file_manager",
+        "editor",
+        "terminal",
+        "dialog",
+        "unknown"
+      ]
+    },
+    "active_app_guess": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "active_window_title_guess": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "visible_text_redacted": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "ui_elements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ui_element"
+      },
+      "default": []
+    },
+    "sensitive_indicators": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "candidate_actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate_action"
+      },
+      "default": []
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    }
+  },
+  "$defs": {
+    "bbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "w": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0
+        },
+        "h": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    },
+    "ui_element": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "element_id",
+        "bbox",
+        "confidence"
+      ],
+      "properties": {
+        "element_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bbox": {
+          "$ref": "#/$defs/bbox"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    },
+    "candidate_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "action_type",
+        "rationale",
+        "expected_effect",
+        "risk_class",
+        "requires_approval",
+        "confidence"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_type": {
+          "enum": [
+            "move_mouse",
+            "click",
+            "double_click",
+            "right_click",
+            "drag",
+            "type_text",
+            "press_key",
+            "hotkey",
+            "scroll",
+            "wait",
+            "switch_window",
+            "focus_window_or_app",
+            "select_file"
+          ]
+        },
+        "target_element_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_bbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/bbox"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hotkey": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": []
+        },
+        "scroll_delta": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "wait_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risk_class": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "requires_approval": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
+import jsonschema
 
 from binliquid.computer_use.models import RiskClass
 from binliquid.computer_use.vision_runtime.errors import VisionRuntimeError
@@ -11,6 +14,11 @@ from binliquid.computer_use.vision_runtime.models import (
 )
 from binliquid.computer_use.vision_runtime.provider_doctor import doctor_vision_provider
 from binliquid.computer_use.vision_runtime.providers.ollama_vision import OllamaVisionInterpreter
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PROVIDER_SCHEMA_PATH = (
+    REPO_ROOT / "contracts" / "computer_use" / "vision_provider_response.schema.json"
+)
 
 
 def _observation() -> VisionObservation:
@@ -41,6 +49,55 @@ def _candidate_action_payload(**overrides):  # noqa: ANN003, ANN201
     }
     payload.update(overrides)
     return payload
+
+
+def _provider_payload(**overrides):  # noqa: ANN003, ANN201
+    payload = {
+        "surface_kind": "browser",
+        "active_app_guess": "Safari",
+        "active_window_title_guess": "Fixture",
+        "visible_text_redacted": ["Submit"],
+        "ui_elements": [
+            {
+                "element_id": "submit",
+                "role": "button",
+                "label": "Submit",
+                "bbox": {"x": 0.4, "y": 0.5, "w": 0.1, "h": 0.05},
+                "confidence": 0.91,
+            }
+        ],
+        "sensitive_indicators": [],
+        "candidate_actions": [_candidate_action_payload()],
+        "summary": "A safe local form is visible.",
+        "confidence": 0.88,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _assert_invalid_provider_response(provider: OllamaVisionInterpreter) -> None:
+    try:
+        provider.interpret(objective="Submit", observation=_observation(), world=None)
+    except VisionRuntimeError as exc:
+        assert exc.reason_code == "VISION_PROVIDER_INVALID_RESPONSE"
+    else:  # pragma: no cover
+        raise AssertionError("expected invalid provider response")
+
+
+def test_vision_provider_response_schema_validates_candidate_action_contract() -> None:
+    schema = json.loads(PROVIDER_SCHEMA_PATH.read_text(encoding="utf-8"))
+    payload = _provider_payload(
+        candidate_actions=[
+            _candidate_action_payload(
+                hotkey=None,
+                text=None,
+                scroll_delta=None,
+                wait_ms=None,
+            )
+        ]
+    )
+
+    jsonschema.Draft202012Validator(schema).validate(payload)
 
 
 def test_ollama_provider_maps_strict_json_response() -> None:
@@ -79,6 +136,7 @@ def test_ollama_provider_maps_strict_json_response() -> None:
     assert interpretation.confidence == 0.88
     assert interpretation.surface_kind == SurfaceKind.BROWSER
     assert interpretation.ui_elements[0].element_id == "submit"
+    assert interpretation.candidate_actions == []
 
 
 def test_ollama_provider_maps_candidate_actions() -> None:
@@ -99,7 +157,7 @@ def test_ollama_provider_maps_candidate_actions() -> None:
                         }
                     ],
                     "sensitive_indicators": [],
-                    "candidate_actions": [_candidate_action_payload()],
+                    "candidate_actions": [_candidate_action_payload(hotkey=None)],
                     "summary": "A safe local form is visible.",
                     "confidence": 0.88,
                 }
@@ -119,6 +177,7 @@ def test_ollama_provider_maps_candidate_actions() -> None:
     assert action.target_element_id == "submit"
     assert action.target_bbox is not None
     assert action.target_bbox.x == 0.4
+    assert action.hotkey == []
     assert action.requires_approval is True
 
 
@@ -134,6 +193,15 @@ def test_ollama_provider_rejects_invalid_json_fail_closed() -> None:
         assert exc.reason_code == "VISION_PROVIDER_INVALID_RESPONSE"
     else:  # pragma: no cover
         raise AssertionError("expected invalid provider response")
+
+
+def test_ollama_provider_rejects_extra_top_level_field_fail_closed() -> None:
+    provider = OllamaVisionInterpreter(
+        model="llava",
+        client=lambda **_: {"response": json.dumps(_provider_payload(extra=True))},
+    )
+
+    _assert_invalid_provider_response(provider)
 
 
 def test_ollama_provider_rejects_invalid_action_type_fail_closed() -> None:
@@ -156,12 +224,7 @@ def test_ollama_provider_rejects_invalid_action_type_fail_closed() -> None:
         },
     )
 
-    try:
-        provider.interpret(objective="Submit", observation=_observation(), world=None)
-    except VisionRuntimeError as exc:
-        assert exc.reason_code == "VISION_PROVIDER_INVALID_RESPONSE"
-    else:  # pragma: no cover
-        raise AssertionError("expected invalid provider response")
+    _assert_invalid_provider_response(provider)
 
 
 def test_ollama_provider_rejects_invalid_risk_class_fail_closed() -> None:
@@ -182,12 +245,7 @@ def test_ollama_provider_rejects_invalid_risk_class_fail_closed() -> None:
         },
     )
 
-    try:
-        provider.interpret(objective="Submit", observation=_observation(), world=None)
-    except VisionRuntimeError as exc:
-        assert exc.reason_code == "VISION_PROVIDER_INVALID_RESPONSE"
-    else:  # pragma: no cover
-        raise AssertionError("expected invalid provider response")
+    _assert_invalid_provider_response(provider)
 
 
 def test_ollama_provider_rejects_extra_action_field_fail_closed() -> None:
@@ -208,12 +266,37 @@ def test_ollama_provider_rejects_extra_action_field_fail_closed() -> None:
         },
     )
 
-    try:
-        provider.interpret(objective="Submit", observation=_observation(), world=None)
-    except VisionRuntimeError as exc:
-        assert exc.reason_code == "VISION_PROVIDER_INVALID_RESPONSE"
-    else:  # pragma: no cover
-        raise AssertionError("expected invalid provider response")
+    _assert_invalid_provider_response(provider)
+
+
+def test_ollama_provider_rejects_invalid_bbox_shape_fail_closed() -> None:
+    provider = OllamaVisionInterpreter(
+        model="llava",
+        client=lambda **_: {
+            "response": json.dumps(
+                _provider_payload(
+                    candidate_actions=[
+                        _candidate_action_payload(target_bbox={"x": 0.4, "y": 0.5, "w": 0.1})
+                    ]
+                )
+            )
+        },
+    )
+
+    _assert_invalid_provider_response(provider)
+
+
+def test_ollama_provider_rejects_confidence_out_of_range_fail_closed() -> None:
+    provider = OllamaVisionInterpreter(
+        model="llava",
+        client=lambda **_: {
+            "response": json.dumps(
+                _provider_payload(candidate_actions=[_candidate_action_payload(confidence=1.5)])
+            )
+        },
+    )
+
+    _assert_invalid_provider_response(provider)
 
 
 def test_ollama_provider_allows_no_actions_as_safe_stop_path() -> None:

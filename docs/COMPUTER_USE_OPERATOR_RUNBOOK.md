@@ -73,6 +73,8 @@ missing or empty `candidate_actions` list as a safe stop, rejects invalid action
 types, low-confidence actions, and invalid target boxes before policy
 classification, and still routes click/type/hotkey-style actions through step
 approval before execution.
+The frozen provider response schema is
+`contracts/computer_use/vision_provider_response.schema.json`.
 
 Preflight writes Phase 4E readiness artifacts:
 
