@@ -8,6 +8,7 @@ import { LiveAgentActivity, type ActivityItem } from './LiveAgentActivity';
 import { ApprovalGateCard } from './ApprovalGateCard';
 import { RuntimeSummaryCard, type RuntimeSummaryItem } from './RuntimeSummaryCard';
 import { SessionEventsCard, type SessionEventItem } from './SessionEventsCard';
+import type { ComputerUseCapabilityResolution } from '../../capabilities';
 
 export type RunOption = {
   id: string;
@@ -33,6 +34,7 @@ export type MissionControlViewProps = {
   sessionEvents: SessionEventItem[];
   runtimeSummary: RuntimeSummaryItem[];
   rawSummary: unknown;
+  computerUseCapabilityResolution?: ComputerUseCapabilityResolution | null;
   debugRawEnabled: boolean;
   hasApproval: boolean;
   approvalLabel: string;
@@ -64,6 +66,7 @@ export function MissionControlView({
   sessionEvents,
   runtimeSummary,
   rawSummary,
+  computerUseCapabilityResolution,
   debugRawEnabled,
   hasApproval,
   approvalLabel,
@@ -148,6 +151,7 @@ export function MissionControlView({
           debugRawEnabled={debugRawEnabled}
           items={runtimeSummary}
           rawJson={rawSummary}
+          computerUseCapabilityResolution={computerUseCapabilityResolution}
           onRawJsonRequested={onRawJsonRequested}
         />
       </div>

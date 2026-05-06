@@ -464,6 +464,43 @@
       "title": "BridgeHandshakeContract",
       "type": "object"
     },
+    "ComputerUseCapabilityConfigPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "captureBackend": {
+          "default": "disabled",
+          "title": "Capturebackend",
+          "type": "string"
+        },
+        "inputBackend": {
+          "default": "disabled",
+          "title": "Inputbackend",
+          "type": "string"
+        },
+        "provider": {
+          "default": "none",
+          "title": "Provider",
+          "type": "string"
+        },
+        "rawScreenshotPersistence": {
+          "default": false,
+          "title": "Rawscreenshotpersistence",
+          "type": "boolean"
+        },
+        "terminalPolicy": {
+          "default": "deny",
+          "title": "Terminalpolicy",
+          "type": "string"
+        },
+        "visionEnabled": {
+          "default": false,
+          "title": "Visionenabled",
+          "type": "boolean"
+        }
+      },
+      "title": "ComputerUseCapabilityConfigPayload",
+      "type": "object"
+    },
     "ComputerUseCapabilityContract": {
       "additionalProperties": false,
       "properties": {
@@ -538,6 +575,206 @@
         "adapterStatus"
       ],
       "title": "ComputerUseCapabilityContract",
+      "type": "object"
+    },
+    "ComputerUseCapabilityDriverPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "captureReady": {
+          "default": false,
+          "title": "Captureready",
+          "type": "boolean"
+        },
+        "inputReady": {
+          "default": false,
+          "title": "Inputready",
+          "type": "boolean"
+        },
+        "permissionReady": {
+          "default": false,
+          "title": "Permissionready",
+          "type": "boolean"
+        },
+        "ready": {
+          "default": false,
+          "title": "Ready",
+          "type": "boolean"
+        }
+      },
+      "title": "ComputerUseCapabilityDriverPayload",
+      "type": "object"
+    },
+    "ComputerUseCapabilityEvidencePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "backendMatch": {
+          "default": false,
+          "title": "Backendmatch",
+          "type": "boolean"
+        },
+        "commitMatch": {
+          "default": false,
+          "title": "Commitmatch",
+          "type": "boolean"
+        },
+        "configMatch": {
+          "default": false,
+          "title": "Configmatch",
+          "type": "boolean"
+        },
+        "fresh": {
+          "default": false,
+          "title": "Fresh",
+          "type": "boolean"
+        },
+        "providerMatch": {
+          "default": false,
+          "title": "Providermatch",
+          "type": "boolean"
+        },
+        "source": {
+          "default": "none",
+          "enum": [
+            "none",
+            "default_path",
+            "explicit_path",
+            "fixture",
+            "unknown"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "ComputerUseCapabilityEvidencePayload",
+      "type": "object"
+    },
+    "ComputerUseCapabilityResolutionPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "config": {
+          "$ref": "#/$defs/ComputerUseCapabilityConfigPayload"
+        },
+        "driver": {
+          "$ref": "#/$defs/ComputerUseCapabilityDriverPayload"
+        },
+        "evidence": {
+          "$ref": "#/$defs/ComputerUseCapabilityEvidencePayload"
+        },
+        "liveEnabled": {
+          "const": false,
+          "default": false,
+          "title": "Liveenabled",
+          "type": "boolean"
+        },
+        "platform": {
+          "enum": [
+            "macos",
+            "windows",
+            "linux",
+            "unknown"
+          ],
+          "title": "Platform",
+          "type": "string"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile"
+        },
+        "publicLiveClaimAllowed": {
+          "const": false,
+          "default": false,
+          "title": "Publicliveclaimallowed",
+          "type": "boolean"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoncode"
+        },
+        "safety": {
+          "$ref": "#/$defs/ComputerUseCapabilitySafetyPayload"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "default": 1,
+          "title": "Schemaversion",
+          "type": "integer"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "supervisedLiveAllowed": {
+          "default": false,
+          "title": "Supervisedliveallowed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "platform",
+        "status",
+        "evidence",
+        "config",
+        "driver",
+        "safety"
+      ],
+      "title": "ComputerUseCapabilityResolutionPayload",
+      "type": "object"
+    },
+    "ComputerUseCapabilitySafetyPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "failClosed": {
+          "default": true,
+          "title": "Failclosed",
+          "type": "boolean"
+        },
+        "rawScreenshotPersistenceAllowed": {
+          "default": false,
+          "title": "Rawscreenshotpersistenceallowed",
+          "type": "boolean"
+        },
+        "requiresStepApproval": {
+          "default": true,
+          "title": "Requiresstepapproval",
+          "type": "boolean"
+        },
+        "sensitiveSurfaceStopEnabled": {
+          "default": true,
+          "title": "Sensitivesurfacestopenabled",
+          "type": "boolean"
+        }
+      },
+      "title": "ComputerUseCapabilitySafetyPayload",
       "type": "object"
     },
     "ComputerUsePlatformCapabilityContract": {
@@ -684,6 +921,17 @@
     "ComputerUseVisionRuntimeCapabilityContract": {
       "additionalProperties": false,
       "properties": {
+        "capabilityResolution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComputerUseCapabilityResolutionPayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "enabled": {
           "title": "Enabled",
           "type": "boolean"

@@ -51,6 +51,50 @@
             "approvalFreshnessEnforced": true,
             "replayIntegrityVerified": true
           },
+          "capabilityResolution": {
+            "schemaVersion": 1,
+            "platform": "macos",
+            "profile": "balanced",
+            "status": "blocked",
+            "liveEnabled": false,
+            "supervisedLiveAllowed": false,
+            "publicLiveClaimAllowed": false,
+            "reasonCode": "MACOS_COMPUTER_USE_NOT_QUALIFIED",
+            "blockers": [
+              "COMPUTER_USE_EVIDENCE_MISSING",
+              "COMPUTER_USE_CONFIG_LIVE_DISABLED",
+              "COMPUTER_USE_DRIVER_NOT_READY"
+            ],
+            "evidence": {
+              "status": "missing",
+              "source": "none",
+              "fresh": false,
+              "commitMatch": false,
+              "configMatch": false,
+              "providerMatch": false,
+              "backendMatch": false
+            },
+            "config": {
+              "visionEnabled": false,
+              "provider": "none",
+              "captureBackend": "disabled",
+              "inputBackend": "disabled",
+              "rawScreenshotPersistence": false,
+              "terminalPolicy": "deny"
+            },
+            "driver": {
+              "ready": false,
+              "captureReady": false,
+              "inputReady": false,
+              "permissionReady": false
+            },
+            "safety": {
+              "failClosed": true,
+              "rawScreenshotPersistenceAllowed": false,
+              "requiresStepApproval": true,
+              "sensitiveSurfaceStopEnabled": true
+            }
+          },
           "platforms": {
             "macos": {
               "platform": "macos",

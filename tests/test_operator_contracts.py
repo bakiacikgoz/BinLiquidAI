@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 import jsonschema
+import pytest
+from pydantic import ValidationError
 from typer.testing import CliRunner
 
 from binliquid.cli import app
@@ -193,6 +195,24 @@ def test_operator_capabilities_payload_matches_contract() -> None:
     vision_runtime = json.loads(result.stdout)["features"]["computerUseVisionRuntime"]
     assert set(vision_runtime["platforms"]) == {"macos", "windows", "linux"}
     assert vision_runtime["platforms"]["windows"]["liveEnabled"] is False
+    resolution = vision_runtime["capabilityResolution"]
+    assert resolution["schemaVersion"] == 1
+    assert resolution["platform"] in {"macos", "windows", "linux", "unknown"}
+    assert resolution["liveEnabled"] is False
+    assert resolution["publicLiveClaimAllowed"] is False
+    assert resolution["reasonCode"]
+    assert isinstance(resolution["blockers"], list)
+    assert resolution["evidence"]["source"] in {
+        "none",
+        "default_path",
+        "explicit_path",
+        "fixture",
+        "unknown",
+    }
+    encoded = json.dumps(vision_runtime, sort_keys=True)
+    assert "rawScreenshotPath" not in encoded
+    assert "raw_screenshot_path" not in encoded
+    assert "Users" not in str(resolution["evidence"]["source"])
     assert (
         vision_runtime["platforms"]["windows"]["reasonCode"]
         == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
@@ -210,6 +230,41 @@ def test_operator_capabilities_payload_matches_contract() -> None:
         assert payload.features.computer_use_pilot.adapter_status == "windows_scaffold"
     else:
         assert payload.features.computer_use_pilot.adapter_status == "safari_applescript"
+
+
+def test_operator_capabilities_contract_accepts_legacy_payload_without_resolution() -> None:
+    result = runner.invoke(app, ["operator", "capabilities", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    payload["features"]["computerUseVisionRuntime"].pop("capabilityResolution", None)
+
+    parsed = OperatorCapabilitiesPayload.model_validate(payload)
+
+    assert parsed.features.computer_use_vision_runtime.capability_resolution is None
+
+
+def test_operator_capabilities_contract_rejects_public_live_claim_true() -> None:
+    result = runner.invoke(app, ["operator", "capabilities", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    payload["features"]["computerUseVisionRuntime"]["capabilityResolution"][
+        "publicLiveClaimAllowed"
+    ] = True
+
+    with pytest.raises(ValidationError):
+        OperatorCapabilitiesPayload.model_validate(payload)
+
+
+def test_operator_capabilities_contract_rejects_resolver_live_enabled_true() -> None:
+    result = runner.invoke(app, ["operator", "capabilities", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    payload["features"]["computerUseVisionRuntime"]["capabilityResolution"][
+        "liveEnabled"
+    ] = True
+
+    with pytest.raises(ValidationError):
+        OperatorCapabilitiesPayload.model_validate(payload)
 
 
 def test_team_runtime_payloads_match_frozen_contracts(monkeypatch, tmp_path: Path) -> None:

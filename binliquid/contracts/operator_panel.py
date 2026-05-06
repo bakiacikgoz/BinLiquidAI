@@ -63,6 +63,61 @@ class ComputerUsePlatformCapabilityContract(ContractModel):
     environment: dict[str, str] = Field(default_factory=dict)
 
 
+class ComputerUseCapabilityEvidencePayload(ContractModel):
+    status: str
+    source: Literal["none", "default_path", "explicit_path", "fixture", "unknown"] = "none"
+    fresh: bool = False
+    commit_match: bool = Field(False, alias="commitMatch")
+    config_match: bool = Field(False, alias="configMatch")
+    provider_match: bool = Field(False, alias="providerMatch")
+    backend_match: bool = Field(False, alias="backendMatch")
+
+
+class ComputerUseCapabilityConfigPayload(ContractModel):
+    vision_enabled: bool = Field(False, alias="visionEnabled")
+    provider: str = "none"
+    capture_backend: str = Field("disabled", alias="captureBackend")
+    input_backend: str = Field("disabled", alias="inputBackend")
+    raw_screenshot_persistence: bool = Field(False, alias="rawScreenshotPersistence")
+    terminal_policy: str = Field("deny", alias="terminalPolicy")
+
+
+class ComputerUseCapabilityDriverPayload(ContractModel):
+    ready: bool = False
+    capture_ready: bool = Field(False, alias="captureReady")
+    input_ready: bool = Field(False, alias="inputReady")
+    permission_ready: bool = Field(False, alias="permissionReady")
+
+
+class ComputerUseCapabilitySafetyPayload(ContractModel):
+    fail_closed: bool = Field(True, alias="failClosed")
+    raw_screenshot_persistence_allowed: bool = Field(
+        False,
+        alias="rawScreenshotPersistenceAllowed",
+    )
+    requires_step_approval: bool = Field(True, alias="requiresStepApproval")
+    sensitive_surface_stop_enabled: bool = Field(True, alias="sensitiveSurfaceStopEnabled")
+
+
+class ComputerUseCapabilityResolutionPayload(ContractModel):
+    schema_version: Literal[1] = Field(1, alias="schemaVersion")
+    platform: Literal["macos", "windows", "linux", "unknown"]
+    profile: str | None = None
+    status: str
+    live_enabled: Literal[False] = Field(False, alias="liveEnabled")
+    supervised_live_allowed: bool = Field(False, alias="supervisedLiveAllowed")
+    public_live_claim_allowed: Literal[False] = Field(
+        False,
+        alias="publicLiveClaimAllowed",
+    )
+    reason_code: str | None = Field(None, alias="reasonCode")
+    blockers: list[str] = Field(default_factory=list)
+    evidence: ComputerUseCapabilityEvidencePayload
+    config: ComputerUseCapabilityConfigPayload
+    driver: ComputerUseCapabilityDriverPayload
+    safety: ComputerUseCapabilitySafetyPayload
+
+
 class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
     enabled: bool
     stage: Literal[
@@ -94,6 +149,10 @@ class ComputerUseVisionRuntimeCapabilityContract(ContractModel):
     provider: dict[str, Any] = Field(default_factory=dict)
     safety: dict[str, Any] = Field(default_factory=dict)
     platforms: dict[str, ComputerUsePlatformCapabilityContract] = Field(default_factory=dict)
+    capability_resolution: ComputerUseCapabilityResolutionPayload | None = Field(
+        None,
+        alias="capabilityResolution",
+    )
 
 
 class OperatorFeatureFlagsContract(ContractModel):

@@ -1056,6 +1056,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             sessionEvents={sessionEvents}
             runtimeSummary={runtimeSummary}
             rawSummary={{ runStatus, computerUseState, configData, handshakeData }}
+            computerUseCapabilityResolution={computerUseVisionCapability.capabilityResolution}
             debugRawEnabled={settings.debugRaw}
             hasApproval={hasApproval}
             approvalLabel={approvalLabel}

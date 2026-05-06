@@ -74,6 +74,46 @@ const visionRuntime = {
     terminalControl: 'deny',
     approvalRequiredForRiskyActions: true,
   },
+  capabilityResolution: {
+    schemaVersion: 1,
+    platform: 'windows',
+    profile: 'balanced',
+    status: 'blocked',
+    liveEnabled: false,
+    supervisedLiveAllowed: false,
+    publicLiveClaimAllowed: false,
+    reasonCode: 'WINDOWS_COMPUTER_USE_NOT_QUALIFIED',
+    blockers: ['COMPUTER_USE_EVIDENCE_MISSING'],
+    evidence: {
+      status: 'missing',
+      source: 'none',
+      fresh: false,
+      commitMatch: false,
+      configMatch: false,
+      providerMatch: false,
+      backendMatch: false,
+    },
+    config: {
+      visionEnabled: false,
+      provider: 'none',
+      captureBackend: 'disabled',
+      inputBackend: 'disabled',
+      rawScreenshotPersistence: false,
+      terminalPolicy: 'deny',
+    },
+    driver: {
+      ready: false,
+      captureReady: false,
+      inputReady: false,
+      permissionReady: false,
+    },
+    safety: {
+      failClosed: true,
+      rawScreenshotPersistenceAllowed: false,
+      requiresStepApproval: true,
+      sensitiveSurfaceStopEnabled: true,
+    },
+  },
   platforms: {
     macos: {
       platform: 'macos',
@@ -245,5 +285,46 @@ describe('capability handshake validation', () => {
         capabilities: { features: { computerUseVisionRuntime: visionRuntime } },
       }),
     ).toBe(false);
+  });
+
+  it('keeps legacy vision runtime payloads parseable without resolver output', () => {
+    const legacyVisionRuntime = { ...visionRuntime } as Record<string, unknown>;
+    delete legacyVisionRuntime.capabilityResolution;
+    const capability = getComputerUseVisionRuntimeCapability({
+      capabilities: {
+        features: {
+          computerUseVisionRuntime: legacyVisionRuntime,
+        },
+      },
+    });
+
+    expect(capability.capabilityResolution).toBeNull();
+    expect(capability.platforms.windows.reasonCode).toBe('WINDOWS_COMPUTER_USE_NOT_QUALIFIED');
+  });
+
+  it('does not trust optimistic resolver flags for live enablement', () => {
+    const optimisticVisionRuntime = {
+      ...visionRuntime,
+      capabilityResolution: {
+        ...visionRuntime.capabilityResolution,
+        liveEnabled: true,
+        supervisedLiveAllowed: true,
+        publicLiveClaimAllowed: true,
+      },
+    };
+    const handshake = {
+      capabilities: {
+        features: {
+          computerUseVisionRuntime: optimisticVisionRuntime,
+        },
+      },
+    };
+
+    const capability = getComputerUseVisionRuntimeCapability(handshake);
+
+    expect(capability.capabilityResolution?.liveEnabled).toBe(false);
+    expect(capability.capabilityResolution?.supervisedLiveAllowed).toBe(true);
+    expect(capability.capabilityResolution?.publicLiveClaimAllowed).toBe(false);
+    expect(isComputerUseVisionRuntimeLiveEnabled(handshake)).toBe(false);
   });
 });

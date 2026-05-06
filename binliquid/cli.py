@@ -551,6 +551,116 @@ def _selected_capability_decision(
     return decision if isinstance(decision, dict) else {}
 
 
+def _operator_computer_use_capability_resolution(
+    computer_use_config: Any,
+    *,
+    profile: str,
+    platform_label: str,
+    current_commit: str,
+) -> dict[str, Any]:
+    snapshot = _computer_use_capability_snapshot(
+        computer_use_config,
+        profile=profile,
+        current_platform_label=platform_label,
+        current_commit=current_commit,
+    )
+    decision = _selected_capability_decision(snapshot, selected=platform_label)
+    platform = _read_string(decision, "platform", platform_label)
+    evidence = _record(decision.get("evidence"))
+    config = _record(decision.get("config"))
+    driver = _record(decision.get("driverReadiness"))
+    return {
+        "schemaVersion": 1,
+        "platform": platform if platform in {"macos", "windows", "linux"} else "unknown",
+        "profile": profile,
+        "status": _read_string(decision, "status", "blocked"),
+        "liveEnabled": False,
+        "supervisedLiveAllowed": decision.get("supervisedLiveAllowed") is True,
+        "publicLiveClaimAllowed": False,
+        "reasonCode": _read_string(
+            decision,
+            "reasonCode",
+            "COMPUTER_USE_PLATFORM_NOT_QUALIFIED",
+        ),
+        "blockers": _operator_blocker_codes(decision),
+        "evidence": {
+            "status": _read_string(evidence, "status", "missing"),
+            "source": _operator_evidence_source(evidence),
+            "fresh": _read_string(evidence, "status", "missing") == "valid",
+            "commitMatch": decision.get("supervisedLiveAllowed") is True,
+            "configMatch": False,
+            "providerMatch": decision.get("supervisedLiveAllowed") is True,
+            "backendMatch": decision.get("supervisedLiveAllowed") is True,
+        },
+        "config": {
+            "visionEnabled": config.get("visionEnabled") is True,
+            "provider": _read_string(config, "visionProvider", "none"),
+            "captureBackend": _read_string(config, "captureBackend", "disabled"),
+            "inputBackend": _read_string(config, "inputBackend", "disabled"),
+            "rawScreenshotPersistence": config.get("rawScreenshotPersistence") is True,
+            "terminalPolicy": getattr(computer_use_config, "terminal_control", "deny"),
+        },
+        "driver": {
+            "ready": (
+                driver.get("captureReady") is True
+                and driver.get("inputReady") is True
+                and driver.get("permissionsReady") is True
+            ),
+            "captureReady": driver.get("captureReady") is True,
+            "inputReady": driver.get("inputReady") is True,
+            "permissionReady": driver.get("permissionsReady") is True,
+        },
+        "safety": {
+            "failClosed": True,
+            "rawScreenshotPersistenceAllowed": False,
+            "requiresStepApproval": getattr(
+                computer_use_config,
+                "macos_require_step_approval",
+                True,
+            ),
+            "sensitiveSurfaceStopEnabled": (
+                getattr(computer_use_config, "sensitive_surface_policy", "stop") == "stop"
+            ),
+        },
+    }
+
+
+def _operator_blocker_codes(decision: dict[str, object]) -> list[str]:
+    blockers = decision.get("blockers", [])
+    if not isinstance(blockers, list):
+        return []
+    result: list[str] = []
+    for blocker in blockers:
+        if isinstance(blocker, dict):
+            code = blocker.get("code")
+            if isinstance(code, str):
+                result.append(code)
+        elif isinstance(blocker, str):
+            result.append(blocker)
+    return result
+
+
+def _operator_evidence_source(evidence: dict[str, object]) -> str:
+    path_value = evidence.get("path")
+    if not isinstance(path_value, str) or not path_value:
+        return "none"
+    lowered = path_value.replace("\\", "/").lower()
+    if "/fixtures/" in lowered or lowered.endswith("_fixture.json"):
+        return "fixture"
+    if "artifacts/" in lowered:
+        return "default_path"
+    return "explicit_path"
+
+
+def _record(value: object) -> dict[str, object]:
+    return value if isinstance(value, dict) else {}
+
+
+def _read_string(source: dict[str, object], key: str, fallback: str) -> str:
+    value = source.get(key)
+    return value if isinstance(value, str) and value else fallback
+
+
 def _parse_computer_use_mode(mode: str) -> ComputerUseMode:
     normalized = mode.strip().lower()
     aliases = {
@@ -1528,7 +1638,9 @@ def operator_panel(
 def _computer_use_vision_runtime_payload(
     vision_config: Any,
     *,
+    profile: str,
     platform_label: str,
+    current_commit: str,
 ) -> dict[str, Any]:
     qualification_reports = {}
     macos_report = _load_json_file_if_present(vision_config.macos_qualification_report)
@@ -1537,7 +1649,7 @@ def _computer_use_vision_runtime_payload(
     platform_capabilities = build_platform_capabilities(
         vision_config,
         qualification_reports=qualification_reports,
-        commit=_current_git_sha(),
+        commit=current_commit,
     )
     current_label = platform_label if platform_label in platform_capabilities else "macos"
     current_capability = platform_capabilities[current_label]
@@ -1576,6 +1688,12 @@ def _computer_use_vision_runtime_payload(
             key: capability.model_dump(mode="json", by_alias=True)
             for key, capability in platform_capabilities.items()
         },
+        "capabilityResolution": _operator_computer_use_capability_resolution(
+            vision_config,
+            profile=profile,
+            platform_label=platform_label,
+            current_commit=current_commit,
+        ),
     }
 
 
@@ -1585,7 +1703,9 @@ def operator_capabilities(
 ) -> None:
     platform_info = current_platform()
     windows_computer_use = platform_info.label == "windows"
-    vision_config = RuntimeConfig.from_profile("balanced").computer_use
+    profile = "balanced"
+    current_commit = _current_git_sha()
+    vision_config = RuntimeConfig.from_profile(profile).computer_use
     computer_use_pilot = (
         {
             "enabled": False,
@@ -1621,7 +1741,9 @@ def operator_capabilities(
     )
     computer_use_vision_runtime = _computer_use_vision_runtime_payload(
         vision_config,
+        profile=profile,
         platform_label=platform_info.label,
+        current_commit=current_commit,
     )
     payload = {
         "coreVersion": __version__,

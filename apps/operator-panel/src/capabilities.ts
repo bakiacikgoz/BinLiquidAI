@@ -62,6 +62,47 @@ export type ComputerUsePlatformStatus = {
   environment: Record<string, string>;
 };
 
+export type ComputerUseCapabilityResolution = {
+  schemaVersion: 1;
+  platform: 'macos' | 'windows' | 'linux' | 'unknown';
+  profile: string | null;
+  status: string;
+  liveEnabled: boolean;
+  supervisedLiveAllowed: boolean;
+  publicLiveClaimAllowed: boolean;
+  reasonCode: string | null;
+  blockers: string[];
+  evidence: {
+    status: string;
+    source: 'none' | 'default_path' | 'explicit_path' | 'fixture' | 'unknown';
+    fresh: boolean;
+    commitMatch: boolean;
+    configMatch: boolean;
+    providerMatch: boolean;
+    backendMatch: boolean;
+  };
+  config: {
+    visionEnabled: boolean;
+    provider: string;
+    captureBackend: string;
+    inputBackend: string;
+    rawScreenshotPersistence: boolean;
+    terminalPolicy: string;
+  };
+  driver: {
+    ready: boolean;
+    captureReady: boolean;
+    inputReady: boolean;
+    permissionReady: boolean;
+  };
+  safety: {
+    failClosed: boolean;
+    rawScreenshotPersistenceAllowed: boolean;
+    requiresStepApproval: boolean;
+    sensitiveSurfaceStopEnabled: boolean;
+  };
+};
+
 export type ComputerUseVisionRuntimeCapability = {
   enabled: boolean;
   stage: string;
@@ -82,6 +123,7 @@ export type ComputerUseVisionRuntimeCapability = {
     terminalControl: string;
     approvalRequiredForRiskyActions: boolean;
   };
+  capabilityResolution: ComputerUseCapabilityResolution | null;
   platforms: Record<string, ComputerUsePlatformStatus>;
 };
 
@@ -108,6 +150,20 @@ function readStringRecord(source: Record<string, unknown>, key: string): Record<
   return Object.fromEntries(
     Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
   );
+}
+
+function readCapabilityPlatform(value: string | null): ComputerUseCapabilityResolution['platform'] {
+  return value === 'macos' || value === 'windows' || value === 'linux' ? value : 'unknown';
+}
+
+function readEvidenceSource(value: string | null): ComputerUseCapabilityResolution['evidence']['source'] {
+  return value === 'none' ||
+    value === 'default_path' ||
+    value === 'explicit_path' ||
+    value === 'fixture' ||
+    value === 'unknown'
+    ? value
+    : 'unknown';
 }
 
 export function hasContractMismatch(handshakeData: unknown): boolean {
@@ -177,7 +233,61 @@ export function getComputerUseVisionRuntimeCapability(
       terminalControl: readString(safety, 'terminalControl') ?? 'deny',
       approvalRequiredForRiskyActions: readBoolean(safety, 'approvalRequiredForRiskyActions'),
     },
+    capabilityResolution: readComputerUseCapabilityResolution(computerUse.capabilityResolution),
     platforms: readComputerUsePlatformStatuses(platforms),
+  };
+}
+
+function readComputerUseCapabilityResolution(value: unknown): ComputerUseCapabilityResolution | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const resolution = asRecord(value);
+  const evidence = asRecord(resolution.evidence);
+  const config = asRecord(resolution.config);
+  const driver = asRecord(resolution.driver);
+  const safety = asRecord(resolution.safety);
+
+  return {
+    schemaVersion: 1,
+    platform: readCapabilityPlatform(readString(resolution, 'platform')),
+    profile: readString(resolution, 'profile'),
+    status: readString(resolution, 'status') ?? 'blocked',
+    liveEnabled: false,
+    supervisedLiveAllowed: readBoolean(resolution, 'supervisedLiveAllowed'),
+    publicLiveClaimAllowed: false,
+    reasonCode: readString(resolution, 'reasonCode'),
+    blockers: readStringArray(resolution, 'blockers'),
+    evidence: {
+      status: readString(evidence, 'status') ?? 'missing',
+      source: readEvidenceSource(readString(evidence, 'source')),
+      fresh: readBoolean(evidence, 'fresh'),
+      commitMatch: readBoolean(evidence, 'commitMatch'),
+      configMatch: readBoolean(evidence, 'configMatch'),
+      providerMatch: readBoolean(evidence, 'providerMatch'),
+      backendMatch: readBoolean(evidence, 'backendMatch'),
+    },
+    config: {
+      visionEnabled: readBoolean(config, 'visionEnabled'),
+      provider: readString(config, 'provider') ?? 'none',
+      captureBackend: readString(config, 'captureBackend') ?? 'disabled',
+      inputBackend: readString(config, 'inputBackend') ?? 'disabled',
+      rawScreenshotPersistence: readBoolean(config, 'rawScreenshotPersistence'),
+      terminalPolicy: readString(config, 'terminalPolicy') ?? 'deny',
+    },
+    driver: {
+      ready: readBoolean(driver, 'ready'),
+      captureReady: readBoolean(driver, 'captureReady'),
+      inputReady: readBoolean(driver, 'inputReady'),
+      permissionReady: readBoolean(driver, 'permissionReady'),
+    },
+    safety: {
+      failClosed: safety.failClosed !== false,
+      rawScreenshotPersistenceAllowed: false,
+      requiresStepApproval: safety.requiresStepApproval !== false,
+      sensitiveSurfaceStopEnabled: safety.sensitiveSurfaceStopEnabled !== false,
+    },
   };
 }
 
