@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from binliquid.computer_use.vision_runtime.models import VisionAction, VisionObservation
+from binliquid.governance.models import ApprovalStatus, ApprovalTicket, ExecutionStatus
 from binliquid.runtime.config import ComputerUseRuntimeConfig
 
 
@@ -59,14 +60,58 @@ def validate_approval_snapshot(
     return _blocked(checks)
 
 
+def validate_vision_approval_resume(
+    *,
+    ticket: ApprovalTicket,
+    current_observation: VisionObservation,
+    action: VisionAction,
+    policy_hash: str,
+    config: ComputerUseRuntimeConfig,
+    now: datetime | None = None,
+) -> ApprovalSnapshotValidation:
+    lifecycle_checks = {
+        "status_executed": ticket.status == ApprovalStatus.EXECUTED,
+        "execution_status_executed": ticket.execution_status == ExecutionStatus.EXECUTED,
+        "not_consumed": ticket.consumed_at is None and ticket.consumed_by_job_id is None,
+    }
+    if ticket.status == ApprovalStatus.CONSUMED or not lifecycle_checks["not_consumed"]:
+        return _blocked(lifecycle_checks, reason_code="REPLAY_BLOCKED")
+    if not (
+        lifecycle_checks["status_executed"]
+        and lifecycle_checks["execution_status_executed"]
+    ):
+        return _blocked(lifecycle_checks, reason_code="APPROVAL_NOT_EXECUTED")
+
+    snapshot_validation = validate_approval_snapshot(
+        snapshot=ticket.snapshot,
+        current_observation=current_observation,
+        action=action,
+        policy_hash=policy_hash,
+        config=config,
+        now=now,
+    )
+    checks = {**lifecycle_checks, **snapshot_validation.checks}
+    if snapshot_validation.allowed:
+        return ApprovalSnapshotValidation(allowed=True, checks=checks)
+    return ApprovalSnapshotValidation(
+        allowed=False,
+        reason_code=snapshot_validation.reason_code,
+        checks=checks,
+    )
+
+
 def hash_json(payload: object) -> str:
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _blocked(checks: dict[str, bool]) -> ApprovalSnapshotValidation:
+def _blocked(
+    checks: dict[str, bool],
+    *,
+    reason_code: str = "COMPUTER_USE_STALE_APPROVAL_SNAPSHOT",
+) -> ApprovalSnapshotValidation:
     return ApprovalSnapshotValidation(
         allowed=False,
-        reason_code="COMPUTER_USE_STALE_APPROVAL_SNAPSHOT",
+        reason_code=reason_code,
         checks=checks,
     )

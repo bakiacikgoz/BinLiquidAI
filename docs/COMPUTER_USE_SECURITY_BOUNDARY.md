@@ -16,6 +16,10 @@ The candidate action planner is a hygiene and selection layer only. Policy
 remains the source of truth for sensitive surfaces, terminal control, approval
 requirements, and platform qualification.
 
+Approval resume requires an executed, unconsumed ticket and a matching
+vision-step snapshot. An `approved` ticket alone does not authorize execution,
+and stale or mismatched snapshots fail closed before input is applied.
+
 ## macOS Permission Boundary
 
 BinLiquid can detect and report permission blockers. It must not grant permissions automatically or bypass macOS consent controls.

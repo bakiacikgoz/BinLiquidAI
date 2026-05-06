@@ -418,20 +418,33 @@ def build_approval_snapshot(
     risk_reasons: list[str],
     max_age_ms: int,
     created_at: str | None = None,
+    planner_version: str = "candidate_action_planner/v1",
+    provider_name: str | None = None,
+    provider_model: str | None = None,
 ) -> dict[str, Any]:
     action_payload = action.model_dump(mode="json", exclude_none=True)
     action_hash = hash_json(action_payload)
+    objective_hash = hash_json({"objective": objective})
     return {
         "kind": "computer_use_vision_action",
+        "approval_kind": "computer_use_step",
         "job_id": job_id,
         "step_index": step_index,
-        "objective_hash": hash_json({"objective": objective}),
+        "step_id": f"step_{step_index:03d}",
+        "objective_hash": objective_hash,
+        "objective_digest": objective_hash,
         "before_screenshot_hash": observation.screenshot_hash,
+        "observation_digest": observation.screenshot_hash,
         "action_hash": action_hash,
+        "action_digest": action_hash,
         "policy_hash": policy_hash,
+        "planner_version": planner_version,
+        "provider_name": provider_name,
+        "provider_model": provider_model,
         "active_app": observation.active_app,
         "active_window_title": observation.active_window_title,
         "surface_kind": observation.surface_kind.value,
+        "target_element_id": action.target_element_id,
         "target_bbox": action.target_bbox.model_dump(mode="json")
         if action.target_bbox is not None
         else None,
