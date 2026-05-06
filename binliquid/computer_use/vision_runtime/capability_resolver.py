@@ -20,6 +20,10 @@ class CapabilityModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
 
+class CapabilityDecisionModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
+
+
 class EvidenceLoadStatus(StrEnum):
     MISSING = "missing"
     INVALID = "invalid"
@@ -37,6 +41,53 @@ class PlatformLiveMode(StrEnum):
     DRY_RUN = "dry_run"
     STEP_APPROVAL = "step_approval"
     SUPERVISED_QUALIFICATION = "supervised_qualification"
+
+
+class CapabilityBlockerDecision(CapabilityDecisionModel):
+    code: str
+    message: str
+    severity: Literal["blocking", "warning"] = "blocking"
+
+
+class CapabilityEvidenceDecision(CapabilityDecisionModel):
+    status: str
+    path: str | None = None
+    report_id: str | None = Field(default=None, alias="reportId")
+    generated_at: str | None = Field(default=None, alias="generatedAt")
+    expires_at: str | None = Field(default=None, alias="expiresAt")
+    git_commit: str | None = Field(default=None, alias="gitCommit")
+    suite: str | None = None
+    mode: str | None = None
+
+
+class CapabilityConfigDecision(CapabilityDecisionModel):
+    vision_enabled: bool = Field(alias="visionEnabled")
+    vision_provider: str = Field(alias="visionProvider")
+    capture_backend: str | None = Field(default=None, alias="captureBackend")
+    input_backend: str | None = Field(default=None, alias="inputBackend")
+    raw_screenshot_persistence: bool = Field(alias="rawScreenshotPersistence")
+
+
+class CapabilityDriverReadinessDecision(CapabilityDecisionModel):
+    capture_ready: bool = Field(alias="captureReady")
+    input_ready: bool = Field(alias="inputReady")
+    permissions_ready: bool = Field(alias="permissionsReady")
+    reason_code: str | None = Field(default=None, alias="reasonCode")
+
+
+class PlatformCapabilityDecision(CapabilityDecisionModel):
+    platform: Literal["macos", "windows", "linux"]
+    runtime: Literal["vision-first"] = "vision-first"
+    status: CapabilityStatus
+    live_enabled: bool = Field(alias="liveEnabled")
+    supervised_live_allowed: bool = Field(alias="supervisedLiveAllowed")
+    public_live_claim_allowed: bool
+    reason_code: str = Field(alias="reasonCode")
+    blockers: list[CapabilityBlockerDecision]
+    evidence: CapabilityEvidenceDecision
+    config: CapabilityConfigDecision
+    driver_readiness: CapabilityDriverReadinessDecision = Field(alias="driverReadiness")
+    evaluated_at: str = Field(alias="evaluatedAt")
 
 
 class EvidenceSource(CapabilityModel):
@@ -102,6 +153,55 @@ EVIDENCE_REASON_MAP = {
     "REPLAY_INTEGRITY_NOT_VERIFIED": "COMPUTER_USE_EVIDENCE_FAILED",
 }
 
+BLOCKER_MESSAGES = {
+    "COMPUTER_USE_CAPABILITY_RESOLVER_EXCEPTION": (
+        "The computer-use capability resolver failed; live execution remains disabled."
+    ),
+    "COMPUTER_USE_CONFIG_LIVE_DISABLED": (
+        "Computer-use live execution is disabled by runtime configuration."
+    ),
+    "COMPUTER_USE_DRIVER_NOT_READY": (
+        "The local computer-use platform driver is not ready for live execution."
+    ),
+    "COMPUTER_USE_DRIVER_READINESS_INVALID": (
+        "The local computer-use driver readiness payload is invalid."
+    ),
+    "COMPUTER_USE_DRIVER_READINESS_PLATFORM_MISMATCH": (
+        "The local computer-use driver readiness platform does not match this platform."
+    ),
+    "COMPUTER_USE_EVIDENCE_BACKEND_MISMATCH": (
+        "Qualification evidence does not match the configured capture/input backend."
+    ),
+    "COMPUTER_USE_EVIDENCE_COMMIT_MISMATCH": (
+        "Qualification evidence was generated for a different git commit."
+    ),
+    "COMPUTER_USE_EVIDENCE_FAILED": (
+        "Qualification evidence reports a failed safety or readiness check."
+    ),
+    "COMPUTER_USE_EVIDENCE_INVALID_SCHEMA": (
+        "Qualification evidence does not match the trusted schema."
+    ),
+    "COMPUTER_USE_EVIDENCE_MISSING": (
+        "No trusted supervised vision qualification evidence was found."
+    ),
+    "COMPUTER_USE_EVIDENCE_PLATFORM_MISMATCH": (
+        "Qualification evidence platform does not match the requested platform."
+    ),
+    "COMPUTER_USE_EVIDENCE_PROVIDER_MISMATCH": (
+        "Qualification evidence does not match the configured vision provider."
+    ),
+    "COMPUTER_USE_EVIDENCE_STALE": "Qualification evidence is expired.",
+    "COMPUTER_USE_PERMISSION_CHECK_FAILED": (
+        "Required computer-use platform permissions were not verified."
+    ),
+    "COMPUTER_USE_PUBLIC_LIVE_CLAIM_BLOCKED": (
+        "Public live computer-use claims are blocked by policy."
+    ),
+    "COMPUTER_USE_RAW_SCREENSHOT_INVARIANT_FAILED": (
+        "Raw screenshot persistence invariant failed; live execution remains disabled."
+    ),
+}
+
 
 def resolve_computer_use_capabilities(
     *,
@@ -143,6 +243,43 @@ def resolve_computer_use_capabilities(
         profile=profile,
         public_live_claim_allowed=False,
         platforms=platforms,
+    )
+
+
+def resolve_capability_decision_snapshot(
+    *,
+    config: ComputerUseRuntimeConfig,
+    profile: str,
+    current_platform: str,
+    current_commit: str | None = None,
+    now: datetime | None = None,
+    evidence_by_platform: Mapping[str, object] | None = None,
+    evidence_paths: Mapping[str, str] | None = None,
+    driver_readiness_by_platform: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    evaluated_at = (now or datetime.now(UTC)).isoformat()
+    try:
+        resolution = resolve_computer_use_capabilities(
+            config=config,
+            profile=profile,
+            current_platform=current_platform,
+            current_commit=current_commit,
+            now=now,
+            evidence_by_platform=evidence_by_platform,
+            evidence_paths=evidence_paths,
+            driver_readiness_by_platform=driver_readiness_by_platform,
+        )
+    except Exception:
+        return _fallback_capability_decision_snapshot(
+            config=config,
+            profile=profile,
+            current_platform=current_platform,
+            evaluated_at=evaluated_at,
+        )
+    return _capability_decision_snapshot(
+        resolution=resolution,
+        config=config,
+        evaluated_at=evaluated_at,
     )
 
 
@@ -188,6 +325,8 @@ def _resolve_platform(
         )
         blockers.extend(_mapped_reasons(validation.reason_codes))
         if validation.status == "fail":
+            blockers.append("COMPUTER_USE_EVIDENCE_FAILED")
+        if evidence is not None and evidence.status.value == "fail":
             blockers.append("COMPUTER_USE_EVIDENCE_FAILED")
         if evidence is not None and evidence.status == "blocked":
             blockers.extend(_mapped_reasons(evidence.reason_codes))
@@ -261,6 +400,158 @@ def _resolve_platform(
         driver_reason_code=driver_reason_code,
         permission_checks_passed=permission_checks_passed,
         raw_screenshot_persistence_allowed=False,
+    )
+
+
+def _capability_decision_snapshot(
+    *,
+    resolution: ComputerUseCapabilityResolution,
+    config: ComputerUseRuntimeConfig,
+    evaluated_at: str,
+) -> dict[str, object]:
+    return {
+        "artifactVersion": resolution.artifact_version,
+        "status": resolution.status.value,
+        "currentPlatform": resolution.current_platform,
+        "profile": resolution.profile,
+        "public_live_claim_allowed": False,
+        "platforms": {
+            platform: _platform_capability_decision(
+                platform_resolution,
+                config=config,
+                evaluated_at=evaluated_at,
+            ).model_dump(mode="json", by_alias=True)
+            for platform, platform_resolution in resolution.platforms.items()
+        },
+    }
+
+
+def _fallback_capability_decision_snapshot(
+    *,
+    config: ComputerUseRuntimeConfig,
+    profile: str,
+    current_platform: str,
+    evaluated_at: str,
+) -> dict[str, object]:
+    normalized_current_platform = _normalize_current_platform(current_platform)
+    return {
+        "artifactVersion": "computer-use-capability-resolution/v1",
+        "status": CapabilityStatus.BLOCKED.value,
+        "currentPlatform": normalized_current_platform,
+        "profile": profile,
+        "public_live_claim_allowed": False,
+        "platforms": {
+            platform: _fallback_platform_capability_decision(
+                platform=platform,
+                config=config,
+                evaluated_at=evaluated_at,
+            ).model_dump(mode="json", by_alias=True)
+            for platform in ("macos", "windows", "linux")
+        },
+    }
+
+
+def _platform_capability_decision(
+    resolution: PlatformCapabilityResolution,
+    *,
+    config: ComputerUseRuntimeConfig,
+    evaluated_at: str,
+) -> PlatformCapabilityDecision:
+    supervised_live_allowed = resolution.live_enabled and resolution.platform == "macos"
+    return PlatformCapabilityDecision(
+        platform=resolution.platform,
+        status=resolution.status,
+        liveEnabled=False,
+        supervisedLiveAllowed=supervised_live_allowed,
+        public_live_claim_allowed=False,
+        reasonCode=_decision_reason_code(resolution, supervised_live_allowed),
+        blockers=_blocker_decisions(resolution.blockers, platform=resolution.platform),
+        evidence=CapabilityEvidenceDecision(
+            status=resolution.evidence.load_status.value,
+            path=resolution.evidence.path,
+        ),
+        config=CapabilityConfigDecision(
+            visionEnabled=config.vision_enabled,
+            visionProvider=config.vision_provider,
+            captureBackend=_capture_backend(config, resolution.platform),
+            inputBackend=_input_backend(config, resolution.platform),
+            rawScreenshotPersistence=config.raw_screenshot_persistence,
+        ),
+        driverReadiness=CapabilityDriverReadinessDecision(
+            captureReady=resolution.driver_ready is True,
+            inputReady=resolution.driver_ready is True,
+            permissionsReady=resolution.permission_checks_passed is True,
+            reasonCode=resolution.driver_reason_code,
+        ),
+        evaluatedAt=evaluated_at,
+    )
+
+
+def _fallback_platform_capability_decision(
+    *,
+    platform: str,
+    config: ComputerUseRuntimeConfig,
+    evaluated_at: str,
+) -> PlatformCapabilityDecision:
+    return PlatformCapabilityDecision(
+        platform=platform,  # type: ignore[arg-type]
+        status=CapabilityStatus.BLOCKED,
+        liveEnabled=False,
+        supervisedLiveAllowed=False,
+        public_live_claim_allowed=False,
+        reasonCode=PLATFORM_REASON_CODES[platform],
+        blockers=_blocker_decisions(
+            ["COMPUTER_USE_CAPABILITY_RESOLVER_EXCEPTION"],
+            platform=platform,
+        ),
+        evidence=CapabilityEvidenceDecision(status=EvidenceLoadStatus.MISSING.value),
+        config=CapabilityConfigDecision(
+            visionEnabled=config.vision_enabled,
+            visionProvider=config.vision_provider,
+            captureBackend=_capture_backend(config, platform),
+            inputBackend=_input_backend(config, platform),
+            rawScreenshotPersistence=config.raw_screenshot_persistence,
+        ),
+        driverReadiness=CapabilityDriverReadinessDecision(
+            captureReady=False,
+            inputReady=False,
+            permissionsReady=False,
+        ),
+        evaluatedAt=evaluated_at,
+    )
+
+
+def _decision_reason_code(
+    resolution: PlatformCapabilityResolution,
+    supervised_live_allowed: bool,
+) -> str:
+    if supervised_live_allowed:
+        return "MACOS_SUPERVISED_VISION_QUALIFIED_LOCAL_ONLY"
+    return resolution.reason_code
+
+
+def _blocker_decisions(
+    blockers: list[str],
+    *,
+    platform: str,
+) -> list[CapabilityBlockerDecision]:
+    return [
+        CapabilityBlockerDecision(
+            code=blocker,
+            message=_blocker_message(blocker, platform=platform),
+        )
+        for blocker in blockers
+    ]
+
+
+def _blocker_message(blocker: str, *, platform: str) -> str:
+    if blocker == "COMPUTER_USE_EVIDENCE_MISSING":
+        return (
+            f"No trusted {platform} supervised vision qualification evidence was found."
+        )
+    return BLOCKER_MESSAGES.get(
+        blocker,
+        f"{platform} computer-use capability is blocked by {blocker}.",
     )
 
 

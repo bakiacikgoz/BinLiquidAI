@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from binliquid.computer_use.vision_runtime.capability_resolver import (
+    resolve_capability_decision_snapshot,
     resolve_computer_use_capabilities,
 )
 from binliquid.runtime.config import ComputerUseRuntimeConfig
@@ -231,3 +232,75 @@ def test_driver_readiness_blocks_valid_evidence_when_driver_is_not_ready() -> No
     assert macos.driver_ready is False
     assert macos.driver_reason_code == "MACOS_CAPTURE_BACKEND_UNAVAILABLE"
     assert "MACOS_CAPTURE_BACKEND_UNAVAILABLE" in macos.blockers
+
+
+def test_capability_decision_snapshot_is_json_safe_and_public_live_disabled() -> None:
+    snapshot = resolve_capability_decision_snapshot(
+        config=_enabled_macos_config(),
+        profile="balanced",
+        current_platform="macos",
+        current_commit="fixture-commit",
+        now=NOW,
+        evidence_by_platform={"macos": _fixture("macos_supervised_v2_evidence_pass.json")},
+    )
+
+    encoded = json.dumps(snapshot, sort_keys=True)
+    macos = snapshot["platforms"]["macos"]
+    assert snapshot["artifactVersion"] == "computer-use-capability-resolution/v1"
+    assert snapshot["public_live_claim_allowed"] is False
+    assert macos["liveEnabled"] is False
+    assert macos["supervisedLiveAllowed"] is True
+    assert macos["public_live_claim_allowed"] is False
+    assert macos["reasonCode"] == "MACOS_SUPERVISED_VISION_QUALIFIED_LOCAL_ONLY"
+    assert macos["evidence"]["status"] == "valid"
+    assert macos["config"]["rawScreenshotPersistence"] is False
+    assert "rawScreenshotPath" not in encoded
+    assert "ocrText" not in encoded
+    assert "visibleScreenText" not in encoded
+
+
+def test_capability_decision_snapshot_preserves_stable_blocker_order() -> None:
+    snapshot = resolve_capability_decision_snapshot(
+        config=_enabled_macos_config(),
+        profile="balanced",
+        current_platform="macos",
+        current_commit="fixture-commit",
+        now=NOW,
+        evidence_by_platform={
+            "macos": _fixture("macos_supervised_v2_evidence_fail_raw_screenshot.json")
+        },
+    )
+
+    blocker_codes = [blocker["code"] for blocker in snapshot["platforms"]["macos"]["blockers"]]
+    assert blocker_codes == [
+        "COMPUTER_USE_RAW_SCREENSHOT_INVARIANT_FAILED",
+        "COMPUTER_USE_EVIDENCE_FAILED",
+    ]
+
+
+def test_capability_decision_snapshot_fails_closed_on_resolver_exception(monkeypatch) -> None:
+    def _raise_resolution_error(**_kwargs: object) -> object:
+        raise RuntimeError("resolver unavailable")
+
+    monkeypatch.setattr(
+        "binliquid.computer_use.vision_runtime.capability_resolver."
+        "resolve_computer_use_capabilities",
+        _raise_resolution_error,
+    )
+
+    snapshot = resolve_capability_decision_snapshot(
+        config=ComputerUseRuntimeConfig(),
+        profile="balanced",
+        current_platform="windows",
+        current_commit="fixture-commit",
+        now=NOW,
+    )
+
+    windows = snapshot["platforms"]["windows"]
+    assert snapshot["status"] == "blocked"
+    assert windows["liveEnabled"] is False
+    assert windows["supervisedLiveAllowed"] is False
+    assert windows["reasonCode"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+    assert [blocker["code"] for blocker in windows["blockers"]] == [
+        "COMPUTER_USE_CAPABILITY_RESOLVER_EXCEPTION"
+    ]

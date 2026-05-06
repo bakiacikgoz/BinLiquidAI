@@ -30,8 +30,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     matrix = evaluate_platform_matrix(
         config.computer_use,
         current_platform=current_platform().label,
+        profile=args.profile,
     )
-    matrix["profile"] = args.profile
 
     output_path = Path(args.output)
     markdown_path = Path(args.markdown)
@@ -57,23 +57,50 @@ def _render_markdown(matrix: dict[str, object]) -> str:
         f"- Live automation default: `{matrix.get('liveAutomationDefault')}`",
         f"- Raw screenshot persistence default: `{matrix.get('rawScreenshotPersistenceDefault')}`",
         "",
-        "| Platform | Stage | Live | Capture | Input | Reason |",
-        "| --- | --- | --- | --- | --- | --- |",
+        (
+            "| Platform | Stage | Live | Supervised Local | Evidence | Capture | Input | "
+            "Reason | Public Claim |"
+        ),
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     if isinstance(platforms, dict):
         for platform, payload in platforms.items():
             if not isinstance(payload, dict):
                 continue
             lines.append(
-                "| {platform} | {stage} | {live} | {capture} | {input} | {reason} |".format(
+                (
+                    "| {platform} | {stage} | {live} | {supervised} | {evidence} | "
+                    "{capture} | {input} | {reason} | {public_claim} |"
+                ).format(
                     platform=platform,
                     stage=payload.get("stage"),
                     live=payload.get("liveEnabled"),
+                    supervised=payload.get("supervisedLiveAllowed"),
+                    evidence=payload.get("evidenceStatus"),
                     capture=payload.get("captureBackend"),
                     input=payload.get("inputBackend"),
                     reason=payload.get("reasonCode"),
+                    public_claim=payload.get("public_live_claim_allowed"),
                 )
             )
+    lines.extend(["", "## Capability Blockers", ""])
+    if isinstance(platforms, dict):
+        for platform, payload in platforms.items():
+            if not isinstance(payload, dict):
+                continue
+            capability = payload.get("capability", {})
+            blockers = (
+                capability.get("blockers", [])
+                if isinstance(capability, dict)
+                else []
+            )
+            if not isinstance(blockers, list) or not blockers:
+                lines.append(f"- {platform}: None")
+                continue
+            for blocker in blockers:
+                if not isinstance(blocker, dict):
+                    continue
+                lines.append(f"- {platform}: `{blocker.get('code')}`")
     blockers = matrix.get("blockers", [])
     lines.extend(["", "## Blockers", ""])
     if isinstance(blockers, list) and blockers:

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from binliquid.computer_use.vision_runtime.capability_resolver import (
+    resolve_capability_decision_snapshot,
+)
 from binliquid.computer_use.vision_runtime.qualification import (
     validate_platform_qualification_report,
 )
@@ -198,18 +203,42 @@ def evaluate_platform_matrix(
     current_platform: str | None = None,
     environment: Mapping[str, str] | None = None,
     qualification_reports: Mapping[str, Mapping[str, Any]] | None = None,
+    evidence_by_platform: Mapping[str, object] | None = None,
+    evidence_paths: Mapping[str, str] | None = None,
+    driver_readiness_by_platform: Mapping[str, object] | None = None,
     commit: str | None = None,
+    profile: str = "unknown",
 ) -> dict[str, Any]:
+    current_platform_label = current_platform or runtime_current_platform().label
+    config_evidence, config_evidence_paths = _qualification_evidence_from_config(config)
+    resolved_evidence = (
+        config_evidence if evidence_by_platform is None else evidence_by_platform
+    )
+    resolved_evidence_paths = config_evidence_paths if evidence_paths is None else evidence_paths
+    capability_resolution = resolve_capability_decision_snapshot(
+        config=config,
+        profile=profile,
+        current_platform=current_platform_label,
+        current_commit=commit,
+        evidence_by_platform=resolved_evidence,
+        evidence_paths=resolved_evidence_paths,
+        driver_readiness_by_platform=driver_readiness_by_platform,
+    )
     capabilities = build_platform_capabilities(
         config,
         environment=environment,
         qualification_reports=qualification_reports,
         commit=commit,
     )
+    platform_payloads = _platform_matrix_payloads(
+        capabilities=capabilities,
+        capability_resolution=capability_resolution,
+    )
     blockers = [
         f"{platform.value}_live_ready_without_valid_qualification"
         for platform in ComputerUsePlatform
-        if _live_requested(config, platform) and not capabilities[platform.value].live_enabled
+        if _live_requested(config, platform)
+        and not _resolver_supervised_live_allowed(capability_resolution, platform.value)
     ]
     raw_screenshot_default = (
         config.raw_screenshot_retention != "disabled" or config.raw_screenshot_max_count > 0
@@ -222,8 +251,8 @@ def evaluate_platform_matrix(
     return {
         "schemaVersion": "computer-use-platform-matrix/v1",
         "runtime": "computer_use_vision",
-        "profile": "unknown",
-        "currentPlatform": current_platform or runtime_current_platform().label,
+        "profile": profile,
+        "currentPlatform": current_platform_label,
         "status": "fail" if blockers else "pass",
         "liveAutomationDefault": False,
         "rawScreenshotPersistenceDefault": raw_screenshot_default,
@@ -236,12 +265,80 @@ def evaluate_platform_matrix(
             "replayIntegrityVerified": True,
             "rawScreenshotsPersistedByDefault": raw_screenshot_default,
         },
-        "platforms": {
-            key: capability.model_dump(mode="json", by_alias=True)
-            for key, capability in capabilities.items()
-        },
+        "capabilityResolution": capability_resolution,
+        "platforms": platform_payloads,
         "blockers": blockers,
     }
+
+
+def _qualification_evidence_from_config(
+    config: ComputerUseRuntimeConfig,
+) -> tuple[dict[str, object], dict[str, str]]:
+    evidence_by_platform: dict[str, object] = {}
+    evidence_paths: dict[str, str] = {}
+    path_value = config.macos_qualification_report
+    if not path_value:
+        return evidence_by_platform, evidence_paths
+    path = Path(path_value)
+    if not path.exists():
+        return evidence_by_platform, evidence_paths
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return evidence_by_platform, evidence_paths
+    if isinstance(payload, dict):
+        evidence_by_platform["macos"] = payload
+        evidence_paths["macos"] = str(path)
+    return evidence_by_platform, evidence_paths
+
+
+def _platform_matrix_payloads(
+    *,
+    capabilities: dict[str, PlatformCapability],
+    capability_resolution: Mapping[str, object],
+) -> dict[str, dict[str, Any]]:
+    resolution_platforms = capability_resolution.get("platforms", {})
+    payloads: dict[str, dict[str, Any]] = {}
+    for key, capability in capabilities.items():
+        payload = capability.model_dump(mode="json", by_alias=True)
+        decision = (
+            resolution_platforms.get(key, {})
+            if isinstance(resolution_platforms, dict)
+            else {}
+        )
+        if isinstance(decision, dict):
+            evidence = decision.get("evidence", {})
+            payload["capability"] = decision
+            payload["liveEnabled"] = decision.get("liveEnabled", payload["liveEnabled"])
+            payload["supervisedLiveAllowed"] = decision.get(
+                "supervisedLiveAllowed",
+                False,
+            )
+            payload["public_live_claim_allowed"] = decision.get(
+                "public_live_claim_allowed",
+                False,
+            )
+            payload["reasonCode"] = decision.get("reasonCode", payload["reasonCode"])
+            payload["evidenceStatus"] = (
+                evidence.get("status", "missing")
+                if isinstance(evidence, dict)
+                else "missing"
+            )
+        payloads[key] = payload
+    return payloads
+
+
+def _resolver_supervised_live_allowed(
+    capability_resolution: Mapping[str, object],
+    platform: str,
+) -> bool:
+    platforms = capability_resolution.get("platforms", {})
+    if not isinstance(platforms, dict):
+        return False
+    decision = platforms.get(platform, {})
+    if not isinstance(decision, dict):
+        return False
+    return decision.get("supervisedLiveAllowed") is True
 
 
 def _normalize_platform(platform: ComputerUsePlatform | str) -> ComputerUsePlatform:

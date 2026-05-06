@@ -26,6 +26,20 @@ def test_computer_use_doctor_reports_all_platforms_without_enabling_live_executi
     assert payload["platforms"]["windows"]["liveEnabled"] is False
     assert payload["platforms"]["windows"]["reasonCode"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
     assert payload["platforms"]["linux"]["reasonCode"] == "LINUX_COMPUTER_USE_NOT_QUALIFIED"
+    resolution = payload["capabilityResolution"]
+    assert resolution["artifactVersion"] == "computer-use-capability-resolution/v1"
+    assert resolution["public_live_claim_allowed"] is False
+    windows = resolution["platforms"]["windows"]
+    assert windows["liveEnabled"] is False
+    assert windows["supervisedLiveAllowed"] is False
+    assert windows["reasonCode"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+    assert windows["public_live_claim_allowed"] is False
+    assert "COMPUTER_USE_EVIDENCE_MISSING" in {
+        blocker["code"] for blocker in windows["blockers"]
+    }
+    assert payload["computerUse"]["visionRuntime"]["capability"][
+        "public_live_claim_allowed"
+    ] is False
 
 
 def test_computer_use_doctor_can_scope_to_windows() -> None:
@@ -38,6 +52,139 @@ def test_computer_use_doctor_can_scope_to_windows() -> None:
     payload = json.loads(result.stdout)
     assert set(payload["platforms"]) == {"windows"}
     assert payload["platforms"]["windows"]["stage"] == "not_qualified"
+    assert set(payload["capabilityResolution"]["platforms"]) == {"windows"}
+    assert payload["computerUse"]["visionRuntime"]["capability"]["platform"] == "windows"
+
+
+def test_computer_use_doctor_reports_stale_evidence_from_resolver() -> None:
+    result = runner.invoke(
+        app,
+        ["computer-use", "doctor", "--profile", "balanced", "--platform", "macos", "--json"],
+        env={
+            "BINLIQUID_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
+                REPO_ROOT
+                / "contracts"
+                / "computer_use"
+                / "fixtures"
+                / "macos_supervised_v2_evidence_fail_stale.json"
+            )
+        },
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    macos = payload["capabilityResolution"]["platforms"]["macos"]
+    assert macos["liveEnabled"] is False
+    assert macos["evidence"]["status"] == "invalid"
+    assert "COMPUTER_USE_EVIDENCE_STALE" in {
+        blocker["code"] for blocker in macos["blockers"]
+    }
+
+
+def test_computer_use_doctor_reports_commit_mismatch_from_resolver(monkeypatch) -> None:
+    monkeypatch.setattr("binliquid.cli._current_git_sha", lambda: "fixture-commit")
+
+    result = runner.invoke(
+        app,
+        ["computer-use", "doctor", "--profile", "balanced", "--platform", "macos", "--json"],
+        env={
+            "BINLIQUID_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
+                REPO_ROOT
+                / "contracts"
+                / "computer_use"
+                / "fixtures"
+                / "macos_supervised_v2_evidence_fail_commit_mismatch.json"
+            )
+        },
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    macos = payload["capabilityResolution"]["platforms"]["macos"]
+    assert macos["liveEnabled"] is False
+    assert "COMPUTER_USE_EVIDENCE_COMMIT_MISMATCH" in {
+        blocker["code"] for blocker in macos["blockers"]
+    }
+
+
+def test_computer_use_doctor_reports_platform_mismatch_from_resolver(monkeypatch) -> None:
+    monkeypatch.setattr("binliquid.cli._current_git_sha", lambda: "fixture-commit")
+
+    result = runner.invoke(
+        app,
+        ["computer-use", "doctor", "--profile", "balanced", "--platform", "all", "--json"],
+        env={
+            "BINLIQUID_COMPUTER_USE_VISION_ENABLED": "1",
+            "BINLIQUID_COMPUTER_USE_VISION_PROVIDER": "ollama",
+            "BINLIQUID_COMPUTER_USE_VISION_MODEL": "llava",
+            "BINLIQUID_COMPUTER_USE_MACOS_LIVE_ENABLED": "1",
+            "BINLIQUID_COMPUTER_USE_MACOS_CAPTURE_BACKEND": "screencapture",
+            "BINLIQUID_COMPUTER_USE_MACOS_INPUT_BACKEND": "quartz",
+            "BINLIQUID_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
+                REPO_ROOT
+                / "contracts"
+                / "computer_use"
+                / "fixtures"
+                / "macos_supervised_v2_evidence_pass.json"
+            ),
+        },
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    macos = payload["capabilityResolution"]["platforms"]["macos"]
+    assert macos["liveEnabled"] is False
+    assert macos["supervisedLiveAllowed"] is False
+    assert "COMPUTER_USE_EVIDENCE_PLATFORM_MISMATCH" in {
+        blocker["code"] for blocker in macos["blockers"]
+    }
+
+
+def test_computer_use_doctor_fails_closed_when_resolver_raises(monkeypatch) -> None:
+    def _raise_resolution_error(**_kwargs: object) -> object:
+        raise RuntimeError("resolver unavailable")
+
+    monkeypatch.setattr(
+        "binliquid.computer_use.vision_runtime.capability_resolver."
+        "resolve_computer_use_capabilities",
+        _raise_resolution_error,
+    )
+
+    result = runner.invoke(
+        app,
+        ["computer-use", "doctor", "--profile", "balanced", "--platform", "windows", "--json"],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    windows = payload["capabilityResolution"]["platforms"]["windows"]
+    assert windows["liveEnabled"] is False
+    assert windows["reasonCode"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+    assert [blocker["code"] for blocker in windows["blockers"]] == [
+        "COMPUTER_USE_CAPABILITY_RESOLVER_EXCEPTION"
+    ]
+
+
+def test_computer_use_doctor_capability_output_does_not_leak_raw_screenshot_fields() -> None:
+    result = runner.invoke(
+        app,
+        ["computer-use", "doctor", "--profile", "balanced", "--platform", "macos", "--json"],
+        env={
+            "BINLIQUID_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
+                REPO_ROOT
+                / "contracts"
+                / "computer_use"
+                / "fixtures"
+                / "macos_supervised_v2_evidence_fail_raw_screenshot.json"
+            )
+        },
+    )
+
+    assert result.exit_code == 0
+    payload_text = json.dumps(json.loads(result.stdout), sort_keys=True)
+    assert "rawScreenshotPath" not in payload_text
+    assert "ocrText" not in payload_text
+    assert "visibleScreenText" not in payload_text
 
 
 def test_computer_use_doctor_macos_shape_reports_exact_fail_closed_blockers() -> None:

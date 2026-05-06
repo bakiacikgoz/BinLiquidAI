@@ -18,6 +18,9 @@ from benchmarks.run_team import run_team_benchmark
 from binliquid import __version__
 from binliquid.computer_use import ComputerUseMode
 from binliquid.computer_use.runtime import ComputerUseRunner, SessionCommand
+from binliquid.computer_use.vision_runtime.capability_resolver import (
+    resolve_capability_decision_snapshot,
+)
 from binliquid.computer_use.vision_runtime.drivers.macos import MacOSVisionReadiness
 from binliquid.computer_use.vision_runtime.platforms import build_platform_capabilities
 from binliquid.computer_use.vision_runtime.provider_doctor import doctor_vision_provider
@@ -479,6 +482,73 @@ def _load_json_file_if_present(path_value: str | None) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _computer_use_evidence_payloads(
+    computer_use_config: Any,
+) -> tuple[dict[str, object], dict[str, str]]:
+    evidence_by_platform: dict[str, object] = {}
+    evidence_paths: dict[str, str] = {}
+    macos_path_value = getattr(computer_use_config, "macos_qualification_report", "")
+    macos_payload = _load_json_file_if_present(macos_path_value)
+    if macos_payload is not None:
+        evidence_by_platform["macos"] = macos_payload
+        evidence_paths["macos"] = str(Path(macos_path_value))
+    return evidence_by_platform, evidence_paths
+
+
+def _computer_use_capability_snapshot(
+    computer_use_config: Any,
+    *,
+    profile: str,
+    current_platform_label: str,
+    current_commit: str,
+) -> dict[str, object]:
+    evidence_by_platform, evidence_paths = _computer_use_evidence_payloads(
+        computer_use_config
+    )
+    return resolve_capability_decision_snapshot(
+        config=computer_use_config,
+        profile=profile,
+        current_platform=current_platform_label,
+        current_commit=current_commit,
+        evidence_by_platform=evidence_by_platform,
+        evidence_paths=evidence_paths,
+    )
+
+
+def _filter_capability_snapshot(
+    snapshot: dict[str, object],
+    *,
+    selected: str,
+) -> dict[str, object]:
+    if selected == "all":
+        return snapshot
+    platforms = snapshot.get("platforms")
+    if not isinstance(platforms, dict) or selected not in platforms:
+        return snapshot
+    return {
+        **snapshot,
+        "status": platforms[selected].get("status")
+        if isinstance(platforms[selected], dict)
+        else snapshot.get("status"),
+        "platforms": {selected: platforms[selected]},
+    }
+
+
+def _selected_capability_decision(
+    snapshot: dict[str, object],
+    *,
+    selected: str,
+) -> dict[str, object]:
+    platforms = snapshot.get("platforms")
+    if not isinstance(platforms, dict) or not platforms:
+        return {}
+    platform_key = selected if selected != "all" else snapshot.get("currentPlatform")
+    if not isinstance(platform_key, str) or platform_key not in platforms:
+        platform_key = "windows" if "windows" in platforms else next(iter(platforms))
+    decision = platforms.get(platform_key, {})
+    return decision if isinstance(decision, dict) else {}
 
 
 def _parse_computer_use_mode(mode: str) -> ComputerUseMode:
@@ -1659,6 +1729,7 @@ def computer_use_doctor(
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     config, _source_map = resolve_runtime_config(profile=profile, root_dir=Path.cwd())
+    current_commit = _current_git_sha()
     qualification_reports = {}
     macos_report = _load_json_file_if_present(config.computer_use.macos_qualification_report)
     if macos_report is not None:
@@ -1666,13 +1737,23 @@ def computer_use_doctor(
     capabilities = build_platform_capabilities(
         config.computer_use,
         qualification_reports=qualification_reports,
-        commit=_current_git_sha(),
+        commit=current_commit,
     )
     selected = platform.strip().lower()
     if selected != "all":
         if selected not in capabilities:
             raise typer.BadParameter("platform must be all, macos, windows, or linux")
         capabilities = {selected: capabilities[selected]}
+    current_platform_label = selected if selected != "all" else current_platform().label
+    capability_snapshot = _filter_capability_snapshot(
+        _computer_use_capability_snapshot(
+            config.computer_use,
+            profile=profile,
+            current_platform_label=current_platform_label,
+            current_commit=current_commit,
+        ),
+        selected=selected,
+    )
     base_payload: dict[str, Any] = {
         "runtime": "computer_use_vision",
         "profile": profile,
@@ -1680,6 +1761,15 @@ def computer_use_doctor(
         "platforms": {
             key: capability.model_dump(mode="json", by_alias=True)
             for key, capability in capabilities.items()
+        },
+        "capabilityResolution": capability_snapshot,
+        "computerUse": {
+            "visionRuntime": {
+                "capability": _selected_capability_decision(
+                    capability_snapshot,
+                    selected=selected,
+                )
+            }
         },
     }
     if selected == "macos":
@@ -1693,7 +1783,7 @@ def computer_use_doctor(
                 ),
                 environment=dict(os.environ),
                 qualification_report=macos_report,
-                commit=_current_git_sha(),
+                commit=current_commit,
             )
         )
     payload = _with_contract_version(base_payload)
