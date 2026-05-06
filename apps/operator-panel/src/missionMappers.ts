@@ -121,6 +121,34 @@ function normalizeHealth(value: string): SystemHealthSummary['health'] {
   return 'Unknown';
 }
 
+function riskBadgeTone(riskClass: string | null): RuntimeSummaryItem['badgeTone'] {
+  const normalized = (riskClass ?? '').toLowerCase();
+  if (normalized === 'low') {
+    return 'success';
+  }
+  if (normalized === 'high' || normalized === 'critical') {
+    return 'error';
+  }
+  if (normalized === 'medium') {
+    return 'warning';
+  }
+  return 'info';
+}
+
+function verificationBadgeTone(status: string | null): RuntimeSummaryItem['badgeTone'] {
+  const normalized = (status ?? '').toLowerCase();
+  if (normalized === 'satisfied' || normalized === 'skipped') {
+    return 'success';
+  }
+  if (normalized === 'failed') {
+    return 'error';
+  }
+  if (normalized === 'inconclusive') {
+    return 'warning';
+  }
+  return 'info';
+}
+
 export function mapWorkspaceStageToMissionStage(
   stage: WorkspaceStageKey,
   hasPendingApproval = false,
@@ -207,6 +235,56 @@ export function buildRuntimeSummaryItems({
     ? `Kaynak metrikleri gerçek ölçümden okunuyor (${systemHealth.health}).`
     : 'Kaynak metrikleri henüz alınmadı.';
 
+  const vision = snapshot.visionRuntime;
+  const visionItems: RuntimeSummaryItem[] = vision
+    ? [
+        {
+          id: 'vision-action',
+          tone: vision.requiresApproval ? 'warning' : 'info',
+          text: `Vision action: ${vision.actionType ?? 'unknown'}${
+            vision.targetElementId ? ` on ${vision.targetElementId}` : ''
+          }.${vision.rationale ? ` Rationale: ${vision.rationale}` : ''}`,
+          badge: vision.riskClass ?? 'risk unknown',
+          badgeTone: riskBadgeTone(vision.riskClass),
+        },
+        {
+          id: 'vision-approval',
+          tone: vision.requiresApproval ? 'warning' : 'success',
+          text: `Approval: ${vision.approvalState ?? (vision.requiresApproval ? 'required' : 'not required')}.${
+            vision.policyDecision ? ` Policy: ${vision.policyDecision}.` : ''
+          }`,
+        },
+        {
+          id: 'vision-verifier',
+          tone:
+            vision.verificationStatus === 'failed' || vision.verificationStatus === 'inconclusive'
+              ? 'warning'
+              : 'success',
+          text: `Verifier: ${vision.verificationStatus ?? 'not reported'}${
+            vision.verificationReason ? ` (${vision.verificationReason})` : ''
+          }.`,
+          badge: vision.verificationStatus ?? 'unknown',
+          badgeTone: verificationBadgeTone(vision.verificationStatus),
+        },
+        ...(vision.stopReason
+          ? [
+              {
+                id: 'vision-stop',
+                tone: 'warning' as const,
+                text: `Stop reason: ${vision.stopReason}.`,
+              },
+            ]
+          : []),
+        {
+          id: 'vision-privacy',
+          tone: vision.rawScreenshotPathIgnored ? 'warning' : 'success',
+          text: vision.rawScreenshotPathIgnored
+            ? 'Raw screenshot paths are hidden; redacted metadata only.'
+            : 'Raw screenshot paths are not present in the operator summary.',
+        },
+      ]
+    : [];
+
   return [
     {
       id: 'stage',
@@ -230,6 +308,7 @@ export function buildRuntimeSummaryItems({
         ? 'Hazırlık sonraki adım için operatör onayı bekleniyor.'
         : 'Bekleyen operatör onayı bulunmuyor.',
     },
+    ...visionItems,
     {
       id: 'resources',
       tone: resourceTone,

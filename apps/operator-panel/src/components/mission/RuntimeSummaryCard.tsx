@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { Badge, type BadgeTone } from '../primitives/Badge';
 import { Icon } from '../primitives/Icon';
 import { SectionHeader } from '../primitives/SectionHeader';
 import { redactJson } from '../../redactJson';
@@ -8,6 +9,8 @@ export type RuntimeSummaryItem = {
   id: string;
   tone: 'success' | 'warning' | 'info';
   text: string;
+  badge?: string;
+  badgeTone?: BadgeTone;
 };
 
 export function RuntimeSummaryCard({
@@ -68,7 +71,10 @@ export function RuntimeSummaryCard({
         {items.map((item) => (
           <li className={`runtime-summary-item runtime-summary-item-${item.tone}`} key={item.id}>
             <Icon name={item.tone === 'warning' ? 'alert' : 'check'} />
-            <span>{item.text}</span>
+            <span className="runtime-summary-copy">
+              <span className="runtime-summary-text">{item.text}</span>
+              {item.badge ? <Badge tone={item.badgeTone ?? item.tone}>{item.badge}</Badge> : null}
+            </span>
           </li>
         ))}
       </ul>

@@ -40,4 +40,32 @@ describe('RuntimeSummaryCard', () => {
       safe: 'ok',
     });
   });
+
+  it('renders risk badges and redacts raw screenshot paths in debug JSON', () => {
+    const html = renderToStaticMarkup(
+      <RuntimeSummaryCard
+        debugRawEnabled
+        defaultShowRaw
+        items={[{ id: 'vision-action', tone: 'warning', text: 'Vision action: click submit_button.', badge: 'medium' }]}
+        rawJson={{
+          computer_use: {
+            steps: [
+              {
+                action: {
+                  action_type: 'click',
+                  raw_screenshot_path: '/tmp/private-screen.png',
+                },
+              },
+            ],
+          },
+        }}
+      />,
+    );
+
+    expect(html).toContain('medium');
+    expect(html).toContain('mc-badge-warning');
+    expect(html).toContain('raw_screenshot_path');
+    expect(html).toContain('[redacted]');
+    expect(html).not.toContain('/tmp/private-screen.png');
+  });
 });

@@ -54,6 +54,23 @@ export interface WorkspaceLiveSurface {
   approvalId: string | null;
 }
 
+export interface WorkspaceVisionRuntime {
+  currentStepStatus: string | null;
+  actionType: string | null;
+  actionId: string | null;
+  targetElementId: string | null;
+  rationale: string | null;
+  expectedEffect: string | null;
+  riskClass: string | null;
+  requiresApproval: boolean;
+  approvalState: string | null;
+  policyDecision: string | null;
+  verificationStatus: string | null;
+  verificationReason: string | null;
+  stopReason: string | null;
+  rawScreenshotPathIgnored: boolean;
+}
+
 export interface WorkspaceRuntimeState {
   displayState: WorkspaceRuntimeStateKey;
   rawState: string;
@@ -88,6 +105,7 @@ export interface WorkspaceSnapshot {
   transcript: WorkspaceTranscriptEntry[];
   timeline: WorkspaceTimelineEntry[];
   artifacts: WorkspaceArtifactEntry[];
+  visionRuntime: WorkspaceVisionRuntime | null;
 }
 
 const PROGRESS_STAGES: WorkspaceStageKey[] = [
@@ -121,6 +139,11 @@ function readBool(source: JsonRecord, key: string): boolean {
   return source[key] === true;
 }
 
+function readNullableBool(source: JsonRecord, key: string): boolean | null {
+  const value = source[key];
+  return typeof value === 'boolean' ? value : null;
+}
+
 function hasMeaningfulPayload(value: unknown): boolean {
   if (Array.isArray(value)) {
     return value.length > 0;
@@ -141,6 +164,21 @@ function humanizeEvent(eventName: string): string {
 
 function humanizeValue(value: string | null): string {
   return value ? humanizeEvent(value) : 'Unknown';
+}
+
+function containsRawScreenshotPath(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) => containsRawScreenshotPath(item));
+  }
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  return Object.entries(value as JsonRecord).some(([key, entry]) => {
+    if (/raw[_-]?screenshot[_-]?path|screenshot[_-]?path/i.test(key)) {
+      return entry !== null && entry !== undefined && entry !== '';
+    }
+    return containsRawScreenshotPath(entry);
+  });
 }
 
 function summarizeControlCommand(command: JsonRecord): string {
@@ -530,6 +568,72 @@ function buildLiveSurface(runStatus: JsonRecord, approvals: JsonRecord[]): Works
   };
 }
 
+function latestVisionStep(computerUse: JsonRecord): JsonRecord {
+  const steps = asArray(computerUse.steps).map((item) => asRecord(item));
+  const nonEmptySteps = steps.filter((item) => Object.keys(item).length > 0);
+  if (nonEmptySteps.length > 0) {
+    return nonEmptySteps[nonEmptySteps.length - 1] ?? {};
+  }
+  return asRecord(computerUse.current_step);
+}
+
+function buildVisionRuntime(computerUse: JsonRecord): WorkspaceVisionRuntime | null {
+  const step = latestVisionStep(computerUse);
+  const action = asRecord(step.action ?? computerUse.selected_candidate_action ?? computerUse.active_action);
+  const policyDecision = asRecord(step.policy_decision ?? computerUse.policy_decision);
+  const approvalSnapshot = asRecord(step.approval_snapshot ?? computerUse.approval_snapshot);
+  const verification = asRecord(step.verification ?? computerUse.last_verification_result);
+  const hasVisionPayload =
+    Object.keys(step).length > 0 ||
+    Object.keys(action).length > 0 ||
+    readNullableString(computerUse, 'stop_reason') !== null;
+
+  if (!hasVisionPayload) {
+    return null;
+  }
+
+  const declaredRequiresApproval = readNullableBool(action, 'requires_approval');
+  const requiresApproval =
+    declaredRequiresApproval ??
+    (readString(step, 'execution_status') === 'approval_required' ||
+      readNullableString(computerUse, 'pending_approval_id') !== null);
+  const approvalState =
+    readNullableString(approvalSnapshot, 'status') ||
+    readNullableString(computerUse, 'approval_state') ||
+    (requiresApproval ? 'pending' : null);
+
+  return {
+    currentStepStatus:
+      readNullableString(step, 'execution_status') ||
+      readNullableString(computerUse, 'session_state') ||
+      readNullableString(computerUse, 'status'),
+    actionType:
+      readNullableString(action, 'action_type') ||
+      (typeof computerUse.active_action === 'string' ? computerUse.active_action : null),
+    actionId: readNullableString(action, 'action_id'),
+    targetElementId:
+      readNullableString(action, 'target_element_id') ||
+      readNullableString(action, 'target_ref') ||
+      readNullableString(action, 'selector'),
+    rationale: readNullableString(action, 'rationale'),
+    expectedEffect:
+      readNullableString(action, 'expected_effect') ||
+      readNullableString(computerUse, 'last_verified_effect'),
+    riskClass: readNullableString(action, 'risk_class'),
+    requiresApproval,
+    approvalState,
+    policyDecision: readNullableString(policyDecision, 'reason_code'),
+    verificationStatus:
+      readNullableString(verification, 'status') ||
+      (readBool(verification, 'verified') ? 'satisfied' : null),
+    verificationReason: readNullableString(verification, 'reason_code'),
+    stopReason:
+      readNullableString(computerUse, 'stop_reason') ||
+      readNullableString(computerUse, 'last_error'),
+    rawScreenshotPathIgnored: containsRawScreenshotPath(computerUse),
+  };
+}
+
 function buildTranscript(
   objective: string,
   stage: WorkspaceStageKey,
@@ -716,6 +820,7 @@ export function buildWorkspaceSnapshot(input: {
   });
   const { stage, blockedReason } = deriveStage(job, computerUse, runtimeState, input.events, approvals);
   const liveSurface = buildLiveSurface(runStatus, approvals);
+  const visionRuntime = buildVisionRuntime(computerUse);
   const timeline = input.events
     .map((item) => asRecord(item))
     .filter((row) => !shouldSuppressLegacyEvent(row, input.events))
@@ -770,6 +875,7 @@ export function buildWorkspaceSnapshot(input: {
     transcript,
     timeline,
     artifacts: buildArtifacts(input.artifactsByName),
+    visionRuntime,
   };
 }
 

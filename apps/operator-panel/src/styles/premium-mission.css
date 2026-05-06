@@ -506,6 +506,19 @@
   color: var(--color-warning);
 }
 
+.runtime-summary-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.55;
+}
+
+.runtime-summary-text {
+  min-width: 0;
+}
+
 .runtime-raw-panel {
   margin-top: 14px;
 }

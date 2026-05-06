@@ -168,6 +168,34 @@ function previewComputerUseStatus(settings: PanelSettings, jobId?: string) {
       traces: [],
     },
     event_count: 6,
+    steps: [
+      {
+        step_index: 0,
+        before_hash: 'a'.repeat(64),
+        execution_status: 'approval_required',
+        action: {
+          action_id: 'click_start_button',
+          action_type: 'click',
+          target_element_id: 'start_button',
+          rationale: 'The local preview form start button is visible.',
+          expected_effect: 'The preview form advances to the name field.',
+          risk_class: 'medium',
+          requires_approval: true,
+          confidence: 0.91,
+        },
+        policy_decision: {
+          reason_code: 'COMPUTER_USE_APPROVAL_REQUIRED',
+        },
+        approval_snapshot: {
+          status: 'pending',
+          raw_screenshot_path: null,
+        },
+        verification: {
+          status: 'satisfied',
+          reason_code: 'VISION_VERIFICATION_SATISFIED',
+        },
+      },
+    ],
   };
   return runPayload;
 }

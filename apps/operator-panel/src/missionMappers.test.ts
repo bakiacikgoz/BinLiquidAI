@@ -44,6 +44,7 @@ const baseSnapshot: WorkspaceSnapshot = {
   transcript: [],
   timeline: [],
   artifacts: [],
+  visionRuntime: null,
 };
 
 describe('mission mappers', () => {
@@ -129,5 +130,68 @@ describe('mission mappers', () => {
       diskUsagePct: 27,
       networkStatus: 'Healthy',
     });
+  });
+
+  it('surfaces vision action, approval, verifier, and stop state without raw screenshots', () => {
+    const systemHealth = buildSystemHealthSummary({
+      coreMode: 'auto',
+      handshakeRecord: { contractVersion: '2.0' },
+      doctor: { status: 'ok' },
+      metricsPayload: {},
+    });
+    const summary = buildRuntimeSummaryItems({
+      snapshot: {
+        ...baseSnapshot,
+        visionRuntime: {
+          currentStepStatus: 'approval_required',
+          actionType: 'click',
+          actionId: 'click_submit_button',
+          targetElementId: 'submit_button',
+          rationale: 'The fixture submit button is visible.',
+          expectedEffect: 'The fixture status changes to submitted.',
+          riskClass: 'medium',
+          requiresApproval: true,
+          approvalState: 'pending',
+          policyDecision: 'COMPUTER_USE_APPROVAL_REQUIRED',
+          verificationStatus: 'satisfied',
+          verificationReason: 'VISION_VERIFICATION_SATISFIED',
+          stopReason: 'COMPUTER_USE_APPROVAL_REQUIRED',
+          rawScreenshotPathIgnored: true,
+        },
+      },
+      selectedRunId: 'run_1',
+      hasApproval: true,
+      stageLabel: 'Onay',
+      systemHealth,
+    });
+
+    expect(summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'vision-action',
+          badge: 'medium',
+          text: expect.stringContaining('click'),
+        }),
+        expect.objectContaining({
+          id: 'vision-approval',
+          tone: 'warning',
+          text: expect.stringContaining('pending'),
+        }),
+        expect.objectContaining({
+          id: 'vision-verifier',
+          badge: 'satisfied',
+          text: expect.stringContaining('VISION_VERIFICATION_SATISFIED'),
+        }),
+        expect.objectContaining({
+          id: 'vision-stop',
+          text: expect.stringContaining('COMPUTER_USE_APPROVAL_REQUIRED'),
+        }),
+        expect.objectContaining({
+          id: 'vision-privacy',
+          text: expect.stringContaining('Raw screenshot'),
+        }),
+      ]),
+    );
+    expect(JSON.stringify(summary)).not.toContain('raw_screenshot_path');
   });
 });

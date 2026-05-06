@@ -335,4 +335,72 @@ describe('workspace snapshot', () => {
     expect(nonResumable.displayState).toBe('non_resumable');
     expect(nonResumable.recoverySummary).toContain('cannot continue');
   });
+
+  it('maps vision-first action and verifier state without raw screenshot paths', () => {
+    const snapshot = buildWorkspaceSnapshot({
+      runStatus: {
+        job: {
+          request: 'Click the submit button',
+          status: 'awaiting_approval',
+          team_id: 'aegis-computer-use',
+        },
+        computer_use: {
+          status: 'awaiting_approval',
+          stop_reason: 'COMPUTER_USE_APPROVAL_REQUIRED',
+          redaction_report: {
+            raw_screenshot_persisted_count: 0,
+          },
+          steps: [
+            {
+              step_index: 0,
+              execution_status: 'approval_required',
+              before_hash: 'a'.repeat(64),
+              action: {
+                action_id: 'click_submit_button',
+                action_type: 'click',
+                target_element_id: 'submit_button',
+                rationale: 'The fixture submit button is visible.',
+                expected_effect: 'The fixture status changes to submitted.',
+                risk_class: 'medium',
+                requires_approval: true,
+                confidence: 0.93,
+                raw_screenshot_path: '/tmp/private-screen.png',
+              },
+              policy_decision: {
+                reason_code: 'COMPUTER_USE_APPROVAL_REQUIRED',
+              },
+              approval_snapshot: {
+                status: 'pending',
+                raw_screenshot_path: '/tmp/private-approval.png',
+              },
+              verification: {
+                status: 'satisfied',
+                reason_code: 'VISION_VERIFICATION_SATISFIED',
+              },
+            },
+          ],
+        },
+      },
+      events: [],
+      pendingApprovals: [],
+      linkedApprovals: [],
+      artifactsByName: {},
+    });
+
+    expect(snapshot.visionRuntime).toMatchObject({
+      currentStepStatus: 'approval_required',
+      actionType: 'click',
+      actionId: 'click_submit_button',
+      targetElementId: 'submit_button',
+      riskClass: 'medium',
+      requiresApproval: true,
+      approvalState: 'pending',
+      policyDecision: 'COMPUTER_USE_APPROVAL_REQUIRED',
+      verificationStatus: 'satisfied',
+      verificationReason: 'VISION_VERIFICATION_SATISFIED',
+      stopReason: 'COMPUTER_USE_APPROVAL_REQUIRED',
+      rawScreenshotPathIgnored: true,
+    });
+    expect(JSON.stringify(snapshot.visionRuntime)).not.toContain('/tmp/private-screen.png');
+  });
 });
