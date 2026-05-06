@@ -68,6 +68,12 @@ uv run binliquid computer-use provider doctor \
 Do not run `ollama pull` automatically from the agent. The operator may run `ollama --version`, `ollama list`, `ollama serve`, and model pulls manually. A passing macOS fixture report means `fixtureQualified=true`, `productionQualified=false`, and `liveEnabled=false` by default; Windows and Linux remain unqualified.
 Provider doctor reports deterministic blockers such as `VISION_PROVIDER_MODEL_NOT_CONFIGURED`, `VISION_PROVIDER_MODEL_NOT_FOUND`, `VISION_PROVIDER_NOT_VISION_CAPABLE`, `VISION_PROVIDER_INVALID_RESPONSE`, `VISION_PROVIDER_TIMEOUT`, and `VISION_PROVIDER_UNAVAILABLE`.
 
+Strict provider responses may include `candidate_actions`. The planner treats a
+missing or empty `candidate_actions` list as a safe stop, rejects invalid action
+types, low-confidence actions, and invalid target boxes before policy
+classification, and still routes click/type/hotkey-style actions through step
+approval before execution.
+
 Preflight writes Phase 4E readiness artifacts:
 
 ```text

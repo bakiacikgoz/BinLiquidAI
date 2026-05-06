@@ -8,8 +8,13 @@ The vision-first computer-use runtime denies or stops before:
 - sensitive surfaces such as passwords, keychains, wallets, payments, and security settings
 - stale approval snapshots
 - invalid strict-JSON provider responses
+- invalid, unsupported, or low-confidence candidate vision actions
 - missing provider or missing permissions
 - stale or mismatched qualification reports
+
+The candidate action planner is a hygiene and selection layer only. Policy
+remains the source of truth for sensitive surfaces, terminal control, approval
+requirements, and platform qualification.
 
 ## macOS Permission Boundary
 

@@ -343,8 +343,8 @@ class VisionComputerUseRuntime:
             approval_snapshot=approval_snapshot,
         )
 
-    @staticmethod
     def _approval_snapshot(
+        self,
         *,
         request: VisionRunRequest,
         step_index: int,
@@ -360,7 +360,7 @@ class VisionComputerUseRuntime:
             action=action,
             policy_hash=decision.policy_hash,
             risk_reasons=decision.risk_reasons,
-            max_age_ms=5000,
+            max_age_ms=self.config.approval_snapshot_max_age_ms,
         )
 
     @staticmethod

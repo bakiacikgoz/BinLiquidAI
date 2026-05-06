@@ -12,9 +12,9 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Any
 
-from binliquid.computer_use.vision_runtime.models import SurfaceKind
 from binliquid.computer_use.vision_runtime.providers.ollama_vision import (
     OllamaVisionResponse,
+    parse_ollama_response,
 )
 
 ProviderClient = Callable[..., Any]
@@ -159,24 +159,8 @@ class _ProviderNotVisionCapable(RuntimeError):
 
 
 def _parse_provider_doctor_response(raw: Any) -> OllamaVisionResponse:
-    raw_text = raw.get("response", raw) if isinstance(raw, dict) else raw
-    if isinstance(raw_text, dict):
-        payload = raw_text
-    elif isinstance(raw_text, str):
-        try:
-            payload = json.loads(raw_text)
-        except json.JSONDecodeError as exc:
-            raise _ProviderInvalidResponse from exc
-    else:
-        raise _ProviderInvalidResponse
-
-    if isinstance(payload.get("surface_kind"), str):
-        try:
-            payload = {**payload, "surface_kind": SurfaceKind(str(payload["surface_kind"]))}
-        except ValueError as exc:
-            raise _ProviderInvalidResponse from exc
     try:
-        parsed = OllamaVisionResponse.model_validate(payload)
+        parsed = parse_ollama_response(raw)
     except Exception as exc:  # noqa: BLE001
         raise _ProviderInvalidResponse from exc
     if not parsed.ui_elements:
@@ -209,8 +193,9 @@ def _synthetic_provider_prompt(fixture: Mapping[str, Any]) -> str:
     return (
         "Inspect this local synthetic fixture image. Return strict JSON only with "
         "surface_kind, active_app_guess, active_window_title_guess, "
-        "visible_text_redacted, ui_elements, sensitive_indicators, summary, and "
-        "confidence. This is a non-sensitive local readiness check. "
+        "visible_text_redacted, ui_elements, sensitive_indicators, candidate_actions, "
+        "summary, and confidence. candidate_actions may be an empty list for this "
+        "readiness check. This is a non-sensitive local readiness check. "
         f"Fixture metadata: {json.dumps(dict(fixture), sort_keys=True)}"
     )
 

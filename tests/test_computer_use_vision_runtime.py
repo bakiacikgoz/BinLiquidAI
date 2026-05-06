@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import binliquid.computer_use.runtime as computer_use_runtime
 from binliquid.computer_use.models import ComputerUseMode, RiskClass
 from binliquid.computer_use.vision_runtime.models import (
     ExecutionResult,
@@ -21,7 +22,7 @@ from binliquid.computer_use.vision_runtime.providers.mock_vision import (
     DeterministicStepVerifier,
 )
 from binliquid.computer_use.vision_runtime.runtime import VisionComputerUseRuntime
-from binliquid.runtime.config import ComputerUseRuntimeConfig
+from binliquid.runtime.config import ComputerUseRuntimeConfig, RuntimeConfig
 
 
 def _observation(hash_char: str = "c") -> VisionObservation:
@@ -71,6 +72,13 @@ class _Executor:
     def execute(self, action: VisionAction) -> ExecutionResult:
         self.executed.append(action)
         return ExecutionResult(status="executed", message="ok")
+
+
+class _MacOSPlatform:
+    label = "macos"
+    system = "Darwin"
+    machine = "arm64"
+    release = "test"
 
 
 def test_runtime_blocks_when_vision_provider_missing(tmp_path) -> None:
@@ -125,8 +133,13 @@ def test_runtime_completes_safe_mock_task_and_records_hash_chain(tmp_path) -> No
 
 def test_runtime_returns_awaiting_approval_without_executing(tmp_path) -> None:
     executor = _Executor()
+    config = ComputerUseRuntimeConfig(
+        runtime_mode="vision_first",
+        vision_enabled=True,
+        approval_snapshot_max_age_ms=12345,
+    )
     runtime = VisionComputerUseRuntime(
-        config=ComputerUseRuntimeConfig(runtime_mode="vision_first", vision_enabled=True),
+        config=config,
         artifact_root=tmp_path,
         capture=DeterministicScreenCapture([_observation()]),
         vision=_Interpreter(),
@@ -148,6 +161,7 @@ def test_runtime_returns_awaiting_approval_without_executing(tmp_path) -> None:
     assert artifact.status == "awaiting_approval"
     assert artifact.steps[0].execution_status == "approval_required"
     assert artifact.steps[0].approval_snapshot is not None
+    assert artifact.steps[0].approval_snapshot["max_age_ms"] == 12345
     assert executor.executed == []
 
 
@@ -180,3 +194,69 @@ def test_runtime_stops_after_verification_failure_budget(tmp_path) -> None:
     assert artifact.stop_reason == "COMPUTER_USE_RECOVERY_BUDGET_EXCEEDED"
     assert artifact.steps[0].verification is not None
     assert artifact.steps[0].verification.verified is False
+
+
+def test_runner_ollama_vision_first_uses_candidate_action_planner(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    class FakeCapture:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def capture(self) -> VisionObservation:
+            return _observation()
+
+    class FakeOllamaVision:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def interpret(self, *, objective, observation, world):  # noqa: ANN001
+            del objective, world
+            return VisionInterpretation(
+                observation_hash=observation.screenshot_hash,
+                summary="A submit button is visible.",
+                candidate_actions=[
+                    _action(action_type=InputActionType.CLICK, risk_class=RiskClass.MEDIUM)
+                ],
+                surface_kind=SurfaceKind.BROWSER,
+                active_app_guess="Safari",
+                confidence=0.93,
+            )
+
+    class FakeMacOSExecutor:
+        def __init__(self, **_: object) -> None:
+            self.executed: list[VisionAction] = []
+
+        def execute(self, action: VisionAction) -> ExecutionResult:
+            self.executed.append(action)
+            return ExecutionResult(status="executed", message="ok")
+
+    monkeypatch.setattr(computer_use_runtime, "current_platform", lambda: _MacOSPlatform())
+    monkeypatch.setattr(computer_use_runtime, "MacOSScreenCaptureProvider", FakeCapture)
+    monkeypatch.setattr(computer_use_runtime, "OllamaVisionInterpreter", FakeOllamaVision)
+    monkeypatch.setattr(computer_use_runtime, "MacOSInputExecutor", FakeMacOSExecutor)
+
+    runner = computer_use_runtime.ComputerUseRunner(
+        config=RuntimeConfig(
+            computer_use=ComputerUseRuntimeConfig(
+                runtime_mode="vision_first",
+                vision_enabled=True,
+                vision_provider="ollama",
+                vision_model="llava",
+                action_set=["click"],
+                max_steps=1,
+            )
+        ),
+        root_dir=tmp_path,
+    )
+
+    payload = runner.run(
+        prompt="Submit safe fixture",
+        job_id="job-ollama-candidate",
+        mode=ComputerUseMode.STEP_APPROVAL,
+        runtime_mode="vision_first",
+    )
+
+    assert payload["job"]["status"] == "awaiting_approval"
+    assert payload["computer_use"]["steps"][0]["action"]["action_type"] == "click"

@@ -70,6 +70,9 @@ from binliquid.computer_use.vision_runtime.models import (
     ExecutionResult as VisionExecutionResult,
 )
 from binliquid.computer_use.vision_runtime.models import (
+    InputActionType as VisionInputActionType,
+)
+from binliquid.computer_use.vision_runtime.models import (
     StopDecision as VisionStopDecision,
 )
 from binliquid.computer_use.vision_runtime.models import (
@@ -83,6 +86,7 @@ from binliquid.computer_use.vision_runtime.models import (
     VisionRunArtifact,
     VisionRunRequest,
 )
+from binliquid.computer_use.vision_runtime.planner import CandidateActionPlanner
 from binliquid.computer_use.vision_runtime.providers.mock_vision import (
     DeterministicActionPlanner,
     DeterministicScreenCapture,
@@ -92,6 +96,7 @@ from binliquid.computer_use.vision_runtime.providers.mock_vision import (
 from binliquid.computer_use.vision_runtime.providers.ollama_vision import OllamaVisionInterpreter
 from binliquid.computer_use.vision_runtime.recorder import RedactedVisionAuditRecorder
 from binliquid.computer_use.vision_runtime.runtime import VisionComputerUseRuntime
+from binliquid.computer_use.vision_runtime.verifier import ConservativeVisionStepVerifier
 from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.runtime.platform import current_platform, default_temp_dir, safe_allowed_roots
@@ -1641,7 +1646,11 @@ end tell
         if vision_config.vision_provider == "mock":
             capture = DeterministicScreenCapture([observation])
             vision = MockVisionInterpreter()
+            planner = DeterministicActionPlanner([VisionStopDecision(reason="done")])
             executor = _NoopVisionExecutor()
+            verifier = DeterministicStepVerifier(
+                [VisionVerificationResult(verified=False, confidence=0.0)]
+            )
         elif vision_config.vision_provider == "ollama":
             capture = MacOSScreenCaptureProvider(
                 config=vision_config,
@@ -1653,23 +1662,45 @@ end tell
                 timeout_s=vision_config.vision_provider_timeout_s,
                 max_retries=vision_config.vision_provider_max_retries,
             )
+            try:
+                allowed_action_types = {
+                    VisionInputActionType(action_type)
+                    for action_type in vision_config.action_set
+                }
+            except ValueError:
+                envelope = recorder.finalize("failed")
+                artifact = VisionRunArtifact(
+                    job_id=job_id,
+                    status="failed",
+                    objective=prompt,
+                    steps=[],
+                    redaction_report=envelope.get("redaction_report", {}),
+                    integrity=envelope.get("integrity", {}),
+                    stop_reason="VISION_ACTION_SET_INVALID",
+                )
+                return self._vision_payload(artifact)
+            planner = CandidateActionPlanner(
+                allowed_action_types=allowed_action_types,
+                min_action_confidence=vision_config.min_action_confidence,
+            )
             executor = MacOSInputExecutor(config=vision_config)
+            verifier = ConservativeVisionStepVerifier()
         else:
             capture = DeterministicScreenCapture([observation])
             vision = None
+            planner = DeterministicActionPlanner([VisionStopDecision(reason="done")])
             executor = _NoopVisionExecutor()
+            verifier = DeterministicStepVerifier(
+                [VisionVerificationResult(verified=False, confidence=0.0)]
+            )
         runtime = VisionComputerUseRuntime(
             config=vision_config,
             artifact_root=self._root_dir,
             capture=capture,
             vision=vision,
-            planner=DeterministicActionPlanner(
-                [VisionStopDecision(reason="done")]
-            ),
+            planner=planner,
             executor=executor,
-            verifier=DeterministicStepVerifier(
-                [VisionVerificationResult(verified=False, confidence=0.0)]
-            ),
+            verifier=verifier,
             audit=recorder,
         )
         artifact = runtime.run(
