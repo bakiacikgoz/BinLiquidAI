@@ -118,11 +118,24 @@ class ExecutionResult(VisionModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class VisionVerificationStatus(StrEnum):
+    SATISFIED = "satisfied"
+    INCONCLUSIVE = "inconclusive"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 class VerificationResult(VisionModel):
     verified: bool
     confidence: float = Field(ge=0.0, le=1.0)
     message: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
+    status: VisionVerificationStatus | None = None
+    reason_code: str | None = None
+    evidence: dict[str, Any] = Field(default_factory=dict)
+    before_observation_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    after_observation_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    action_digest: str | None = None
 
 
 class VisionRunRequest(VisionModel):

@@ -283,7 +283,10 @@ class VisionComputerUseRuntime:
                         status="failed",
                         steps=steps,
                         envelope=envelope,
-                        stop_reason="COMPUTER_USE_RECOVERY_BUDGET_EXCEEDED",
+                        stop_reason=(
+                            verification.reason_code
+                            or "COMPUTER_USE_RECOVERY_BUDGET_EXCEEDED"
+                        ),
                     )
                 recovery_attempts += 1
 

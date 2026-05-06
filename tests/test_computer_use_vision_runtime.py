@@ -15,6 +15,7 @@ from binliquid.computer_use.vision_runtime.models import (
     VisionInterpretation,
     VisionObservation,
     VisionRunRequest,
+    VisionVerificationStatus,
 )
 from binliquid.computer_use.vision_runtime.providers.mock_vision import (
     DeterministicActionPlanner,
@@ -194,6 +195,45 @@ def test_runtime_stops_after_verification_failure_budget(tmp_path) -> None:
     assert artifact.stop_reason == "COMPUTER_USE_RECOVERY_BUDGET_EXCEEDED"
     assert artifact.steps[0].verification is not None
     assert artifact.steps[0].verification.verified is False
+
+
+def test_runtime_stops_on_semantic_verification_inconclusive(tmp_path) -> None:
+    runtime = VisionComputerUseRuntime(
+        config=ComputerUseRuntimeConfig(
+            runtime_mode="vision_first",
+            vision_enabled=True,
+            max_recovery_attempts=0,
+        ),
+        artifact_root=tmp_path,
+        capture=DeterministicScreenCapture([_observation("c"), _observation("d")]),
+        vision=_Interpreter(),
+        planner=DeterministicActionPlanner([_action()]),
+        executor=_Executor(),
+        verifier=DeterministicStepVerifier(
+            [
+                VerificationResult(
+                    verified=False,
+                    confidence=0.4,
+                    status=VisionVerificationStatus.INCONCLUSIVE,
+                    reason_code="VISION_VERIFICATION_INCONCLUSIVE",
+                    message="changed but expected effect was not observed",
+                )
+            ]
+        ),
+    )
+
+    artifact = runtime.run(
+        VisionRunRequest(
+            job_id="job-verify-inconclusive",
+            objective="Read page",
+            mode=ComputerUseMode.EXECUTE,
+        )
+    )
+
+    assert artifact.status == "failed"
+    assert artifact.stop_reason == "VISION_VERIFICATION_INCONCLUSIVE"
+    assert artifact.steps[0].verification is not None
+    assert artifact.steps[0].verification.status == VisionVerificationStatus.INCONCLUSIVE
 
 
 def test_runner_ollama_vision_first_uses_candidate_action_planner(
