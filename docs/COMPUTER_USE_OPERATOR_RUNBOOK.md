@@ -81,6 +81,13 @@ digest is selected again or if consecutive `wait` actions exceed
 `max_consecutive_wait_actions`. The stop reasons are
 `VISION_REPEATED_ACTION_REJECTED` and `VISION_WAIT_BUDGET_EXCEEDED`.
 
+For v2 macOS supervised qualification, write the report to
+`artifacts/computer_use/macos_qualification_v2_report.json` and verify both the
+qualification report and replay output. The evidence must include semantic
+verification counters, approval block/resume safety where applicable,
+no-progress loop guards, replay integrity, platform/backend match, and
+`raw_screenshot_persisted == 0`.
+
 Preflight writes Phase 4E readiness artifacts:
 
 ```text

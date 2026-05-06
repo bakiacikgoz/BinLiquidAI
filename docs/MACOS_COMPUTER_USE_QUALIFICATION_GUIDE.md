@@ -109,3 +109,12 @@ qualification is not unrestricted desktop automation, and it does not qualify
 Windows or Linux live computer-use.
 
 Replay verifies trace and audit integrity, not business correctness. Raw screenshots are not persisted by default.
+
+## v2 Evidence
+
+For the semantic-verifier v2 gate, use
+`artifacts/computer_use/macos_qualification_v2_report.json` as the report path.
+The accepted evidence must show positive semantic verification, approval
+blocking before execution, stale approval fail-closed behavior when tested,
+replay integrity, no unrestricted live enablement, and zero raw screenshot
+persistence.
