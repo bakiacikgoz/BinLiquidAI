@@ -56,6 +56,7 @@ class RuntimePreflightDecision:
     provider_attempted: bool = False
     executor_attempted: bool = False
     approval_created: bool = False
+    approval_consumed: bool = False
 
     def to_payload(self) -> dict[str, object]:
         runtime_preflight = {
@@ -72,6 +73,7 @@ class RuntimePreflightDecision:
             "providerAttempted": self.provider_attempted,
             "executorAttempted": self.executor_attempted,
             "approvalCreated": self.approval_created,
+            "approvalConsumed": self.approval_consumed,
             "capability": dict(self.capability),
         }
         return {
@@ -82,6 +84,7 @@ class RuntimePreflightDecision:
             "providerAttempted": self.provider_attempted,
             "executorAttempted": self.executor_attempted,
             "approvalCreated": self.approval_created,
+            "approvalConsumed": self.approval_consumed,
             "runtimePreflight": runtime_preflight,
         }
 

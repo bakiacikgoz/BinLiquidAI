@@ -87,6 +87,12 @@ class VisionComputerUseRuntime:
                         }
                     ),
                 )
+                if isinstance(runtime_preflight, dict):
+                    _record_preflight_blocked_lifecycle(
+                        recorder,
+                        runtime_preflight=runtime_preflight,
+                        reason_code=preflight.reason_code,
+                    )
                 envelope = recorder.finalize("blocked")
                 return self._artifact(
                     request=request,
@@ -544,6 +550,21 @@ class VisionComputerUseRuntime:
 
 def _hash_json(payload: object) -> str:
     return hash_json(payload)
+
+
+def _record_preflight_blocked_lifecycle(
+    recorder: VisionAuditSink,
+    *,
+    runtime_preflight: dict[str, Any],
+    reason_code: str,
+) -> None:
+    record_start = getattr(recorder, "record_runtime_start", None)
+    record_blocked = getattr(recorder, "record_preflight_blocked", None)
+    record_stop = getattr(recorder, "record_runtime_stop", None)
+    if callable(record_start) and callable(record_blocked) and callable(record_stop):
+        record_start()
+        record_blocked(runtime_preflight)
+        record_stop(status="blocked", reason_code=reason_code)
 
 
 def _build_runtime_safety_summary(

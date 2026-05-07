@@ -2294,18 +2294,29 @@ def computer_use_run(
             typer.echo(str(exc))
         raise typer.Exit(code=1) from None
 
+    computer_use_payload = payload.get("computer_use", {})
+    runtime_preflight = (
+        computer_use_payload.get("runtimePreflight")
+        if isinstance(computer_use_payload, dict)
+        else None
+    )
+    job_status = str(payload.get("job", {}).get("status", "unknown"))
+    blocked_by_preflight = job_status == "blocked" and isinstance(runtime_preflight, dict)
     output = _with_contract_version(
         {
             "status": "ok",
             "job_id": effective_job_id,
-            "root_dir": effective_root,
+            "root_dir": "[redacted]" if blocked_by_preflight else effective_root,
             **payload,
         }
     )
     if json_output:
         typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
     else:
-        typer.echo(f"job_id={effective_job_id} status={payload['job']['status']}")
+        typer.echo(f"job_id={effective_job_id} status={job_status}")
+        if blocked_by_preflight:
+            typer.echo(f"reason_code={runtime_preflight.get('reasonCode', 'UNKNOWN')}")
+            typer.echo("hint=Run: binliquid computer-use doctor --json")
 
 
 @computer_use_app.command("pause")

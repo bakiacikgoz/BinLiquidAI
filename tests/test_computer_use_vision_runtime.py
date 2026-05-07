@@ -143,6 +143,22 @@ def _blocked_preflight_context() -> RuntimePreflightContext:
     )
 
 
+def _assert_blocked_runtime_preflight_payload(runtime_preflight: dict[str, object]) -> None:
+    assert runtime_preflight["status"] == "blocked"
+    assert runtime_preflight["reasonCode"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+    assert "COMPUTER_USE_EVIDENCE_MISSING" in runtime_preflight["blockers"]
+    assert runtime_preflight["operationIntent"] == "normal_runtime_live"
+    assert runtime_preflight["publicLiveClaimAllowed"] is False
+    assert runtime_preflight["liveExecutionAttempted"] is False
+    assert runtime_preflight["captureAttempted"] is False
+    assert runtime_preflight["providerAttempted"] is False
+    assert runtime_preflight["executorAttempted"] is False
+    assert runtime_preflight["approvalCreated"] is False
+    assert runtime_preflight["approvalConsumed"] is False
+    assert runtime_preflight["capabilityStatus"] == "blocked"
+    assert runtime_preflight["evidenceStatus"] == "missing"
+
+
 def test_runtime_preflight_block_stops_before_capture_provider_planner_and_executor(
     tmp_path,
     monkeypatch,
@@ -184,7 +200,7 @@ def test_runtime_preflight_block_stops_before_capture_provider_planner_and_execu
     assert artifact.steps == []
     assert artifact.runtime_preflight is not None
     assert artifact.runtime_preflight["allowed"] is False
-    assert artifact.runtime_preflight["publicLiveClaimAllowed"] is False
+    _assert_blocked_runtime_preflight_payload(artifact.runtime_preflight)
     assert capture.calls == 0
     assert vision.calls == 0
     assert planner.calls == 0
@@ -195,11 +211,19 @@ def test_runtime_preflight_block_stops_before_capture_provider_planner_and_execu
         )
     )
     assert summary["runtimePreflight"]["allowed"] is False
-    assert summary["runtimePreflight"]["captureAttempted"] is False
-    assert summary["runtimePreflight"]["providerAttempted"] is False
-    assert summary["runtimePreflight"]["executorAttempted"] is False
-    assert summary["runtimePreflight"]["approvalCreated"] is False
+    _assert_blocked_runtime_preflight_payload(summary["runtimePreflight"])
     assert summary["approval_blocks"] == 0
+    events_path = tmp_path / "job-preflight-blocked" / "events.jsonl"
+    events = [
+        json.loads(line)
+        for line in events_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == [
+        "runtime_start",
+        "preflight_blocked",
+        "runtime_stop",
+    ]
 
 
 def test_runtime_preflight_block_does_not_create_approval_snapshot(tmp_path) -> None:
@@ -319,11 +343,25 @@ def test_runner_live_preflight_blocks_before_provider_construction(
     assert payload["computer_use"]["status"] == "blocked"
     assert payload["computer_use"]["stop_reason"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
     assert runtime_preflight["allowed"] is False
-    assert runtime_preflight["publicLiveClaimAllowed"] is False
-    assert runtime_preflight["captureAttempted"] is False
-    assert runtime_preflight["providerAttempted"] is False
-    assert runtime_preflight["executorAttempted"] is False
-    assert runtime_preflight["approvalCreated"] is False
+    _assert_blocked_runtime_preflight_payload(runtime_preflight)
+    summary = json.loads(
+        (tmp_path / "job-runner-preflight-blocked" / "vision_runtime_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert summary["status"] == "blocked"
+    assert summary["runtimePreflight"] == runtime_preflight
+    events_path = tmp_path / "job-runner-preflight-blocked" / "events.jsonl"
+    events = [
+        json.loads(line)
+        for line in events_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert [event["event_type"] for event in events] == [
+        "runtime_start",
+        "preflight_blocked",
+        "runtime_stop",
+    ]
     assert "rawScreenshotPath" not in encoded
     assert "providerRawResponse" not in encoded
     assert "approvalSnapshotBody" not in encoded

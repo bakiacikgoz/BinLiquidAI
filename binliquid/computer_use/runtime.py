@@ -98,7 +98,11 @@ from binliquid.computer_use.vision_runtime.providers.mock_vision import (
 )
 from binliquid.computer_use.vision_runtime.providers.ollama_vision import OllamaVisionInterpreter
 from binliquid.computer_use.vision_runtime.recorder import RedactedVisionAuditRecorder
-from binliquid.computer_use.vision_runtime.runtime import VisionComputerUseRuntime
+from binliquid.computer_use.vision_runtime.runtime import (
+    VisionComputerUseRuntime,
+    _build_runtime_safety_summary,
+    _record_preflight_blocked_lifecycle,
+)
 from binliquid.computer_use.vision_runtime.runtime_gate import (
     ComputerUseOperationIntent,
     RuntimePreflightContext,
@@ -1673,6 +1677,7 @@ end tell
             return self._blocked_vision_preflight_payload(
                 job_id=job_id,
                 prompt=prompt,
+                mode=mode,
                 recorder=recorder,
                 preflight=preflight,
             )
@@ -1813,10 +1818,17 @@ end tell
         *,
         job_id: str,
         prompt: str,
+        mode: ComputerUseMode,
         recorder: RedactedVisionAuditRecorder,
         preflight: RuntimePreflightDecision,
     ) -> dict[str, Any]:
         runtime_preflight = preflight.to_payload()["runtimePreflight"]
+        if isinstance(runtime_preflight, dict):
+            _record_preflight_blocked_lifecycle(
+                recorder,
+                runtime_preflight=runtime_preflight,
+                reason_code=preflight.reason_code,
+            )
         envelope = recorder.finalize("blocked")
         artifact = VisionRunArtifact(
             job_id=job_id,
@@ -1827,6 +1839,19 @@ end tell
             integrity=envelope.get("integrity", {}),
             stop_reason=preflight.reason_code,
             runtime_preflight=runtime_preflight if isinstance(runtime_preflight, dict) else None,
+        )
+        summary = _build_runtime_safety_summary(
+            request=VisionRunRequest(job_id=job_id, objective=prompt, mode=mode),
+            status="blocked",
+            steps=[],
+            envelope=envelope,
+            stop_reason=preflight.reason_code,
+            runtime_preflight=runtime_preflight if isinstance(runtime_preflight, dict) else None,
+        )
+        summary_path = self._root_dir / job_id / "vision_runtime_summary.json"
+        summary_path.write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
         )
         return self._vision_payload(artifact)
 

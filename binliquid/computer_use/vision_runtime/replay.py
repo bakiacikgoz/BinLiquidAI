@@ -26,6 +26,7 @@ def load_replay_summary(job_dir: Path) -> dict[str, Any]:
         "job_id": envelope["job_id"],
         "status": envelope["status"],
         "event_count": len(events),
+        "event_types": [event.get("event_type") for event in events],
         "redacted": envelope.get("redaction_report", {}).get("redacted") is True,
         "hash_chain_verified": envelope.get("integrity", {}).get("hash_chain_verified") is True,
         "steps": [
@@ -38,6 +39,7 @@ def load_replay_summary(job_dir: Path) -> dict[str, Any]:
                 "after_hash": event.get("payload", {}).get("after_hash"),
             }
             for event in events
+            if event.get("event_type") == "checkpoint"
         ],
         "verified": verification["verified"],
         "checks": verification["checks"],
@@ -56,6 +58,7 @@ def verify_replay(job_dir: Path) -> dict[str, Any]:
         "approval_required_not_executed": False,
         "screenshot_hash_format": False,
         "raw_screenshot_policy": False,
+        "preflight_blocked_safe_stop": True,
     }
     events = [
         json.loads(line)
@@ -73,16 +76,19 @@ def verify_replay(job_dir: Path) -> dict[str, Any]:
         previous = str(event.get("hash") or "")
     checks["hash_chain_verified"] = hash_ok
 
-    indices = [int(event.get("step_index", -1)) for event in events]
+    checkpoint_events = [event for event in events if event.get("event_type") == "checkpoint"]
+    indices = [int(event.get("step_index", -1)) for event in checkpoint_events]
     checks["step_index_monotonic"] = indices == sorted(indices) and all(
         index >= 0 for index in indices
     )
+    if not checkpoint_events:
+        checks["step_index_monotonic"] = True
     if not checks["step_index_monotonic"]:
         errors.append("step_index monotonicity failed")
 
     approval_ok = True
     hash_format_ok = True
-    for event in events:
+    for event in checkpoint_events:
         payload = event.get("payload", {})
         if (
             payload.get("execution_status") == "executed"
@@ -107,6 +113,14 @@ def verify_replay(job_dir: Path) -> dict[str, Any]:
     checks["raw_screenshot_policy"] = raw_count == 0
     if raw_count != 0:
         errors.append("raw screenshot persistence violates default replay policy")
+
+    if envelope.get("status") == "blocked":
+        checks["preflight_blocked_safe_stop"] = _is_preflight_blocked_safe_stop(
+            job_dir=job_dir,
+            events=events,
+        )
+        if not checks["preflight_blocked_safe_stop"]:
+            errors.append("preflight-blocked runtime did not stop at a safe replay boundary")
 
     return {
         "artifact_version": "computer_use_vision_replay_verification/v1",
@@ -276,6 +290,34 @@ def _is_hex(value: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _is_preflight_blocked_safe_stop(
+    *,
+    job_dir: Path,
+    events: list[dict[str, Any]],
+) -> bool:
+    event_types = [event.get("event_type") for event in events]
+    if event_types != ["runtime_start", "preflight_blocked", "runtime_stop"]:
+        return False
+    summary_path = job_dir / "vision_runtime_summary.json"
+    if not summary_path.exists():
+        return False
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    runtime_preflight = summary.get("runtimePreflight")
+    if not isinstance(runtime_preflight, dict):
+        return False
+    return (
+        summary.get("status") == "blocked"
+        and runtime_preflight.get("status") == "blocked"
+        and runtime_preflight.get("publicLiveClaimAllowed") is False
+        and runtime_preflight.get("liveExecutionAttempted") is False
+        and runtime_preflight.get("captureAttempted") is False
+        and runtime_preflight.get("providerAttempted") is False
+        and runtime_preflight.get("executorAttempted") is False
+        and runtime_preflight.get("approvalCreated") is False
+        and runtime_preflight.get("approvalConsumed") is False
+    )
 
 
 def _resolve_artifact_path(report_path: Path, value: object) -> Path | None:

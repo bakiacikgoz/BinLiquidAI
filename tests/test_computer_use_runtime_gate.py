@@ -81,6 +81,8 @@ def test_missing_evidence_blocks_normal_runtime_live() -> None:
     assert "COMPUTER_USE_EVIDENCE_MISSING" in decision.blockers
     assert decision.public_live_claim_allowed is False
     assert decision.to_payload()["captureAttempted"] is False
+    assert decision.to_payload()["approvalConsumed"] is False
+    assert decision.to_payload()["runtimePreflight"]["approvalConsumed"] is False
 
 
 def test_stale_evidence_blocks_normal_runtime_live() -> None:

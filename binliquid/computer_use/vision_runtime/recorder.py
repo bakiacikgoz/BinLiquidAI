@@ -33,24 +33,30 @@ class RedactedVisionAuditRecorder:
     def record_step(self, step: VisionStepResult) -> None:
         payload = step.model_dump(mode="json", exclude_none=True)
         payload.pop("raw_screenshot_path", None)
-        event = {
-            "event_version": "computer_use_vision_event/v1",
-            "job_id": self.job_id,
-            "step_index": step.step_index,
-            "event_type": "checkpoint",
-            "created_at": datetime.now(UTC).isoformat(),
-            "payload": payload,
-            "prev_hash": self._prev_hash,
-        }
-        event["hash"] = _event_hash(event)
-        self._prev_hash = str(event["hash"])
-        self._events.append(event)
+        self._append_event("checkpoint", payload, step_index=step.step_index)
         self._steps.append(payload)
-        self._write_events()
         self.steps_path.write_text(
             json.dumps(self._steps, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+    def record_runtime_start(self) -> None:
+        self._append_event("runtime_start", {"status": "running"})
+
+    def record_preflight_blocked(self, runtime_preflight: dict[str, Any]) -> None:
+        self._append_event(
+            "preflight_blocked",
+            {
+                "reasonCode": runtime_preflight.get("reasonCode"),
+                "runtimePreflight": runtime_preflight,
+            },
+        )
+
+    def record_runtime_stop(self, *, status: str, reason_code: str | None = None) -> None:
+        payload: dict[str, Any] = {"status": status}
+        if reason_code:
+            payload["reasonCode"] = reason_code
+        self._append_event("runtime_stop", payload)
 
     def finalize(self, status: str) -> dict[str, Any]:
         envelope = {
@@ -88,6 +94,28 @@ class RedactedVisionAuditRecorder:
     def _write_events(self) -> None:
         lines = [json.dumps(event, ensure_ascii=False, sort_keys=True) for event in self._events]
         self.events_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+    def _append_event(
+        self,
+        event_type: str,
+        payload: dict[str, Any],
+        *,
+        step_index: int | None = None,
+    ) -> None:
+        event: dict[str, Any] = {
+            "event_version": "computer_use_vision_event/v1",
+            "job_id": self.job_id,
+            "event_type": event_type,
+            "created_at": datetime.now(UTC).isoformat(),
+            "payload": payload,
+            "prev_hash": self._prev_hash,
+        }
+        if step_index is not None:
+            event["step_index"] = step_index
+        event["hash"] = _event_hash(event)
+        self._prev_hash = str(event["hash"])
+        self._events.append(event)
+        self._write_events()
 
 
 def _event_hash(event: dict[str, Any]) -> str:
