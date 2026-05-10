@@ -423,7 +423,9 @@ veya Apple ID mode:
    `signed=false`, `timestamped=false`, and `signed_rc_allowed=false`.
 3. `windows-release-status.json` yalnızca signed RC kararı için okunur.
    **2026-05-10 durum:** confirmed; public release gate remained separate and
-   reported `public_release_allowed=false`.
+   reported `public_release_allowed=false`. Local verification PASS:
+   `uv run --extra dev pytest -q tests/test_windows_release_gate.py
+   tests/test_windows_release_workflows_static.py`.
 4. Signed installer SHA256 ile clean Windows smoke workflow çalışır.
 5. Promote workflow çalışır.
 6. `windows-public-release-gate.json` `status=pass` verir.

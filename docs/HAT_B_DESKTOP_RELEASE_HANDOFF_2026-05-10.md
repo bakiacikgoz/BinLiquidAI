@@ -31,6 +31,11 @@ Local evidence already captured:
   `signed=false`, `timestamped=false`, `signed_rc_allowed=false`, and
   `secret_material_written=false`. The public gate reports
   `public_release_allowed=false`.
+- Windows release gate ownership verification PASS:
+  `tests/test_windows_release_gate.py` and
+  `tests/test_windows_release_workflows_static.py` confirm
+  `windows-release-status.json` stays scoped to signed-RC status and
+  `windows-public-release-gate.json` remains the public release authority.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.
