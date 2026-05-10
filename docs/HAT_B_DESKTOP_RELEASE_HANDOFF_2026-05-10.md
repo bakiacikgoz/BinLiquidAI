@@ -6,6 +6,8 @@ Hat B is blocked by external credentials and clean-machine evidence. No public
 desktop installer release has been made, and no desktop release claim should be
 published from the current evidence.
 
+Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4
+
 Local evidence already captured:
 
 - Operator Panel UI gate: PASS.

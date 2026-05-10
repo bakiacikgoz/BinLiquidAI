@@ -609,7 +609,8 @@ Hat B’deki maddeler tamamlanmamışsa proje Hat A olarak release edilebilir; f
 Durum: Hat B blocked. macOS signing/notarization credentials, Windows
 Authenticode signing credentials, signed RC evidence, and clean-machine smoke
 evidence hazır olmadan bu checklist işaretlenmeyecek. Ayrıntılı handoff:
-`docs/HAT_B_DESKTOP_RELEASE_HANDOFF_2026-05-10.md`.
+`docs/HAT_B_DESKTOP_RELEASE_HANDOFF_2026-05-10.md`. Tracking issue:
+https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
 
 ---
 

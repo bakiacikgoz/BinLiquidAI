@@ -5,6 +5,8 @@
 Detailed operator handoff:
 `docs/HAT_B_DESKTOP_RELEASE_HANDOFF_2026-05-10.md`.
 
+Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
+
 - Provision macOS signing and notarization credentials:
   `MACOS_SIGNING_IDENTITY`, `MACOS_SIGNING_CERT_P12_B64`,
   `MACOS_SIGNING_CERT_PASSWORD`, and either Apple notary API key secrets or
