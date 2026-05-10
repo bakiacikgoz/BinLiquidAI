@@ -523,6 +523,15 @@ uv run python scripts/evaluate_computer_use_platform_matrix.py \
 
 **Amaç:** Geliştirme döngüsünü kapatıp release artifact / evidence pack üretmek.
 
+**2026-05-10 durum güncellemesi:**
+
+- Hat A için tag kesildi ve origin'e push edildi:
+  `hat-a-v0.4.1-2026-05-10`.
+- Hat A evidence pack üretildi, arşivlendi ve GitHub'da draft/prerelease
+  olarak yüklendi.
+- Bu durum yalnızca Source / CLI / Enterprise self-hosted candidate kapsamıdır.
+  Hat B desktop installer release iddiası yoktur.
+
 **Yapılacaklar:**
 
 1. Release branch veya tag oluştur.
@@ -566,19 +575,22 @@ Aşağıdaki checklist tamamlandığında mevcut geliştirme döngüsü bitmiş 
 
 ### 7.1 Hat A — Source / CLI / Enterprise self-hosted release
 
-- [ ] Git worktree temiz veya değişiklikler bilinçli commit’lenmiş.
-- [ ] `make mainline-gate` PASS.
-- [ ] `make pilot-gate` PASS.
-- [ ] `make enterprise-gate` PASS.
-- [ ] `make qualification-run` en az 6h candidate smoke-soak ile PASS.
-- [ ] 24h release-candidate soak PASS veya açıkça “RC değil candidate” olarak işaretli.
-- [ ] `ga_readiness_report.json` signed ve verify edilmiş.
-- [ ] `security_posture.json` signed ve verify edilmiş.
-- [ ] Key rotation dry-run PASS.
-- [ ] Backup/restore verification PASS.
-- [ ] Replay/signature tamper drills PASS.
-- [ ] README ve docs gerçek destek sınırlarıyla uyumlu.
-- [ ] Computer-use claims qualification evidence dışına taşmıyor.
+- [x] Git worktree temiz veya değişiklikler bilinçli commit’lenmiş.
+- [x] `make mainline-gate` PASS.
+- [x] `make pilot-gate` PASS.
+- [x] `make enterprise-gate` PASS.
+- [x] `make qualification-run` en az 6h candidate smoke-soak ile PASS.
+- [x] 24h release-candidate soak PASS veya açıkça “RC değil candidate” olarak işaretli.
+- [x] `ga_readiness_report.json` signed ve verify edilmiş.
+- [x] `security_posture.json` signed ve verify edilmiş.
+- [x] Key rotation dry-run PASS.
+- [x] Backup/restore verification PASS.
+- [x] Replay/signature tamper drills PASS.
+- [x] README ve docs gerçek destek sınırlarıyla uyumlu.
+- [x] Computer-use claims qualification evidence dışına taşmıyor.
+
+Durum: Hat A candidate kapsamı kapandı. Bu, 24h RC/final-GA claim değildir;
+6h signed qualification evidence ile desteklenen draft/prerelease candidate'tır.
 
 ### 7.2 Hat B — Desktop installer release
 
@@ -593,6 +605,11 @@ Aşağıdaki checklist tamamlandığında mevcut geliştirme döngüsü bitmiş 
 - [ ] Windows computer-use disabled evidence PASS.
 
 Hat B’deki maddeler tamamlanmamışsa proje Hat A olarak release edilebilir; fakat desktop installer release iddiası yapılmaz.
+
+Durum: Hat B blocked. macOS signing/notarization credentials, Windows
+Authenticode signing credentials, signed RC evidence, and clean-machine smoke
+evidence hazır olmadan bu checklist işaretlenmeyecek. Ayrıntılı handoff:
+`docs/HAT_B_DESKTOP_RELEASE_HANDOFF_2026-05-10.md`.
 
 ---
 

@@ -61,5 +61,14 @@ The local evidence pack is written under:
 artifacts/release-pack/0.4.1-hat-a-2026-05-10/
 ```
 
+GitHub draft/prerelease metadata:
+
+- Tag: `hat-a-v0.4.1-2026-05-10`.
+- Title: `Hat A Candidate v0.4.1 - 2026-05-10`.
+- Evidence archive SHA256:
+  `a0d0db298316ccc487212a0ceb9b8d3af38b037a479e402d3085c5b85ff59cc3`.
+- Assets uploaded: evidence pack `.tar.gz` and matching `.sha256` file.
+- Release remains draft/prerelease and is not marked latest.
+
 Do not tag or publish a Hat B desktop release until the blocked desktop gates are
 green.
