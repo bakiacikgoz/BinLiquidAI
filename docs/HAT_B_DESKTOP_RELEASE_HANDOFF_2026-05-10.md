@@ -16,6 +16,10 @@ Local evidence already captured:
 - macOS release workflow now preflights signing/notarization credentials before
   checkout/build and uploads `operator-panel-macos-credential-preflight-<arch>`
   evidence when blocked.
+- GitHub Actions run `25638420468` verified the macOS preflight behavior:
+  both `arm64` and `x86_64` lanes stopped at credential preflight with
+  `status=blocked_external_credentials`, uploaded preflight evidence, skipped
+  checkout/build/sign/notarize steps, and wrote no secret material.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.
