@@ -24,6 +24,13 @@ Local evidence already captured:
   required lane and `windows-2025` canary lane both completed with
   `conclusion=success`. Evidence was downloaded under
   `artifacts/readiness/2026-05-10/github_windows_ci_25638465677/`.
+- GitHub Actions run `25638818041` verified the Windows signed-RC workflow in
+  missing-secret mode. The workflow completed and uploaded unsigned CI smoke
+  evidence, but did not upload signed release-candidate artifacts.
+  `windows-release-status.json` reports `status=blocked_external_credentials`,
+  `signed=false`, `timestamped=false`, `signed_rc_allowed=false`, and
+  `secret_material_written=false`. The public gate reports
+  `public_release_allowed=false`.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.

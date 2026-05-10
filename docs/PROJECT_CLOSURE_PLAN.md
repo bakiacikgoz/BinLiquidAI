@@ -416,10 +416,14 @@ veya Apple ID mode:
 1. Windows CI çalışır. **2026-05-10 durum:** PASS. GitHub Actions run
    `25638465677`; `windows-2022` zorunlu lane ve `windows-2025` canary lane
    success.
-2. Windows signed RC workflow çalışır. **2026-05-10 durum:** blocked by
-   missing `WINDOWS_SIGNING_CERT_PFX_B64` and
-   `WINDOWS_SIGNING_CERT_PASSWORD` secrets.
+2. Windows signed RC workflow çalışır. **2026-05-10 durum:** workflow run
+   `25638818041` completed, but signed RC remains blocked by missing
+   `WINDOWS_SIGNING_CERT_PFX_B64` and `WINDOWS_SIGNING_CERT_PASSWORD` secrets.
+   `windows-release-status.json` reports `status=blocked_external_credentials`,
+   `signed=false`, `timestamped=false`, and `signed_rc_allowed=false`.
 3. `windows-release-status.json` yalnızca signed RC kararı için okunur.
+   **2026-05-10 durum:** confirmed; public release gate remained separate and
+   reported `public_release_allowed=false`.
 4. Signed installer SHA256 ile clean Windows smoke workflow çalışır.
 5. Promote workflow çalışır.
 6. `windows-public-release-gate.json` `status=pass` verir.
