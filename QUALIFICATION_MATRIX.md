@@ -5,6 +5,26 @@
 This document defines the evidence required before BinLiquid / AegisOS can be described as `enterprise deployment-ready under defined constraints`.
 It does not claim that evidence already exists.
 
+## Current Evidence Status - 2026-05-10
+
+Hat A source/CLI/enterprise self-hosted readiness has published signed
+qualification evidence for a 6h candidate smoke-soak:
+
+- `artifacts/qualification_report.json`: `qualification_status=pass`,
+  `recommended_status=green`, `go_no_go=go`.
+- `artifacts/ga_readiness_report.json`: `overall_status=green`,
+  `go_no_go=go`, `pending_evidence=[]`, `blocking_findings=[]`.
+- 6h soak evidence: `duration_seconds=21600`, `iterations=73`,
+  replay verification PASS, signing verification PASS.
+
+This supports a Hat A candidate release under the support boundaries below.
+It is not a desktop installer release and it is not a 24h/72h RC/final-GA soak.
+The remaining qualification residual risks are:
+
+- 24h soak evidence not yet published.
+- Managed KMS live drill not yet published.
+- Non-developer operator validation not yet published.
+
 ## Supported Deployment Classes
 
 - `Linux Standard`: primary GA runtime reference
@@ -87,7 +107,7 @@ At minimum publish:
 - fallback thresholds where serial execution becomes expected
 - provider failure classification summary
 
-## Blocking Test Set Before Enterprise Claim
+## Blocking Test Set Before RC / Final GA Claim
 
 - role boundary negative tests
 - key rotation and revocation drills
