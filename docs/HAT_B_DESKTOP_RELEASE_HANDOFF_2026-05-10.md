@@ -20,6 +20,10 @@ Local evidence already captured:
   both `arm64` and `x86_64` lanes stopped at credential preflight with
   `status=blocked_external_credentials`, uploaded preflight evidence, skipped
   checkout/build/sign/notarize steps, and wrote no secret material.
+- GitHub Actions run `25638465677` verified Windows CI: `windows-2022`
+  required lane and `windows-2025` canary lane both completed with
+  `conclusion=success`. Evidence was downloaded under
+  `artifacts/readiness/2026-05-10/github_windows_ci_25638465677/`.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.

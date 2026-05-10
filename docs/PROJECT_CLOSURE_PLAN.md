@@ -413,8 +413,12 @@ veya Apple ID mode:
 
 **Sıra:**
 
-1. Windows CI çalışır.
-2. Windows signed RC workflow çalışır.
+1. Windows CI çalışır. **2026-05-10 durum:** PASS. GitHub Actions run
+   `25638465677`; `windows-2022` zorunlu lane ve `windows-2025` canary lane
+   success.
+2. Windows signed RC workflow çalışır. **2026-05-10 durum:** blocked by
+   missing `WINDOWS_SIGNING_CERT_PFX_B64` and
+   `WINDOWS_SIGNING_CERT_PASSWORD` secrets.
 3. `windows-release-status.json` yalnızca signed RC kararı için okunur.
 4. Signed installer SHA256 ile clean Windows smoke workflow çalışır.
 5. Promote workflow çalışır.
