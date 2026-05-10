@@ -540,11 +540,19 @@ def _selected_capability_decision(
     snapshot: dict[str, object],
     *,
     selected: str,
+    fallback_platform: str | None = None,
 ) -> dict[str, object]:
     platforms = snapshot.get("platforms")
     if not isinstance(platforms, dict) or not platforms:
         return {}
     platform_key = selected if selected != "all" else snapshot.get("currentPlatform")
+    if (
+        selected == "all"
+        and isinstance(fallback_platform, str)
+        and platform_key not in platforms
+        and fallback_platform in platforms
+    ):
+        platform_key = fallback_platform
     if not isinstance(platform_key, str) or platform_key not in platforms:
         platform_key = "windows" if "windows" in platforms else next(iter(platforms))
     decision = platforms.get(platform_key, {})
@@ -1867,12 +1875,13 @@ def computer_use_doctor(
         if selected not in capabilities:
             raise typer.BadParameter("platform must be all, macos, windows, or linux")
         capabilities = {selected: capabilities[selected]}
-    current_platform_label = selected if selected != "all" else current_platform().label
+    actual_platform_label = current_platform().label
+    capability_snapshot_platform = selected if selected != "all" else "unknown"
     capability_snapshot = _filter_capability_snapshot(
         _computer_use_capability_snapshot(
             config.computer_use,
             profile=profile,
-            current_platform_label=current_platform_label,
+            current_platform_label=capability_snapshot_platform,
             current_commit=current_commit,
         ),
         selected=selected,
@@ -1891,6 +1900,7 @@ def computer_use_doctor(
                 "capability": _selected_capability_decision(
                     capability_snapshot,
                     selected=selected,
+                    fallback_platform=actual_platform_label,
                 )
             }
         },
