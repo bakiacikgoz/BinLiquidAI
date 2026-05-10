@@ -13,6 +13,9 @@ Local evidence already captured:
 - Operator Panel UI gate: PASS.
 - Operator Panel Rust/Tauri tests: PASS.
 - Local unsigned macOS `.app` and `.dmg` build: PASS.
+- macOS release workflow now preflights signing/notarization credentials before
+  checkout/build and uploads `operator-panel-macos-credential-preflight-<arch>`
+  evidence when blocked.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.
@@ -62,6 +65,10 @@ Workflow to run after secrets are provisioned:
 gh workflow run operator-panel-release-macos.yml \
   --repo bakiacikgoz/BinLiquidAI
 ```
+
+If secrets are still missing or partial, the workflow should fail before
+checkout/build with `status=blocked_external_credentials`; this is expected
+blocked evidence, not a desktop release failure.
 
 macOS PASS criteria:
 
