@@ -427,6 +427,10 @@ veya Apple ID mode:
    `uv run --extra dev pytest -q tests/test_windows_release_gate.py
    tests/test_windows_release_workflows_static.py`.
 4. Signed installer SHA256 ile clean Windows smoke workflow çalışır.
+   **2026-05-10 durum:** blocked until signed RC exists. GitHub repo and
+   `release-windows` environment secrets were rechecked; signing secrets are
+   still absent. Clean smoke/promote workflow inputs are documented in
+   `docs/HAT_B_DESKTOP_RELEASE_HANDOFF_2026-05-10.md`.
 5. Promote workflow çalışır.
 6. `windows-public-release-gate.json` `status=pass` verir.
 7. Ancak ondan sonra public/enterprise Windows artifact üretilebilir.

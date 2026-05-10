@@ -118,10 +118,15 @@ gh workflow run operator-panel-release-windows.yml \
   --repo bakiacikgoz/BinLiquidAI
 
 gh workflow run operator-panel-windows-clean-smoke.yml \
-  --repo bakiacikgoz/BinLiquidAI
+  --repo bakiacikgoz/BinLiquidAI \
+  -f signed_rc_run_id=<SIGNED_RC_RUN_ID> \
+  -f installer_sha256=<SIGNED_RC_INSTALLER_SHA256>
 
 gh workflow run operator-panel-promote-windows.yml \
-  --repo bakiacikgoz/BinLiquidAI
+  --repo bakiacikgoz/BinLiquidAI \
+  -f signed_rc_run_id=<SIGNED_RC_RUN_ID> \
+  -f clean_smoke_run_id=<CLEAN_SMOKE_RUN_ID> \
+  -f expected_installer_sha256=<SIGNED_RC_INSTALLER_SHA256>
 ```
 
 Windows PASS criteria:
