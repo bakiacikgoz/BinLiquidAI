@@ -11,7 +11,8 @@ Detailed operator handoff:
   Apple ID notarization secrets.
 - Run `operator-panel-release-macos.yml` and capture codesign, notarytool,
   stapler, and clean-machine Gatekeeper evidence.
-- Provision Windows signing credentials and timestamp configuration.
+- Provision Windows signing credentials. `WINDOWS_TIMESTAMP_URL` is already
+  configured on the `release-windows` environment.
 - Run Windows signed RC, clean smoke, and promote workflows.
 - Publish `windows-public-release-gate.json` with `status=pass`,
   `public_release_allowed=true`, and `blocking_reasons=[]`.

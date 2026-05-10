@@ -21,8 +21,14 @@ GitHub inventory observed on 2026-05-10:
 
 - Repository secrets: none listed.
 - Repository variables: none listed.
-- Existing environment: `release-macos`.
-- Missing/empty release environment coverage for Windows release credentials.
+- Existing environments: `release-macos`, `release-windows`,
+  `clean-smoke-windows`, and `promote-windows`.
+- Environment protection reviewer/wait-timer rules were attempted but rejected
+  by the repository billing plan (`HTTP 422`). Current environments therefore
+  have empty `protection_rules`.
+- `release-windows` environment variable configured:
+  `WINDOWS_TIMESTAMP_URL=http://timestamp.digicert.com`.
+- macOS and Windows signing secrets remain missing.
 
 ## macOS Blocker
 
@@ -72,7 +78,7 @@ Required secrets:
 - `WINDOWS_SIGNING_CERT_PFX_B64`
 - `WINDOWS_SIGNING_CERT_PASSWORD`
 
-Required variable:
+Configured variable:
 
 - `WINDOWS_TIMESTAMP_URL`
 
