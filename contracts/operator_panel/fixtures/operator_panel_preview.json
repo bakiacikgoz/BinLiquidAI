@@ -169,6 +169,7 @@
         "computerUseResume": true,
         "computerUseStop": true,
         "computerUseStateJson": true,
+        "computerUseSummaryJson": true,
         "teamSubmit": true,
         "teamResumeSubmit": true,
         "teamListJson": true,

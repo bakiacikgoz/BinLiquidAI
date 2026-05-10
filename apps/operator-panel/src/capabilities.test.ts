@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getComputerUseCapability,
+  getComputerUseVisionRuntimeBlockers,
   getComputerUseVisionRuntimeCapability,
   hasContractMismatch,
   isComputerUseLiveEnabled,
+  isComputerUseSessionStartAllowed,
   isComputerUseVisionRuntimeLiveEnabled,
 } from './capabilities';
 
@@ -14,6 +16,7 @@ const baseCommands = {
   computerUseResume: true,
   computerUseStop: true,
   computerUseStateJson: true,
+  computerUseSummaryJson: true,
   teamSubmit: true,
   teamResumeSubmit: true,
   teamListJson: true,
@@ -244,6 +247,39 @@ describe('capability handshake validation', () => {
     ).toBe(true);
   });
 
+  it('does not allow default vision-first start from legacy pilot alone', () => {
+    const handshake = {
+      capabilities: {
+        features: {
+          computerUsePilot: enabledComputerUse,
+          computerUseVisionRuntime: visionRuntime,
+        },
+      },
+    };
+
+    expect(isComputerUseSessionStartAllowed(handshake, 'vision-first')).toBe(false);
+    expect(isComputerUseSessionStartAllowed(handshake, 'auto')).toBe(false);
+    expect(isComputerUseSessionStartAllowed(handshake, 'legacy-pilot')).toBe(true);
+  });
+
+  it('allows vision-first start only when the vision runtime is enabled and fail-closed', () => {
+    const handshake = {
+      capabilities: {
+        features: {
+          computerUsePilot: { ...enabledComputerUse, enabled: false },
+          computerUseVisionRuntime: {
+            ...visionRuntime,
+            enabled: true,
+            platform: 'macos',
+            reasonCode: null,
+          },
+        },
+      },
+    };
+
+    expect(isComputerUseSessionStartAllowed(handshake, 'vision-first')).toBe(true);
+  });
+
   it('keeps Windows computer-use disabled and exposes the reason code', () => {
     const capability = getComputerUseCapability({
       capabilities: {
@@ -266,6 +302,19 @@ describe('capability handshake validation', () => {
     expect(capability.enabled).toBe(false);
     expect(capability.reasonCode).toBe('WINDOWS_COMPUTER_USE_NOT_QUALIFIED');
     expect(isComputerUseLiveEnabled({ capabilities: { features: { computerUsePilot: capability } } })).toBe(false);
+    expect(
+      isComputerUseSessionStartAllowed(
+        {
+          capabilities: {
+            features: {
+              computerUsePilot: capability,
+              computerUseVisionRuntime: visionRuntime,
+            },
+          },
+        },
+        'vision-first',
+      ),
+    ).toBe(false);
   });
 
   it('reads additive vision runtime capability without enabling live execution', () => {
@@ -326,5 +375,37 @@ describe('capability handshake validation', () => {
     expect(capability.capabilityResolution?.supervisedLiveAllowed).toBe(true);
     expect(capability.capabilityResolution?.publicLiveClaimAllowed).toBe(false);
     expect(isComputerUseVisionRuntimeLiveEnabled(handshake)).toBe(false);
+  });
+
+  it('merges vision reason codes and blockers for operator remediation display', () => {
+    const blockers = getComputerUseVisionRuntimeBlockers({
+      capabilities: {
+        features: {
+          computerUseVisionRuntime: visionRuntime,
+        },
+      },
+    });
+
+    expect(blockers).toContain('WINDOWS_COMPUTER_USE_NOT_QUALIFIED');
+    expect(blockers).toContain('COMPUTER_USE_EVIDENCE_MISSING');
+    expect(blockers).toContain('WINDOWS_CAPTURE_BACKEND_DISABLED');
+  });
+
+  it('normalizes boolean raw screenshot safety drift for UI display', () => {
+    const capability = getComputerUseVisionRuntimeCapability({
+      capabilities: {
+        features: {
+          computerUseVisionRuntime: {
+            ...visionRuntime,
+            safety: {
+              ...visionRuntime.safety,
+              rawScreenshotPersistence: true,
+            },
+          },
+        },
+      },
+    });
+
+    expect(capability.safety.rawScreenshotPersistence).toBe('enabled');
   });
 });

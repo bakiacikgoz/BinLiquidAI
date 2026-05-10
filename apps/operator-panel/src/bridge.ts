@@ -7,6 +7,7 @@ import {
   previewBackupCreate,
   previewBackupVerify,
   previewComputerUseControl,
+  previewComputerUseSummary,
   previewComputerUseSessionState,
   previewComputerUseSubmitResponse,
   previewConfigResolve,
@@ -29,6 +30,7 @@ import {
   previewTailEvents,
 } from './previewFixtures';
 import type { PanelSettings } from './settings';
+import type { ComputerUseRuntimeChoice } from './capabilities';
 
 export type BridgeErrorCode =
   | 'INVALID_INPUT'
@@ -95,6 +97,7 @@ export interface SubmitComputerUseRunOptions {
   caseId?: string;
   jobId?: string;
   mode?: 'dry_run' | 'step_approval' | 'execute';
+  runtime?: ComputerUseRuntimeChoice;
   provider?: string;
   fallbackProvider?: string;
   model?: string;
@@ -322,7 +325,7 @@ export async function submitComputerUseRun(
   options: SubmitComputerUseRunOptions,
 ): Promise<unknown> {
   if (isBridgePreviewMode()) {
-    return previewComputerUseSubmitResponse(settings, options.jobId);
+    return previewComputerUseSubmitResponse(settings, options.jobId, options.runtime);
   }
   return callBridge('bridge_computer_use_submit', {
     config: toBridgeConfig(settings),
@@ -330,10 +333,21 @@ export async function submitComputerUseRun(
     caseId: options.caseId,
     jobId: options.jobId,
     mode: options.mode,
+    runtime: options.runtime,
     provider: options.provider,
     fallbackProvider: options.fallbackProvider,
     model: options.model,
     hfModelId: options.hfModelId,
+  });
+}
+
+export async function getComputerUseSummary(settings: PanelSettings, limit = 20): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewComputerUseSummary(settings, limit);
+  }
+  return callBridge('bridge_computer_use_summary', {
+    config: toBridgeConfig(settings),
+    limit,
   });
 }
 

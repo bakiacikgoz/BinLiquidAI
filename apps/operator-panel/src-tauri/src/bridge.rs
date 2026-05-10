@@ -516,6 +516,7 @@ pub async fn bridge_computer_use_submit(
     case_id: Option<String>,
     job_id: Option<String>,
     mode: Option<String>,
+    runtime: Option<String>,
     provider: Option<String>,
     fallback_provider: Option<String>,
     model: Option<String>,
@@ -545,6 +546,11 @@ pub async fn bridge_computer_use_submit(
     ];
     push_optional_arg(&mut args, "--case-id", case_id.as_deref());
     push_optional_arg(&mut args, "--mode", mode.as_deref());
+    let runtime = match normalize_computer_use_runtime(runtime.as_deref()) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    push_optional_arg(&mut args, "--runtime", runtime.as_deref());
     push_optional_arg(&mut args, "--provider", provider.as_deref());
     push_optional_arg(
         &mut args,
@@ -562,6 +568,31 @@ pub async fn bridge_computer_use_submit(
             root_dir: config.root_dir(),
             process_id,
         }),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_computer_use_summary(
+    config: BridgeConfig,
+    limit: Option<u32>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "computer-use".to_string(),
+        "summary".to_string(),
+        "--root-dir".to_string(),
+        config.root_dir(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    if let Some(value) = limit {
+        args.push("--limit".to_string());
+        args.push(value.clamp(1, 200).to_string());
+    }
+
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
         Err(error) => BridgeResult::err(error),
     }
 }
@@ -1651,6 +1682,29 @@ fn normalize_job_id(job_id: &str) -> Result<String, BridgeError> {
     Ok(normalized.to_string())
 }
 
+fn normalize_computer_use_runtime(value: Option<&str>) -> Result<Option<String>, BridgeError> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    let normalized = raw.trim().to_ascii_lowercase().replace('_', "-");
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+    if matches!(
+        normalized.as_str(),
+        "legacy-pilot" | "vision-first" | "auto"
+    ) {
+        return Ok(Some(normalized));
+    }
+    Err(BridgeError::new(
+        "INVALID_INPUT",
+        "runtime must be legacy-pilot, vision-first, or auto",
+        "",
+        "computer-use run",
+        false,
+    ))
+}
+
 fn resolve_root_dir(root_dir: &str) -> Result<PathBuf, BridgeError> {
     let normalized = root_dir.trim();
     if normalized.is_empty() {
@@ -1983,6 +2037,27 @@ mod tests {
         assert!(normalize_actor("ops-1").is_ok());
         assert!(normalize_actor(" ").is_err());
         assert!(normalize_actor("a*").is_err());
+    }
+
+    #[test]
+    fn normalize_computer_use_runtime_allows_only_supported_values() {
+        assert_eq!(
+            normalize_computer_use_runtime(Some("vision_first")).expect("runtime"),
+            Some("vision-first".to_string())
+        );
+        assert_eq!(
+            normalize_computer_use_runtime(Some("legacy-pilot")).expect("runtime"),
+            Some("legacy-pilot".to_string())
+        );
+        assert_eq!(
+            normalize_computer_use_runtime(Some("auto")).expect("runtime"),
+            Some("auto".to_string())
+        );
+        assert_eq!(
+            normalize_computer_use_runtime(Some(" ")).expect("empty"),
+            None
+        );
+        assert!(normalize_computer_use_runtime(Some("unsafe-live")).is_err());
     }
 
     #[test]

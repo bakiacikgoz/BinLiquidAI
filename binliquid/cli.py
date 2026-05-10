@@ -1786,6 +1786,7 @@ def operator_capabilities(
             "computerUseResume": True,
             "computerUseStop": True,
             "computerUseStateJson": True,
+            "computerUseSummaryJson": True,
         },
         "artifactSchema": {
             "auditEnvelope": "3",
@@ -1913,6 +1914,26 @@ def computer_use_doctor(
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         typer.echo(f"platforms={','.join(payload['platforms'])}")
+
+
+@computer_use_app.command("summary")
+def computer_use_summary(
+    root_dir: str | None = typer.Option(None, "--root-dir", help="Artifact root"),
+    profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    limit: int = typer.Option(20, "--limit", help="Recent run window"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    bounded_limit = max(1, min(limit, 200))
+    runner = ComputerUseRunner(config=config, root_dir=root_dir or config.team.artifact_dir)
+    payload = {
+        "contractVersion": OPERATOR_PANEL_CONTRACT_VERSION,
+        **runner.summary(limit=bounded_limit),
+    }
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(str(payload.get("summary") or ""))
 
 
 @computer_use_provider_app.command("doctor")

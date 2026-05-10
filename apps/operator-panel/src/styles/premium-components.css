@@ -401,6 +401,62 @@
   font-weight: 680;
 }
 
+.premium-shell .computer-use-operations-card {
+  display: grid;
+  gap: 14px;
+}
+
+.premium-shell .computer-use-operations-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.premium-shell .computer-use-operations-head h3 {
+  margin: 0;
+}
+
+.premium-shell .computer-use-count-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.premium-shell .computer-use-count {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: var(--surface-control);
+}
+
+.premium-shell .computer-use-count span {
+  overflow: hidden;
+  color: var(--fg-muted);
+  font-size: 10px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.premium-shell .computer-use-count strong {
+  color: var(--fg-primary);
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.premium-shell .computer-use-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .premium-shell .ghost-btn,
 .premium-shell .action-btn,
 .premium-shell .tab-btn,
@@ -650,6 +706,16 @@
   color: var(--fg-secondary);
   font-size: 12px;
   font-weight: 650;
+}
+
+.premium-shell .pill-success {
+  border-color: color-mix(in srgb, var(--color-success) 34%, var(--line-soft));
+  color: var(--color-success);
+}
+
+.premium-shell .pill-warning {
+  border-color: color-mix(in srgb, var(--color-warning) 40%, var(--line-soft));
+  color: var(--color-warning);
 }
 
 .premium-shell .json-panel {

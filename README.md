@@ -106,7 +106,20 @@ Core Runtime
 | Team Runtime | Pilot-hardened | Restricted/controlled profiles with bounded concurrency and replay verification. |
 | Enterprise profile | Constrained readiness | Requires signed evidence and deployment drills for broader GA claims. |
 | Operator Panel | Beta | Tauri desktop surface for operator workflows. |
-| Vision-first computer-use | Gated foundation | Strict policy, replay, qualification gates, deterministic mocks; no default live OS automation. |
+| Vision-first computer-use | Gated foundation | Strict policy, replay, qualification gates, deterministic mocks, CLI/Operator Panel summary; no default live OS automation. |
+
+Computer-use operator control surfaces:
+
+```bash
+uv run python -m binliquid computer-use doctor --platform all --json
+uv run python -m binliquid computer-use summary --root-dir .binliquid/team/jobs --limit 20 --json
+uv run python -m binliquid operator capabilities --json
+```
+
+Operator capabilities advertise `computerUseSummaryJson=true` when the summary
+bridge is available. The Operator Panel default runtime selection is
+`vision-first`; live start remains disabled until the vision runtime reports a
+fail-closed qualified capability.
 
 ---
 

@@ -689,6 +689,10 @@
           "title": "Computerusesubmit",
           "type": "boolean"
         },
+        "computerUseSummaryJson": {
+          "title": "Computerusesummaryjson",
+          "type": "boolean"
+        },
         "configResolveJson": {
           "title": "Configresolvejson",
           "type": "boolean"
@@ -768,6 +772,7 @@
         "computerUseResume",
         "computerUseStop",
         "computerUseStateJson",
+        "computerUseSummaryJson",
         "teamSubmit",
         "teamResumeSubmit",
         "teamListJson",

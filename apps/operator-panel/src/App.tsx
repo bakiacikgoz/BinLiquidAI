@@ -11,6 +11,7 @@ import {
   exportRunArtifacts,
   exportSupportBundle,
   fetchApprovals,
+  getComputerUseSummary,
   getComputerUseSessionState,
   fetchGaReadiness,
   fetchIdentity,
@@ -41,9 +42,11 @@ import {
 } from './bridge';
 import {
   getComputerUseCapability,
+  getComputerUseVisionRuntimeBlockers,
   getComputerUseVisionRuntimeCapability,
   hasContractMismatch,
-  isComputerUseLiveEnabled,
+  isComputerUseSessionStartAllowed,
+  type ComputerUseRuntimeChoice,
 } from './capabilities';
 import { ThemeProvider } from './context/ThemeContext';
 import { dictionaries } from './i18n';
@@ -71,6 +74,7 @@ import {
   mapWorkspaceStageToMissionStage,
 } from './missionMappers';
 import { MissionControlView } from './components/mission/MissionControlView';
+import { ComputerUseOperationsCard } from './components/mission/ComputerUseOperationsCard';
 import { AppShell } from './components/shell/AppShell';
 import { RightRail } from './components/shell/RightRail';
 import type { ShellViewKey } from './components/shell/Sidebar';
@@ -190,6 +194,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [runTab, setRunTab] = useState<RunTabKey>('overview');
   const [operationTab, setOperationTab] = useState<OperationTabKey>('identity');
   const [automationMode, setAutomationMode] = useState<AutomationMode>('assisted');
+  const [computerUseRuntimeChoice, setComputerUseRuntimeChoice] =
+    useState<ComputerUseRuntimeChoice>('vision-first');
   const [stepMode, setStepMode] = useState(true);
   const [askBeforeExternal, setAskBeforeExternal] = useState(true);
   const [askBeforeDeletion, setAskBeforeDeletion] = useState(true);
@@ -207,6 +213,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [selectedRunId, setSelectedRunId] = useState('');
   const [runStatus, setRunStatus] = useState<unknown>(null);
   const [computerUseState, setComputerUseState] = useState<unknown>(null);
+  const [computerUseSummaryData, setComputerUseSummaryData] = useState<unknown>(null);
   const [runReplay, setRunReplay] = useState<unknown>(null);
   const [artifactsByName, setArtifactsByName] = useState<Record<string, unknown>>({});
   const [selectedArtifactName, setSelectedArtifactName] = useState<string>('status.json');
@@ -269,14 +276,19 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const computerUseCapability = getComputerUseCapability(handshakeData);
   const computerUseVisionCapability = getComputerUseVisionRuntimeCapability(handshakeData);
   const computerUseVisionPlatformStatuses = Object.values(computerUseVisionCapability.platforms);
-  const computerUseLiveEnabled = isComputerUseLiveEnabled(handshakeData);
-  const computerUseDisabledReason =
-    computerUseLiveEnabled
-      ? ''
-      : computerUseCapability.summary ||
+  const computerUseLiveEnabled = isComputerUseSessionStartAllowed(handshakeData, computerUseRuntimeChoice);
+  const computerUseVisionBlockers = getComputerUseVisionRuntimeBlockers(handshakeData);
+  const computerUseDisabledReason = computerUseLiveEnabled
+    ? ''
+    : computerUseRuntimeChoice === 'legacy-pilot'
+      ? computerUseCapability.summary ||
         (computerUseCapability.reasonCode
-          ? `Computer-use live action disabled: ${computerUseCapability.reasonCode}`
-          : 'Computer-use live action requires a qualified capability handshake.');
+          ? `Computer-use legacy pilot disabled: ${computerUseCapability.reasonCode}`
+          : 'Computer-use legacy pilot requires an explicit qualified macOS pilot handshake.')
+      : computerUseVisionBlockers.length > 0
+        ? `Computer-use vision runtime blocked: ${computerUseVisionBlockers.join(', ')}`
+        : computerUseVisionCapability.summary ||
+          'Computer-use vision runtime requires a qualified fail-closed capability handshake.';
   const operatorIdValid = isOperatorIdValid(settings.operatorId);
   const canMutate = canMutateWithOperatorId(settings.operatorId, contractMismatch);
 
@@ -353,6 +365,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       if (!selectedRunId && items.length > 0) {
         setSelectedRunId(readString(asRecord(items[0]), 'job_id'));
       }
+      void refreshComputerUseSummary();
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
@@ -361,8 +374,25 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
+  async function refreshComputerUseSummary() {
+    try {
+      const payload = await getComputerUseSummary(settings, 20);
+      setComputerUseSummaryData(payload);
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        setComputerUseSummaryData({ status: 'error', error: parsed.message, code: parsed.code });
+      }
+    }
+  }
+
   async function refreshCore() {
-    await Promise.all([refreshHandshake(), refreshConfig(), refreshApprovals(), refreshRuns()]);
+    await Promise.all([
+      refreshHandshake(),
+      refreshConfig(),
+      refreshApprovals(),
+      refreshRuns(),
+    ]);
   }
 
   async function loadApprovalDetail(approvalId: string) {
@@ -625,6 +655,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         caseId: taskForm.caseId || undefined,
         jobId: taskForm.jobId || undefined,
         mode,
+        runtime: computerUseRuntimeChoice,
         provider: taskForm.provider || undefined,
         fallbackProvider: taskForm.fallbackProvider || undefined,
         model: taskForm.model || undefined,
@@ -642,6 +673,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           },
           computer_use: {
             mode,
+            runtime: computerUseRuntimeChoice,
             lifecycle_state: 'running',
             stage: 'plan',
             paused: false,
@@ -1233,6 +1265,17 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </details>
               </article>
 
+              <ComputerUseOperationsCard
+                legacyCapability={computerUseCapability}
+                visionCapability={computerUseVisionCapability}
+                summary={computerUseSummaryData}
+                runtimeChoice={computerUseRuntimeChoice}
+                startAllowed={computerUseLiveEnabled}
+                disabledReason={computerUseDisabledReason}
+                blockers={computerUseVisionBlockers}
+                onRuntimeChoiceChange={setComputerUseRuntimeChoice}
+              />
+
               <article className="page-card">
                 <h3>{t.submitReadiness}</h3>
                 <div className="metric-list">
@@ -1253,12 +1296,22 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     <strong>{readBool(features, 'operatorWorkflowParity') ? t.enabled : t.disabled}</strong>
                   </div>
                   <div className="metric-row">
+                    <span>Runtime</span>
+                    <strong>{computerUseRuntimeChoice}</strong>
+                  </div>
+                  <div className="metric-row">
                     <span>Computer-use live</span>
                     <strong>{computerUseLiveEnabled ? t.enabled : 'Qualification required'}</strong>
                   </div>
                   <div className="metric-row">
                     <span>Reason code</span>
-                    <strong>{computerUseCapability.reasonCode || '-'}</strong>
+                    <strong>
+                      {computerUseRuntimeChoice === 'legacy-pilot'
+                        ? computerUseCapability.reasonCode || '-'
+                        : computerUseVisionCapability.reasonCode ||
+                          computerUseVisionCapability.capabilityResolution?.reasonCode ||
+                          '-'}
+                    </strong>
                   </div>
                   <div className="metric-row">
                     <span>Vision runtime</span>

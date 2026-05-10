@@ -17,6 +17,7 @@ pub fn run() {
             bridge::bridge_computer_use_resume,
             bridge::bridge_computer_use_stop,
             bridge::bridge_computer_use_state,
+            bridge::bridge_computer_use_summary,
             bridge::bridge_team_list,
             bridge::bridge_team_replay,
             bridge::bridge_team_status,

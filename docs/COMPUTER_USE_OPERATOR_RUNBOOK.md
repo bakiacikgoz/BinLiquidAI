@@ -4,6 +4,7 @@
 
 ```bash
 uv run binliquid computer-use doctor --platform all --json
+uv run binliquid computer-use summary --root-dir .binliquid/team/jobs --limit 20 --json
 uv run binliquid operator capabilities --json
 ```
 
@@ -13,7 +14,20 @@ Expected default:
 macOS: not_configured or not_qualified, liveEnabled=false
 Windows: not_qualified, liveEnabled=false
 Linux: not_qualified, liveEnabled=false
+summary: status=ok, zero or recent local outcomes
 ```
+
+## Operator Panel Control Plane
+
+- Default runtime selection is `vision-first`.
+- Start Session is enabled only when `computerUseVisionRuntime.enabled=true` and
+  `computerUseVisionRuntime.failClosed=true`.
+- `legacy-pilot` requires explicit operator selection and remains local and
+  supervised; the UI must not silently fall back from vision-first to legacy.
+- The Computer-Use Operations card shows the current runtime, platform/stage,
+  reason codes, blockers, safety invariants, recent outcome counts, top failure
+  codes, and the safe next action.
+- If unqualified, run doctor/preflight and do not start live automation.
 
 ## macOS Qualification
 

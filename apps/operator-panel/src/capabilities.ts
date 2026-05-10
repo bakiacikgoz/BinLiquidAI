@@ -12,6 +12,7 @@ const REQUIRED_COMMAND_KEYS = [
   'computerUseResume',
   'computerUseStop',
   'computerUseStateJson',
+  'computerUseSummaryJson',
   'configResolveJson',
   'gaReadinessJson',
   'keysStatusJson',
@@ -43,6 +44,8 @@ export type ComputerUseCapability = {
   reasonCode: string | null;
   summary: string | null;
 };
+
+export type ComputerUseRuntimeChoice = 'vision-first' | 'legacy-pilot' | 'auto';
 
 export type ComputerUsePlatformStatus = {
   platform: string;
@@ -134,6 +137,20 @@ function asRecord(value: unknown): Record<string, unknown> {
 function readString(source: Record<string, unknown>, key: string): string | null {
   const value = source[key];
   return typeof value === 'string' ? value : null;
+}
+
+function readSafetyToggle(source: Record<string, unknown>, key: string, fallback: string): string {
+  const value = source[key];
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === true) {
+    return 'enabled';
+  }
+  if (value === false) {
+    return 'disabled';
+  }
+  return fallback;
 }
 
 function readBoolean(source: Record<string, unknown>, key: string): boolean {
@@ -229,7 +246,7 @@ export function getComputerUseVisionRuntimeCapability(
       model: readString(provider, 'model'),
     },
     safety: {
-      rawScreenshotPersistence: readString(safety, 'rawScreenshotPersistence') ?? 'disabled',
+      rawScreenshotPersistence: readSafetyToggle(safety, 'rawScreenshotPersistence', 'disabled'),
       terminalControl: readString(safety, 'terminalControl') ?? 'deny',
       approvalRequiredForRiskyActions: readBoolean(safety, 'approvalRequiredForRiskyActions'),
     },
@@ -332,4 +349,39 @@ export function isComputerUseLiveEnabled(handshakeData: unknown): boolean {
 export function isComputerUseVisionRuntimeLiveEnabled(handshakeData: unknown): boolean {
   const capability = getComputerUseVisionRuntimeCapability(handshakeData);
   return capability.enabled === true && capability.failClosed === true;
+}
+
+export function isComputerUseSessionStartAllowed(
+  handshakeData: unknown,
+  runtimeChoice: ComputerUseRuntimeChoice,
+): boolean {
+  if (runtimeChoice === 'vision-first' || runtimeChoice === 'auto') {
+    return isComputerUseVisionRuntimeLiveEnabled(handshakeData);
+  }
+
+  const legacy = getComputerUseCapability(handshakeData);
+  return legacy.enabled === true && legacy.failClosed === true && legacy.platform === 'macos';
+}
+
+export function getComputerUseVisionRuntimeBlockers(handshakeData: unknown): string[] {
+  const capability = getComputerUseVisionRuntimeCapability(handshakeData);
+  const blockers = new Set<string>();
+  if (capability.reasonCode) {
+    blockers.add(capability.reasonCode);
+  }
+  const resolution = capability.capabilityResolution;
+  if (resolution?.reasonCode) {
+    blockers.add(resolution.reasonCode);
+  }
+  for (const blocker of resolution?.blockers ?? []) {
+    blockers.add(blocker);
+  }
+  const platformStatus = capability.platforms[capability.platform];
+  if (platformStatus?.reasonCode) {
+    blockers.add(platformStatus.reasonCode);
+  }
+  for (const blocker of platformStatus?.blockers ?? []) {
+    blockers.add(blocker);
+  }
+  return Array.from(blockers).filter((item) => item.trim().length > 0);
 }

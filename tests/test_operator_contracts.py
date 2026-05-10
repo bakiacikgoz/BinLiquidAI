@@ -192,6 +192,7 @@ def test_operator_capabilities_payload_matches_contract() -> None:
     jsonschema.Draft202012Validator(schema).validate(json.loads(result.stdout))
 
     assert payload.contract_version == "2.0"
+    assert payload.commands.computer_use_summary_json is True
     vision_runtime = json.loads(result.stdout)["features"]["computerUseVisionRuntime"]
     assert set(vision_runtime["platforms"]) == {"macos", "windows", "linux"}
     assert vision_runtime["platforms"]["windows"]["liveEnabled"] is False

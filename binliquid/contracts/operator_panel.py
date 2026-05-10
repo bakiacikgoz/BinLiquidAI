@@ -174,6 +174,7 @@ class OperatorCommandCapabilitiesContract(ContractModel):
     computer_use_resume: bool = Field(alias="computerUseResume")
     computer_use_stop: bool = Field(alias="computerUseStop")
     computer_use_state_json: bool = Field(alias="computerUseStateJson")
+    computer_use_summary_json: bool = Field(alias="computerUseSummaryJson")
     team_submit: bool = Field(alias="teamSubmit")
     team_resume_submit: bool = Field(alias="teamResumeSubmit")
     team_list_json: bool = Field(alias="teamListJson")

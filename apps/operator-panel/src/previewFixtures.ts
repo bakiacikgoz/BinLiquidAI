@@ -1,5 +1,6 @@
 import previewBundle from '../../../contracts/operator_panel/fixtures/operator_panel_preview.json';
 
+import type { ComputerUseRuntimeChoice } from './capabilities';
 import type { PanelSettings } from './settings';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
@@ -50,6 +51,7 @@ export function previewHandshake(settings: PanelSettings) {
   payload.capabilities.commands.computerUseResume = true;
   payload.capabilities.commands.computerUseStop = true;
   payload.capabilities.commands.computerUseStateJson = true;
+  payload.capabilities.commands.computerUseSummaryJson = true;
   payload.doctor.profile = settings.profile;
   return payload;
 }
@@ -200,10 +202,55 @@ function previewComputerUseStatus(settings: PanelSettings, jobId?: string) {
   return runPayload;
 }
 
-export function previewComputerUseSubmitResponse(settings: PanelSettings, jobId?: string) {
+export function previewComputerUseSubmitResponse(
+  settings: PanelSettings,
+  jobId?: string,
+  runtime?: ComputerUseRuntimeChoice,
+) {
   const payload = previewSubmitResponse(settings, jobId || 'job-ui-preview-cu-1') as Record<string, unknown>;
   payload.jobId = jobId || 'job-ui-preview-cu-1';
+  payload.runtime = runtime ?? 'vision-first';
   return payload;
+}
+
+export function previewComputerUseSummary(settings: PanelSettings, limit = 20) {
+  return {
+    contractVersion: previewBundle.contractVersion,
+    status: 'ok',
+    checked_at: '2026-03-08T09:42:00Z',
+    artifact_root: settings.rootDir,
+    window: {
+      limit: Math.max(1, Math.min(limit, 200)),
+      observed: 4,
+    },
+    counts: {
+      success: 1,
+      blocked: 1,
+      failed: 1,
+      stopped: 1,
+      active: 0,
+    },
+    recent_runs: [
+      {
+        job_id: 'job-ui-preview-cu-1',
+        job_status: 'blocked',
+        session_state: 'awaiting_approval',
+        outcome: 'blocked',
+        failure_code: 'approval_not_executed',
+        finished_at: '2026-03-08T09:10:08Z',
+        created_at: '2026-03-08T09:10:00Z',
+      },
+    ],
+    top_failure_codes: [{ code: 'approval_not_executed', count: 1 }],
+    last_success_at: '2026-03-08T08:42:00Z',
+    last_blocked_at: '2026-03-08T09:10:08Z',
+    last_failed_at: '2026-03-07T17:15:00Z',
+    last_stopped_at: '2026-03-07T16:05:00Z',
+    readiness_status: 'blocked',
+    readiness_blockers: ['VISION_PROVIDER_UNAVAILABLE', 'COMPUTER_USE_EVIDENCE_MISSING'],
+    readiness_warnings: [],
+    summary: 'Recent pilot outcomes: 1 success, 1 blocked, 1 failed, 1 stopped, 0 active.',
+  };
 }
 
 export function previewComputerUseControl(jobId: string, requested: 'pause' | 'resume' | 'stop') {

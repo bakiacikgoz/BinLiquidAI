@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getComputerUseSessionState,
+  getComputerUseSummary,
   handshake,
   isBridgePreviewMode,
   isPreviewAllowedForEnv,
@@ -52,6 +53,7 @@ describe('bridge preview fallback', () => {
         {
           request: 'open "https://preview.aegis.local/form"',
           mode: 'step_approval',
+          runtime: 'vision-first',
         },
       ),
     ]);
@@ -63,6 +65,18 @@ describe('bridge preview fallback', () => {
     const computerUseRecord = computerUsePayload as Record<string, unknown>;
     expect(computerUseRecord.contractVersion).toBe('2.0');
     expect(computerUseRecord.jobId).toBe('job-ui-preview-cu-1');
+    expect(computerUseRecord.runtime).toBe('vision-first');
+  });
+
+  it('returns preview computer-use summary payloads', async () => {
+    const payload = await getComputerUseSummary({ ...DEFAULT_SETTINGS }, 2);
+    const record = payload as Record<string, unknown>;
+    const window = record.window as Record<string, unknown>;
+    const counts = record.counts as Record<string, unknown>;
+
+    expect(record.contractVersion).toBe('2.0');
+    expect(window.limit).toBe(2);
+    expect(counts.blocked).toBe(1);
   });
 
   it('returns preview control payloads for computer-use sessions', async () => {
