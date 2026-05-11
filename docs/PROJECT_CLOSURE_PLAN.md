@@ -437,6 +437,10 @@ veya Apple ID mode:
    no signed RC installer exists. Preparation advanced: the Windows release
    workflow now preflights signing credentials before checkout/build and
    uploads `operator-panel-windows-credential-preflight` evidence.
+   GitHub Actions run `25654446077` verified the preflight behavior:
+   `Validate Windows signing credentials` failed with
+   `status=blocked_external_credentials`, uploaded credential preflight
+   evidence, and skipped checkout/build/signing/public-gate steps.
 5. Promote workflow çalışır.
 6. `windows-public-release-gate.json` `status=pass` verir.
 7. Ancak ondan sonra public/enterprise Windows artifact üretilebilir.

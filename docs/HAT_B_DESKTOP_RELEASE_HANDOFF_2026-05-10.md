@@ -120,6 +120,13 @@ Configured variable:
 - The Windows release workflow now preflights signing credentials before
   checkout/build and uploads `operator-panel-windows-credential-preflight`
   evidence when credentials are missing.
+- GitHub Actions run `25654446077` verified that behavior. The preflight
+  artifact reports `status=blocked_external_credentials`, missing
+  `WINDOWS_SIGNING_CERT_PFX_B64` and `WINDOWS_SIGNING_CERT_PASSWORD`,
+  `secret_material_written=false`, `signed_rc_allowed=false`, and skipped
+  checkout/build/signing/public-gate steps. Artifact
+  `operator-panel-windows-credential-preflight` id `6911820950` has digest
+  `sha256:6c13170009f6098bfce55203c54294d5824b60b6cc18bf2a1609e5bd431bfb00`.
 
 Workflow sequence after secrets are provisioned:
 
