@@ -94,6 +94,12 @@ if [[ -z "${RUN_ID}" ]]; then
   RUN_ID="rc24h-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 
+REPO_ROOT="$(/bin/pwd -P)"
+SCRIPT_PATH="$0"
+if [[ "${SCRIPT_PATH}" != /* ]]; then
+  SCRIPT_PATH="${REPO_ROOT}/${SCRIPT_PATH#./}"
+fi
+
 RUN_DIR="${STATE_ROOT}/${RUN_ID}"
 STATUS_PATH="${RUN_DIR}/status.json"
 HEARTBEAT_PATH="${RUN_DIR}/heartbeat.txt"
@@ -193,7 +199,7 @@ write_status() {
     "STATE_ROOT=${STATE_ROOT}" \
     "RUN_DIR=${RUN_DIR}" \
     "COMMAND_DISPLAY=${COMMAND_DISPLAY}" \
-    "CWD=${PWD}" \
+    "CWD=${REPO_ROOT}" \
     "SUPERVISOR_PID=$$" \
     "CHILD_PID=${CHILD_PID:-}" \
     "EXIT_CODE=${exit_code}" \
@@ -224,7 +230,7 @@ if [[ "${LAUNCHD}" -eq 1 ]]; then
     python3 - <<PY
 import json
 print(json.dumps([
-    "$PWD/$0",
+    "$SCRIPT_PATH",
     "--hours", "$SOAK_HOURS",
     "--profile", "$PROFILE",
     "--mode", "$MODE",
@@ -237,7 +243,7 @@ PY
   )"
   LAUNCHD_LABEL="${LAUNCHD_LABEL}" \
   PLIST_PATH="${PLIST_PATH}" \
-  WORKING_DIRECTORY="${PWD}" \
+  WORKING_DIRECTORY="${REPO_ROOT}" \
   PROGRAM_ARGS_JSON="${PROGRAM_ARGS_JSON}" \
   LAUNCHD_STDOUT_PATH="${LAUNCHD_STDOUT_PATH}" \
   LAUNCHD_STDERR_PATH="${LAUNCHD_STDERR_PATH}" \
@@ -273,7 +279,7 @@ PY
     "STATE_ROOT=${STATE_ROOT}" \
     "RUN_DIR=${RUN_DIR}" \
     "COMMAND_DISPLAY=${COMMAND_DISPLAY}" \
-    "CWD=${PWD}" \
+    "CWD=${REPO_ROOT}" \
     "SUPERVISOR_PID=0" \
     "CHILD_PID=" \
     "EXIT_CODE=" \
@@ -287,7 +293,7 @@ fi
 
 if [[ "${DETACH}" -eq 1 ]]; then
   mkdir -p "${RUN_DIR}"
-  nohup "$0" \
+  nohup "${SCRIPT_PATH}" \
     --hours "${SOAK_HOURS}" \
     --profile "${PROFILE}" \
     --mode "${MODE}" \
@@ -308,7 +314,7 @@ if [[ "${DETACH}" -eq 1 ]]; then
     "STATE_ROOT=${STATE_ROOT}" \
     "RUN_DIR=${RUN_DIR}" \
     "COMMAND_DISPLAY=${COMMAND_DISPLAY}" \
-    "CWD=${PWD}" \
+    "CWD=${REPO_ROOT}" \
     "SUPERVISOR_PID=${DETACHED_PID}" \
     "CHILD_PID=" \
     "EXIT_CODE=" \
