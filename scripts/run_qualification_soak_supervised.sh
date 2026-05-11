@@ -9,6 +9,7 @@ STATE_ROOT=""
 RUN_ID=""
 RUNNER="auto"
 DETACH=0
+LAUNCHD=0
 DRY_RUN=0
 
 usage() {
@@ -26,6 +27,7 @@ Options:
   --run-id ID                   Stable supervisor run id
   --runner auto|venv|uv         Command runner (default: auto, prefer .venv)
   --detach                      Start in the background with nohup
+  --launchd                     Start as a macOS launchd agent
   --dry-run                     Print the command and exit without running
   -h, --help                    Show this help
 EOF
@@ -63,6 +65,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --detach)
       DETACH=1
+      shift
+      ;;
+    --launchd)
+      LAUNCHD=1
       shift
       ;;
     --dry-run)
@@ -201,6 +207,81 @@ if [[ "${DRY_RUN}" -eq 1 ]]; then
   mkdir -p "${RUN_DIR}"
   write_status "dry_run" ""
   cat "${STATUS_PATH}"
+  exit 0
+fi
+
+if [[ "${LAUNCHD}" -eq 1 ]]; then
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "--launchd is only supported on macOS" >&2
+    exit 64
+  fi
+  mkdir -p "${RUN_DIR}"
+  LAUNCHD_LABEL="com.binliquid.qualification-soak.${RUN_ID//[^A-Za-z0-9]/-}"
+  PLIST_PATH="${RUN_DIR}/${LAUNCHD_LABEL}.plist"
+  LAUNCHD_STDOUT_PATH="${RUN_DIR}/launchd.stdout.log"
+  LAUNCHD_STDERR_PATH="${RUN_DIR}/launchd.stderr.log"
+  PROGRAM_ARGS_JSON="$(
+    python3 - <<PY
+import json
+print(json.dumps([
+    "$PWD/$0",
+    "--hours", "$SOAK_HOURS",
+    "--profile", "$PROFILE",
+    "--mode", "$MODE",
+    "--output-root", "$OUTPUT_ROOT",
+    "--state-root", "$STATE_ROOT",
+    "--run-id", "$RUN_ID",
+    "--runner", "$RESOLVED_RUNNER",
+]))
+PY
+  )"
+  LAUNCHD_LABEL="${LAUNCHD_LABEL}" \
+  PLIST_PATH="${PLIST_PATH}" \
+  WORKING_DIRECTORY="${PWD}" \
+  PROGRAM_ARGS_JSON="${PROGRAM_ARGS_JSON}" \
+  LAUNCHD_STDOUT_PATH="${LAUNCHD_STDOUT_PATH}" \
+  LAUNCHD_STDERR_PATH="${LAUNCHD_STDERR_PATH}" \
+  python3 - <<'PY'
+import json
+import os
+import plistlib
+from pathlib import Path
+
+plist_path = Path(os.environ["PLIST_PATH"])
+program_arguments = json.loads(os.environ["PROGRAM_ARGS_JSON"])
+payload = {
+    "Label": os.environ["LAUNCHD_LABEL"],
+    "ProgramArguments": program_arguments,
+    "WorkingDirectory": os.environ["WORKING_DIRECTORY"],
+    "RunAtLoad": True,
+    "KeepAlive": False,
+    "ProcessType": "Background",
+    "StandardOutPath": os.environ["LAUNCHD_STDOUT_PATH"],
+    "StandardErrorPath": os.environ["LAUNCHD_STDERR_PATH"],
+}
+plist_path.write_bytes(plistlib.dumps(payload, sort_keys=False))
+PY
+  launchctl bootstrap "gui/$(id -u)" "${PLIST_PATH}"
+  write_json "${RUN_DIR}/launchd.json" \
+    "RUN_ID=${RUN_ID}" \
+    "STATUS=launchd_submitted" \
+    "PROFILE=${PROFILE}" \
+    "MODE=${MODE}" \
+    "SOAK_HOURS=${SOAK_HOURS}" \
+    "RUNNER=${RESOLVED_RUNNER}" \
+    "OUTPUT_ROOT=${OUTPUT_ROOT}" \
+    "STATE_ROOT=${STATE_ROOT}" \
+    "RUN_DIR=${RUN_DIR}" \
+    "COMMAND_DISPLAY=${COMMAND_DISPLAY}" \
+    "CWD=${PWD}" \
+    "SUPERVISOR_PID=0" \
+    "CHILD_PID=" \
+    "EXIT_CODE=" \
+    "CAFFEINATE_ENABLED=0" \
+    "STDOUT_PATH=${STDOUT_PATH}" \
+    "STDERR_PATH=${STDERR_PATH}" \
+    "HEARTBEAT_PATH=${HEARTBEAT_PATH}"
+  cat "${RUN_DIR}/launchd.json"
   exit 0
 fi
 
