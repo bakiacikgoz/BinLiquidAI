@@ -22,6 +22,9 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
 ## Qualification Follow-Ups
 
 - Run 24h release-candidate soak and publish signed evidence.
+  Use `scripts/run_qualification_soak_supervised.sh --detach --hours 24`
+  so the soak is not tied to an interactive terminal session. Refresh the local
+  enterprise identity assertion for more than 24 hours first if it has expired.
 - Run 72h final pre-GA soak if required by the release policy.
 - Publish managed KMS/HSM live drill evidence.
 - Complete non-developer operator validation.
