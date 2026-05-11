@@ -276,7 +276,8 @@ cleanup() {
   rm -rf "${LOCK_DIR}"
 }
 trap cleanup EXIT
-trap 'exit 130' INT TERM HUP
+trap 'exit 130' INT TERM
+trap '' HUP
 
 write_status "running" ""
 "${RUN_COMMAND[@]}" > "${STDOUT_PATH}" 2> "${STDERR_PATH}" &
