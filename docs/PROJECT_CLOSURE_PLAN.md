@@ -333,6 +333,13 @@ uv run binliquid qualification run \
   --json
 ```
 
+**2026-05-11 durum:** 24h release-candidate soak LaunchAgent olarak
+başlatıldı. Run id: `rc24h-20260511T153314Z`. Çalışma klasörü:
+`/private/tmp/binliquid_soak_rc24h-20260511T153314Z`. Supervisor status:
+`artifacts/qualification/supervisor/rc24h-20260511T153314Z/status.json`.
+Heartbeat `2026-05-11T15:36:09Z` itibarıyla güncel ve süreç `running`.
+Beklenen bitiş yaklaşık `2026-05-12T15:34Z` / `2026-05-12 18:34 Europe/Istanbul`.
+
 **Final pre-GA soak:**
 
 ```bash
