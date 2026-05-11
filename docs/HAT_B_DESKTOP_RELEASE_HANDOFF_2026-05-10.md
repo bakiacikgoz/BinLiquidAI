@@ -111,6 +111,13 @@ Configured variable:
 
 - `WINDOWS_TIMESTAMP_URL`
 
+2026-05-11 recheck:
+
+- Repository-level secrets: absent.
+- `release-windows` environment secrets: absent.
+- `release-windows` environment variable: `WINDOWS_TIMESTAMP_URL` present.
+- Clean smoke remains blocked until a signed RC artifact exists.
+
 Workflow sequence after secrets are provisioned:
 
 ```bash

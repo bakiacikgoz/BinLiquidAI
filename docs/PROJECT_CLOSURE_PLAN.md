@@ -431,6 +431,10 @@ veya Apple ID mode:
    `release-windows` environment secrets were rechecked; signing secrets are
    still absent. Clean smoke/promote workflow inputs are documented in
    `docs/HAT_B_DESKTOP_RELEASE_HANDOFF_2026-05-10.md`.
+   **2026-05-11 durum:** still blocked. Repository-level secrets and
+   `release-windows` environment secrets were rechecked and remain absent;
+   only `WINDOWS_TIMESTAMP_URL` is configured. Clean smoke was not run because
+   no signed RC installer exists.
 5. Promote workflow çalışır.
 6. `windows-public-release-gate.json` `status=pass` verir.
 7. Ancak ondan sonra public/enterprise Windows artifact üretilebilir.
