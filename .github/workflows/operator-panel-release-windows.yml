@@ -17,6 +17,60 @@ jobs:
     environment: release-windows
 
     steps:
+      - name: Validate Windows signing credentials
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_CERT_PFX_B64: ${{ secrets.WINDOWS_SIGNING_CERT_PFX_B64 }}
+          WINDOWS_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows-release-evidence | Out-Null
+          $preflightPath = "artifacts/windows-release-evidence/credential-preflight.json"
+          $missingSecrets = @()
+          $blockingReasons = @()
+
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PFX_B64)) {
+            $missingSecrets += "WINDOWS_SIGNING_CERT_PFX_B64"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERT_PASSWORD)) {
+            $missingSecrets += "WINDOWS_SIGNING_CERT_PASSWORD"
+          }
+
+          $status = "pass"
+          if ($missingSecrets.Count -gt 0) {
+            $status = "blocked_external_credentials"
+            $blockingReasons += "windows_signing_credentials_missing"
+          }
+
+          @{
+            schemaVersion = "windows-release-credential-preflight/v1"
+            platform = "windows"
+            artifact_type = "nsis"
+            status = $status
+            blocking_reasons = @($blockingReasons)
+            missing_signing_secret_names = @($missingSecrets)
+            timestamp_url_configured = -not [string]::IsNullOrWhiteSpace($env:WINDOWS_TIMESTAMP_URL)
+            secret_material_written = $false
+            signed = $false
+            timestamped = $false
+            signtool_verify_status = "not_run"
+            signed_rc_allowed = $false
+            created_at_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $preflightPath -Encoding utf8
+
+          if ($status -ne "pass") {
+            throw "Windows credential preflight blocked: $($blockingReasons -join ', ')"
+          }
+
+          "windows_credential_preflight=pass" >> $env:GITHUB_OUTPUT
+
+      - name: Upload Windows credential preflight
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-panel-windows-credential-preflight
+          path: artifacts/windows-release-evidence/credential-preflight.json
+
       - name: Checkout
         uses: actions/checkout@v4
 

@@ -117,6 +117,9 @@ Configured variable:
 - `release-windows` environment secrets: absent.
 - `release-windows` environment variable: `WINDOWS_TIMESTAMP_URL` present.
 - Clean smoke remains blocked until a signed RC artifact exists.
+- The Windows release workflow now preflights signing credentials before
+  checkout/build and uploads `operator-panel-windows-credential-preflight`
+  evidence when credentials are missing.
 
 Workflow sequence after secrets are provisioned:
 

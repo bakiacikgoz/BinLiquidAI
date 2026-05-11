@@ -434,7 +434,9 @@ veya Apple ID mode:
    **2026-05-11 durum:** still blocked. Repository-level secrets and
    `release-windows` environment secrets were rechecked and remain absent;
    only `WINDOWS_TIMESTAMP_URL` is configured. Clean smoke was not run because
-   no signed RC installer exists.
+   no signed RC installer exists. Preparation advanced: the Windows release
+   workflow now preflights signing credentials before checkout/build and
+   uploads `operator-panel-windows-credential-preflight` evidence.
 5. Promote workflow çalışır.
 6. `windows-public-release-gate.json` `status=pass` verir.
 7. Ancak ondan sonra public/enterprise Windows artifact üretilebilir.
