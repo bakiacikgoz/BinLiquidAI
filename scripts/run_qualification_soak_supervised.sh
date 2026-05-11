@@ -126,7 +126,7 @@ esac
 
 if [[ "${RESOLVED_RUNNER}" == "venv" ]]; then
   COMMAND=(
-    .venv/bin/binliquid qualification run
+    .venv/bin/python -m binliquid qualification run
     --profile "${PROFILE}"
     --mode "${MODE}"
     --soak-hours "${SOAK_HOURS}"
