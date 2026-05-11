@@ -7,6 +7,7 @@ MODE="mixed"
 OUTPUT_ROOT="artifacts/qualification"
 STATE_ROOT=""
 RUN_ID=""
+RUNNER="auto"
 DETACH=0
 DRY_RUN=0
 
@@ -23,6 +24,7 @@ Options:
   --output-root PATH            Qualification output root (default: artifacts/qualification)
   --state-root PATH             Supervisor state root (default: <output-root>/supervisor)
   --run-id ID                   Stable supervisor run id
+  --runner auto|venv|uv         Command runner (default: auto, prefer .venv)
   --detach                      Start in the background with nohup
   --dry-run                     Print the command and exit without running
   -h, --help                    Show this help
@@ -53,6 +55,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --run-id)
       RUN_ID="${2:?missing value for $1}"
+      shift 2
+      ;;
+    --runner)
+      RUNNER="${2:?missing value for $1}"
       shift 2
       ;;
     --detach)
@@ -89,14 +95,42 @@ STDOUT_PATH="${RUN_DIR}/qualification.stdout.json"
 STDERR_PATH="${RUN_DIR}/qualification.stderr.log"
 SUPERVISOR_LOG_PATH="${RUN_DIR}/supervisor.nohup.log"
 LOCK_DIR="${STATE_ROOT}/.running.lock"
-COMMAND=(
-  uv run binliquid qualification run
-  --profile "${PROFILE}"
-  --mode "${MODE}"
-  --soak-hours "${SOAK_HOURS}"
-  --output-root "${OUTPUT_ROOT}"
-  --json
-)
+case "${RUNNER}" in
+  auto)
+    if [[ -x ".venv/bin/binliquid" ]]; then
+      RESOLVED_RUNNER="venv"
+    else
+      RESOLVED_RUNNER="uv"
+    fi
+    ;;
+  venv|uv)
+    RESOLVED_RUNNER="${RUNNER}"
+    ;;
+  *)
+    echo "Unsupported runner: ${RUNNER}" >&2
+    exit 64
+    ;;
+esac
+
+if [[ "${RESOLVED_RUNNER}" == "venv" ]]; then
+  COMMAND=(
+    .venv/bin/binliquid qualification run
+    --profile "${PROFILE}"
+    --mode "${MODE}"
+    --soak-hours "${SOAK_HOURS}"
+    --output-root "${OUTPUT_ROOT}"
+    --json
+  )
+else
+  COMMAND=(
+    uv run binliquid qualification run
+    --profile "${PROFILE}"
+    --mode "${MODE}"
+    --soak-hours "${SOAK_HOURS}"
+    --output-root "${OUTPUT_ROOT}"
+    --json
+  )
+fi
 COMMAND_DISPLAY="$(printf "%q " "${COMMAND[@]}")"
 
 write_json() {
@@ -118,6 +152,7 @@ payload = {
     "profile": os.environ["PROFILE"],
     "mode": os.environ["MODE"],
     "soak_hours": float(os.environ["SOAK_HOURS"]),
+    "runner": os.environ["RUNNER"],
     "output_root": os.environ["OUTPUT_ROOT"],
     "state_root": os.environ["STATE_ROOT"],
     "run_dir": os.environ["RUN_DIR"],
@@ -147,6 +182,7 @@ write_status() {
     "PROFILE=${PROFILE}" \
     "MODE=${MODE}" \
     "SOAK_HOURS=${SOAK_HOURS}" \
+    "RUNNER=${RESOLVED_RUNNER}" \
     "OUTPUT_ROOT=${OUTPUT_ROOT}" \
     "STATE_ROOT=${STATE_ROOT}" \
     "RUN_DIR=${RUN_DIR}" \
@@ -177,6 +213,7 @@ if [[ "${DETACH}" -eq 1 ]]; then
     --output-root "${OUTPUT_ROOT}" \
     --state-root "${STATE_ROOT}" \
     --run-id "${RUN_ID}" \
+    --runner "${RESOLVED_RUNNER}" \
     > "${SUPERVISOR_LOG_PATH}" 2>&1 &
   DETACHED_PID="$!"
   write_json "${RUN_DIR}/launch.json" \
@@ -185,6 +222,7 @@ if [[ "${DETACH}" -eq 1 ]]; then
     "PROFILE=${PROFILE}" \
     "MODE=${MODE}" \
     "SOAK_HOURS=${SOAK_HOURS}" \
+    "RUNNER=${RESOLVED_RUNNER}" \
     "OUTPUT_ROOT=${OUTPUT_ROOT}" \
     "STATE_ROOT=${STATE_ROOT}" \
     "RUN_DIR=${RUN_DIR}" \
