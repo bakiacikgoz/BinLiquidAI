@@ -340,6 +340,24 @@ başlatıldı. Run id: `rc24h-20260511T153314Z`. Çalışma klasörü:
 Heartbeat `2026-05-11T15:36:09Z` itibarıyla güncel ve süreç `running`.
 Beklenen bitiş yaklaşık `2026-05-12T15:34Z` / `2026-05-12 18:34 Europe/Istanbul`.
 
+**2026-05-12 sonuç:** 24h release-candidate soak completed successfully.
+Supervisor status `completed_success`, exit code `0`, final heartbeat
+`2026-05-12T15:34:17Z`. Signed qualification report verification PASS:
+`verified=true`, `signature_verified=true`, `signature_mode=ed25519_local_file`.
+Qualification report: `qualification_status=pass`, `recommended_status=green`,
+`go_no_go=go`. Post-run GA readiness: `overall_status=green`, `go_no_go=go`.
+The 24h duration is recorded under the existing `soak_6h_flow` workload:
+`duration_seconds=86401`, `evidence_verified=true`, `replay_verify_status=pass`,
+`signing_verify_status=pass`, `blocking_findings=[]`. Note: the current report
+schema still includes optional `24h_soak_flow` as `not_run`, so a reporting
+alignment follow-up remains before treating that optional field as published.
+Local evidence copy:
+`artifacts/readiness/2026-05-12/qualification_rc24h_20260511T153314Z/`.
+SHA256:
+`qualification_report.json=79372fb197c2645a570882f449697ed48d6cb6d15195205b5b0cdfdc0e78ed63`,
+`ga_readiness_report_after_24h.json=7c3a43218e4d861a2cb476e192981e71f79de9ac0cceebf10572f2338007354b`,
+`supervisor_status.json=981bdb13a47ccc8e1d62a676a4d8526be62ca82051df758ecc382bbf63c6b237`.
+
 **Final pre-GA soak:**
 
 ```bash
@@ -611,7 +629,11 @@ Aşağıdaki checklist tamamlandığında mevcut geliştirme döngüsü bitmiş 
 - [x] `make pilot-gate` PASS.
 - [x] `make enterprise-gate` PASS.
 - [x] `make qualification-run` en az 6h candidate smoke-soak ile PASS.
-- [x] 24h release-candidate soak PASS veya açıkça “RC değil candidate” olarak işaretli.
+- [x] 24h release-candidate soak PASS. 2026-05-12 run
+  `rc24h-20260511T153314Z`; supervisor `completed_success`, signed
+  qualification report verified, GA readiness green/go. Reporting caveat:
+  duration is recorded under `soak_6h_flow`; optional `24h_soak_flow` remains a
+  schema-alignment follow-up.
 - [x] `ga_readiness_report.json` signed ve verify edilmiş.
 - [x] `security_posture.json` signed ve verify edilmiş.
 - [x] Key rotation dry-run PASS.

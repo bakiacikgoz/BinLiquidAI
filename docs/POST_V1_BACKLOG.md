@@ -21,7 +21,9 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
 
 ## Qualification Follow-Ups
 
-- Run 24h release-candidate soak and publish signed evidence.
+- Run 24h release-candidate soak and publish signed evidence. **Completed
+  2026-05-12:** run `rc24h-20260511T153314Z` completed successfully with
+  signed qualification verification PASS and GA readiness green/go.
   Use `scripts/run_qualification_soak_supervised.sh --detach --hours 24`
   so the soak is not tied to an interactive terminal session. Refresh the local
   enterprise identity assertion for more than 24 hours first if it has expired.
@@ -29,6 +31,8 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
   `/private/tmp/binliquid_soak_rc24h-20260511T153314Z` with run id
   `rc24h-20260511T153314Z`; expected completion is approximately
   `2026-05-12T15:34Z`.
+- Align the qualification report schema so a true 24h run is published through
+  the optional `24h_soak_flow` field instead of only extending `soak_6h_flow`.
 - Run 72h final pre-GA soak if required by the release policy.
 - Publish managed KMS/HSM live drill evidence.
 - Complete non-developer operator validation.
