@@ -479,6 +479,13 @@ limit, then provision macOS signing/notarization credentials and rerun
    `Validate Windows signing credentials` failed with
    `status=blocked_external_credentials`, uploaded credential preflight
    evidence, and skipped checkout/build/signing/public-gate steps.
+   **2026-05-12 durum:** `release-windows` environment secrets were rechecked
+   and remain absent; only `WINDOWS_TIMESTAMP_URL` is configured. Windows
+   signed-RC workflow run `25752181105` was started, but the `windows-2022` job
+   failed before any workflow step ran because GitHub Actions could not
+   allocate a runner: account payments/spending limit must be fixed. No fresh
+   credential preflight artifact or signed-RC artifact was produced by that
+   run.
 5. Promote workflow çalışır.
 6. `windows-public-release-gate.json` `status=pass` verir.
 7. Ancak ondan sonra public/enterprise Windows artifact üretilebilir.

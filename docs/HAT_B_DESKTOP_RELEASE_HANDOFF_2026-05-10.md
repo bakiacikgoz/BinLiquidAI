@@ -41,6 +41,11 @@ Local evidence already captured:
   `tests/test_windows_release_workflows_static.py` confirm
   `windows-release-status.json` stays scoped to signed-RC status and
   `windows-public-release-gate.json` remains the public release authority.
+- GitHub Actions run `25752181105` rechecked the Windows signed-RC workflow on
+  2026-05-12. The `windows-2022` job failed before any workflow step started
+  because GitHub Actions could not allocate a runner: "recent account payments
+  have failed or your spending limit needs to be increased." No credential
+  preflight or signed-RC artifacts were produced in that run.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.
@@ -63,8 +68,9 @@ GitHub inventory observed on 2026-05-10:
   `release-windows` still only has
   `WINDOWS_TIMESTAMP_URL=http://timestamp.digicert.com`.
 - macOS and Windows signing secrets remain missing.
-- GitHub Actions billing/spending limit must be fixed before the macOS release
-  workflow can produce fresh credential preflight or notarization evidence.
+- GitHub Actions billing/spending limit must be fixed before the macOS or
+  Windows release workflows can produce fresh credential preflight, signing, or
+  notarization evidence.
 
 ## macOS Blocker
 
@@ -138,6 +144,16 @@ Configured variable:
   checkout/build/signing/public-gate steps. Artifact
   `operator-panel-windows-credential-preflight` id `6911820950` has digest
   `sha256:6c13170009f6098bfce55203c54294d5824b60b6cc18bf2a1609e5bd431bfb00`.
+
+2026-05-12 recheck:
+
+- `release-windows` environment secrets remain absent.
+- `release-windows` environment variable `WINDOWS_TIMESTAMP_URL` remains
+  configured.
+- GitHub Actions run `25752181105` failed before workflow steps started because
+  account billing/spending limit blocked runner allocation. No credential
+  preflight artifact was produced.
+- Fix billing/spending limit before rerunning Windows signed-RC evidence.
 
 Workflow sequence after secrets are provisioned:
 
