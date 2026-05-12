@@ -20,6 +20,11 @@ Local evidence already captured:
   both `arm64` and `x86_64` lanes stopped at credential preflight with
   `status=blocked_external_credentials`, uploaded preflight evidence, skipped
   checkout/build/sign/notarize steps, and wrote no secret material.
+- GitHub Actions run `25751802651` rechecked the macOS release workflow on
+  2026-05-12. Both macOS jobs failed before any workflow step started because
+  GitHub Actions could not allocate runners: "recent account payments have
+  failed or your spending limit needs to be increased." No credential preflight
+  artifacts were produced in that run.
 - GitHub Actions run `25638465677` verified Windows CI: `windows-2022`
   required lane and `windows-2025` canary lane both completed with
   `conclusion=success`. Evidence was downloaded under
@@ -53,7 +58,13 @@ GitHub inventory observed on 2026-05-10:
   have empty `protection_rules`.
 - `release-windows` environment variable configured:
   `WINDOWS_TIMESTAMP_URL=http://timestamp.digicert.com`.
+- 2026-05-12 recheck: repository secrets and variables remain empty,
+  `release-macos` environment secrets and variables remain empty, and
+  `release-windows` still only has
+  `WINDOWS_TIMESTAMP_URL=http://timestamp.digicert.com`.
 - macOS and Windows signing secrets remain missing.
+- GitHub Actions billing/spending limit must be fixed before the macOS release
+  workflow can produce fresh credential preflight or notarization evidence.
 
 ## macOS Blocker
 

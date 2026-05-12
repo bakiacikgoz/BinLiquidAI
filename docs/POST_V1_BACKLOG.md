@@ -7,6 +7,9 @@ Detailed operator handoff:
 
 Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
 
+- Fix GitHub Actions account billing/spending limit so macOS release jobs can
+  start. 2026-05-12 run `25751802651` failed before any workflow step and
+  produced no preflight artifact because runners could not be allocated.
 - Provision macOS signing and notarization credentials:
   `MACOS_SIGNING_IDENTITY`, `MACOS_SIGNING_CERT_P12_B64`,
   `MACOS_SIGNING_CERT_PASSWORD`, and either Apple notary API key secrets or

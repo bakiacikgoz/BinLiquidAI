@@ -438,6 +438,15 @@ veya Apple ID mode:
 - Gatekeeper clean-machine open test yoksa.
 - Credential yokken release “PASS” gibi gösteriliyorsa.
 
+**2026-05-12 durum:** `release-macos` environment secrets/variables rechecked;
+required signing/notarization credentials are still absent. macOS release
+workflow run `25751802651` was started, but both macOS jobs failed before any
+workflow step ran because GitHub Actions could not allocate runners: account
+payments/spending limit must be fixed. No fresh credential preflight artifact
+was produced by that run. Next blocker: fix GitHub Actions billing/spending
+limit, then provision macOS signing/notarization credentials and rerun
+`operator-panel-release-macos.yml`.
+
 #### 5.2 Windows signed RC + clean VM smoke + promote gate
 
 **Sıra:**
