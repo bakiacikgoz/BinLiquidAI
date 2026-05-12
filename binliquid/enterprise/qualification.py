@@ -32,6 +32,7 @@ from binliquid.team.supervisor import TeamSupervisor
 from binliquid.team.validation import validate_team_spec
 
 MIN_GREEN_SOAK_SECONDS = 21_600
+MIN_EXTENDED_SOAK_SECONDS = 86_400
 QUALIFICATION_REPORT_VERSION = "1"
 REQUIRED_WORKLOADS = (
     "baseline_enterprise_flow",
@@ -286,6 +287,10 @@ def run_qualification(
                 runner=runner_meta["runner"],
             )
         )
+    workloads_payload = _publish_extended_soak_evidence(
+        workloads_payload,
+        run_root=run_root,
+    )
 
     environment_summary = {
         "platform": platform.platform(),
@@ -859,7 +864,16 @@ def evaluate_qualification_evidence(*, qualification_payload: dict[str, Any]) ->
             f"6h soak threshold not met (observed={int(soak.get('duration_seconds') or 0)}s)"
         )
     optional_24h = workload_map.get("24h_soak_flow")
-    if optional_24h is None or str(optional_24h.get("pass_fail") or "") != "pass":
+    optional_24h_published = (
+        optional_24h is not None
+        and str(optional_24h.get("pass_fail") or "") == "pass"
+        and bool(optional_24h.get("evidence_verified"))
+        and str(optional_24h.get("replay_verify_status") or "") == "pass"
+        and str(optional_24h.get("signing_verify_status") or "") == "pass"
+        and int(optional_24h.get("duration_seconds") or 0) >= MIN_EXTENDED_SOAK_SECONDS
+        and not optional_24h.get("blocking_findings")
+    )
+    if not optional_24h_published:
         residual_risks.append("24h soak evidence not yet published")
     residual_risks.extend(
         item
@@ -1670,6 +1684,70 @@ def _skipped_extended_soak(*, run_root: Path) -> dict[str, Any]:
         "residual_risks": ["24h soak evidence not yet published"],
         "evidence_verified": False,
     }
+
+
+def _publish_extended_soak_evidence(
+    workloads: list[dict[str, Any]],
+    *,
+    run_root: Path,
+) -> list[dict[str, Any]]:
+    extended_index = next(
+        (index for index, item in enumerate(workloads) if item.get("name") == "24h_soak_flow"),
+        None,
+    )
+    if extended_index is None:
+        return workloads
+
+    source = next((item for item in workloads if item.get("name") == "soak_6h_flow"), None)
+    if source is None:
+        return workloads
+    source_duration = int(source.get("duration_seconds") or 0)
+    if source_duration < MIN_EXTENDED_SOAK_SECONDS:
+        return workloads
+    source_is_verified = (
+        str(source.get("pass_fail") or "") == "pass"
+        and bool(source.get("evidence_verified"))
+        and str(source.get("replay_verify_status") or "") == "pass"
+        and str(source.get("signing_verify_status") or "") == "pass"
+        and not source.get("blocking_findings")
+    )
+    if not source_is_verified:
+        return workloads
+
+    source_artifacts = source.get("artifacts") if isinstance(source.get("artifacts"), dict) else {}
+    extended_artifacts = {
+        **source_artifacts,
+        "workload_root": str(run_root / "24h_soak_flow"),
+        "source_workload": "soak_6h_flow",
+        "source_workload_root": str(source_artifacts.get("workload_root") or ""),
+    }
+    notes = [
+        *[str(item) for item in (source.get("notes") or [])],
+        (
+            "Published from sustained soak_6h_flow evidence because duration "
+            "met the 24h release-candidate threshold."
+        ),
+    ]
+    operational_followups = [
+        str(item)
+        for item in (source.get("operational_followups") or [])
+        if str(item) != "run a signed 24h soak before broader GA sign-off"
+    ]
+    extended = {
+        **source,
+        "name": "24h_soak_flow",
+        "purpose": "Extended 24h release-candidate soak evidence for GA RC sign-off.",
+        "required_for_green": False,
+        "support_classification": "conditional",
+        "notes": _unique_strings(notes),
+        "operational_followups": _unique_strings(operational_followups),
+        "artifacts": extended_artifacts,
+        "residual_risks": [],
+    }
+
+    updated = list(workloads)
+    updated[extended_index] = extended
+    return updated
 
 
 def _run_terminal_positive_smoke(

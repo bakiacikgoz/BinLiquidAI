@@ -348,13 +348,17 @@ Qualification report: `qualification_status=pass`, `recommended_status=green`,
 `go_no_go=go`. Post-run GA readiness: `overall_status=green`, `go_no_go=go`.
 The 24h duration is recorded under the existing `soak_6h_flow` workload:
 `duration_seconds=86401`, `evidence_verified=true`, `replay_verify_status=pass`,
-`signing_verify_status=pass`, `blocking_findings=[]`. Note: the current report
-schema still includes optional `24h_soak_flow` as `not_run`, so a reporting
-alignment follow-up remains before treating that optional field as published.
+`signing_verify_status=pass`, `blocking_findings=[]`. **2026-05-12
+alignment:** reporting was fixed so future 24h runs publish the same sustained
+evidence through optional `24h_soak_flow` when it meets the 24h threshold. The
+completed run was re-signed as aligned evidence with `24h_soak_flow=pass`,
+`duration_seconds=86401`, `evidence_verified=true`, and no
+`24h soak evidence not yet published` residual risk.
 Local evidence copy:
 `artifacts/readiness/2026-05-12/qualification_rc24h_20260511T153314Z/`.
 SHA256:
 `qualification_report.json=79372fb197c2645a570882f449697ed48d6cb6d15195205b5b0cdfdc0e78ed63`,
+`qualification_report_aligned_24h.json=65a61ed36f3e1ef06d61b0a38bcf44cdb86d673f84559108a576b9528ea6e3dd`,
 `ga_readiness_report_after_24h.json=7c3a43218e4d861a2cb476e192981e71f79de9ac0cceebf10572f2338007354b`,
 `supervisor_status.json=981bdb13a47ccc8e1d62a676a4d8526be62ca82051df758ecc382bbf63c6b237`.
 
@@ -631,9 +635,8 @@ Aşağıdaki checklist tamamlandığında mevcut geliştirme döngüsü bitmiş 
 - [x] `make qualification-run` en az 6h candidate smoke-soak ile PASS.
 - [x] 24h release-candidate soak PASS. 2026-05-12 run
   `rc24h-20260511T153314Z`; supervisor `completed_success`, signed
-  qualification report verified, GA readiness green/go. Reporting caveat:
-  duration is recorded under `soak_6h_flow`; optional `24h_soak_flow` remains a
-  schema-alignment follow-up.
+  qualification report verified, GA readiness green/go. Reporting alignment
+  fixed and aligned signed evidence published with `24h_soak_flow=pass`.
 - [x] `ga_readiness_report.json` signed ve verify edilmiş.
 - [x] `security_posture.json` signed ve verify edilmiş.
 - [x] Key rotation dry-run PASS.

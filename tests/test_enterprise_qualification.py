@@ -13,9 +13,11 @@ from binliquid import __version__
 from binliquid.cli import app
 from binliquid.enterprise.maintenance import ga_readiness_report
 from binliquid.enterprise.qualification import (
+    MIN_EXTENDED_SOAK_SECONDS,
     MIN_GREEN_SOAK_SECONDS,
     QualificationFailure,
     _merge_qualification_report,
+    _publish_extended_soak_evidence,
     _resolve_merge_from_report_path,
     _run_terminal_positive_smoke,
     evaluate_qualification_evidence,
@@ -221,6 +223,52 @@ def _complete_green_qualification_payload() -> dict[str, object]:
         "operational_findings": evaluation["operational_findings"],
         "artifacts": {},
     }
+
+
+def test_extended_24h_soak_is_published_from_sustained_soak(tmp_path: Path) -> None:
+    workloads = [
+        _green_workload("baseline_enterprise_flow", duration_seconds=300),
+        _green_workload("approval_heavy_flow", duration_seconds=300),
+        _green_workload("conflict_heavy_flow", duration_seconds=300),
+        _green_workload("soak_6h_flow", duration_seconds=MIN_EXTENDED_SOAK_SECONDS),
+        _green_workload("failure_injection_flow", duration_seconds=300),
+        {
+            **_green_workload("24h_soak_flow", duration_seconds=0),
+            "required_for_green": False,
+            "pass_fail": "not_run",
+            "replay_verify_status": "not_run",
+            "signing_verify_status": "not_run",
+            "evidence_verified": False,
+            "residual_risks": ["24h soak evidence not yet published"],
+        },
+    ]
+
+    published = _publish_extended_soak_evidence(
+        workloads,
+        run_root=tmp_path / "artifacts" / "qualification" / "qualification-test",
+    )
+    extended = next(item for item in published if item["name"] == "24h_soak_flow")
+
+    assert extended["pass_fail"] == "pass"
+    assert extended["duration_seconds"] == MIN_EXTENDED_SOAK_SECONDS
+    assert extended["evidence_verified"] is True
+    assert extended["required_for_green"] is False
+    assert extended["replay_verify_status"] == "pass"
+    assert extended["signing_verify_status"] == "pass"
+    assert extended["blocking_findings"] == []
+    assert extended["residual_risks"] == []
+    assert extended["artifacts"]["source_workload"] == "soak_6h_flow"
+
+    evaluation = evaluate_qualification_evidence(
+        qualification_payload={
+            "profile": "enterprise",
+            "workloads": published,
+            "minimum_green_soak_seconds": MIN_GREEN_SOAK_SECONDS,
+        }
+    )
+    assert "24h soak evidence not yet published" not in evaluation["residual_risks"]
+    assert evaluation["qualification_status"] == "pass"
+    assert evaluation["go_no_go"] == "go"
 
 
 def test_qualification_runner_writes_signed_report(monkeypatch, tmp_path: Path) -> None:
