@@ -447,6 +447,16 @@ was produced by that run. Next blocker: fix GitHub Actions billing/spending
 limit, then provision macOS signing/notarization credentials and rerun
 `operator-panel-release-macos.yml`.
 
+**2026-05-12 güncelleme:** billing/spending-limit blocker düzeltildi.
+macOS release workflow run `25755093728` iki lane'de runner başlattı ve
+credential preflight'a kadar geldi. `arm64` ve `x86_64` artifact'ları
+`status=blocked_external_credentials` raporladı; eksik signing secret'ları
+`MACOS_SIGNING_IDENTITY`, `MACOS_SIGNING_CERT_P12_B64`,
+`MACOS_SIGNING_CERT_PASSWORD`; notarization credentials da yok. Checkout,
+build, sign, notarize, stapler ve Gatekeeper adımları güvenli şekilde skipped.
+Local evidence:
+`artifacts/readiness/2026-05-12/github_macos_preflight_25755093728/`.
+
 #### 5.2 Windows signed RC + clean VM smoke + promote gate
 
 **Sıra:**
@@ -486,6 +496,15 @@ limit, then provision macOS signing/notarization credentials and rerun
    allocate a runner: account payments/spending limit must be fixed. No fresh
    credential preflight artifact or signed-RC artifact was produced by that
    run.
+   **2026-05-12 güncelleme:** billing/spending-limit blocker düzeltildi.
+   Windows release workflow run `25755177376` runner başlattı ve credential
+   preflight'a kadar geldi. Artifact
+   `status=blocked_external_credentials`, missing
+   `WINDOWS_SIGNING_CERT_PFX_B64` and `WINDOWS_SIGNING_CERT_PASSWORD`,
+   `timestamp_url_configured=true`, `signed=false`, `timestamped=false`,
+   `signed_rc_allowed=false`, `secret_material_written=false`. Checkout/build/
+   signing/public-gate adımları güvenli şekilde skipped. Local evidence:
+   `artifacts/readiness/2026-05-12/github_windows_preflight_25755177376/`.
 5. Promote workflow çalışır.
 6. `windows-public-release-gate.json` `status=pass` verir.
 7. Ancak ondan sonra public/enterprise Windows artifact üretilebilir.

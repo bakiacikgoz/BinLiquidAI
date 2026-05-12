@@ -7,10 +7,9 @@ Detailed operator handoff:
 
 Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
 
-- Fix GitHub Actions account billing/spending limit so desktop release jobs can
-  start. 2026-05-12 macOS run `25751802651` and Windows run `25752181105`
-  failed before any workflow step and produced no preflight artifacts because
-  runners could not be allocated.
+- GitHub Actions account billing/spending limit was fixed on 2026-05-12:
+  macOS run `25755093728` and Windows run `25755177376` both started runners
+  and produced credential preflight artifacts.
 - Provision macOS signing and notarization credentials:
   `MACOS_SIGNING_IDENTITY`, `MACOS_SIGNING_CERT_P12_B64`,
   `MACOS_SIGNING_CERT_PASSWORD`, and either Apple notary API key secrets or

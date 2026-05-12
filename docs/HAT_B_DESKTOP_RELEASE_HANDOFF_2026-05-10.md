@@ -25,6 +25,13 @@ Local evidence already captured:
   GitHub Actions could not allocate runners: "recent account payments have
   failed or your spending limit needs to be increased." No credential preflight
   artifacts were produced in that run.
+- GitHub Actions run `25755093728` verified on 2026-05-12 that the billing /
+  spending-limit blocker was cleared. Both macOS lanes started runners, failed
+  at `Validate signing and notarization credentials`, uploaded credential
+  preflight evidence, and skipped checkout/build/sign/notarize steps.
+  `arm64` and `x86_64` both report `status=blocked_external_credentials`,
+  missing `MACOS_SIGNING_IDENTITY`, `MACOS_SIGNING_CERT_P12_B64`,
+  `MACOS_SIGNING_CERT_PASSWORD`, and missing notarization credentials.
 - GitHub Actions run `25638465677` verified Windows CI: `windows-2022`
   required lane and `windows-2025` canary lane both completed with
   `conclusion=success`. Evidence was downloaded under
@@ -46,6 +53,15 @@ Local evidence already captured:
   because GitHub Actions could not allocate a runner: "recent account payments
   have failed or your spending limit needs to be increased." No credential
   preflight or signed-RC artifacts were produced in that run.
+- GitHub Actions run `25755177376` verified on 2026-05-12 that the billing /
+  spending-limit blocker was cleared for Windows too. The `windows-2022` job
+  started, failed at `Validate Windows signing credentials`, uploaded
+  `operator-panel-windows-credential-preflight`, and skipped checkout/build/
+  signing/public-gate steps. The preflight artifact reports
+  `status=blocked_external_credentials`, missing
+  `WINDOWS_SIGNING_CERT_PFX_B64` and `WINDOWS_SIGNING_CERT_PASSWORD`,
+  `timestamp_url_configured=true`, `signed=false`, `timestamped=false`,
+  `signed_rc_allowed=false`, and `secret_material_written=false`.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.
@@ -68,9 +84,10 @@ GitHub inventory observed on 2026-05-10:
   `release-windows` still only has
   `WINDOWS_TIMESTAMP_URL=http://timestamp.digicert.com`.
 - macOS and Windows signing secrets remain missing.
-- GitHub Actions billing/spending limit must be fixed before the macOS or
-  Windows release workflows can produce fresh credential preflight, signing, or
-  notarization evidence.
+- 2026-05-12 billing/spending limit recheck passed: macOS and Windows release
+  runners now start and produce credential preflight evidence.
+- macOS and Windows signing/notarization credentials must be provisioned before
+  signing, notarization, clean-machine smoke, or promote evidence can pass.
 
 ## macOS Blocker
 
@@ -153,7 +170,12 @@ Configured variable:
 - GitHub Actions run `25752181105` failed before workflow steps started because
   account billing/spending limit blocked runner allocation. No credential
   preflight artifact was produced.
-- Fix billing/spending limit before rerunning Windows signed-RC evidence.
+- GitHub Actions run `25755177376` confirmed runners now start. The workflow
+  stops at credential preflight with `status=blocked_external_credentials`
+  because `WINDOWS_SIGNING_CERT_PFX_B64` and
+  `WINDOWS_SIGNING_CERT_PASSWORD` are missing.
+- Provision Windows signing secrets before rerunning Windows signed-RC
+  evidence.
 
 Workflow sequence after secrets are provisioned:
 
