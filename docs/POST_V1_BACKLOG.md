@@ -43,6 +43,10 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
 
 ## Computer-Use Follow-Ups
 
+- 2026-05-12 deterministic boundary evidence refreshed under
+  `artifacts/readiness/2026-05-12/computer_use_faz6/`: qualification PASS,
+  platform matrix PASS, raw screenshot persisted count `0`, terminal default
+  `deny`, and public live claim `false` for macOS/Windows/Linux.
 - Publish macOS supervised live qualification only after Screen Recording,
   Accessibility, local vision provider readiness, runtime summary, replay
   verification, and fresh qualification evidence all pass.

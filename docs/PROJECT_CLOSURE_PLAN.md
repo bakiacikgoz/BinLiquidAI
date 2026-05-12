@@ -577,6 +577,25 @@ uv run python scripts/evaluate_computer_use_platform_matrix.py \
 - Linux `LINUX_COMPUTER_USE_NOT_QUALIFIED` olarak kalır.
 - macOS için yalnızca fresh supervised qualification evidence varsa dar destek iddiası yapılır.
 
+**2026-05-12 durum:** Faz 6 default kontrolleri, deterministic qualification ve
+platform matrix yenilendi. Local evidence:
+`artifacts/readiness/2026-05-12/computer_use_faz6/`. Deterministic
+qualification: `status=pass`, `task_count=6`, `success_rate=1.0`,
+`raw_screenshot_persisted_count=0`, `policy_denial_count=2`. Platform matrix:
+`status=pass`, `liveAutomationDefault=false`,
+`rawScreenshotPersistenceDefault=false`, `terminalControlDefault=deny`,
+`sensitiveSurfaceBlocked=true`, `approvalFreshnessEnforced=true`,
+`replayIntegrityVerified=true`. macOS, Windows ve Linux public live claim
+`false`; Windows `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`, Linux
+`LINUX_COMPUTER_USE_NOT_QUALIFIED`, macOS
+`MACOS_COMPUTER_USE_NOT_QUALIFIED`. Bu kanıt deterministic/sınır kanıtıdır;
+macOS supervised live destek iddiası için hâlâ taze supervised evidence gerekir.
+SHA256:
+`computer_use_qualify_deterministic.json=8bb429f4d9149a5c8897784894be7d1cb3d0a843f32c3c011fcfa7e2898fea47`,
+`computer_use_platform_matrix.json=73808fed7d03039caf060cdd917841a6f760f2b5e4dd1dbf827c5a0f0ab76698`,
+`computer_use_doctor_all.json=5e94826713e72841c121c62b1134c2bbeb15f4d1c2889ce23752d64db7a53411`,
+`operator_capabilities.json=e11dafa9e65f7d782fc5819db7de27bc75e83d88ab39d82face9768c63588af0`.
+
 **No-Ship:**
 
 - Windows/Linux live computer-use enabled ise.
