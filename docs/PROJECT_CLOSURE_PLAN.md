@@ -620,6 +620,20 @@ SHA256:
 - Bu durum yalnızca Source / CLI / Enterprise self-hosted candidate kapsamıdır.
   Hat B desktop installer release iddiası yoktur.
 
+**2026-05-12 addendum:** 24h qualification evidence ve yenilenmiş Computer-Use
+boundary evidence için Hat A addendum evidence pack üretildi:
+`artifacts/release-pack/0.4.1-hat-a-post-24h-2026-05-12/`. Arşiv:
+`artifacts/release-pack/0.4.1-hat-a-post-24h-2026-05-12.tar.gz`;
+SHA256:
+`1fd8d5e978c105972dbb955126700abbeab94d893d04652f46ea491fdaca3aa7`.
+Manifest `qualification=pass`, `qualification_go_no_go=go`,
+`ga_readiness=green`, `ga_go_no_go=go`,
+`computer_use_deterministic_qualification=pass`, and
+`computer_use_platform_matrix=pass` reports. Hat A addendum no-ship listesi
+boş; Hat B no-ship listesi açık kalır: GitHub Actions billing/spending limit,
+macOS signing/notarization evidence, and Windows signed-RC/clean-VM/promote
+evidence.
+
 **Yapılacaklar:**
 
 1. Release branch veya tag oluştur.
