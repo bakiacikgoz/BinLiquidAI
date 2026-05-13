@@ -23,8 +23,8 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
   `public_release_allowed=true`, and `blocking_reasons=[]`.
 - If signing credentials remain unavailable, use
   `operator-panel-internal-unsigned-build.yml` only for internal QA/evaluation
-  artifacts. These artifacts are explicitly no-ship and do not satisfy Hat B
-  release gates.
+  no-bundle debug binary artifacts. These artifacts are explicitly no-ship and
+  do not satisfy Hat B release gates.
 
 ## Qualification Follow-Ups
 

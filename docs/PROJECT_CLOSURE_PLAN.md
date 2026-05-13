@@ -542,7 +542,7 @@ Local evidence:
 
 Signing/notarization credential sağlanamıyorsa Hat B public/enterprise desktop
 release tamamlanamaz. Desteklenen tek alternatif, internal QA/evaluation için
-unsigned artifact üretmektir. Workflow:
+unsigned no-bundle debug binary artifact üretmektir. Workflow:
 `operator-panel-internal-unsigned-build.yml`.
 
 Bu workflow:
@@ -551,9 +551,11 @@ Bu workflow:
 - `release-macos` veya `release-windows` environment kullanmaz.
 - GitHub signing secret'ı veya notarization secret'ı okumaz.
 - Artifact manifestlerinde `status=internal_unsigned`,
-  `release_eligible=false`, and `public_release_allowed=false` yazar.
-- Ürettiği artifact'lar no-ship kabul edilir; macOS notarization, Windows
-  signed-RC, clean-machine smoke veya promote gate yerine geçmez.
+  `release_eligible=false`, `public_release_allowed=false`, and
+  `packaging=no_bundle_debug_binary` yazar.
+- Ürettiği binary artifact'lar no-ship kabul edilir; installer, signed RC,
+  macOS notarization, Windows clean-machine smoke veya promote gate yerine
+  geçmez.
 
 ---
 

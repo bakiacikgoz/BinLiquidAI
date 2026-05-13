@@ -56,8 +56,18 @@ jobs:
           test -x "${RUNTIME_ROOT}/python/bin/python"
           "${RUNTIME_ROOT}/python/bin/python" -m binliquid --version
 
-      - name: Build internal unsigned bundle
-        run: pnpm --dir apps/operator-panel tauri:build
+      - name: Build internal unsigned binary
+        run: pnpm --dir apps/operator-panel exec tauri build --debug --no-bundle
+
+      - name: Stage internal unsigned artifact
+        run: |
+          STAGE_ROOT="artifacts/operator-panel-internal-unsigned/macos-${{ matrix.arch }}"
+          RUNTIME_ROOT="apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          mkdir -p "${STAGE_ROOT}/resources"
+          install -m 755 \
+            apps/operator-panel/src-tauri/target/debug/aegisos_operator_panel \
+            "${STAGE_ROOT}/aegisos_operator_panel"
+          cp -R "${RUNTIME_ROOT}" "${STAGE_ROOT}/resources/binliquid-runtime"
 
       - name: Write internal unsigned evidence
         run: |
@@ -69,9 +79,9 @@ jobs:
           from datetime import datetime, timezone
           from pathlib import Path
 
-          bundle_root = Path("apps/operator-panel/src-tauri/target/release/bundle")
+          artifact_root = Path("artifacts/operator-panel-internal-unsigned") / f"macos-{os.environ['MATRIX_ARCH']}"
           artifacts = []
-          for path in sorted(bundle_root.rglob("*")):
+          for path in sorted(artifact_root.rglob("*")):
               if not path.is_file():
                   continue
               artifacts.append(
@@ -91,11 +101,14 @@ jobs:
               "signed": False,
               "notarized": False,
               "stapled": False,
+              "packaging": "no_bundle_debug_binary",
               "gatekeeper_clean_machine_status": "not_run",
               "no_ship_reasons": [
-                  "macos_artifact_unsigned",
+                  "macos_binary_unsigned",
                   "macos_notarization_not_run",
+                  "installer_not_built",
                   "internal_unsigned_artifact_not_public_release_eligible",
+                  "internal_unsigned_binary_not_public_release_eligible",
               ],
               "artifacts": artifacts,
               "created_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -112,9 +125,9 @@ jobs:
       - name: Upload macOS internal unsigned artifact
         uses: actions/upload-artifact@v4
         with:
-          name: operator-panel-macos-internal-unsigned-${{ matrix.arch }}
+          name: operator-panel-macos-internal-unsigned-binary-${{ matrix.arch }}
           path: |
-            apps/operator-panel/src-tauri/target/release/bundle/**
+            artifacts/operator-panel-internal-unsigned/macos-${{ matrix.arch }}/**
             artifacts/operator-panel-internal-unsigned/macos-internal-unsigned-${{ matrix.arch }}.json
 
   windows-internal-unsigned:
@@ -166,18 +179,27 @@ jobs:
           $runtime = "apps/operator-panel/src-tauri/resources/binliquid-runtime"
           pwsh apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1 -RuntimeDir $runtime
 
-      - name: Build internal unsigned NSIS bundle
+      - name: Build internal unsigned binary
         shell: pwsh
         run: |
           pnpm --dir apps/operator-panel build
-          pnpm --dir apps/operator-panel exec tauri build --config src-tauri/tauri.windows.conf.json --bundles nsis
+          pnpm --dir apps/operator-panel exec tauri build --config src-tauri/tauri.windows.conf.json --debug --no-bundle
+
+      - name: Stage internal unsigned artifact
+        shell: pwsh
+        run: |
+          $stageRoot = "artifacts/operator-panel-internal-unsigned/windows-x64"
+          $runtimeRoot = "apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          New-Item -ItemType Directory -Force -Path "$stageRoot/resources" | Out-Null
+          Copy-Item -LiteralPath "apps/operator-panel/src-tauri/target/debug/aegisos_operator_panel.exe" -Destination "$stageRoot/aegisos_operator_panel.exe" -Force
+          Copy-Item -LiteralPath $runtimeRoot -Destination "$stageRoot/resources/binliquid-runtime" -Recurse -Force
 
       - name: Write internal unsigned evidence
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/operator-panel-internal-unsigned | Out-Null
-          $bundleRoot = "apps/operator-panel/src-tauri/target/release/bundle"
-          $artifacts = @(Get-ChildItem -Path $bundleRoot -File -Recurse | ForEach-Object {
+          $artifactRoot = "artifacts/operator-panel-internal-unsigned/windows-x64"
+          $artifacts = @(Get-ChildItem -Path $artifactRoot -File -Recurse | ForEach-Object {
             $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName
             [pscustomobject]@{
               path = $_.FullName.Replace("\", "/")
@@ -193,13 +215,16 @@ jobs:
             public_release_allowed = $false
             signed = $false
             timestamped = $false
+            packaging = "no_bundle_debug_binary"
             signtool_verify_status = "not_run"
             clean_vm_smoke_status = "not_run"
             no_ship_reasons = @(
-              "windows_artifact_unsigned",
+              "windows_binary_unsigned",
               "windows_timestamp_not_run",
+              "installer_not_built",
               "windows_clean_vm_smoke_not_run",
-              "internal_unsigned_artifact_not_public_release_eligible"
+              "internal_unsigned_artifact_not_public_release_eligible",
+              "internal_unsigned_binary_not_public_release_eligible"
             )
             artifacts = @($artifacts)
             created_at_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -209,7 +234,7 @@ jobs:
       - name: Upload Windows internal unsigned artifact
         uses: actions/upload-artifact@v4
         with:
-          name: operator-panel-windows-internal-unsigned-x64
+          name: operator-panel-windows-internal-unsigned-binary-x64
           path: |
-            apps/operator-panel/src-tauri/target/release/bundle/nsis/**
+            artifacts/operator-panel-internal-unsigned/windows-x64/**
             artifacts/operator-panel-internal-unsigned/windows-internal-unsigned-x64.json
