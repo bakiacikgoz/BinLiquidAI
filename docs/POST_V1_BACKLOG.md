@@ -43,11 +43,14 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
   `/private/tmp/binliquid_soak_rc24h-20260511T153314Z` with run id
   `rc24h-20260511T153314Z`; expected completion is approximately
   `2026-05-12T15:34Z`.
-- Run 72h final pre-GA soak if required by the release policy. **Started
-  2026-05-13:** run `final72h-20260513T192000Z` is running from
-  `/private/tmp/binliquid_soak_final72h-20260513T192000Z` with status at
-  `artifacts/qualification/supervisor/final72h-20260513T192000Z/status.json`.
-  Expected completion is approximately `2026-05-16T19:23Z`.
+- Run 72h final pre-GA soak if required by the release policy. **Restarted
+  2026-05-13 with resilient launcher:** the earlier run
+  `final72h-20260513T192000Z` was intentionally stopped at user request and
+  recorded `status=interrupted`, `exit_code=130`. The active run is
+  `final72h-20260513T194220Z` from
+  `/private/tmp/binliquid_soak_final72h-20260513T194220Z`; status is tracked at
+  `artifacts/qualification/supervisor/final72h-20260513T194220Z/status.json`.
+  Expected completion is approximately `2026-05-16T19:43:33Z`.
 - Publish managed KMS adapter live drill evidence. **Completed 2026-05-13:**
   `artifacts/readiness/2026-05-13/managed_kms_adapter_drill/` reports
   `status=pass`, signed report verification PASS, sign/verify PASS, rotation

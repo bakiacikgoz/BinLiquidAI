@@ -31,9 +31,11 @@ The remaining qualification residual risks are:
 - Operator proxy validation dry-run is published, and the independent
   non-developer operator attestation template/validator path is documented.
   The actual independent human attestation is still pending.
-- 72h final pre-GA soak is in progress as run
-  `final72h-20260513T192000Z`; it remains pending until the completed report,
-  signature verification, and GA readiness addendum are published.
+- 72h final pre-GA soak is in progress as resilient launchd run
+  `final72h-20260513T194220Z`; the earlier
+  `final72h-20260513T192000Z` attempt was intentionally interrupted at user
+  request. The 72h item remains pending until the completed report, signature
+  verification, and GA readiness addendum are published.
 - Hardware HSM/PKCS#11 breadth remains deferred beyond the managed KMS adapter
   drill.
 
