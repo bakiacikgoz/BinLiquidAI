@@ -25,6 +25,10 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - Operator proxy validation dry-run:
   `artifacts/readiness/2026-05-13/operator_validation_drill/` PASS for
   operator-facing command checks and evidence checks.
+- 72h final pre-GA soak resilient launch:
+  run `final72h-20260513T194220Z` is running from an isolated
+  `/private/tmp` workspace under launchd with a fresh heartbeat; this is
+  in-progress evidence, not a final-GA pass claim.
 - Non-developer operator attestation handoff:
   `docs/NON_DEVELOPER_OPERATOR_ATTESTATION.md` and
   `docs/templates/non_developer_operator_attestation.template.json` define the
@@ -47,6 +51,8 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - No unrestricted live computer-use automation claim.
 - No Windows or Linux live computer-use claim.
 - No hardware HSM/PKCS#11 breadth claim.
+- No 72h final-GA soak pass claim until the long soak completes and the signed
+  report, signature verification, and GA readiness addendum are published.
 - No independent non-developer operator attestation claim until a separate
   human attestation is provided and validated with `--operator-attestation`.
 
