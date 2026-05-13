@@ -681,6 +681,14 @@ boş; Hat B no-ship listesi açık kalır: GitHub Actions billing/spending limit
 macOS signing/notarization evidence, and Windows signed-RC/clean-VM/promote
 evidence.
 
+**2026-05-13 closure addendum:** Hat A closure release notes hizalandı,
+qualification matrix 24h evidence ile güncellendi, internal unsigned Operator
+Panel fallback evidence no-ship olarak pack'e eklendi ve GitHub draft/prerelease
+asset'lerine closure addendum yüklendi. Local pack:
+`artifacts/release-pack/0.4.1-hat-a-closure-2026-05-13/`. Bu hâlâ sadece Hat A
+source/CLI/enterprise self-hosted closure kapsamıdır; Hat B desktop release
+claim'i yoktur.
+
 **Yapılacaklar:**
 
 1. Release branch veya tag oluştur.
