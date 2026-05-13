@@ -22,6 +22,9 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
   `artifacts/readiness/2026-05-13/managed_kms_adapter_drill/` PASS for
   sign/verify, rotation dry-run, revoked key reject, restore-time historical
   artifact verification, and signed report verification.
+- Operator proxy validation dry-run:
+  `artifacts/readiness/2026-05-13/operator_validation_drill/` PASS for
+  operator-facing command checks and evidence checks.
 
 ## Supported Claims
 
@@ -40,6 +43,8 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - No unrestricted live computer-use automation claim.
 - No Windows or Linux live computer-use claim.
 - No hardware HSM/PKCS#11 breadth claim.
+- No independent non-developer operator attestation claim until a separate
+  human attestation is provided.
 
 ## No-Ship Boundaries
 
@@ -63,4 +68,5 @@ Related evidence:
 artifacts/release-pack/0.4.1-hat-a-post-24h-2026-05-12/
 artifacts/readiness/2026-05-13/operator_panel_internal_unsigned_25814422248/
 artifacts/readiness/2026-05-13/managed_kms_adapter_drill/
+artifacts/readiness/2026-05-13/operator_validation_drill/
 ```

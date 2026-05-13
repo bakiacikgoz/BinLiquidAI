@@ -50,7 +50,12 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
   dry-run PASS, revoked key reject PASS, restore-time historical artifact
   verification PASS, and no secret material persisted in evidence.
 - Hardware HSM/PKCS#11 breadth remains deferred.
-- Complete non-developer operator validation.
+- Complete operator proxy validation dry-run. **Completed 2026-05-13:**
+  `artifacts/readiness/2026-05-13/operator_validation_drill/` reports
+  `status=pass`, `command_status=pass`, `evidence_status=pass`, and
+  `validation_scope=operator_proxy_dry_run`.
+- Collect independent non-developer operator attestation. This is not yet
+  provided and cannot be substituted by automated proxy validation.
 
 ## Computer-Use Follow-Ups
 

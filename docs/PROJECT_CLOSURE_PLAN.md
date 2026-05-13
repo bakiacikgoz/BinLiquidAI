@@ -697,6 +697,14 @@ asset'lerine closure addendum yüklendi. Local pack:
 source/CLI/enterprise self-hosted closure kapsamıdır; Hat B desktop release
 claim'i yoktur.
 
+**2026-05-13 operator validation addendum:** Operator proxy validation dry-run
+evidence üretildi:
+`artifacts/readiness/2026-05-13/operator_validation_drill/`.
+`operator_validation_report.json` `status=pass`, `command_status=pass`,
+`evidence_status=pass`, `validation_scope=operator_proxy_dry_run` raporlar.
+Bu otomatik proxy evidence'dır; bağımsız non-developer operator attestation
+hâlâ ayrıca gerekir.
+
 **Yapılacaklar:**
 
 1. Release branch veya tag oluştur.

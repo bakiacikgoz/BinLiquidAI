@@ -14,7 +14,8 @@
   evidence.
 - [x] Managed KMS adapter live drill evidence.
 - [ ] Hardware HSM/PKCS#11 breadth.
-- [ ] Non-developer operator validation.
+- [x] Operator proxy validation dry-run evidence.
+- [ ] Independent non-developer operator attestation.
 
 ## Quality Gates
 

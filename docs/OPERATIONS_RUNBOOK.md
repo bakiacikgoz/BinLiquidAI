@@ -63,6 +63,21 @@ uv run binliquid team list --root-dir .binliquid/team/jobs --json
 
 If capabilities contract or command flags are missing, keep UI mutations disabled.
 
+## 8.1 Operator Validation Dry-Run
+
+Run the operator-facing validation drill before asking an independent
+non-developer operator for sign-off:
+
+```bash
+uv run python scripts/run_operator_validation_drill.py \
+  --output-root artifacts/readiness/2026-05-13/operator_validation_drill
+```
+
+The drill writes `operator_validation_report.json` and
+`OPERATOR_VALIDATION_REPORT.md`. Without `--operator-attestation`, this is only
+an automated proxy validation and must not be described as independent
+non-developer operator attestation.
+
 ## 9. Incident Hints
 
 - Planner fallback spikes: inspect `planner_parse_fail_rate` and `planner_fallback_rate`.
