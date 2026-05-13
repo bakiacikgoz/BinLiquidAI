@@ -1,5 +1,20 @@
 # RELEASE_CHECKLIST
 
+## Current Closure Status - 2026-05-13
+
+- [x] Hat A source/CLI/enterprise self-hosted candidate evidence published.
+- [x] 24h release-candidate soak completed with signed aligned evidence.
+- [x] Computer-use deterministic boundary evidence refreshed and fail-closed.
+- [x] Internal unsigned Operator Panel fallback artifacts produced for
+  QA/evaluation only.
+- [ ] Hat B macOS public desktop installer release. Blocked by missing
+  signing/notarization credentials and clean-machine Gatekeeper evidence.
+- [ ] Hat B Windows public desktop installer release. Blocked by missing
+  Authenticode signing credentials, signed RC, clean VM smoke, and promote gate
+  evidence.
+- [ ] Managed KMS/HSM live drill evidence.
+- [ ] Non-developer operator validation.
+
 ## Quality Gates
 
 - [ ] `uv run ruff check .`

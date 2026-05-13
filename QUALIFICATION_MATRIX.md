@@ -5,10 +5,11 @@
 This document defines the evidence required before BinLiquid / AegisOS can be described as `enterprise deployment-ready under defined constraints`.
 It does not claim that evidence already exists.
 
-## Current Evidence Status - 2026-05-10
+## Current Evidence Status - 2026-05-13
 
 Hat A source/CLI/enterprise self-hosted readiness has published signed
-qualification evidence for a 6h candidate smoke-soak:
+qualification evidence for a 6h candidate smoke-soak and a 24h
+release-candidate soak addendum:
 
 - `artifacts/qualification_report.json`: `qualification_status=pass`,
   `recommended_status=green`, `go_no_go=go`.
@@ -16,20 +17,30 @@ qualification evidence for a 6h candidate smoke-soak:
   `go_no_go=go`, `pending_evidence=[]`, `blocking_findings=[]`.
 - 6h soak evidence: `duration_seconds=21600`, `iterations=73`,
   replay verification PASS, signing verification PASS.
+- 24h soak evidence: run `rc24h-20260511T153314Z`,
+  `supervisor_status=completed_success`, aligned signed qualification
+  verification PASS, GA readiness green/go, and `24h_soak_flow=pass`.
+- Computer-use deterministic boundary evidence: PASS with raw screenshot
+  persisted count `0`, terminal control default `deny`, sensitive surface
+  blocked, and public live claim `false` for macOS, Windows, and Linux.
 
 This supports a Hat A candidate release under the support boundaries below.
-It is not a desktop installer release and it is not a 24h/72h RC/final-GA soak.
+It is not a desktop installer release and it is not a 72h final-GA soak.
 The remaining qualification residual risks are:
 
-- 24h soak evidence not yet published.
 - Managed KMS live drill not yet published.
 - Non-developer operator validation not yet published.
+- 72h final pre-GA soak remains a policy follow-up if required before a
+  final-GA claim.
 
 ## Supported Deployment Classes
 
 - `Linux Standard`: primary GA runtime reference
 - `macOS Operator`: secondary operator tooling surface
-- `Windows Standard`: core runtime, operator panel, bundled runtime, signed release-candidate evidence, and clean NSIS installer smoke
+- `Windows Standard`: core runtime, operator panel build/test surface, and
+  bundled runtime evidence. Public/enterprise Windows desktop installer release
+  remains blocked until Authenticode signed RC, clean VM smoke, and promote gate
+  evidence pass.
 
 ## Workload Families
 
@@ -68,13 +79,15 @@ The remaining qualification residual risks are:
 - `live` qualification is macOS-only and opt-in.
 - Raw screenshots must remain disabled by default with persisted count `0`.
 - Replay verifies integrity and policy invariants, not business correctness.
-  any public or enterprise Windows release claim.
-- Windows release evidence additionally requires schema drift gate PASS,
+- Windows desktop release evidence additionally requires schema drift gate PASS,
   recursive resource bundle proof, runtime hash manifest, signed RC release
   status JSON, bundle hash evidence, `docs/WINDOWS_INSTALLER_SMOKE.md` clean VM
   smoke report, installed runtime/capabilities/doctor evidence, and
   `windows-public-release-gate.json` with `status=pass`,
   `public_release_allowed=true`, and no blocking reasons.
+- Internal unsigned no-bundle Operator Panel desktop binaries are QA/evaluation
+  evidence only. They do not satisfy macOS notarization, Windows signed-RC,
+  clean-machine smoke, or promote gates.
 - Windows live computer-use automation remains disabled with
   `WINDOWS_COMPUTER_USE_NOT_QUALIFIED` unless a separate signed Windows
   qualification report explicitly enables that surface.

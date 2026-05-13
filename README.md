@@ -604,6 +604,7 @@ Computer-use live automation remains blocked per platform until platform qualifi
 - Measured energy depends on platform permissions such as macOS `powermetrics`.
 - sLTC gains vary by workload distribution.
 - Operator Panel is beta and release artifacts may depend on signing/notary credentials.
+- Internal unsigned Operator Panel desktop binaries are QA/evaluation artifacts only; they are not public desktop installers or release candidates.
 - Model assets are not auto-installed; `ollama pull` remains operator-driven.
 - Team runs intentionally fail closed when governance requires approval in a blocking dependency chain.
 - `team replay --verify` checks ordering, causal continuity, handoff consistency, and trace integrity; it does not guarantee external business correctness.
@@ -634,8 +635,11 @@ docs/OPERATIONS_RUNBOOK.md
 docs/OPERATOR_CONTRACT_BEHAVIOR.md
 docs/PRIVACY_MODEL.md
 docs/PRODUCT_BOUNDARY_NOTE.md
+docs/HAT_B_DESKTOP_RELEASE_HANDOFF_2026-05-10.md
 docs/RELEASE_CHECKLIST.md
 docs/RELEASE_GATE_v0.5.md
+docs/RELEASE_NOTES_HAT_A_2026-05-10.md
+docs/RELEASE_NOTES_HAT_A_CLOSURE_2026-05-13.md
 docs/SECURITY_MODEL.md
 docs/RFC_COMPUTER_USE_001.md
 docs/RFC_COMPUTER_USE_002_full_runtime_foundation.md
