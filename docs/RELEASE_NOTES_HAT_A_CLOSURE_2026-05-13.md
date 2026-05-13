@@ -66,6 +66,12 @@ Expected local closure pack:
 artifacts/release-pack/0.4.1-hat-a-closure-2026-05-13/
 ```
 
+Closure tag:
+
+```text
+hat-a-v0.4.1-closure-2026-05-13
+```
+
 Related evidence:
 
 ```text

@@ -714,9 +714,17 @@ versiyonu, boş olmayan operator alanları, evidence path'leri ve UTC imza
 zamanını doğrular. Bu sadece handoff hazırlığıdır; gerçek bağımsız insan
 attestation hâlâ beklemededir.
 
+**2026-05-13 closure tag addendum:** Base Hat A tag'i
+`hat-a-v0.4.1-2026-05-10` taşınmadan bırakıldı. Closure kanıtları için ayrı
+tag `hat-a-v0.4.1-closure-2026-05-13` kullanılacak. Bu tag Hat A
+source/CLI/enterprise self-hosted closure kapsamını temsil eder; Hat B desktop
+release, bağımsız non-developer operator attestation ve hardware HSM/PKCS#11
+breadth claim'i içermez.
+
 **Yapılacaklar:**
 
-1. Release branch veya tag oluştur.
+1. Release branch veya tag oluştur. **Tamamlandı 2026-05-13:** closure tag
+   `hat-a-v0.4.1-closure-2026-05-13`.
 2. Tüm gate artifact’larını tek klasöre topla.
 3. README, RELEASE_CHECKLIST, QUALIFICATION_MATRIX ve release notes’u gerçek durumla hizala.
 4. No-ship listesi boş değilse release yapma.
