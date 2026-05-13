@@ -725,11 +725,22 @@ breadth claim'i içermez.
 
 1. Release branch veya tag oluştur. **Tamamlandı 2026-05-13:** closure tag
    `hat-a-v0.4.1-closure-2026-05-13`.
-2. Tüm gate artifact’larını tek klasöre topla.
-3. README, RELEASE_CHECKLIST, QUALIFICATION_MATRIX ve release notes’u gerçek durumla hizala.
-4. No-ship listesi boş değilse release yapma.
+2. Tüm gate artifact’larını tek klasöre topla. **Tamamlandı 2026-05-13:**
+   `artifacts/release-pack/0.4.1-hat-a-closure-2026-05-13/`.
+3. README, RELEASE_CHECKLIST, QUALIFICATION_MATRIX ve release notes’u gerçek
+   durumla hizala. **Tamamlandı 2026-05-13:** Hat A closure, Hat B blocker,
+   operator proxy validation, attestation handoff ve managed KMS drill durumu
+   dokümanlarda ayrıştırıldı.
+4. No-ship listesi boş değilse release yapma. **Tamamlandı 2026-05-13:**
+   Hat A closure no-ship listesi boş; Hat B desktop ve bağımsız operator
+   attestation no-ship/pending sınırları açık kaldığı için public desktop
+   release yapılmadı.
 5. Release notes içinde desteklenen ve desteklenmeyen yüzeyleri açık yaz.
-6. Post-release backlog’u ayrı dosyaya taşı.
+   **Tamamlandı 2026-05-13:** desteklenen Hat A kapsamı ve desteklenmeyen Hat B,
+   hardware HSM/PKCS#11, live computer-use ve bağımsız operator attestation
+   claim'leri release notes içinde listelendi.
+6. Post-release backlog’u ayrı dosyaya taşı. **Tamamlandı 2026-05-13:**
+   `docs/POST_V1_BACKLOG.md`.
 
 **Önerilen artifact pack:**
 
