@@ -381,6 +381,15 @@ uv run binliquid qualification run \
   --json
 ```
 
+**2026-05-13 durum:** 72h final pre-GA soak başlatıldı. Run id:
+`final72h-20260513T192000Z`. Çalışma klasörü:
+`/private/tmp/binliquid_soak_final72h-20260513T192000Z`. Supervisor status:
+`artifacts/qualification/supervisor/final72h-20260513T192000Z/status.json`.
+Heartbeat `2026-05-13T19:25:20Z` itibarıyla güncel ve süreç `running`.
+Beklenen bitiş yaklaşık `2026-05-16T19:23Z` / `2026-05-16 22:23 Europe/Istanbul`.
+Bu hâlâ in-progress evidence'dır; final-GA pass claim'i tamamlanmış 72h
+raporu, imza doğrulaması ve GA readiness addendum yayınlanmadan yapılmayacak.
+
 **Kapanış kriteri:**
 
 - `0` replay/audit integrity failure.
