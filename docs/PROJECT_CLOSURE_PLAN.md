@@ -557,6 +557,13 @@ Bu workflow:
   macOS notarization, Windows clean-machine smoke veya promote gate yerine
   geçmez.
 
+2026-05-13 durum: Internal unsigned fallback workflow run `25814422248` PASS.
+macOS `arm64`, macOS `x86_64` ve Windows `x64` no-bundle debug binary
+artifact'ları üretildi. Local evidence:
+`artifacts/readiness/2026-05-13/operator_panel_internal_unsigned_25814422248/`.
+Bu sadece QA/evaluation kanıtıdır; Hat B desktop release blocker'larını
+kapatmaz.
+
 ---
 
 ### Faz 6 — Computer-Use qualification ve sınır kapısı

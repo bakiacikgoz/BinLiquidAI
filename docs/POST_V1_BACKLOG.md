@@ -25,6 +25,9 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
   `operator-panel-internal-unsigned-build.yml` only for internal QA/evaluation
   no-bundle debug binary artifacts. These artifacts are explicitly no-ship and
   do not satisfy Hat B release gates.
+- 2026-05-13 internal unsigned fallback run `25814422248` passed for macOS
+  `arm64`, macOS `x86_64`, and Windows `x64`. Keep treating those artifacts as
+  no-ship QA/evaluation evidence only.
 
 ## Qualification Follow-Ups
 

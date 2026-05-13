@@ -68,6 +68,11 @@ Local evidence already captured:
   secrets or release environments, and uploads no-bundle debug binary artifacts
   explicitly labeled `internal_unsigned`. These artifacts are for local
   QA/evaluation only and are not public release eligible.
+- 2026-05-13 fallback validation: GitHub Actions run `25814422248` passed for
+  macOS `arm64`, macOS `x86_64`, and Windows `x64`. Downloaded local evidence:
+  `artifacts/readiness/2026-05-13/operator_panel_internal_unsigned_25814422248/`.
+  Manifests report `status=internal_unsigned`, `release_eligible=false`,
+  `public_release_allowed=false`, and `packaging=no_bundle_debug_binary`.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.
