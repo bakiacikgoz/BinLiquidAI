@@ -28,10 +28,11 @@ This supports a Hat A candidate release under the support boundaries below.
 It is not a desktop installer release and it is not a 72h final-GA soak.
 The remaining qualification residual risks are:
 
-- Managed KMS live drill not yet published.
 - Non-developer operator validation not yet published.
 - 72h final pre-GA soak remains a policy follow-up if required before a
   final-GA claim.
+- Hardware HSM/PKCS#11 breadth remains deferred beyond the managed KMS adapter
+  drill.
 
 ## Supported Deployment Classes
 

@@ -12,7 +12,8 @@
 - [ ] Hat B Windows public desktop installer release. Blocked by missing
   Authenticode signing credentials, signed RC, clean VM smoke, and promote gate
   evidence.
-- [ ] Managed KMS/HSM live drill evidence.
+- [x] Managed KMS adapter live drill evidence.
+- [ ] Hardware HSM/PKCS#11 breadth.
 - [ ] Non-developer operator validation.
 
 ## Quality Gates

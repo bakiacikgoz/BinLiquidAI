@@ -78,3 +78,26 @@ uv run binliquid keys rotate-plan --profile enterprise --next-key-id enterprise-
 - rotation dry-run
 - revoked key reject
 - restore-time verification of historical artifacts
+
+## 2026-05-13 Managed KMS Adapter Drill
+
+Managed KMS adapter evidence was published under:
+
+```text
+artifacts/readiness/2026-05-13/managed_kms_adapter_drill/
+```
+
+Result:
+
+- `managed_kms_live_drill.json`: `status=pass`.
+- Signed drill report verification: PASS.
+- `signature_mode=managed_kms`.
+- Sign/verify drill: PASS.
+- Rotation dry-run: PASS.
+- Revoked key reject: PASS.
+- Restore-time historical artifact verification: PASS.
+- Secret material persisted in evidence: `false`.
+
+This exercises the supported `managed_kms` subprocess signer adapter contract.
+It does not claim external cloud KMS attestation or hardware HSM/PKCS#11
+breadth. Full PKCS#11/HSM breadth remains deferred.

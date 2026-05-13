@@ -18,6 +18,10 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - Internal unsigned Operator Panel no-bundle debug binaries:
   GitHub Actions run `25814422248` PASS for macOS `arm64`, macOS `x86_64`,
   and Windows `x64`.
+- Managed KMS adapter live drill:
+  `artifacts/readiness/2026-05-13/managed_kms_adapter_drill/` PASS for
+  sign/verify, rotation dry-run, revoked key reject, restore-time historical
+  artifact verification, and signed report verification.
 
 ## Supported Claims
 
@@ -35,6 +39,7 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - No Windows signed-RC, clean-VM, or promote-gate claim.
 - No unrestricted live computer-use automation claim.
 - No Windows or Linux live computer-use claim.
+- No hardware HSM/PKCS#11 breadth claim.
 
 ## No-Ship Boundaries
 
@@ -57,4 +62,5 @@ Related evidence:
 ```text
 artifacts/release-pack/0.4.1-hat-a-post-24h-2026-05-12/
 artifacts/readiness/2026-05-13/operator_panel_internal_unsigned_25814422248/
+artifacts/readiness/2026-05-13/managed_kms_adapter_drill/
 ```

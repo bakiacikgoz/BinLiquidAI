@@ -44,7 +44,12 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
   `rc24h-20260511T153314Z`; expected completion is approximately
   `2026-05-12T15:34Z`.
 - Run 72h final pre-GA soak if required by the release policy.
-- Publish managed KMS/HSM live drill evidence.
+- Publish managed KMS adapter live drill evidence. **Completed 2026-05-13:**
+  `artifacts/readiness/2026-05-13/managed_kms_adapter_drill/` reports
+  `status=pass`, signed report verification PASS, sign/verify PASS, rotation
+  dry-run PASS, revoked key reject PASS, restore-time historical artifact
+  verification PASS, and no secret material persisted in evidence.
+- Hardware HSM/PKCS#11 breadth remains deferred.
 - Complete non-developer operator validation.
 
 ## Computer-Use Follow-Ups

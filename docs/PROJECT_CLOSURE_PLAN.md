@@ -297,6 +297,14 @@ uv run binliquid keys verify \
 - Backup/restore verification drill geçer.
 - Key rotation dry-run artifact üretir.
 
+**2026-05-13 durum:** Managed KMS adapter live drill evidence üretildi:
+`artifacts/readiness/2026-05-13/managed_kms_adapter_drill/`.
+`managed_kms_live_drill.json` `status=pass`; signed report verification,
+sign/verify, rotation dry-run, revoked key reject ve restore-time historical
+artifact verification PASS. Evidence içinde secret material persisted `false`.
+Bu, `managed_kms` subprocess signer adapter kontratını kapatır; hardware
+HSM/PKCS#11 breadth hâlâ post-v1 deferred kalır.
+
 **No-Ship:**
 
 - Enterprise mode’da identity disabled ise.
