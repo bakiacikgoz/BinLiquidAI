@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "binliquid-operator-validation-drill/v1"
+ATTESTATION_SCHEMA_VERSION = "binliquid-non-developer-operator-attestation/v1"
 
 
 @dataclass(frozen=True)
@@ -285,26 +286,77 @@ def _attestation_status(path: Path | None) -> dict[str, Any]:
             "path": str(path),
         }
     required = {
+        "schema_version",
         "operator_name",
         "operator_role",
         "non_developer_operator",
         "reviewed_runbook",
         "completed_validation",
+        "validation_report_path",
+        "release_pack_path",
         "signed_at_utc",
     }
     missing = sorted(required - set(payload))
+    string_fields = {
+        "schema_version",
+        "operator_name",
+        "operator_role",
+        "validation_report_path",
+        "release_pack_path",
+        "signed_at_utc",
+    }
+    empty_fields = sorted(
+        field
+        for field in string_fields
+        if field not in missing and not str(payload.get(field) or "").strip()
+    )
+    placeholder_candidates = string_fields | {"notes"}
+    placeholder_fields = sorted(
+        field
+        for field in placeholder_candidates
+        if field not in missing
+        and "REPLACE_WITH_" in str(payload.get(field) or "")
+    )
+    invalid_fields = [
+        field
+        for field, expected in {
+            "schema_version": ATTESTATION_SCHEMA_VERSION,
+            "non_developer_operator": True,
+            "reviewed_runbook": True,
+            "completed_validation": True,
+        }.items()
+        if field not in missing and payload.get(field) != expected
+    ]
+    signed_at_utc = payload.get("signed_at_utc")
+    signed_at_valid = _valid_utc_timestamp(signed_at_utc)
+    if "signed_at_utc" not in missing and not signed_at_valid:
+        invalid_fields.append("signed_at_utc")
     valid = (
         not missing
-        and payload.get("non_developer_operator") is True
-        and payload.get("reviewed_runbook") is True
-        and payload.get("completed_validation") is True
+        and not empty_fields
+        and not placeholder_fields
+        and not invalid_fields
     )
     return {
         "status": "pass" if valid else "fail",
         "non_developer_operator_validated": bool(valid),
         "path": str(path),
         "missing_fields": missing,
+        "empty_fields": empty_fields,
+        "placeholder_fields": placeholder_fields,
+        "invalid_fields": sorted(set(invalid_fields)),
+        "expected_schema_version": ATTESTATION_SCHEMA_VERSION,
     }
+
+
+def _valid_utc_timestamp(value: Any) -> bool:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() == UTC.utcoffset(None)
 
 
 def _write_markdown_report(path: Path, report: dict[str, Any]) -> None:

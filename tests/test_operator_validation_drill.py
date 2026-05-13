@@ -15,6 +15,7 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 CommandResult = MODULE.CommandResult
+ATTESTATION_SCHEMA_VERSION = MODULE.ATTESTATION_SCHEMA_VERSION
 run_validation = MODULE.run_validation
 
 
@@ -101,11 +102,19 @@ def test_operator_validation_attestation_marks_non_developer_scope(tmp_path: Pat
     _write_json(
         attestation,
         {
+            "schema_version": ATTESTATION_SCHEMA_VERSION,
             "operator_name": "Ops User",
             "operator_role": "release_operator",
             "non_developer_operator": True,
             "reviewed_runbook": True,
             "completed_validation": True,
+            "validation_report_path": (
+                "artifacts/readiness/2026-05-13/operator_validation_drill/"
+                "operator_validation_report.json"
+            ),
+            "release_pack_path": (
+                "artifacts/release-pack/0.4.1-hat-a-closure-2026-05-13/"
+            ),
             "signed_at_utc": "2026-05-13T18:10:00Z",
         },
     )
@@ -130,3 +139,80 @@ def test_operator_validation_attestation_marks_non_developer_scope(tmp_path: Pat
     assert report["status"] == "pass"
     assert report["validation_scope"] == "non_developer_operator_attested"
     assert report["operator_attestation"]["non_developer_operator_validated"] is True
+
+
+def test_operator_validation_rejects_incomplete_attestation(tmp_path: Path) -> None:
+    _prepare_root(tmp_path)
+    attestation = tmp_path / "operator_attestation.json"
+    _write_json(
+        attestation,
+        {
+            "schema_version": ATTESTATION_SCHEMA_VERSION,
+            "operator_name": "",
+            "operator_role": "release_operator",
+            "non_developer_operator": True,
+            "reviewed_runbook": True,
+            "completed_validation": True,
+            "validation_report_path": (
+                "artifacts/readiness/2026-05-13/operator_validation_drill/"
+                "operator_validation_report.json"
+            ),
+            "release_pack_path": (
+                "artifacts/release-pack/0.4.1-hat-a-closure-2026-05-13/"
+            ),
+            "signed_at_utc": "YYYY-MM-DDTHH:MM:SSZ",
+        },
+    )
+
+    def runner(spec):
+        stdout = "0.4.1\n" if not spec.expect_json else "{}\n"
+        return CommandResult(
+            name=spec.name,
+            args=spec.args,
+            returncode=0,
+            stdout=stdout,
+            stderr="",
+        )
+
+    report = run_validation(
+        output_root=tmp_path / "out",
+        root=tmp_path,
+        command_runner=runner,
+        operator_attestation_path=attestation,
+    )
+
+    assert report["status"] == "fail"
+    assert report["validation_scope"] == "operator_proxy_dry_run"
+    assert report["operator_attestation"]["non_developer_operator_validated"] is False
+    assert report["operator_attestation"]["empty_fields"] == ["operator_name"]
+    assert report["operator_attestation"]["invalid_fields"] == ["signed_at_utc"]
+
+
+def test_operator_validation_rejects_unedited_attestation_template(tmp_path: Path) -> None:
+    _prepare_root(tmp_path)
+    template = ROOT / "docs/templates/non_developer_operator_attestation.template.json"
+
+    def runner(spec):
+        stdout = "0.4.1\n" if not spec.expect_json else "{}\n"
+        return CommandResult(
+            name=spec.name,
+            args=spec.args,
+            returncode=0,
+            stdout=stdout,
+            stderr="",
+        )
+
+    report = run_validation(
+        output_root=tmp_path / "out",
+        root=tmp_path,
+        command_runner=runner,
+        operator_attestation_path=template,
+    )
+
+    assert report["status"] == "fail"
+    assert report["operator_attestation"]["placeholder_fields"] == [
+        "notes",
+        "operator_name",
+        "operator_role",
+    ]
+    assert report["operator_attestation"]["invalid_fields"] == ["signed_at_utc"]

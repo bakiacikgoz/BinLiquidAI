@@ -25,6 +25,10 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - Operator proxy validation dry-run:
   `artifacts/readiness/2026-05-13/operator_validation_drill/` PASS for
   operator-facing command checks and evidence checks.
+- Non-developer operator attestation handoff:
+  `docs/NON_DEVELOPER_OPERATOR_ATTESTATION.md` and
+  `docs/templates/non_developer_operator_attestation.template.json` define the
+  required independent human sign-off file and validator path.
 
 ## Supported Claims
 
@@ -44,7 +48,7 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - No Windows or Linux live computer-use claim.
 - No hardware HSM/PKCS#11 breadth claim.
 - No independent non-developer operator attestation claim until a separate
-  human attestation is provided.
+  human attestation is provided and validated with `--operator-attestation`.
 
 ## No-Ship Boundaries
 

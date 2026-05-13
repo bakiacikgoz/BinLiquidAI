@@ -78,6 +78,22 @@ The drill writes `operator_validation_report.json` and
 an automated proxy validation and must not be described as independent
 non-developer operator attestation.
 
+For the human sign-off flow, copy
+`docs/templates/non_developer_operator_attestation.template.json` to the
+readiness evidence directory, have an independent non-developer operator fill it
+out, then rerun:
+
+```bash
+uv run python scripts/run_operator_validation_drill.py \
+  --output-root artifacts/readiness/2026-05-13/operator_validation_drill_attested \
+  --operator-attestation artifacts/readiness/2026-05-13/operator_validation_attestation.json
+```
+
+The attested report may claim
+`validation_scope=non_developer_operator_attested` only if the template is fully
+filled by that operator and the command/evidence checks still pass. See
+`docs/NON_DEVELOPER_OPERATOR_ATTESTATION.md` for the exact rules.
+
 ## 9. Incident Hints
 
 - Planner fallback spikes: inspect `planner_parse_fail_rate` and `planner_fallback_rate`.

@@ -54,6 +54,11 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
   `artifacts/readiness/2026-05-13/operator_validation_drill/` reports
   `status=pass`, `command_status=pass`, `evidence_status=pass`, and
   `validation_scope=operator_proxy_dry_run`.
+- Prepare independent non-developer operator attestation workflow. **Completed
+  2026-05-13:** `docs/NON_DEVELOPER_OPERATOR_ATTESTATION.md`,
+  `docs/templates/non_developer_operator_attestation.template.json`, and
+  `scripts/run_operator_validation_drill.py --operator-attestation` define and
+  validate the handoff path.
 - Collect independent non-developer operator attestation. This is not yet
   provided and cannot be substituted by automated proxy validation.
 

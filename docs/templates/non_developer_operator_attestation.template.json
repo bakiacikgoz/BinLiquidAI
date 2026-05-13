@@ -1,0 +1,12 @@
+{
+  "schema_version": "binliquid-non-developer-operator-attestation/v1",
+  "operator_name": "REPLACE_WITH_OPERATOR_NAME",
+  "operator_role": "REPLACE_WITH_OPERATOR_ROLE",
+  "non_developer_operator": true,
+  "reviewed_runbook": true,
+  "completed_validation": true,
+  "validation_report_path": "artifacts/readiness/2026-05-13/operator_validation_drill/operator_validation_report.json",
+  "release_pack_path": "artifacts/release-pack/0.4.1-hat-a-closure-2026-05-13/",
+  "notes": "REPLACE_WITH_OPERATOR_NOTES_OR_EMPTY_STRING",
+  "signed_at_utc": "YYYY-MM-DDTHH:MM:SSZ"
+}

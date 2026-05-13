@@ -705,6 +705,15 @@ evidence üretildi:
 Bu otomatik proxy evidence'dır; bağımsız non-developer operator attestation
 hâlâ ayrıca gerekir.
 
+**2026-05-13 operator attestation handoff addendum:** Bağımsız non-developer
+operator attestation akışı dokümante edildi:
+`docs/NON_DEVELOPER_OPERATOR_ATTESTATION.md` ve
+`docs/templates/non_developer_operator_attestation.template.json`.
+`scripts/run_operator_validation_drill.py --operator-attestation` artık şema
+versiyonu, boş olmayan operator alanları, evidence path'leri ve UTC imza
+zamanını doğrular. Bu sadece handoff hazırlığıdır; gerçek bağımsız insan
+attestation hâlâ beklemededir.
+
 **Yapılacaklar:**
 
 1. Release branch veya tag oluştur.
