@@ -94,6 +94,34 @@ The attested report may claim
 filled by that operator and the command/evidence checks still pass. See
 `docs/NON_DEVELOPER_OPERATOR_ATTESTATION.md` for the exact rules.
 
+## 8.2 Resilient Long Soak Launch
+
+For long final soak windows, launch from an isolated `/private/tmp` workspace
+instead of the interactive project directory:
+
+```bash
+scripts/launch_resilient_qualification_soak.sh \
+  --hours 72 \
+  --valid-hours 96 \
+  --run-id final72h-YYYYMMDDTHHMMSSZ
+```
+
+The launcher copies the runtime-critical workspace files, refreshes the local
+enterprise identity assertion inside the isolated workspace, runs a supervisor
+dry-run, submits the actual soak through macOS `launchd`, and waits for a fresh
+heartbeat before reporting success.
+
+Live monitor:
+
+```bash
+scripts/watch_qualification_soak.sh \
+  --run-dir /private/tmp/binliquid_soak_final72h-YYYYMMDDTHHMMSSZ/artifacts/qualification/supervisor/final72h-YYYYMMDDTHHMMSSZ
+```
+
+Do not claim final-GA pass until the long soak completes and the resulting
+qualification report, signature verification, and GA readiness addendum are
+published.
+
 ## 9. Incident Hints
 
 - Planner fallback spikes: inspect `planner_parse_fail_rate` and `planner_fallback_rate`.

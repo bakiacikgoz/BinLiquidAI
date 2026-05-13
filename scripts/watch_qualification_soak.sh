@@ -186,7 +186,7 @@ now = datetime.now(UTC)
 run_id = payload.get("run_id", run_dir.name)
 soak_hours = float(payload.get("soak_hours") or 0)
 duration_seconds = max(1.0, soak_hours * 3600)
-started_at = start_from_run_id(run_id) or parse_utc(launch.get("updated_at_utc")) or parse_utc(status.get("updated_at_utc"))
+started_at = parse_utc(launch.get("updated_at_utc")) or start_from_run_id(run_id) or parse_utc(status.get("updated_at_utc"))
 elapsed_seconds = (now - started_at).total_seconds() if started_at else 0.0
 progress = min(100.0, max(0.0, (elapsed_seconds / duration_seconds) * 100.0))
 remaining_seconds = max(0.0, duration_seconds - elapsed_seconds)
@@ -212,7 +212,27 @@ supervisor_pid = payload.get("supervisor_pid")
 child_pid = payload.get("child_pid")
 caffeinate = payload.get("caffeinate_enabled")
 
-print("BinLiquid 24h Qualification Soak Monitor")
+def pid_state(value: object) -> str:
+    try:
+        pid = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return "unknown"
+    if pid <= 0:
+        return "unknown"
+    try:
+        import os
+
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return "missing"
+    except PermissionError:
+        return "permission-denied"
+    return "alive"
+
+supervisor_state = pid_state(supervisor_pid)
+child_state = pid_state(child_pid)
+
+print("BinLiquid Qualification Soak Monitor")
 print("=" * 72)
 print(f"Run id      : {run_id}")
 print(f"Status      : {status_text}    Exit: {exit_code}")
@@ -224,10 +244,18 @@ print(f"ETA         : {fmt_dt(finished_at)}")
 print(f"Heartbeat   : {heartbeat_value or 'missing'} ({heartbeat_state})")
 if heartbeat_age is not None:
     print(f"HB age      : {fmt_duration(heartbeat_age)}")
-print(f"Supervisor  : {supervisor_pid}    Child: {child_pid}    Caffeinate: {caffeinate}")
+print(
+    "Supervisor  : "
+    f"{supervisor_pid} ({supervisor_state})    "
+    f"Child: {child_pid} ({child_state})    Caffeinate: {caffeinate}"
+)
 print(f"Run dir     : {run_dir}")
 print(f"stderr log  : {stderr_path}")
 print(f"stdout json : {stdout_path}")
+if status_text == "running" and heartbeat_state != "fresh":
+    print("WARNING    : running status has no fresh heartbeat")
+if status_text == "running" and child_state == "missing":
+    print("WARNING    : running status has a missing child process")
 
 def tail(path: Path, lines: int) -> list[str]:
     if not path.exists():

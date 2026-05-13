@@ -268,6 +268,30 @@ payload = {
 plist_path.write_bytes(plistlib.dumps(payload, sort_keys=False))
 PY
   launchctl bootstrap "gui/$(id -u)" "${PLIST_PATH}"
+  LAUNCHCTL_EXIT_CODE="$?"
+  if [[ "${LAUNCHCTL_EXIT_CODE}" -ne 0 ]]; then
+    write_json "${RUN_DIR}/launchd.json" \
+      "RUN_ID=${RUN_ID}" \
+      "STATUS=launchd_failed" \
+      "PROFILE=${PROFILE}" \
+      "MODE=${MODE}" \
+      "SOAK_HOURS=${SOAK_HOURS}" \
+      "RUNNER=${RESOLVED_RUNNER}" \
+      "OUTPUT_ROOT=${OUTPUT_ROOT}" \
+      "STATE_ROOT=${STATE_ROOT}" \
+      "RUN_DIR=${RUN_DIR}" \
+      "COMMAND_DISPLAY=${COMMAND_DISPLAY}" \
+      "CWD=${REPO_ROOT}" \
+      "SUPERVISOR_PID=0" \
+      "CHILD_PID=" \
+      "EXIT_CODE=${LAUNCHCTL_EXIT_CODE}" \
+      "CAFFEINATE_ENABLED=0" \
+      "STDOUT_PATH=${STDOUT_PATH}" \
+      "STDERR_PATH=${STDERR_PATH}" \
+      "HEARTBEAT_PATH=${HEARTBEAT_PATH}"
+    cat "${RUN_DIR}/launchd.json" >&2
+    exit "${LAUNCHCTL_EXIT_CODE}"
+  fi
   write_json "${RUN_DIR}/launchd.json" \
     "RUN_ID=${RUN_ID}" \
     "STATUS=launchd_submitted" \
