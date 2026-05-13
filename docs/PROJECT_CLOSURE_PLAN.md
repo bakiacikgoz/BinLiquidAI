@@ -437,6 +437,7 @@ veya Apple ID mode:
 - Stapler validate yoksa.
 - Gatekeeper clean-machine open test yoksa.
 - Credential yokken release “PASS” gibi gösteriliyorsa.
+- Internal unsigned artifact public/enterprise release gibi gösteriliyorsa.
 
 **2026-05-12 durum:** `release-macos` environment secrets/variables rechecked;
 required signing/notarization credentials are still absent. macOS release
@@ -535,6 +536,24 @@ Local evidence:
 - `clean_vm_claimed != true` ise.
 - Signed RC installer hash mismatch varsa.
 - Windows computer-use enabled görünüyorsa.
+- Internal unsigned artifact signed RC veya public release gibi gösteriliyorsa.
+
+#### 5.3 Signing credentials yoksa desteklenen alternatif
+
+Signing/notarization credential sağlanamıyorsa Hat B public/enterprise desktop
+release tamamlanamaz. Desteklenen tek alternatif, internal QA/evaluation için
+unsigned artifact üretmektir. Workflow:
+`operator-panel-internal-unsigned-build.yml`.
+
+Bu workflow:
+
+- Sadece manuel `workflow_dispatch` ile çalışır.
+- `release-macos` veya `release-windows` environment kullanmaz.
+- GitHub signing secret'ı veya notarization secret'ı okumaz.
+- Artifact manifestlerinde `status=internal_unsigned`,
+  `release_eligible=false`, and `public_release_allowed=false` yazar.
+- Ürettiği artifact'lar no-ship kabul edilir; macOS notarization, Windows
+  signed-RC, clean-machine smoke veya promote gate yerine geçmez.
 
 ---
 

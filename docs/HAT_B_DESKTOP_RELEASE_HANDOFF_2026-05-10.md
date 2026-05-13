@@ -62,6 +62,12 @@ Local evidence already captured:
   `WINDOWS_SIGNING_CERT_PFX_B64` and `WINDOWS_SIGNING_CERT_PASSWORD`,
   `timestamp_url_configured=true`, `signed=false`, `timestamped=false`,
   `signed_rc_allowed=false`, and `secret_material_written=false`.
+- If signing/notarization credentials cannot be provided, the only supported
+  alternate path is internal unsigned desktop build evidence. Workflow
+  `operator-panel-internal-unsigned-build.yml` is manual-only, uses no signing
+  secrets or release environments, and uploads artifacts explicitly labeled
+  `internal_unsigned`. These artifacts are for local QA/evaluation only and are
+  not public release eligible.
 - Windows release gate evaluator tests: PASS.
 - Windows public release gate fail-closed evidence: `status=blocked`,
   `public_release_allowed=false`.
@@ -214,3 +220,8 @@ Do not publish a Hat B desktop release until every macOS or Windows target being
 claimed has green signing, notarization/signature, clean-machine smoke, and
 public release gate evidence. Hat A may remain published as a source/CLI/
 enterprise self-hosted candidate without desktop installer claims.
+
+Unsigned internal artifacts from `operator-panel-internal-unsigned-build.yml`
+must never be renamed, promoted, or described as release candidates. They do not
+close macOS notarization, Windows signed-RC, clean-machine smoke, or promote
+gates.

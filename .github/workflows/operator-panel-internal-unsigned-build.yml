@@ -1,0 +1,215 @@
+name: Operator Panel Internal Unsigned Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-internal-unsigned:
+    name: macOS internal unsigned (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: x86_64
+          - os: macos-14
+            arch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        run: pip install uv
+
+      - name: Install UI deps
+        run: pnpm install --dir apps/operator-panel --frozen-lockfile
+
+      - name: Build bundled runtime
+        run: apps/operator-panel/scripts/build_bundled_runtime_macos.sh "${{ matrix.arch }}"
+
+      - name: Verify bundled runtime
+        run: |
+          RUNTIME_ROOT="apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          test -f "${RUNTIME_ROOT}/RUNTIME_MANIFEST.txt"
+          test -f "${RUNTIME_ROOT}/README.txt"
+          test -x "${RUNTIME_ROOT}/python/bin/python"
+          "${RUNTIME_ROOT}/python/bin/python" -m binliquid --version
+
+      - name: Build internal unsigned bundle
+        run: pnpm --dir apps/operator-panel tauri:build
+
+      - name: Write internal unsigned evidence
+        run: |
+          mkdir -p artifacts/operator-panel-internal-unsigned
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          bundle_root = Path("apps/operator-panel/src-tauri/target/release/bundle")
+          artifacts = []
+          for path in sorted(bundle_root.rglob("*")):
+              if not path.is_file():
+                  continue
+              artifacts.append(
+                  {
+                      "path": path.as_posix(),
+                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  }
+              )
+
+          payload = {
+              "schemaVersion": "operator-panel-internal-unsigned-build/v1",
+              "platform": "macos",
+              "arch": os.environ["MATRIX_ARCH"],
+              "status": "internal_unsigned",
+              "release_eligible": False,
+              "public_release_allowed": False,
+              "signed": False,
+              "notarized": False,
+              "stapled": False,
+              "gatekeeper_clean_machine_status": "not_run",
+              "no_ship_reasons": [
+                  "macos_artifact_unsigned",
+                  "macos_notarization_not_run",
+                  "internal_unsigned_artifact_not_public_release_eligible",
+              ],
+              "artifacts": artifacts,
+              "created_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+          }
+          out = Path("artifacts/operator-panel-internal-unsigned")
+          (out / f"macos-internal-unsigned-{os.environ['MATRIX_ARCH']}.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+        env:
+          MATRIX_ARCH: ${{ matrix.arch }}
+
+      - name: Upload macOS internal unsigned artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-panel-macos-internal-unsigned-${{ matrix.arch }}
+          path: |
+            apps/operator-panel/src-tauri/target/release/bundle/**
+            artifacts/operator-panel-internal-unsigned/macos-internal-unsigned-${{ matrix.arch }}.json
+
+  windows-internal-unsigned:
+    name: Windows internal unsigned
+    runs-on: windows-2022
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup uv
+        shell: pwsh
+        run: python -m pip install uv
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python deps
+        shell: pwsh
+        run: uv sync --python 3.11 --extra dev --frozen
+
+      - name: Install UI deps
+        shell: pwsh
+        run: pnpm install --dir apps/operator-panel --frozen-lockfile
+
+      - name: Build bundled runtime
+        shell: pwsh
+        run: pwsh apps/operator-panel/scripts/build_bundled_runtime_windows.ps1 -Arch x64
+
+      - name: Verify bundled runtime
+        shell: pwsh
+        run: |
+          $runtime = "apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          pwsh apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1 -RuntimeDir $runtime
+
+      - name: Build internal unsigned NSIS bundle
+        shell: pwsh
+        run: |
+          pnpm --dir apps/operator-panel build
+          pnpm --dir apps/operator-panel exec tauri build --config src-tauri/tauri.windows.conf.json --bundles nsis
+
+      - name: Write internal unsigned evidence
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/operator-panel-internal-unsigned | Out-Null
+          $bundleRoot = "apps/operator-panel/src-tauri/target/release/bundle"
+          $artifacts = @(Get-ChildItem -Path $bundleRoot -File -Recurse | ForEach-Object {
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName
+            [pscustomobject]@{
+              path = $_.FullName.Replace("\", "/")
+              sha256 = $hash.Hash.ToLowerInvariant()
+            }
+          })
+          @{
+            schemaVersion = "operator-panel-internal-unsigned-build/v1"
+            platform = "windows"
+            arch = "x64"
+            status = "internal_unsigned"
+            release_eligible = $false
+            public_release_allowed = $false
+            signed = $false
+            timestamped = $false
+            signtool_verify_status = "not_run"
+            clean_vm_smoke_status = "not_run"
+            no_ship_reasons = @(
+              "windows_artifact_unsigned",
+              "windows_timestamp_not_run",
+              "windows_clean_vm_smoke_not_run",
+              "internal_unsigned_artifact_not_public_release_eligible"
+            )
+            artifacts = @($artifacts)
+            created_at_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          } | ConvertTo-Json -Depth 5 |
+            Set-Content -LiteralPath artifacts/operator-panel-internal-unsigned/windows-internal-unsigned-x64.json -Encoding utf8
+
+      - name: Upload Windows internal unsigned artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-panel-windows-internal-unsigned-x64
+          path: |
+            apps/operator-panel/src-tauri/target/release/bundle/nsis/**
+            artifacts/operator-panel-internal-unsigned/windows-internal-unsigned-x64.json
