@@ -68,6 +68,10 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
   `artifacts/readiness/2026-05-12/computer_use_faz6/`: qualification PASS,
   platform matrix PASS, raw screenshot persisted count `0`, terminal default
   `deny`, and public live claim `false` for macOS/Windows/Linux.
+- 2026-05-13 Hat B Windows computer-use disabled evidence verified in the
+  closure pack: `computer_use_platform_matrix.json` and
+  `operator_capabilities.json` both keep Windows fail-closed with
+  `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.
 - Publish macOS supervised live qualification only after Screen Recording,
   Accessibility, local vision provider readiness, runtime summary, replay
   verification, and fresh qualification evidence all pass.

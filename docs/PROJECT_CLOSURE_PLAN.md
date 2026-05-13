@@ -806,7 +806,10 @@ Durum: Hat A candidate kapsamı kapandı. Bu, 24h RC/final-GA claim değildir;
 - [ ] Windows clean VM smoke PASS.
 - [ ] Windows promote gate PASS.
 - [ ] `windows-public-release-gate.json` `status=pass`, `public_release_allowed=true`, `blocking_reasons=[]`.
-- [ ] Windows computer-use disabled evidence PASS.
+- [x] Windows computer-use disabled evidence PASS. 2026-05-13 closure pack:
+  `computer_use_platform_matrix.json` and `operator_capabilities.json` both
+  report Windows `liveEnabled=false`,
+  `reasonCode=WINDOWS_COMPUTER_USE_NOT_QUALIFIED`, and fail-closed behavior.
 
 Hat B’deki maddeler tamamlanmamışsa proje Hat A olarak release edilebilir; fakat desktop installer release iddiası yapılmaz.
 

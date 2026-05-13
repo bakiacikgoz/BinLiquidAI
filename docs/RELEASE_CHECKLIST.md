@@ -99,7 +99,7 @@
 - [ ] Promote workflow runs `uv run python scripts/evaluate_windows_release_gate.py ... --fail-on-blocked`
 - [ ] `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and `blocking_reasons=[]` before public/enterprise Windows release
 - [ ] Unsigned/internal smoke reports `public_release_allowed=false`
-- [ ] `operator capabilities --json` reports Windows live computer-use disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
+- [x] `operator capabilities --json` reports Windows live computer-use disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
 - [ ] `windows-installer-smoke.json` also reports `computer_use_live_enabled=false` and `computer_use_reason_code=WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
 - [ ] Do not ship if `windows-public-release-gate.json` is missing, blocked, failed, has blocking reasons, used unsigned smoke, has `clean_vm_claimed != true`, or has an installer hash mismatch
 
