@@ -3,7 +3,8 @@
 ## Scope
 
 This addendum closes the current Hat A source/CLI/enterprise self-hosted
-evidence loop after the 24h soak and computer-use boundary refresh.
+evidence loop after the 24h soak, 72h final pre-GA soak, and computer-use
+boundary refresh.
 
 It does not publish or approve a Hat B desktop installer release. macOS and
 Windows public desktop installer claims remain blocked by external signing,
@@ -25,10 +26,11 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - Operator proxy validation dry-run:
   `artifacts/readiness/2026-05-13/operator_validation_drill/` PASS for
   operator-facing command checks and evidence checks.
-- 72h final pre-GA soak resilient launch:
-  run `final72h-20260513T194220Z` is running from an isolated
-  `/private/tmp` workspace under launchd with a fresh heartbeat; this is
-  in-progress evidence, not a final-GA pass claim.
+- 72h final pre-GA soak:
+  run `final72h-20260513T194220Z` completed successfully with
+  `status=completed_success`, `exit_code=0`, empty stderr, observed duration
+  `259203` seconds, signed qualification verification PASS, and 72h GA
+  readiness green/go with `pending_evidence=[]`.
 - Non-developer operator attestation handoff:
   `docs/NON_DEVELOPER_OPERATOR_ATTESTATION.md` and
   `docs/templates/non_developer_operator_attestation.template.json` define the
@@ -51,8 +53,6 @@ notarization, signed-RC, clean-machine smoke, and promote-gate evidence.
 - No unrestricted live computer-use automation claim.
 - No Windows or Linux live computer-use claim.
 - No hardware HSM/PKCS#11 breadth claim.
-- No 72h final-GA soak pass claim until the long soak completes and the signed
-  report, signature verification, and GA readiness addendum are published.
 - No independent non-developer operator attestation claim until a separate
   human attestation is provided and validated with `--operator-attestation`.
 
@@ -85,4 +85,5 @@ artifacts/release-pack/0.4.1-hat-a-post-24h-2026-05-12/
 artifacts/readiness/2026-05-13/operator_panel_internal_unsigned_25814422248/
 artifacts/readiness/2026-05-13/managed_kms_adapter_drill/
 artifacts/readiness/2026-05-13/operator_validation_drill/
+artifacts/readiness/2026-05-16/final_72h_soak/
 ```

@@ -381,17 +381,18 @@ uv run binliquid qualification run \
   --json
 ```
 
-**2026-05-13 durum:** İlk 72h final pre-GA run
+**2026-05-16 sonuç:** İlk 72h final pre-GA run
 `final72h-20260513T192000Z` kullanıcı isteğiyle durduruldu ve
 `status=interrupted`, `exit_code=130` olarak kaydedildi. Yeni dayanıklı run
 `scripts/launch_resilient_qualification_soak.sh` ile başlatıldı. Run id:
 `final72h-20260513T194220Z`. Çalışma klasörü:
-`/private/tmp/binliquid_soak_final72h-20260513T194220Z`. Supervisor status:
-`artifacts/qualification/supervisor/final72h-20260513T194220Z/status.json`.
-Heartbeat `2026-05-13T19:43:33Z` itibarıyla güncel ve süreç `running`.
-Beklenen bitiş yaklaşık `2026-05-16T19:43:33Z` / `2026-05-16 22:43:33 Europe/Istanbul`.
-Bu hâlâ in-progress evidence'dır; final-GA pass claim'i tamamlanmış 72h
-raporu, imza doğrulaması ve GA readiness addendum yayınlanmadan yapılmayacak.
+`/private/tmp/binliquid_soak_final72h-20260513T194220Z`. Run
+`2026-05-16T19:43:55Z` itibarıyla `status=completed_success`, `exit_code=0`
+ve boş stderr ile tamamlandı. 72h qualification raporu `qualification_status=pass`,
+`recommended_status=green`, `go_no_go=go`, imza doğrulaması PASS ve ana repo
+bağlamında 72h sonrası GA readiness `overall_status=green`, `go_no_go=go`,
+`pending_evidence=[]` döndürdü. Evidence summary:
+`artifacts/readiness/2026-05-16/final_72h_soak/summary.json`.
 
 **Kapanış kriteri:**
 
@@ -797,6 +798,10 @@ Aşağıdaki checklist tamamlandığında mevcut geliştirme döngüsü bitmiş 
   `rc24h-20260511T153314Z`; supervisor `completed_success`, signed
   qualification report verified, GA readiness green/go. Reporting alignment
   fixed and aligned signed evidence published with `24h_soak_flow=pass`.
+- [x] 72h final pre-GA soak PASS. 2026-05-16 run
+  `final72h-20260513T194220Z`; supervisor `completed_success`, `exit_code=0`,
+  observed duration `259203` seconds, signed qualification report verified,
+  and 72h GA readiness green/go with `pending_evidence=[]`.
 - [x] `ga_readiness_report.json` signed ve verify edilmiş.
 - [x] `security_posture.json` signed ve verify edilmiş.
 - [x] Key rotation dry-run PASS.
@@ -805,8 +810,9 @@ Aşağıdaki checklist tamamlandığında mevcut geliştirme döngüsü bitmiş 
 - [x] README ve docs gerçek destek sınırlarıyla uyumlu.
 - [x] Computer-use claims qualification evidence dışına taşmıyor.
 
-Durum: Hat A candidate kapsamı kapandı. Bu, 24h RC/final-GA claim değildir;
-6h signed qualification evidence ile desteklenen draft/prerelease candidate'tır.
+Durum: Hat A source/CLI/enterprise self-hosted qualification kapsamı 6h, 24h ve
+72h signed evidence ile kapandı. Bu hâlâ Hat B desktop installer release claim'i
+değildir.
 
 ### 7.2 Hat B — Desktop installer release
 

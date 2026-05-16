@@ -5,11 +5,11 @@
 This document defines the evidence required before BinLiquid / AegisOS can be described as `enterprise deployment-ready under defined constraints`.
 It does not claim that evidence already exists.
 
-## Current Evidence Status - 2026-05-13
+## Current Evidence Status - 2026-05-16
 
 Hat A source/CLI/enterprise self-hosted readiness has published signed
-qualification evidence for a 6h candidate smoke-soak and a 24h
-release-candidate soak addendum:
+qualification evidence for a 6h candidate smoke-soak, a 24h
+release-candidate soak addendum, and a completed 72h final pre-GA soak:
 
 - `artifacts/qualification_report.json`: `qualification_status=pass`,
   `recommended_status=green`, `go_no_go=go`.
@@ -20,22 +20,22 @@ release-candidate soak addendum:
 - 24h soak evidence: run `rc24h-20260511T153314Z`,
   `supervisor_status=completed_success`, aligned signed qualification
   verification PASS, GA readiness green/go, and `24h_soak_flow=pass`.
+- 72h final pre-GA soak evidence: run `final72h-20260513T194220Z`,
+  `supervisor_status=completed_success`, `exit_code=0`, empty stderr,
+  observed soak duration `259203` seconds, signed qualification verification
+  PASS, GA readiness green/go, `pending_evidence=[]`, and evidence summary
+  `artifacts/readiness/2026-05-16/final_72h_soak/summary.json`.
 - Computer-use deterministic boundary evidence: PASS with raw screenshot
   persisted count `0`, terminal control default `deny`, sensitive surface
   blocked, and public live claim `false` for macOS, Windows, and Linux.
 
 This supports a Hat A candidate release under the support boundaries below.
-It is not a desktop installer release and it is not a 72h final-GA soak.
+It is not a desktop installer release.
 The remaining qualification residual risks are:
 
 - Operator proxy validation dry-run is published, and the independent
   non-developer operator attestation template/validator path is documented.
   The actual independent human attestation is still pending.
-- 72h final pre-GA soak is in progress as resilient launchd run
-  `final72h-20260513T194220Z`; the earlier
-  `final72h-20260513T192000Z` attempt was intentionally interrupted at user
-  request. The 72h item remains pending until the completed report, signature
-  verification, and GA readiness addendum are published.
 - Hardware HSM/PKCS#11 breadth remains deferred beyond the managed KMS adapter
   drill.
 
