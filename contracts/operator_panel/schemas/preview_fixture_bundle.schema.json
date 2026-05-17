@@ -290,6 +290,107 @@
       "title": "ApprovalTicket",
       "type": "object"
     },
+    "AssistantStartTurnPayloadContract": {
+      "additionalProperties": false,
+      "properties": {
+        "assistantTurnId": {
+          "title": "Assistantturnid",
+          "type": "string"
+        },
+        "contractVersion": {
+          "const": "2.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "processId": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Processid"
+        },
+        "sessionId": {
+          "title": "Sessionid",
+          "type": "string"
+        },
+        "status": {
+          "const": "started",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "assistantTurnId",
+        "sessionId",
+        "processId",
+        "status"
+      ],
+      "title": "AssistantStartTurnPayloadContract",
+      "type": "object"
+    },
+    "AssistantStreamEventPayloadContract": {
+      "additionalProperties": false,
+      "properties": {
+        "assistantTurnId": {
+          "title": "Assistantturnid",
+          "type": "string"
+        },
+        "contractVersion": {
+          "const": "2.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "event": {
+          "enum": [
+            "status",
+            "token",
+            "router_decision",
+            "policy_decision",
+            "approval_pending",
+            "expert_start",
+            "expert_end",
+            "audit_artifact",
+            "final",
+            "warning",
+            "error"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "sequence": {
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "sessionId": {
+          "title": "Sessionid",
+          "type": "string"
+        },
+        "timestampUtc": {
+          "title": "Timestamputc",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "assistantTurnId",
+        "sessionId",
+        "event",
+        "sequence",
+        "timestampUtc"
+      ],
+      "title": "AssistantStreamEventPayloadContract",
+      "type": "object"
+    },
     "AuthCheckPayloadContract": {
       "additionalProperties": false,
       "properties": {
@@ -1615,6 +1716,26 @@
       "title": "PreviewFixtureArtifactsContract",
       "type": "object"
     },
+    "PreviewFixtureAssistantContract": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/$defs/AssistantStreamEventPayloadContract"
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "startTurn": {
+          "$ref": "#/$defs/AssistantStartTurnPayloadContract"
+        }
+      },
+      "required": [
+        "startTurn"
+      ],
+      "title": "PreviewFixtureAssistantContract",
+      "type": "object"
+    },
     "PreviewFixtureOperationsContract": {
       "additionalProperties": false,
       "properties": {
@@ -2706,6 +2827,17 @@
     },
     "approvalPending": {
       "$ref": "#/$defs/ApprovalPendingPayloadContract"
+    },
+    "assistant": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PreviewFixtureAssistantContract"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "configResolve": {
       "$ref": "#/$defs/ConfigResolvePayloadContract"

@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "assistantTurnId": {
+      "title": "Assistantturnid",
+      "type": "string"
+    },
+    "contractVersion": {
+      "const": "2.0",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "data": {
+      "additionalProperties": true,
+      "title": "Data",
+      "type": "object"
+    },
+    "event": {
+      "enum": [
+        "status",
+        "token",
+        "router_decision",
+        "policy_decision",
+        "approval_pending",
+        "expert_start",
+        "expert_end",
+        "audit_artifact",
+        "final",
+        "warning",
+        "error"
+      ],
+      "title": "Event",
+      "type": "string"
+    },
+    "sequence": {
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "timestampUtc": {
+      "title": "Timestamputc",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contractVersion",
+    "assistantTurnId",
+    "sessionId",
+    "event",
+    "sequence",
+    "timestampUtc"
+  ],
+  "title": "AssistantStreamEventPayloadContract",
+  "type": "object"
+}

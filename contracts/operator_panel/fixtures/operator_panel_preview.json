@@ -1,5 +1,52 @@
 {
   "contractVersion": "2.0",
+  "assistant": {
+    "startTurn": {
+      "contractVersion": "2.0",
+      "assistantTurnId": "assistant-preview-turn",
+      "sessionId": "assistant-preview-session",
+      "processId": null,
+      "status": "started"
+    },
+    "events": [
+      {
+        "contractVersion": "2.0",
+        "assistantTurnId": "assistant-preview-turn",
+        "sessionId": "assistant-preview-session",
+        "event": "status",
+        "sequence": 1,
+        "timestampUtc": "2026-03-08T09:20:00Z",
+        "data": {
+          "phase": "routing",
+          "message": "Inspecting selected run context"
+        }
+      },
+      {
+        "contractVersion": "2.0",
+        "assistantTurnId": "assistant-preview-turn",
+        "sessionId": "assistant-preview-session",
+        "event": "token",
+        "sequence": 2,
+        "timestampUtc": "2026-03-08T09:20:01Z",
+        "data": {
+          "text": "The selected run is blocked by an approval gate."
+        }
+      },
+      {
+        "contractVersion": "2.0",
+        "assistantTurnId": "assistant-preview-turn",
+        "sessionId": "assistant-preview-session",
+        "event": "approval_pending",
+        "sequence": 3,
+        "timestampUtc": "2026-03-08T09:20:02Z",
+        "data": {
+          "approval_id": "apr_20260308_device_action",
+          "title": "Click preview form start button",
+          "risk": "medium"
+        }
+      }
+    ]
+  },
   "handshake": {
     "uiVersion": "0.6.0-preview",
     "coreVersion": "0.6.0-preview",

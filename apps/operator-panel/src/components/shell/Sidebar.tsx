@@ -1,7 +1,15 @@
 import { Icon, type IconName } from '../primitives/Icon';
 import { StatusDot } from '../primitives/StatusDot';
 
-export type ShellViewKey = 'workspace' | 'tasks' | 'approvals' | 'runs' | 'system' | 'operations' | 'settings';
+export type ShellViewKey =
+  | 'workspace'
+  | 'assistant'
+  | 'tasks'
+  | 'approvals'
+  | 'runs'
+  | 'system'
+  | 'operations'
+  | 'settings';
 
 export type SidebarGroup = {
   title: string;
@@ -36,11 +44,15 @@ export function Sidebar({
   onToggleCollapse: () => void;
   onNavigate: (view: ShellViewKey) => void;
 }) {
+  const assistantEnabled = import.meta.env.VITE_OPERATOR_PANEL_ASSISTANT !== '0';
   const groups: SidebarGroup[] = [
     {
       title: 'ÇALIŞMA ALANI',
       items: [
         { id: 'mission-control', key: 'workspace', label: 'Mission Control', icon: 'target' },
+        ...(assistantEnabled
+          ? [{ id: 'ai-assistant', key: 'assistant' as const, label: 'AI Assistant', icon: 'sparkle' as const }]
+          : []),
         { id: 'runs', key: 'runs', label: 'Çalıştırmalar', icon: 'terminal' },
         { id: 'tasks', key: 'tasks', label: 'Görevler', icon: 'list' },
         { id: 'approvals', key: 'approvals', label: 'Onaylar', icon: 'check', badgeCount: pendingApprovalCount },

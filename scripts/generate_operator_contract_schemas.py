@@ -11,6 +11,8 @@ if str(REPO_ROOT) not in sys.path:
 from binliquid.contracts.operator_panel import (  # noqa: E402
     ApprovalDetailPayloadContract,
     ApprovalPendingPayloadContract,
+    AssistantStartTurnPayloadContract,
+    AssistantStreamEventPayloadContract,
     AuthCheckPayloadContract,
     AuthWhoAmIPayloadContract,
     BridgeHandshakeContract,
@@ -32,6 +34,8 @@ from binliquid.contracts.operator_panel import (  # noqa: E402
 SCHEMAS = {
     "approval_detail": ApprovalDetailPayloadContract,
     "approval_pending": ApprovalPendingPayloadContract,
+    "assistant_start_turn": AssistantStartTurnPayloadContract,
+    "assistant_stream_event": AssistantStreamEventPayloadContract,
     "auth_check": AuthCheckPayloadContract,
     "auth_whoami": AuthWhoAmIPayloadContract,
     "bridge_handshake": BridgeHandshakeContract,

@@ -38,6 +38,7 @@ pub fn run() {
             bridge::bridge_metrics_snapshot,
             bridge::bridge_ga_readiness,
             bridge::bridge_qualification_run,
+            bridge::bridge_assistant_start_turn,
             bridge::bridge_read_artifact,
             bridge::bridge_tail_events,
         ])

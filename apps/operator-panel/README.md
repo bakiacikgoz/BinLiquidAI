@@ -55,11 +55,20 @@ script or CI and keep `RUNTIME_MANIFEST.txt` as evidence artifact output.
 - No shell passthrough.
 - Bridge command surface is allowlisted.
 - Artifact reads are root-dir bounded with symlink/traversal checks.
+- AI Assistant is read-only by default. It can inspect selected run/log/artifact
+  context through bounded prompt packing, but proposed actions remain proposals
+  until the existing approval lifecycle is used.
+- Assistant streaming uses `bridge_assistant_start_turn` to run
+  `chat --stdio-json --stream --once`; stdout JSONL is converted to
+  `assistant://event` payloads and malformed lines become non-blocking warnings.
 - Bundled mode keeps a minimal platform-aware environment after `env_clear`;
   Windows preserves required system process variables such as `SystemRoot`,
   `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `ComSpec`, `PATHEXT`, `TEMP`, and `TMP`.
 - Event tail uses cursor contract with reset/truncated/badLineCount reporting.
 - Mutation actions require valid `operator_id`; actor format is `ui:<operator_id>`.
+- Assistant approval buttons never execute directly. `Approve`, `Reject`, and
+  `Execute` remain separate explicit actions backed by the existing governance
+  bridge.
 
 ## Signing / Notarization
 

@@ -1,18 +1,22 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::io::{BufRead, BufReader as StdBufReader, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader as TokioBufReader};
 use tokio::process::Command;
+use tokio::process::{ChildStderr, ChildStdout};
 
 const CONTRACT_VERSION: &str = "2.0";
 const DEFAULT_TIMEOUT_MS: u64 = 15_000;
 const DEFAULT_MAX_BYTES: usize = 256 * 1024;
 const DEFAULT_MAX_LINES: usize = 500;
+const DEFAULT_ASSISTANT_PROMPT_MAX_CHARS: usize = 24_000;
+const ASSISTANT_EVENT_NAME: &str = "assistant://event";
 
 const ARTIFACT_ALLOWLIST: &[&str] = &[
     "status.json",
@@ -165,6 +169,28 @@ pub struct SpawnedRunPayload {
     profile: String,
     root_dir: String,
     process_id: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantStartTurnPayload {
+    contract_version: String,
+    assistant_turn_id: String,
+    session_id: String,
+    process_id: Option<u32>,
+    status: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantStreamEventPayload {
+    contract_version: String,
+    assistant_turn_id: String,
+    session_id: String,
+    event: String,
+    sequence: u64,
+    timestamp_utc: String,
+    data: Value,
 }
 
 #[derive(Debug)]
@@ -1191,6 +1217,157 @@ pub async fn bridge_qualification_run(
 }
 
 #[tauri::command]
+pub async fn bridge_assistant_start_turn(
+    app: tauri::AppHandle,
+    config: BridgeConfig,
+    assistant_turn_id: String,
+    session_id: String,
+    compiled_prompt: String,
+    provider: Option<String>,
+    fallback_provider: Option<String>,
+    model: Option<String>,
+    hf_model_id: Option<String>,
+) -> BridgeResult<AssistantStartTurnPayload> {
+    let assistant_turn_id = match normalize_assistant_turn_id(&assistant_turn_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let session_id = match normalize_session_id(&session_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let compiled_prompt =
+        match normalize_assistant_prompt(&compiled_prompt, DEFAULT_ASSISTANT_PROMPT_MAX_CHARS) {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
+
+    let resource_dir = app_resource_dir(&app);
+    let resolved = match resolve_cli_command(&config, resource_dir.as_deref()) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let args = build_assistant_chat_args(
+        &config,
+        &compiled_prompt,
+        &session_id,
+        provider.as_deref(),
+        fallback_provider.as_deref(),
+        model.as_deref(),
+        hf_model_id.as_deref(),
+    );
+    let command_preview =
+        format_assistant_command_preview(&resolved.program, &resolved.prefix_args, &args);
+
+    let mut command = Command::new(&resolved.program);
+    command.args(&resolved.prefix_args);
+    command.args(&args);
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+    configure_cli_env(&mut command, &config, &resolved);
+
+    let mut child = match command.spawn() {
+        Ok(value) => value,
+        Err(error) => {
+            let code = if error.kind() == std::io::ErrorKind::NotFound {
+                "CLI_NOT_FOUND"
+            } else {
+                "CLI_FAILED"
+            };
+            return BridgeResult::err(BridgeError::new(
+                code,
+                error.to_string(),
+                "",
+                command_preview,
+                code != "CLI_NOT_FOUND",
+            ));
+        }
+    };
+
+    let process_id = child.id();
+    let stdout = match child.stdout.take() {
+        Some(value) => value,
+        None => {
+            return BridgeResult::err(BridgeError::new(
+                "CLI_FAILED",
+                "Assistant process stdout was not available.",
+                "",
+                command_preview,
+                true,
+            ));
+        }
+    };
+    let stderr = child.stderr.take();
+    let task_app = app.clone();
+    let task_turn_id = assistant_turn_id.clone();
+    let task_session_id = session_id.clone();
+    let task_command_preview = command_preview.clone();
+
+    tokio::spawn(async move {
+        let stderr_task = tokio::spawn(read_assistant_stderr_preview(stderr));
+        let stream_result = stream_assistant_stdout(
+            task_app.clone(),
+            stdout,
+            task_turn_id.clone(),
+            task_session_id.clone(),
+        )
+        .await;
+        let observed_events = match stream_result {
+            Ok(count) => count,
+            Err(error) => {
+                let _ = emit_assistant_error(&task_app, &task_turn_id, &task_session_id, 1, &error);
+                1
+            }
+        };
+
+        let stderr_preview = stderr_task.await.unwrap_or_default();
+        match child.wait().await {
+            Ok(status) if status.success() => {}
+            Ok(status) => {
+                let error = BridgeError::new(
+                    "CLI_FAILED",
+                    format!("Assistant command exited with status {status}."),
+                    stderr_preview,
+                    task_command_preview,
+                    false,
+                );
+                let _ = emit_assistant_error(
+                    &task_app,
+                    &task_turn_id,
+                    &task_session_id,
+                    observed_events + 1,
+                    &error,
+                );
+            }
+            Err(error) => {
+                let error = BridgeError::new(
+                    "CLI_FAILED",
+                    format!("Failed to wait for assistant process: {error}"),
+                    stderr_preview,
+                    task_command_preview,
+                    true,
+                );
+                let _ = emit_assistant_error(
+                    &task_app,
+                    &task_turn_id,
+                    &task_session_id,
+                    observed_events + 1,
+                    &error,
+                );
+            }
+        }
+    });
+
+    BridgeResult::ok(AssistantStartTurnPayload {
+        contract_version: CONTRACT_VERSION.to_string(),
+        assistant_turn_id,
+        session_id,
+        process_id,
+        status: "started".to_string(),
+    })
+}
+
+#[tauri::command]
 pub async fn bridge_read_artifact(
     root_dir: String,
     job_id: String,
@@ -1228,6 +1405,279 @@ pub async fn bridge_tail_events(
         }),
         Err(error) => BridgeResult::err(error),
     }
+}
+
+fn normalize_assistant_turn_id(value: &str) -> Result<String, BridgeError> {
+    normalize_assistant_id(value, "assistant_turn_id")
+}
+
+fn normalize_session_id(value: &str) -> Result<String, BridgeError> {
+    normalize_assistant_id(value, "session_id")
+}
+
+fn normalize_assistant_id(value: &str, field: &str) -> Result<String, BridgeError> {
+    let normalized = value.trim();
+    let valid = !normalized.is_empty()
+        && normalized.len() <= 128
+        && normalized
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'));
+    if valid {
+        return Ok(normalized.to_string());
+    }
+    Err(BridgeError::new(
+        "INVALID_INPUT",
+        format!("{field} must be 1-128 chars using [a-zA-Z0-9._-]"),
+        "",
+        "assistant id validation",
+        false,
+    ))
+}
+
+fn normalize_assistant_prompt(value: &str, max_chars: usize) -> Result<String, BridgeError> {
+    let normalized = value.trim();
+    if normalized.is_empty() {
+        return Err(BridgeError::new(
+            "INVALID_INPUT",
+            "compiled_prompt is required",
+            "",
+            "assistant prompt validation",
+            false,
+        ));
+    }
+    if normalized.chars().count() > max_chars {
+        return Err(BridgeError::new(
+            "INVALID_INPUT",
+            format!("compiled_prompt exceeds {max_chars} characters"),
+            "",
+            "assistant prompt validation",
+            false,
+        ));
+    }
+    Ok(normalized.to_string())
+}
+
+fn build_assistant_chat_args(
+    config: &BridgeConfig,
+    compiled_prompt: &str,
+    session_id: &str,
+    provider: Option<&str>,
+    fallback_provider: Option<&str>,
+    model: Option<&str>,
+    hf_model_id: Option<&str>,
+) -> Vec<String> {
+    let mut args = vec![
+        "chat".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--once".to_string(),
+        compiled_prompt.to_string(),
+        "--stdio-json".to_string(),
+        "--stream".to_string(),
+        "--session-id".to_string(),
+        session_id.to_string(),
+    ];
+    push_optional_arg(&mut args, "--provider", provider);
+    push_optional_arg(&mut args, "--fallback-provider", fallback_provider);
+    push_optional_arg(&mut args, "--model", model);
+    push_optional_arg(&mut args, "--hf-model-id", hf_model_id);
+    args
+}
+
+fn format_assistant_command_preview(program: &str, prefix: &[String], args: &[String]) -> String {
+    let sanitized_args = args
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            if index > 0 && args[index - 1] == "--once" {
+                "[compiled_prompt]".to_string()
+            } else {
+                value.clone()
+            }
+        })
+        .collect::<Vec<_>>();
+    format_command(program, prefix, &sanitized_args)
+}
+
+fn assistant_now_utc() -> String {
+    time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_else(|_| {
+            let millis = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis();
+            format!("{millis}")
+        })
+}
+
+fn assistant_event_payload(
+    assistant_turn_id: &str,
+    session_id: &str,
+    event: &str,
+    sequence: u64,
+    data: Value,
+) -> AssistantStreamEventPayload {
+    AssistantStreamEventPayload {
+        contract_version: CONTRACT_VERSION.to_string(),
+        assistant_turn_id: assistant_turn_id.to_string(),
+        session_id: session_id.to_string(),
+        event: event.to_string(),
+        sequence,
+        timestamp_utc: assistant_now_utc(),
+        data,
+    }
+}
+
+fn parse_assistant_json_line(
+    line: &str,
+    assistant_turn_id: &str,
+    session_id: &str,
+    sequence: u64,
+) -> Result<AssistantStreamEventPayload, BridgeError> {
+    let parsed = serde_json::from_str::<Value>(line).map_err(|error| {
+        BridgeError::new(
+            "PARSE_FAILED",
+            format!("Failed to parse assistant JSONL event: {error}"),
+            sanitize_preview(line),
+            "assistant stream parse",
+            false,
+        )
+    })?;
+    let raw_event = parsed
+        .get("event")
+        .or_else(|| parsed.get("type"))
+        .and_then(Value::as_str)
+        .unwrap_or("status")
+        .to_string();
+    let event = normalize_assistant_event_name(&raw_event).to_string();
+    let data = parsed.get("data").cloned().unwrap_or(parsed);
+    Ok(assistant_event_payload(
+        assistant_turn_id,
+        session_id,
+        &event,
+        sequence,
+        data,
+    ))
+}
+
+fn normalize_assistant_event_name(value: &str) -> &str {
+    match value {
+        "status" | "token" | "router_decision" | "policy_decision" | "approval_pending"
+        | "expert_start" | "expert_end" | "audit_artifact" | "final" | "warning" | "error" => value,
+        _ => "status",
+    }
+}
+
+async fn stream_assistant_stdout(
+    app: tauri::AppHandle,
+    stdout: ChildStdout,
+    assistant_turn_id: String,
+    session_id: String,
+) -> Result<u64, BridgeError> {
+    let mut reader = TokioBufReader::new(stdout).lines();
+    let mut sequence = 0u64;
+    let mut final_seen = false;
+
+    while let Some(line) = reader.next_line().await.map_err(|error| {
+        BridgeError::new(
+            "CLI_FAILED",
+            format!("Failed to read assistant stdout: {error}"),
+            "",
+            "assistant stream read",
+            true,
+        )
+    })? {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        sequence += 1;
+        match parse_assistant_json_line(trimmed, &assistant_turn_id, &session_id, sequence) {
+            Ok(payload) => {
+                if payload.event == "final" {
+                    final_seen = true;
+                }
+                emit_assistant_payload(&app, &payload)?;
+            }
+            Err(error) => {
+                let warning = assistant_event_payload(
+                    &assistant_turn_id,
+                    &session_id,
+                    "warning",
+                    sequence,
+                    json!({
+                        "message": "Ignored malformed assistant stream line.",
+                        "stderrPreview": sanitize_preview(&error.stderr_preview),
+                    }),
+                );
+                emit_assistant_payload(&app, &warning)?;
+            }
+        }
+    }
+
+    if !final_seen {
+        let error = BridgeError::new(
+            "PARSE_FAILED",
+            "Assistant stream ended before a final event.",
+            "",
+            "assistant stream final",
+            false,
+        );
+        emit_assistant_error(&app, &assistant_turn_id, &session_id, sequence + 1, &error)?;
+        sequence += 1;
+    }
+
+    Ok(sequence)
+}
+
+async fn read_assistant_stderr_preview(stderr: Option<ChildStderr>) -> String {
+    let Some(stderr) = stderr else {
+        return String::new();
+    };
+    let reader = TokioBufReader::new(stderr);
+    let mut buffer = Vec::new();
+    let mut limited = reader.take((4 * 1024) + 1);
+    let _ = limited.read_to_end(&mut buffer).await;
+    sanitize_preview(&String::from_utf8_lossy(&buffer))
+}
+
+fn emit_assistant_payload(
+    app: &tauri::AppHandle,
+    payload: &AssistantStreamEventPayload,
+) -> Result<(), BridgeError> {
+    app.emit(ASSISTANT_EVENT_NAME, payload).map_err(|error| {
+        BridgeError::new(
+            "CLI_FAILED",
+            format!("Failed to emit assistant event: {error}"),
+            "",
+            ASSISTANT_EVENT_NAME,
+            true,
+        )
+    })
+}
+
+fn emit_assistant_error(
+    app: &tauri::AppHandle,
+    assistant_turn_id: &str,
+    session_id: &str,
+    sequence: u64,
+    error: &BridgeError,
+) -> Result<(), BridgeError> {
+    let payload = assistant_event_payload(
+        assistant_turn_id,
+        session_id,
+        "error",
+        sequence,
+        json!({
+            "code": error.code,
+            "message": error.message,
+            "stderrPreview": error.stderr_preview,
+            "command": error.command,
+            "retryable": error.retryable,
+        }),
+    );
+    emit_assistant_payload(app, &payload)
 }
 
 fn parse_core_mode(value: Option<&str>) -> CoreMode {
@@ -1636,12 +2086,32 @@ fn format_command(program: &str, prefix: &[String], args: &[String]) -> String {
 }
 
 fn sanitize_preview(text: &str) -> String {
-    text.lines()
+    let preview = text
+        .lines()
         .take(8)
         .map(str::trim)
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n");
+    redact_sensitive_preview(&preview)
+        .chars()
+        .take(4 * 1024)
+        .collect()
+}
+
+fn redact_sensitive_preview(text: &str) -> String {
+    text.split_whitespace()
+        .map(|part| {
+            if part.starts_with("sk-") {
+                "[redacted-secret]".to_string()
+            } else if part.starts_with("ghp_") {
+                "[redacted-token]".to_string()
+            } else {
+                part.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn normalize_actor(operator_id: &str) -> Result<String, BridgeError> {
@@ -1941,7 +2411,7 @@ fn tail_events_impl(
             )
         })?;
 
-    let mut reader = BufReader::new(file);
+    let mut reader = StdBufReader::new(file);
     let mut events = Vec::new();
     let mut bytes_used = 0usize;
     let mut lines_used = 0usize;
@@ -2058,6 +2528,101 @@ mod tests {
             None
         );
         assert!(normalize_computer_use_runtime(Some("unsafe-live")).is_err());
+    }
+
+    #[test]
+    fn normalize_assistant_prompt_rejects_empty_and_too_large() {
+        assert!(normalize_assistant_prompt("hello", 10).is_ok());
+        assert!(normalize_assistant_prompt(" ", 10).is_err());
+        assert!(normalize_assistant_prompt("12345678901", 10).is_err());
+    }
+
+    #[test]
+    fn parse_assistant_json_line_valid_token() {
+        let payload = parse_assistant_json_line(
+            r#"{"event":"token","data":{"text":"Hello"}}"#,
+            "turn-1",
+            "session-1",
+            7,
+        )
+        .expect("payload");
+        let json = serde_json::to_value(payload).expect("serialize");
+
+        assert_eq!(json["contractVersion"], CONTRACT_VERSION);
+        assert_eq!(json["assistantTurnId"], "turn-1");
+        assert_eq!(json["event"], "token");
+        assert_eq!(json["sequence"], 7);
+        assert_eq!(json["data"]["text"], "Hello");
+    }
+
+    #[test]
+    fn parse_assistant_json_line_valid_final() {
+        let payload = parse_assistant_json_line(
+            r#"{"event":"final","data":{"final_text":"Done","trace_id":"trace_1"}}"#,
+            "turn-1",
+            "session-1",
+            8,
+        )
+        .expect("payload");
+
+        assert_eq!(payload.event, "final");
+        assert_eq!(payload.data["final_text"], "Done");
+    }
+
+    #[test]
+    fn parse_assistant_json_line_rejects_invalid_json_with_warning_path() {
+        let error = parse_assistant_json_line("not-json", "turn-1", "session-1", 1)
+            .expect_err("invalid json");
+
+        assert_eq!(error.code, "PARSE_FAILED");
+        assert!(error.stderr_preview.contains("not-json"));
+    }
+
+    #[test]
+    fn assistant_command_args_include_stdio_json_stream_once() {
+        let config = BridgeConfig {
+            mode: Some("external".to_string()),
+            cli_path: Some("binliquid".to_string()),
+            bundled_python_path: None,
+            profile: Some("balanced".to_string()),
+            root_dir: None,
+            env: HashMap::new(),
+            timeout_ms: None,
+        };
+        let args = build_assistant_chat_args(
+            &config,
+            "compiled prompt",
+            "session-1",
+            Some("openai"),
+            None,
+            Some("gpt-test"),
+            None,
+        );
+
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--once" && pair[1] == "compiled prompt"));
+        assert!(args.contains(&"--stdio-json".to_string()));
+        assert!(args.contains(&"--stream".to_string()));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--session-id" && pair[1] == "session-1"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--provider" && pair[1] == "openai"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--model" && pair[1] == "gpt-test"));
+    }
+
+    #[test]
+    fn assistant_stderr_preview_is_sanitized() {
+        let preview = sanitize_preview("failed sk-abc123456789 ghp_abcdefghijklmnop");
+
+        assert!(!preview.contains("sk-abc"));
+        assert!(!preview.contains("ghp_"));
+        assert!(preview.contains("[redacted-secret]"));
+        assert!(preview.contains("[redacted-token]"));
     }
 
     #[test]

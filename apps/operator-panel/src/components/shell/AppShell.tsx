@@ -24,7 +24,7 @@ export function AppShell({
   onRefresh,
 }: {
   children: ReactNode;
-  rightRail: ReactNode;
+  rightRail?: ReactNode;
   toasts: ToastItem[];
   activeView: ShellViewKey;
   mobileNavOpen: boolean;
@@ -44,6 +44,7 @@ export function AppShell({
   const shellClassName = [
     'shell',
     'premium-shell',
+    activeView === 'assistant' ? 'shell-assistant-mode' : '',
     mobileNavOpen ? 'shell-nav-open' : '',
     sidebarCollapsed ? 'shell-sidebar-collapsed' : '',
   ]
@@ -79,7 +80,7 @@ export function AppShell({
         />
         {children}
       </main>
-      {rightRail}
+      {rightRail ?? null}
       <ToastHost toasts={toasts} />
     </div>
   );

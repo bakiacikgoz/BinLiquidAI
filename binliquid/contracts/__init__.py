@@ -1,6 +1,8 @@
 from binliquid.contracts.operator_panel import (
     ApprovalDetailPayloadContract,
     ApprovalPendingPayloadContract,
+    AssistantStartTurnPayloadContract,
+    AssistantStreamEventPayloadContract,
     AuthCheckPayloadContract,
     AuthWhoAmIPayloadContract,
     BridgeHandshakeContract,
@@ -21,6 +23,8 @@ from binliquid.contracts.operator_panel import (
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 
 __all__ = [
+    "AssistantStartTurnPayloadContract",
+    "AssistantStreamEventPayloadContract",
     "ApprovalDetailPayloadContract",
     "ApprovalPendingPayloadContract",
     "AuthCheckPayloadContract",

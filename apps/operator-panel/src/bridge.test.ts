@@ -12,6 +12,7 @@ import {
   resumeComputerUseSession,
   resolveConfig,
   showApproval,
+  startAssistantTurn,
   stopComputerUseSession,
   submitComputerUseRun,
   submitTeamRun,
@@ -66,6 +67,23 @@ describe('bridge preview fallback', () => {
     expect(computerUseRecord.contractVersion).toBe('2.0');
     expect(computerUseRecord.jobId).toBe('job-ui-preview-cu-1');
     expect(computerUseRecord.runtime).toBe('vision-first');
+  });
+
+  it('returns preview assistant start payloads without starting a bridge process', async () => {
+    const payload = await startAssistantTurn(
+      { ...DEFAULT_SETTINGS },
+      {
+        assistantTurnId: 'turn-preview',
+        sessionId: 'session-preview',
+        userMessage: 'hello',
+        compiledPrompt: 'hello',
+      },
+    );
+
+    expect(payload.contractVersion).toBe('2.0');
+    expect(payload.assistantTurnId).toBe('turn-preview');
+    expect(payload.sessionId).toBe('session-preview');
+    expect(payload.processId).toBeNull();
   });
 
   it('returns preview computer-use summary payloads', async () => {

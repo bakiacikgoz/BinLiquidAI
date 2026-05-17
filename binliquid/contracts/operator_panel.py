@@ -227,6 +227,36 @@ class SpawnedRunPayloadContract(ContractModel):
     process_id: int | None = Field(alias="processId")
 
 
+class AssistantStartTurnPayloadContract(ContractModel):
+    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    assistant_turn_id: str = Field(alias="assistantTurnId")
+    session_id: str = Field(alias="sessionId")
+    process_id: int | None = Field(alias="processId")
+    status: Literal["started"]
+
+
+class AssistantStreamEventPayloadContract(ContractModel):
+    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    assistant_turn_id: str = Field(alias="assistantTurnId")
+    session_id: str = Field(alias="sessionId")
+    event: Literal[
+        "status",
+        "token",
+        "router_decision",
+        "policy_decision",
+        "approval_pending",
+        "expert_start",
+        "expert_end",
+        "audit_artifact",
+        "final",
+        "warning",
+        "error",
+    ]
+    sequence: int
+    timestamp_utc: str = Field(alias="timestampUtc")
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
 class ApprovalPendingPayloadContract(ContractModel):
     contract_version: Literal["2.0"]
     pending: list[ApprovalTicket] = Field(default_factory=list)
@@ -419,8 +449,14 @@ class PreviewFixtureArtifactsContract(ContractModel):
     audit_envelope: dict[str, Any] = Field(default_factory=dict, alias="auditEnvelope")
 
 
+class PreviewFixtureAssistantContract(ContractModel):
+    start_turn: AssistantStartTurnPayloadContract = Field(alias="startTurn")
+    events: list[AssistantStreamEventPayloadContract] = Field(default_factory=list)
+
+
 class PreviewFixtureBundleContract(ContractModel):
     contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    assistant: PreviewFixtureAssistantContract | None = None
     handshake: BridgeHandshakeContract
     submit_team_run: SpawnedRunPayloadContract = Field(alias="submitTeamRun")
     approval_pending: ApprovalPendingPayloadContract = Field(alias="approvalPending")

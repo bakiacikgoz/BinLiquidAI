@@ -1,5 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
+import { previewAssistantStartTurn } from './assistant/assistantFixtures';
+import type {
+  AssistantStartTurnOptions,
+  AssistantStartTurnResponse,
+  AssistantStreamEvent,
+} from './assistant/assistantTypes';
 import {
   previewApprovalDetail,
   previewApprovalPending,
@@ -139,6 +146,8 @@ export interface KeyRotatePlanOptions {
   activateAt?: string;
   retireAfter?: string;
 }
+
+export type AssistantEventUnlisten = () => void;
 
 export class BridgeError extends Error {
   readonly payload: BridgeErrorPayload;
@@ -729,4 +738,35 @@ export async function tailEvents(
     maxBytes,
     maxLines,
   });
+}
+
+export async function startAssistantTurn(
+  settings: PanelSettings,
+  options: AssistantStartTurnOptions,
+): Promise<AssistantStartTurnResponse> {
+  if (isBridgePreviewMode()) {
+    return previewAssistantStartTurn(options.assistantTurnId, options.sessionId);
+  }
+  return callBridge('bridge_assistant_start_turn', {
+    config: toBridgeConfig(settings, 120000),
+    assistantTurnId: options.assistantTurnId,
+    sessionId: options.sessionId,
+    compiledPrompt: options.compiledPrompt,
+    provider: options.provider,
+    fallbackProvider: options.fallbackProvider,
+    model: options.model,
+    hfModelId: options.hfModelId,
+  });
+}
+
+export async function listenAssistantEvents(
+  handler: (event: AssistantStreamEvent) => void,
+): Promise<AssistantEventUnlisten> {
+  if (!isTauriRuntime()) {
+    return () => undefined;
+  }
+  const unlisten = await listen<AssistantStreamEvent>('assistant://event', (event) => {
+    handler(event.payload);
+  });
+  return unlisten;
 }

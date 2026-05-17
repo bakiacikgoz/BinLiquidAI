@@ -5,6 +5,7 @@
 - Operator bridge payloads use `contractVersion="2.0"` in camelCase.
 - CLI JSON payloads and team artifact files use `contract_version="2.0"` in snake_case.
 - `computer-use summary --json` is an Operator Panel control-plane payload and uses `contractVersion="2.0"` in camelCase.
+- Assistant start-turn and stream-event payloads use `contractVersion="2.0"` in camelCase.
 - Stream events remain versioned by `schema_version="3"`.
 - Audit envelopes remain versioned by `contract_version="2.0"` plus `envelope_version="3"`, `event_schema_version="3"`, and `handoff_schema_version="3"`.
 
@@ -18,6 +19,7 @@
 - Operations payloads surfaced in the operator workspace
 - Computer-use summary payloads surfaced through `bridge_computer_use_summary`
 - Computer-use device action approval snapshot
+- Assistant payloads surfaced through `bridge_assistant_start_turn` and `assistant://event`
 
 ## Empty State Rules
 
@@ -33,6 +35,15 @@
 - `bridge_computer_use_submit` passes `--runtime vision-first|legacy-pilot|auto` when the UI selects a runtime. Invalid runtime values are rejected by the bridge before CLI spawn.
 - `bridge_computer_use_summary` calls `computer-use summary --root-dir <root> --profile <profile> --json` and clamps `limit` to `1..200`.
 - Operator capabilities include `computerUseSummaryJson=true` when this summary surface is present.
+
+## Assistant Bridge Commands
+
+- `bridge_assistant_start_turn` starts one CLI process per assistant turn.
+- The command invokes `chat --profile <profile> --once <compiled_prompt> --stdio-json --stream --session-id <session_id>`.
+- `compiled_prompt` is rejected when empty or above 24,000 characters.
+- stdout JSONL is normalized into `assistant://event` payloads. Invalid JSONL lines produce `warning` events and do not kill the stream.
+- A non-zero CLI exit produces an `error` event with sanitized `stderrPreview`.
+- Assistant events may request approval with `approval_pending`, but execution still uses the existing approval pending/detail/decide/execute lifecycle.
 
 ## Optional Field Rules
 

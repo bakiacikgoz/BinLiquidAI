@@ -73,13 +73,16 @@ import {
   buildSystemHealthSummary,
   mapWorkspaceStageToMissionStage,
 } from './missionMappers';
+import { useAssistantSession } from './assistant/useAssistantSession';
 import { MissionControlView } from './components/mission/MissionControlView';
 import { ComputerUseOperationsCard } from './components/mission/ComputerUseOperationsCard';
+import { AssistantView, type AssistantViewCopy } from './components/assistant/AssistantView';
+import { AssistantRightRail } from './components/assistant/AssistantRightRail';
 import { AppShell } from './components/shell/AppShell';
 import { RightRail } from './components/shell/RightRail';
 import type { ShellViewKey } from './components/shell/Sidebar';
 
-type ViewKey = 'workspace' | 'tasks' | 'approvals' | 'runs' | 'system' | 'operations' | 'settings';
+type ViewKey = 'workspace' | 'assistant' | 'tasks' | 'approvals' | 'runs' | 'system' | 'operations' | 'settings';
 type RunTabKey = 'overview' | 'stream' | 'approvals' | 'artifacts' | 'replay' | 'diagnostics';
 type OperationTabKey = 'identity' | 'qualification' | 'security' | 'keys' | 'support' | 'maintenance';
 type AutomationMode = 'assisted' | 'supervised';
@@ -266,6 +269,35 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
   const locale = resolveLocale(settings.locale);
   const t = dictionaries[locale];
+  const assistantCopy: AssistantViewCopy = {
+    title: t.assistantTitle,
+    subtitle: t.assistantSubtitle,
+    welcomeTitle: t.assistantWelcomeTitle,
+    badgeLabel: t.assistantBadgeLabel,
+    newChat: t.assistantNewChat,
+    messageLabel: t.assistantMessageLabel,
+    sendLabel: t.assistantSendLabel,
+    composerPlaceholder: t.assistantComposerPlaceholder,
+    readOnlyByDefault: t.assistantReadOnlyByDefault,
+    sensitiveDataNotice: t.assistantSensitiveDataNotice,
+    dryRunSafe: t.assistantDryRunSafe,
+    referencedRuns: t.assistantReferencedRuns,
+    systemHealth: t.assistantSystemHealth,
+    suggestedPromptsLabel: t.assistantSuggestedPromptsLabel,
+    suggestedPrompts: [
+      t.assistantPromptSummarizeErrors,
+      t.assistantPromptDraftRemediation,
+      t.assistantPromptReviewPolicies,
+      t.assistantPromptAnalyzeRun,
+    ],
+    awaitingContextTitle: t.assistantAwaitingContextTitle,
+    awaitingContextBody: t.assistantAwaitingContextBody,
+    noReferencedRunTitle: t.assistantNoReferencedRunTitle,
+    noReferencedRunBody: t.assistantNoReferencedRunBody,
+    approvalLifecycle: t.assistantApprovalLifecycle,
+    approvalGated: t.assistantApprovalGated,
+    approvalLifecycleBody: t.assistantApprovalLifecycleBody,
+  };
 
   const handshakeRecord = asRecord(handshakeData);
   const capabilities = asRecord(handshakeRecord.capabilities);
@@ -395,19 +427,21 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     ]);
   }
 
-  async function loadApprovalDetail(approvalId: string) {
+  async function loadApprovalDetail(approvalId: string): Promise<unknown | null> {
     if (!approvalId) {
       setApprovalDetail(null);
-      return;
+      return null;
     }
     try {
       const payload = await showApproval(settings, approvalId);
       setApprovalDetail(payload);
+      return payload;
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
         pushToast('error', `${parsed.code}: ${parsed.message}`);
       }
+      return null;
     }
   }
 
@@ -999,6 +1033,107 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       : !workspaceSnapshot.runtimeState.canStop
         ? 'Runtime bu durumda durdurma kabul etmiyor.'
         : '';
+  const assistantSession = useAssistantSession(settings, () => ({
+    selectedRunId,
+    selectedRunStatus: runStatus,
+    selectedRunEvents: events,
+    selectedArtifacts: artifactsByName,
+    pendingApproval: approvalDetail || activeApproval,
+    systemHealth,
+  }));
+
+  useEffect(() => {
+    const approvalId = assistantSession.state.pendingApprovalId;
+    if (!approvalId || approvalId === selectedApprovalId) {
+      return;
+    }
+    setSelectedApprovalId(approvalId);
+    void loadApprovalDetail(approvalId).then((payload) => {
+      if (payload) {
+        assistantSession.actions.markApprovalDetailLoaded(approvalId, payload);
+      }
+    });
+  }, [assistantSession.state.pendingApprovalId, selectedApprovalId, settings.profile]);
+
+  function onReviewAssistantApproval(approvalId: string) {
+    setSelectedApprovalId(approvalId);
+    setActiveView('approvals');
+    void loadApprovalDetail(approvalId);
+  }
+
+  async function onDecideAssistantApproval(approvalId: string, approve: boolean) {
+    if (!approvalId || !canMutate) {
+      pushToast('error', approvalDisabledReason || t.setOperatorId);
+      return;
+    }
+
+    const label = approve ? t.approve : t.reject;
+    const actor = actorForOperator(settings.operatorId);
+    const confirmed = window.confirm(`${label}\n${approvalId}\n${actor}`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await decideApproval(settings, approvalId, approve, settings.operatorId, 'assistant approval action');
+      pushToast('ok', `${label} OK`);
+      assistantSession.actions.appendSystemMessage(approve ? 'Approved by operator' : 'Rejected by operator');
+      await Promise.all([refreshApprovals(), refreshRuns()]);
+      if (selectedRunId) {
+        await loadRunContext(selectedRunId, false);
+      }
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
+  async function onExecuteAssistantApproval(approvalId: string) {
+    if (!approvalId || !canMutate) {
+      pushToast('error', approvalDisabledReason || t.setOperatorId);
+      return;
+    }
+
+    const actor = actorForOperator(settings.operatorId);
+    const confirmed = window.confirm(`${t.execute}\n${approvalId}\n${actor}`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await executeApproval(settings, approvalId, settings.operatorId);
+      pushToast('ok', `${t.execute} OK`);
+      assistantSession.actions.appendSystemMessage('Executed approved action through governance lifecycle');
+      await Promise.all([refreshApprovals(), refreshRuns()]);
+      if (selectedRunId) {
+        await loadRunContext(selectedRunId, false);
+      }
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
+  const assistantRightRail = (
+    <AssistantRightRail
+      state={assistantSession.state}
+      systemHealth={systemHealth}
+      pendingApprovals={pendingApprovalSummaries}
+      selectedRunId={selectedRunId}
+      onRefreshContext={() => {
+        void refreshCore();
+        if (selectedRunId) {
+          void loadRunContext(selectedRunId);
+        }
+      }}
+      onViewApprovals={() => setActiveView('approvals')}
+      onViewRuns={() => setActiveView('runs')}
+    />
+  );
 
   return (
     <AppShell
@@ -1018,46 +1153,48 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       onCloseNav={() => setMobileNavOpen(false)}
       onRefresh={() => void refreshCore()}
       rightRail={
-        <RightRail
-          notifications={notifications}
-          selectedRunId={selectedRunId || '-'}
-          sessionId={sessionId}
-          mode={settings.mode === 'auto' ? 'Yardımlı' : settings.mode}
-          profile={settings.profile}
-          startedAt={startedAt}
-          duration={duration}
-          systemHealth={systemHealth}
-          pendingApprovals={pendingApprovalSummaries}
-          resumeDisabled={!canResumeFromQuickAction}
-          resumeDisabledReason={resumeDisabledReason}
-          terminalDisabled
-          terminalDisabledReason="Terminal entegrasyonu bu sürümde bağlı değil."
-          exportDisabled={!selectedRunId}
-          exportDisabledReason={!selectedRunId ? 'Seçili çalıştırma yok.' : ''}
-          cancelDisabled={cancelDisabled}
-          cancelDisabledReason={cancelDisabledReason}
-          onDismissNotification={(id) => setDismissedNotifications((prev) => [...prev, id])}
-          onRefreshContext={() => {
-            void refreshCore();
-            if (selectedRunId) {
-              void loadRunContext(selectedRunId);
-            }
-          }}
-          onResume={() => {
-            if (canResumeSession) {
-              void onControlSession('resume');
-            } else {
-              void onResumeRun();
-            }
-          }}
-          onOpenTerminal={() => {
-            pushToast('error', 'Terminal entegrasyonu bu sürümde bağlı değil.');
-          }}
-          onExport={() => void onExportArtifacts()}
-          onCancel={() => void onControlSession('stop')}
-          onViewDetails={() => setActiveView('runs')}
-          onViewApprovals={() => setActiveView('approvals')}
-        />
+        activeView === 'assistant' ? null : (
+          <RightRail
+            notifications={notifications}
+            selectedRunId={selectedRunId || '-'}
+            sessionId={sessionId}
+            mode={settings.mode === 'auto' ? 'Yardımlı' : settings.mode}
+            profile={settings.profile}
+            startedAt={startedAt}
+            duration={duration}
+            systemHealth={systemHealth}
+            pendingApprovals={pendingApprovalSummaries}
+            resumeDisabled={!canResumeFromQuickAction}
+            resumeDisabledReason={resumeDisabledReason}
+            terminalDisabled
+            terminalDisabledReason="Terminal entegrasyonu bu sürümde bağlı değil."
+            exportDisabled={!selectedRunId}
+            exportDisabledReason={!selectedRunId ? 'Seçili çalıştırma yok.' : ''}
+            cancelDisabled={cancelDisabled}
+            cancelDisabledReason={cancelDisabledReason}
+            onDismissNotification={(id) => setDismissedNotifications((prev) => [...prev, id])}
+            onRefreshContext={() => {
+              void refreshCore();
+              if (selectedRunId) {
+                void loadRunContext(selectedRunId);
+              }
+            }}
+            onResume={() => {
+              if (canResumeSession) {
+                void onControlSession('resume');
+              } else {
+                void onResumeRun();
+              }
+            }}
+            onOpenTerminal={() => {
+              pushToast('error', 'Terminal entegrasyonu bu sürümde bağlı değil.');
+            }}
+            onExport={() => void onExportArtifacts()}
+            onCancel={() => void onControlSession('stop')}
+            onViewDetails={() => setActiveView('runs')}
+            onViewApprovals={() => setActiveView('approvals')}
+          />
+        )
       }
     >
         {contractMismatch ? <div className="error-banner">{t.contractMismatch}</div> : null}
@@ -1099,6 +1236,22 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onApprove={() => void onApproveAndContinue()}
             onEditApproval={() => setActiveView('approvals')}
             onReject={() => void onDecideApproval(false)}
+          />
+        ) : null}
+        {activeView === 'assistant' ? (
+          <AssistantView
+            copy={assistantCopy}
+            state={assistantSession.state}
+            approvalDisabled={approvalDisabled}
+            approvalDisabledReason={approvalDisabledReason}
+            debugRawEnabled={settings.debugRaw}
+            rightRail={assistantRightRail}
+            onSend={(message) => void assistantSession.actions.send(message)}
+            onNewChat={assistantSession.actions.newChat}
+            onReviewApproval={onReviewAssistantApproval}
+            onApprove={(approvalId) => void onDecideAssistantApproval(approvalId, true)}
+            onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}
+            onExecute={(approvalId) => void onExecuteAssistantApproval(approvalId)}
           />
         ) : null}
 

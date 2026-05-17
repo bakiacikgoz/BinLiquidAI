@@ -9,6 +9,7 @@ describe('App', () => {
 
     expect(html).toContain('AegisOS');
     expect(html).toContain('Mission Control');
+    expect(html).toContain('AI Assistant');
     expect(html).toContain('SİSTEM SAĞLIĞI');
   });
 });

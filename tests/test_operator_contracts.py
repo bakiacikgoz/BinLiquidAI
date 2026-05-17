@@ -12,6 +12,8 @@ from binliquid.cli import app
 from binliquid.contracts import (
     ApprovalDetailPayloadContract,
     ApprovalPendingPayloadContract,
+    AssistantStartTurnPayloadContract,
+    AssistantStreamEventPayloadContract,
     OperatorCapabilitiesPayload,
     PreviewFixtureBundleContract,
     RunReplayPayloadContract,
@@ -171,10 +173,39 @@ def test_preview_fixture_bundle_validates_against_contracts() -> None:
         fixture_path.read_text(encoding="utf-8")
     )
     assert fixture.contract_version == "2.0"
+    assert fixture.assistant is not None
+    assert fixture.assistant.start_turn.status == "started"
+    assert fixture.assistant.events[0].event == "status"
     assert (
         fixture.handshake.capabilities.features.computer_use_pilot.adapter_status
         == "safari_applescript"
     )
+
+
+def test_assistant_bridge_payload_contracts_match_schema() -> None:
+    start = AssistantStartTurnPayloadContract.model_validate(
+        {
+            "contractVersion": "2.0",
+            "assistantTurnId": "turn-test",
+            "sessionId": "session-test",
+            "processId": None,
+            "status": "started",
+        }
+    )
+    event = AssistantStreamEventPayloadContract.model_validate(
+        {
+            "contractVersion": "2.0",
+            "assistantTurnId": start.assistant_turn_id,
+            "sessionId": start.session_id,
+            "event": "token",
+            "sequence": 1,
+            "timestampUtc": "2026-03-08T09:20:00Z",
+            "data": {"text": "Hello"},
+        }
+    )
+
+    assert start.contract_version == "2.0"
+    assert event.event == "token"
 
 
 def test_operator_capabilities_payload_matches_contract() -> None:

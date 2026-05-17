@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "assistantTurnId": {
+      "title": "Assistantturnid",
+      "type": "string"
+    },
+    "contractVersion": {
+      "const": "2.0",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "processId": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Processid"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "status": {
+      "const": "started",
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contractVersion",
+    "assistantTurnId",
+    "sessionId",
+    "processId",
+    "status"
+  ],
+  "title": "AssistantStartTurnPayloadContract",
+  "type": "object"
+}

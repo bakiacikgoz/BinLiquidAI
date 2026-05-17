@@ -1,5 +1,11 @@
 import previewBundle from '../../../contracts/operator_panel/fixtures/operator_panel_preview.json';
 
+export {
+  getAssistantFixture as previewAssistantFixture,
+  previewAssistantEvents,
+  previewAssistantStartTurn,
+} from './assistant/assistantFixtures';
+
 import type { ComputerUseRuntimeChoice } from './capabilities';
 import type { PanelSettings } from './settings';
 

@@ -10,6 +10,7 @@ import './index.css'  // Keep existing styles for secondary workspaces during mi
 import './styles/premium-components.css'
 import './styles/premium-shell.css'
 import './styles/premium-mission.css'
+import './styles/premium-assistant.css'
 
 import App from './App.tsx'
 

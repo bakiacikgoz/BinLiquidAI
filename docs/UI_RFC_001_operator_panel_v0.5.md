@@ -35,6 +35,14 @@ Desktop operator panel (Tauri 2 + React) for approvals, runs, replay, artifacts,
 ## UI Behavior
 - Default redaction-first view.
 - Raw payload exposure requires `debugRaw` setting + explicit confirm.
+- AI Assistant is a first-class shell route that preserves the existing AegisOS
+  sidebar, logo, topbar, right rail structure, and theme tokens.
+- Assistant suggested prompts only seed the composer; they do not execute.
+- Assistant turns stream through `assistant://event` and render status, token,
+  activity, referenced run/artifact, warning, error, final, and approval states.
+- Assistant approvals keep the governance lifecycle explicit:
+  pending -> approved -> executed -> consumed. `Approve` and `Execute` are
+  separate actions.
 - Adaptive polling cadence:
   - running: 1.5s
   - blocked: 3.5s
@@ -49,3 +57,5 @@ Desktop operator panel (Tauri 2 + React) for approvals, runs, replay, artifacts,
 - Policy IDE/editor
 - IAM/SSO
 - Windows builds
+- Long-lived interactive assistant process. The initial integration uses one
+  CLI process per assistant turn.
