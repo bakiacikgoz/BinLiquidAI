@@ -12,13 +12,29 @@ export type SessionEventItem = {
   tone: 'info' | 'success' | 'warning' | 'neutral';
 };
 
-export function SessionEventsCard({ items }: { items: SessionEventItem[] }) {
+export function SessionEventsCard({
+  items,
+  hasMore = false,
+  onFilter,
+  onLoadMore,
+}: {
+  items: SessionEventItem[];
+  hasMore?: boolean;
+  onFilter?: () => void;
+  onLoadMore?: () => void;
+}) {
   return (
     <div className="mc-card session-events-card">
       <SectionHeader
         title="OTURUM OLAYLARI"
         action={
-          <button className="filter-button" type="button">
+          <button
+            className="filter-button"
+            type="button"
+            disabled={!onFilter}
+            title={!onFilter ? 'Event filtering is not available for this view' : undefined}
+            onClick={onFilter}
+          >
             Tümü <Icon name="chevron" />
           </button>
         }
@@ -37,7 +53,14 @@ export function SessionEventsCard({ items }: { items: SessionEventItem[] }) {
           </div>
         ))}
       </div>
-      <Button variant="ghost" className="load-more-button" icon={<Icon name="chevron" />}>
+      <Button
+        variant="ghost"
+        className="load-more-button"
+        icon={<Icon name="chevron" />}
+        disabled={!hasMore || !onLoadMore}
+        title={!hasMore || !onLoadMore ? 'No additional events are available' : undefined}
+        onClick={onLoadMore}
+      >
         Daha fazla olay yükle
       </Button>
     </div>

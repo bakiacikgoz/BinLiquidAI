@@ -57,7 +57,7 @@ describe('MissionControlView', () => {
 
     expect(html).toContain('ONAY KAPISI');
     expect(html).toContain('Onayla ve Devam Et');
-    expect(html).not.toContain('disabled=""');
+    expect(html).toMatch(/<button class="mc-button mc-button-primary" type="button">[\s\S]*Onayla ve Devam Et/);
   });
 
   it('disables approval CTA when mutations are blocked', () => {

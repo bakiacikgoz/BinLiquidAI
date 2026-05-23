@@ -12,6 +12,10 @@ export function AssistantRunReferences({
   artifacts: AssistantArtifactRef[];
   emptyRunLabel: string;
 }) {
+  if (runs.length === 0 && artifacts.length === 0) {
+    return <span className="sr-only">{emptyRunLabel}</span>;
+  }
+
   return (
     <Card className="assistant-reference-card">
       <div className="assistant-card-head">
@@ -21,7 +25,6 @@ export function AssistantRunReferences({
         </Badge>
       </div>
       <div className="assistant-reference-list">
-        {runs.length === 0 && artifacts.length === 0 ? <p>{emptyRunLabel}</p> : null}
         {runs.map((run) => (
           <div className="assistant-reference-row" key={run.id}>
             <StatusDot tone={run.status === 'blocked' ? 'warning' : 'info'} />

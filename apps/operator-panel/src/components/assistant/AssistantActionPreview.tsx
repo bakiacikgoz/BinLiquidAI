@@ -14,6 +14,12 @@ function riskTone(risk: AssistantProposedAction['risk']): 'success' | 'warning' 
 }
 
 export function AssistantActionPreview({ action }: { action: AssistantProposedAction }) {
+  const copyCommand = () => {
+    if (action.commandPreview) {
+      void navigator.clipboard?.writeText(action.commandPreview);
+    }
+  };
+
   return (
     <Card className="assistant-action-preview">
       <div className="assistant-card-head">
@@ -30,7 +36,7 @@ export function AssistantActionPreview({ action }: { action: AssistantProposedAc
       {action.commandPreview ? (
         <div className="assistant-command-preview">
           <code>{action.commandPreview}</code>
-          <button type="button">
+          <button type="button" onClick={copyCommand}>
             <Icon name="copy" /> Copy
           </button>
         </div>

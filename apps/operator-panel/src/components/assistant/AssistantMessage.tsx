@@ -43,10 +43,7 @@ export function AssistantMessage({
       <Card className="assistant-user-message">
         <span className="assistant-avatar">OP</span>
         <div>
-          <span className="assistant-message-meta">
-            <strong>You</strong>
-            <time>{formatClock(turn.userMessage.createdAtUtc)}</time>
-          </span>
+          <time className="assistant-user-time">{formatClock(turn.userMessage.createdAtUtc)}</time>
           <p>{turn.userMessage.text}</p>
         </div>
       </Card>

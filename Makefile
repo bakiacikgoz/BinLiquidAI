@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate ui-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -91,9 +91,10 @@ vision-gate:
 		--json
 
 ui-gate:
-	corepack pnpm --dir apps/operator-panel test
-	corepack pnpm --dir apps/operator-panel lint
-	corepack pnpm --dir apps/operator-panel build
+	corepack pnpm --dir apps/operator-panel qa:frontend
+
+ui-e2e-gate:
+	corepack pnpm --dir apps/operator-panel test:e2e
 
 rust-gate:
 	cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml

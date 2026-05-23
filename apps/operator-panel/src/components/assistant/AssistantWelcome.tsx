@@ -1,33 +1,15 @@
 import { Icon } from '../primitives/Icon';
-import { AssistantSafetyStrip } from './AssistantSafetyStrip';
-
-const promptBodies = [
-  'Spot trends and anomalies quickly',
-  'Create a step-by-step fix strategy',
-  'Show recent updates and impact',
-  'Explain what happened in the selected run',
-];
 
 export function AssistantWelcome({
   title,
   subtitle,
   badgeLabel,
-  suggestedPromptsLabel,
-  suggestedPrompts,
   readOnlyByDefault,
-  sensitiveDataNotice,
-  dryRunSafe,
-  onSelectPrompt,
 }: {
   title: string;
   subtitle: string;
   badgeLabel: string;
-  suggestedPromptsLabel: string;
-  suggestedPrompts: string[];
   readOnlyByDefault: string;
-  sensitiveDataNotice: string;
-  dryRunSafe: string;
-  onSelectPrompt: (prompt: string) => void;
 }) {
   const aegisIndex = title.indexOf('AegisOS');
   const highlightedTitle =
@@ -60,40 +42,8 @@ export function AssistantWelcome({
           <span className="assistant-chip-warning">
             <Icon name="check" /> Approval protected
           </span>
-          <span>
-            <Icon name="layers" /> Enterprise secure
-          </span>
         </div>
       </div>
-
-      <div className="assistant-prompt-divider">
-        <span>{suggestedPromptsLabel}</span>
-      </div>
-      <div className="assistant-prompt-grid" aria-label={suggestedPromptsLabel}>
-        {suggestedPrompts.map((prompt, index) => (
-          <button
-            className={`assistant-prompt-card assistant-prompt-card-${index + 1}`}
-            type="button"
-            key={prompt}
-            onClick={() => onSelectPrompt(prompt)}
-          >
-            <span className="assistant-prompt-icon">
-              <Icon name={index === 0 ? 'logs' : index === 1 ? 'list' : index === 2 ? 'shield' : 'gauge'} />
-            </span>
-            <span>
-              <strong>{prompt}</strong>
-              <small>{promptBodies[index] ?? prompt}</small>
-            </span>
-            <Icon name="chevron" />
-          </button>
-        ))}
-      </div>
-
-      <AssistantSafetyStrip
-        readOnlyByDefault={readOnlyByDefault}
-        sensitiveDataNotice={sensitiveDataNotice}
-        dryRunSafe={dryRunSafe}
-      />
     </div>
   );
 }

@@ -41,11 +41,13 @@ function statusLabel(value: string): string {
 function RailSection({
   title,
   action,
+  onAction,
   children,
   className = '',
 }: {
   title: string;
   action?: string;
+  onAction?: () => void;
   children: ReactNode;
   className?: string;
 }) {
@@ -53,7 +55,16 @@ function RailSection({
     <Card className={`assistant-rail-card ${className}`.trim()}>
       <div className="assistant-rail-card-head">
         <span>{title}</span>
-        {action ? <button type="button">{action}</button> : null}
+        {action ? (
+          <button
+            type="button"
+            disabled={!onAction}
+            title={!onAction ? 'Action is not available in this context' : undefined}
+            onClick={onAction}
+          >
+            {action}
+          </button>
+        ) : null}
       </div>
       {children}
     </Card>
@@ -116,7 +127,7 @@ export function AssistantRightRail({
             </div>
           </RailSection>
 
-          <RailSection title="Recent Sessions" action="View all">
+          <RailSection title="Recent Sessions" action="View all" onAction={onViewRuns}>
             <div className="assistant-rail-list">
               {['Investigate run_20260308_0910', 'Error spike in payment-service', 'Draft remediation plan'].map(
                 (item) => (
@@ -203,7 +214,7 @@ export function AssistantRightRail({
             </Button>
           </RailSection>
 
-          <RailSection title="Referenced Runs" action="View all">
+          <RailSection title="Referenced Runs" action="View all" onAction={onViewRuns}>
             <div className="assistant-rail-list assistant-run-list">
               {referencedRuns.map((runId, index) => (
                 <button type="button" key={runId} onClick={onViewRuns}>
@@ -253,7 +264,7 @@ export function AssistantRightRail({
 
       {mode === 'approval' ? (
         <>
-          <RailSection title="Approval Queue" action="View all">
+          <RailSection title="Approval Queue" action="View all" onAction={onViewApprovals}>
             <div className="assistant-approval-ticket">
               <strong>{approval?.title ?? 'Restart operator queue deployment'}</strong>
               <span>{approval?.subtitle ?? selectedRunId}</span>
@@ -295,7 +306,7 @@ export function AssistantRightRail({
             </div>
           </RailSection>
 
-          <RailSection title="Recent Activity" action="View all">
+          <RailSection title="Recent Activity" action="View all" onAction={onViewRuns}>
             <div className="assistant-rail-list">
               {['Health check failed: operator queue', 'Auto-diagnosis completed', 'Run initiated by user'].map(
                 (item, index) => (

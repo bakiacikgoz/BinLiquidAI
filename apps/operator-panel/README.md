@@ -14,6 +14,27 @@ Settings defaults:
 - profile `balanced`
 - root dir `.binliquid/team/jobs`
 
+## Frontend QA Gate
+
+```bash
+pnpm qa:frontend
+```
+
+The full gate runs UI control audit, Vitest unit/interaction/integration tests,
+ESLint, production build, Playwright preview E2E, accessibility smoke, responsive
+smoke, and final summary generation. Browser tests run only in preview mode and
+do not call the live CLI/Tauri bridge.
+
+Primary artifacts:
+- `artifacts/operator-panel-ui/qa-summary.md`
+- `artifacts/operator-panel-ui/control-inventory.md`
+- `artifacts/operator-panel-ui/e2e-report/index.html`
+- `artifacts/operator-panel-ui/accessibility/accessibility-report.md`
+- `artifacts/operator-panel-ui/responsive/responsive-report.md`
+
+`pnpm qa:frontend:static` runs the non-browser portion when a Playwright browser
+or local server is intentionally unavailable.
+
 In `auto` mode, bridge resolution order is:
 1. configured `cliPath`
 2. bundled runtime python

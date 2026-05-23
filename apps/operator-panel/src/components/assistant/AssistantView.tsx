@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import { Button } from '../primitives/Button';
@@ -60,11 +60,9 @@ export function AssistantView({
   onReject?: (approvalId: string) => void;
   onExecute?: (approvalId: string) => void;
 }) {
-  const [selectedPrompt, setSelectedPrompt] = useState('');
   const currentTurnRunning = state.status === 'starting' || state.status === 'streaming';
   const surfaceState =
     state.status === 'awaiting_approval' ? 'approval' : state.turns.length > 0 ? 'transcript' : 'welcome';
-  const statusLabel = state.status.replaceAll('_', ' ');
 
   return (
     <section className={`assistant-surface assistant-surface-${surfaceState}`} aria-labelledby="assistant-title">
@@ -93,10 +91,16 @@ export function AssistantView({
             <input aria-label="Search assistant context" placeholder="Search" />
             <kbd>⌘K</kbd>
           </label>
-          <button type="button" aria-label="Open terminal">
+          <button type="button" aria-label="Open terminal" disabled title="Terminal access is not available in assistant preview">
             <Icon name="terminal" />
           </button>
-          <button type="button" aria-label="Notifications" className="assistant-notification-button">
+          <button
+            type="button"
+            aria-label="Notifications"
+            className="assistant-notification-button"
+            disabled
+            title="Assistant notifications are not available in this context"
+          >
             <Icon name="bell" />
             <span aria-hidden="true" />
           </button>
@@ -120,7 +124,12 @@ export function AssistantView({
                 <Button icon={<Icon name="edit" />} variant="ghost" onClick={onNewChat}>
                   {copy.newChat}
                 </Button>
-                <button type="button" aria-label="More assistant actions">
+                <button
+                  type="button"
+                  aria-label="More assistant actions"
+                  disabled
+                  title="More assistant actions are not available yet"
+                >
                   ···
                 </button>
               </div>
@@ -136,12 +145,7 @@ export function AssistantView({
               title={copy.welcomeTitle}
               subtitle={copy.subtitle}
               badgeLabel={copy.badgeLabel}
-              suggestedPromptsLabel={copy.suggestedPromptsLabel}
-              suggestedPrompts={copy.suggestedPrompts}
               readOnlyByDefault={copy.readOnlyByDefault}
-              sensitiveDataNotice={copy.sensitiveDataNotice}
-              dryRunSafe={copy.dryRunSafe}
-              onSelectPrompt={setSelectedPrompt}
             />
           ) : (
             <AssistantTranscript
@@ -182,12 +186,7 @@ export function AssistantView({
             placeholder={copy.composerPlaceholder}
             sendLabel={copy.sendLabel}
             disabled={currentTurnRunning}
-            initialValue={selectedPrompt}
-            statusLabel={statusLabel}
-            onSend={(message) => {
-              setSelectedPrompt('');
-              onSend(message);
-            }}
+            onSend={onSend}
           />
         </div>
 

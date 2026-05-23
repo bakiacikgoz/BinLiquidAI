@@ -405,15 +405,21 @@ make ui-install
 make ui-dev
 make ui-build
 make ui-tauri-build
+make ui-gate
 ```
 
 Direct pnpm usage:
 
 ```bash
-corepack pnpm --dir apps/operator-panel test
-corepack pnpm --dir apps/operator-panel lint
-corepack pnpm --dir apps/operator-panel build
+corepack pnpm --dir apps/operator-panel qa:frontend
+corepack pnpm --dir apps/operator-panel qa:frontend:static
+corepack pnpm --dir apps/operator-panel test:e2e
 ```
+
+`qa:frontend` is the full merge-oriented UI gate: control audit, unit/component
+tests, lint, build, Playwright preview E2E, accessibility smoke, responsive
+smoke, and final QA summary generation. Reports are written under
+`artifacts/operator-panel-ui/`.
 
 Tauri checks:
 

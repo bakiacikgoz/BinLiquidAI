@@ -35,14 +35,13 @@ const copy: AssistantViewCopy = {
 };
 
 describe('AssistantView', () => {
-  it('renders the welcome state with safe suggested prompts', () => {
+  it('renders the welcome state with safety context', () => {
     const html = renderToStaticMarkup(<AssistantView copy={copy} state={getAssistantFixture('welcome')} />);
 
     expect(html).toContain('Welcome to AegisOS Assistant');
     expect(html).toContain('Read-only by default');
-    expect(html).toContain('Sensitive data stays in your environment');
     expect(html).toContain('Referenced runs');
-    expect(html).toContain('Summarize recent errors');
+    expect(html).not.toContain('Summarize recent errors');
   });
 
   it('renders the running state with transcript and referenced run context', () => {

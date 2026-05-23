@@ -3,6 +3,7 @@ export type IconName =
   | 'alert'
   | 'approval'
   | 'archive'
+  | 'arrow-up'
   | 'bell'
   | 'box'
   | 'check'
@@ -42,6 +43,7 @@ const paths: Record<IconName, string> = {
   alert: 'M12 4l8 15H4L12 4z M12 9v4 M12 16h.01',
   approval: 'M12 3l7 4v5c0 4.4-2.8 7.4-7 9-4.2-1.6-7-4.6-7-9V7z M9 12l2 2 4-5',
   archive: 'M4 7h16 M6 7v12h12V7 M9 11h6',
+  'arrow-up': 'M12 18V6 M6.75 11.25 12 6l5.25 5.25',
   bell: 'M6 15h12l-1.5-2V9a4.5 4.5 0 0 0-9 0v4L6 15z M10 19h4',
   box: 'M4 8l8-4 8 4-8 4-8-4z M4 8v8l8 4 8-4V8 M12 12v8',
   check: 'M5 12l4 4L19 6',

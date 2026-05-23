@@ -46,11 +46,26 @@ jobs:
       - name: Install UI deps
         run: pnpm install --dir apps/operator-panel
 
-      - name: UI lint
-        run: pnpm --dir apps/operator-panel lint
+      - name: Install Playwright Chromium
+        run: pnpm --dir apps/operator-panel exec playwright install chromium
 
-      - name: UI build
-        run: pnpm --dir apps/operator-panel build
+      - name: UI frontend QA
+        run: pnpm --dir apps/operator-panel qa:frontend
+
+      - name: Publish UI QA summary
+        if: always()
+        run: |
+          if [ -f artifacts/operator-panel-ui/qa-summary.md ]; then
+            cat artifacts/operator-panel-ui/qa-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload UI QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-panel-ui-qa
+          path: artifacts/operator-panel-ui/**
+          if-no-files-found: warn
 
       - name: Rust bridge tests
         run: cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml
