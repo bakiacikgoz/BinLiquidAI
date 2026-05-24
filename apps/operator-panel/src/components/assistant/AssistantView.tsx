@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
+import type { AssistantRuntimeSettings } from '../../settings';
 import { Button } from '../primitives/Button';
 import { Card } from '../primitives/Card';
 import { Icon } from '../primitives/Icon';
@@ -40,12 +41,14 @@ export function AssistantView({
   approvalDisabled = true,
   approvalDisabledReason = '',
   debugRawEnabled = false,
-  onSend = () => undefined,
-  onNewChat = () => undefined,
-  onReviewApproval = () => undefined,
-  onApprove = () => undefined,
-  onReject = () => undefined,
-  onExecute = () => undefined,
+  runtimeSettings,
+  onRuntimeSettingsChange,
+  onSend,
+  onNewChat,
+  onReviewApproval,
+  onApprove,
+  onReject,
+  onExecute,
 }: {
   copy: AssistantViewCopy;
   state: AssistantSessionState;
@@ -53,12 +56,14 @@ export function AssistantView({
   approvalDisabled?: boolean;
   approvalDisabledReason?: string;
   debugRawEnabled?: boolean;
-  onSend?: (message: string) => void;
-  onNewChat?: () => void;
-  onReviewApproval?: (approvalId: string) => void;
-  onApprove?: (approvalId: string) => void;
-  onReject?: (approvalId: string) => void;
-  onExecute?: (approvalId: string) => void;
+  runtimeSettings: AssistantRuntimeSettings;
+  onRuntimeSettingsChange: (next: Partial<AssistantRuntimeSettings>) => void;
+  onSend: (message: string, runtimeSettings: AssistantRuntimeSettings) => void;
+  onNewChat: () => void;
+  onReviewApproval: (approvalId: string) => void;
+  onApprove: (approvalId: string) => void;
+  onReject: (approvalId: string) => void;
+  onExecute: (approvalId: string) => void;
 }) {
   const currentTurnRunning = state.status === 'starting' || state.status === 'streaming';
   const surfaceState =
@@ -88,7 +93,13 @@ export function AssistantView({
         <div className="assistant-top-actions">
           <label className="assistant-search">
             <Icon name="logs" />
-            <input aria-label="Search assistant context" placeholder="Search" />
+            <input
+              aria-label="Search assistant context"
+              placeholder="Search"
+              disabled
+              title="Assistant context search is not available yet"
+              data-disabled-reason="Assistant context search is not available yet"
+            />
             <kbd>⌘K</kbd>
           </label>
           <button type="button" aria-label="Open terminal" disabled title="Terminal access is not available in assistant preview">
@@ -186,6 +197,8 @@ export function AssistantView({
             placeholder={copy.composerPlaceholder}
             sendLabel={copy.sendLabel}
             disabled={currentTurnRunning}
+            runtimeSettings={runtimeSettings}
+            onRuntimeSettingsChange={onRuntimeSettingsChange}
             onSend={onSend}
           />
         </div>

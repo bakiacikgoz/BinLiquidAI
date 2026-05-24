@@ -4,6 +4,11 @@ import { gotoOperatorPanel, openPrimaryView } from './helpers';
 
 test('runs workspace exposes artifact, replay, and diagnostics tabs safely', async ({ page }) => {
   const consoleHealth = await gotoOperatorPanel(page);
+  const prompts: string[] = [];
+  page.on('dialog', async (dialog) => {
+    prompts.push(dialog.message());
+    await dialog.accept('./exports/e2e-runs');
+  });
   await openPrimaryView(page, 'Çalıştırmalar', 'Runs');
 
   await expect(page.locator('.list-scroll').getByRole('button').filter({ hasText: 'run_20260308_0910' })).toBeVisible();
@@ -20,6 +25,10 @@ test('runs workspace exposes artifact, replay, and diagnostics tabs safely', asy
   await page.getByRole('button', { name: 'Diagnostics', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Drift signals', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'System context', exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await expect(page.getByText('Export completed')).toBeVisible();
+  expect(prompts.some((message) => message.includes('Export directory'))).toBe(true);
 
   consoleHealth.assertNoCriticalErrors();
 });

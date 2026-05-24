@@ -490,6 +490,59 @@
   gap: 10px;
 }
 
+.assistant-runtime-settings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.assistant-runtime-settings label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.assistant-runtime-settings span {
+  color: var(--assistant-dim);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.assistant-runtime-settings input,
+.assistant-runtime-settings select {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--assistant-line) 74%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--assistant-panel-soft) 72%, transparent);
+  color: var(--assistant-text);
+  font-size: 12px;
+  outline: none;
+}
+
+.assistant-runtime-settings input {
+  padding: 0 9px;
+}
+
+.assistant-runtime-settings select {
+  padding: 0 7px;
+}
+
+.assistant-runtime-settings input:focus,
+.assistant-runtime-settings select:focus {
+  border-color: color-mix(in srgb, var(--assistant-line-strong) 92%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--assistant-line-strong) 18%, transparent);
+}
+
+.assistant-runtime-validation {
+  margin: 0;
+  color: var(--assistant-yellow);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .assistant-composer-tools,
 .assistant-composer-submit {
   gap: 8px;
@@ -497,7 +550,7 @@
 }
 
 .assistant-composer-tools button,
-.assistant-model-select {
+.assistant-model-summary {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -522,18 +575,18 @@
   font-style: normal;
 }
 
-.assistant-model-select {
+.assistant-model-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 14px;
-  min-width: 112px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 148px;
   text-align: left;
 }
 
-.assistant-model-select span {
+.assistant-model-summary span {
   display: none;
 }
 
-.assistant-model-select strong {
+.assistant-model-summary strong {
   min-width: 0;
   overflow: hidden;
   color: var(--assistant-text);
@@ -1453,8 +1506,13 @@
 
   .assistant-top-actions,
   .assistant-composer-tools,
-  .assistant-composer-submit {
+  .assistant-composer-submit,
+  .assistant-runtime-settings {
     flex-wrap: wrap;
+  }
+
+  .assistant-runtime-settings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .assistant-welcome-card {
@@ -1473,6 +1531,10 @@
   .assistant-composer {
     width: 100%;
     bottom: 12px;
+  }
+
+  .assistant-runtime-settings {
+    grid-template-columns: 1fr;
   }
 
   .assistant-user-message,

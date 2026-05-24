@@ -54,10 +54,13 @@ import { actorForOperator, canMutateWithOperatorId } from './operator';
 import {
   type PanelSettings,
   type LocaleMode,
+  assistantRuntimeOptionsFromSettings,
+  getAssistantRuntimeSettings,
   isOperatorIdValid,
   loadSettings,
   resolveLocale,
   saveSettings,
+  validateAssistantRuntimeSettings,
 } from './settings';
 import {
   buildWorkspaceSnapshot,
@@ -77,7 +80,7 @@ import { useAssistantSession } from './assistant/useAssistantSession';
 import { MissionControlView } from './components/mission/MissionControlView';
 import { ComputerUseOperationsCard } from './components/mission/ComputerUseOperationsCard';
 import { AssistantView, type AssistantViewCopy } from './components/assistant/AssistantView';
-import { AssistantRightRail } from './components/assistant/AssistantRightRail';
+import { AssistantRightRail, type AssistantRuntimeSummary } from './components/assistant/AssistantRightRail';
 import { AppShell } from './components/shell/AppShell';
 import { RightRail } from './components/shell/RightRail';
 import type { ShellViewKey } from './components/shell/Sidebar';
@@ -342,6 +345,22 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     return name.includes('snapshot_drift') || name.includes('approval_stale') || name.includes('stale_');
   });
   const configRecord = asRecord(configData);
+  const assistantRuntimeSettings = getAssistantRuntimeSettings(settings);
+  const assistantRuntimeValidationMessage = validateAssistantRuntimeSettings(assistantRuntimeSettings);
+  const assistantResolvedConfig = asRecord(asRecord(configRecord.resolved));
+  const profileDefaultLabel = 'profile default';
+  const assistantRuntimeSummary: AssistantRuntimeSummary = {
+    selectedProvider: settings.assistantProvider.trim() || profileDefaultLabel,
+    selectedModel: settings.assistantModel.trim() || profileDefaultLabel,
+    selectedFallbackProvider: settings.assistantFallbackProvider.trim() || profileDefaultLabel,
+    selectedHfModelId: settings.assistantHfModelId.trim() || profileDefaultLabel,
+    effectiveProvider:
+      settings.assistantProvider.trim() || readString(assistantResolvedConfig, 'llm_provider', profileDefaultLabel),
+    effectiveModel:
+      settings.assistantModel.trim() || readString(assistantResolvedConfig, 'model_name', profileDefaultLabel),
+    effectiveHfModelId:
+      settings.assistantHfModelId.trim() || readString(assistantResolvedConfig, 'hf_model_id', profileDefaultLabel),
+  };
 
   function pushToast(kind: Toast['kind'], text: string) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -363,7 +382,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
   async function refreshConfig() {
     try {
-      const payload = await resolveConfig(settings);
+      const payload = await resolveConfig(
+        settings,
+        assistantRuntimeValidationMessage ? undefined : assistantRuntimeOptionsFromSettings(settings),
+      );
       setConfigData(payload);
     } catch (error) {
       const parsed = getErrorPayload(error);
@@ -485,6 +507,18 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   useEffect(() => {
     void refreshCore();
   }, [settings.mode, settings.cliPath, settings.bundledPythonPath, settings.profile, settings.rootDir]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void refreshConfig();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [
+    settings.assistantProvider,
+    settings.assistantFallbackProvider,
+    settings.assistantModel,
+    settings.assistantHfModelId,
+  ]);
 
   useEffect(() => {
     if (!resumeForm.specPath && taskForm.specPath) {
@@ -993,6 +1027,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           ? 'Seçili onay yok.'
           : '';
   const approvalDisabled = !canMutate || !activeApprovalId;
+  const selectedApprovalActionDisabledReason = !selectedApprovalId
+    ? t.noSelection
+    : !canMutate
+      ? approvalDisabledReason || t.setOperatorId
+      : '';
+  const selectedRunActionDisabledReason = !selectedRunId ? t.selectRun : '';
   const systemHealth = buildSystemHealthSummary({
     coreMode: settings.mode,
     handshakeRecord,
@@ -1124,6 +1164,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       systemHealth={systemHealth}
       pendingApprovals={pendingApprovalSummaries}
       selectedRunId={selectedRunId}
+      runtimeSummary={assistantRuntimeSummary}
       onRefreshContext={() => {
         void refreshCore();
         if (selectedRunId) {
@@ -1246,7 +1287,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             approvalDisabledReason={approvalDisabledReason}
             debugRawEnabled={settings.debugRaw}
             rightRail={assistantRightRail}
-            onSend={(message) => void assistantSession.actions.send(message)}
+            runtimeSettings={assistantRuntimeSettings}
+            onRuntimeSettingsChange={updateSettings}
+            onSend={(message, runtimeSettings) => void assistantSession.actions.send(message, runtimeSettings)}
             onNewChat={assistantSession.actions.newChat}
             onReviewApproval={onReviewAssistantApproval}
             onApprove={(approvalId) => void onDecideAssistantApproval(approvalId, true)}
@@ -1535,13 +1578,34 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 <button className="ghost-btn" type="button" onClick={() => void refreshApprovals()}>
                   {t.refresh}
                 </button>
-                <button className="action-btn" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onDecideApproval(true)}>
+                <button
+                  className="action-btn"
+                  type="button"
+                  disabled={!canMutate || !selectedApprovalId}
+                  title={selectedApprovalActionDisabledReason || undefined}
+                  data-disabled-reason={selectedApprovalActionDisabledReason || undefined}
+                  onClick={() => void onDecideApproval(true)}
+                >
                   {t.approve}
                 </button>
-                <button className="ghost-btn" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onDecideApproval(false)}>
+                <button
+                  className="ghost-btn"
+                  type="button"
+                  disabled={!canMutate || !selectedApprovalId}
+                  title={selectedApprovalActionDisabledReason || undefined}
+                  data-disabled-reason={selectedApprovalActionDisabledReason || undefined}
+                  onClick={() => void onDecideApproval(false)}
+                >
                   {t.reject}
                 </button>
-                <button className="action-btn action-danger" type="button" disabled={!canMutate || !selectedApprovalId} onClick={() => void onExecuteApproval()}>
+                <button
+                  className="action-btn action-danger"
+                  type="button"
+                  disabled={!canMutate || !selectedApprovalId}
+                  title={selectedApprovalActionDisabledReason || undefined}
+                  data-disabled-reason={selectedApprovalActionDisabledReason || undefined}
+                  onClick={() => void onExecuteApproval()}
+                >
                   {t.execute}
                 </button>
               </div>
@@ -1591,10 +1655,24 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
                   {t.refreshRuns}
                 </button>
-                <button className="ghost-btn" type="button" disabled={!selectedRunId} onClick={() => void loadRunContext(selectedRunId)}>
+                <button
+                  className="ghost-btn"
+                  type="button"
+                  disabled={!selectedRunId}
+                  title={selectedRunActionDisabledReason || undefined}
+                  data-disabled-reason={selectedRunActionDisabledReason || undefined}
+                  onClick={() => void loadRunContext(selectedRunId)}
+                >
                   {t.refreshContext}
                 </button>
-                <button className="action-btn" type="button" disabled={!selectedRunId} onClick={() => void onExportArtifacts()}>
+                <button
+                  className="action-btn"
+                  type="button"
+                  disabled={!selectedRunId}
+                  title={selectedRunActionDisabledReason || undefined}
+                  data-disabled-reason={selectedRunActionDisabledReason || undefined}
+                  onClick={() => void onExportArtifacts()}
+                >
                   {t.export}
                 </button>
               </div>
@@ -1800,7 +1878,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 <p className="workspace-lead">{t.operationsLead}</p>
               </div>
               <div className="workspace-actions">
-                <button className="ghost-btn" type="button" onClick={() => void snapshotMetrics(settings).then((payload) => setOperationOutputs((prev) => ({ ...prev, metrics: payload }))).catch(() => undefined)}>
+                <button
+                  className="ghost-btn"
+                  type="button"
+                  onClick={() => void runOperation('metrics', () => snapshotMetrics(settings))}
+                >
                   {t.quickMetrics}
                 </button>
               </div>

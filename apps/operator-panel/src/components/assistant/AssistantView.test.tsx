@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { getAssistantFixture } from '../../assistant/assistantFixtures';
+import { DEFAULT_ASSISTANT_RUNTIME_SETTINGS } from '../../settings';
 import { AssistantView, type AssistantViewCopy } from './AssistantView';
 
 const copy: AssistantViewCopy = {
@@ -34,9 +35,22 @@ const copy: AssistantViewCopy = {
   approvalLifecycleBody: 'Proposed actions will reuse the existing pending, approved, executed, and consumed flow.',
 };
 
+const requiredActionProps = {
+  runtimeSettings: DEFAULT_ASSISTANT_RUNTIME_SETTINGS,
+  onRuntimeSettingsChange: () => undefined,
+  onSend: () => undefined,
+  onNewChat: () => undefined,
+  onReviewApproval: () => undefined,
+  onApprove: () => undefined,
+  onReject: () => undefined,
+  onExecute: () => undefined,
+};
+
 describe('AssistantView', () => {
   it('renders the welcome state with safety context', () => {
-    const html = renderToStaticMarkup(<AssistantView copy={copy} state={getAssistantFixture('welcome')} />);
+    const html = renderToStaticMarkup(
+      <AssistantView copy={copy} state={getAssistantFixture('welcome')} {...requiredActionProps} />,
+    );
 
     expect(html).toContain('Welcome to AegisOS Assistant');
     expect(html).toContain('Read-only by default');
@@ -45,7 +59,9 @@ describe('AssistantView', () => {
   });
 
   it('renders the running state with transcript and referenced run context', () => {
-    const html = renderToStaticMarkup(<AssistantView copy={copy} state={getAssistantFixture('running')} />);
+    const html = renderToStaticMarkup(
+      <AssistantView copy={copy} state={getAssistantFixture('running')} {...requiredActionProps} />,
+    );
 
     expect(html).toContain('Son run hatasını özetle');
     expect(html).toContain('The selected run is blocked by an approval gate.');
@@ -59,6 +75,7 @@ describe('AssistantView', () => {
         state={getAssistantFixture('approval_required')}
         approvalDisabled
         approvalDisabledReason="Set operator id to continue"
+        {...requiredActionProps}
       />,
     );
 

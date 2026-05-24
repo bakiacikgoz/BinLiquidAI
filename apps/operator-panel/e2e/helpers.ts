@@ -17,6 +17,10 @@ type E2eSettings = {
   updaterMode: 'off' | 'manual' | 'auto';
   debugRaw: boolean;
   theme: 'light' | 'dark' | 'system';
+  assistantProvider: string;
+  assistantFallbackProvider: string;
+  assistantModel: string;
+  assistantHfModelId: string;
 };
 
 type ConsoleHealth = {
@@ -45,6 +49,10 @@ const defaultSettings: E2eSettings = {
   updaterMode: 'off',
   debugRaw: false,
   theme: 'light',
+  assistantProvider: '',
+  assistantFallbackProvider: '',
+  assistantModel: '',
+  assistantHfModelId: '',
 };
 
 const ignoredConsolePatterns = [/favicon/i, /ResizeObserver loop/i];

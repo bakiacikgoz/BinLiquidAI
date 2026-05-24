@@ -3,6 +3,13 @@ export type LocaleMode = 'auto' | 'en' | 'tr';
 export type UpdaterMode = 'off' | 'manual' | 'auto';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+export interface AssistantRuntimeSettings {
+  assistantProvider: string;
+  assistantFallbackProvider: string;
+  assistantModel: string;
+  assistantHfModelId: string;
+}
+
 export interface PanelSettings {
   mode: CoreMode;
   cliPath: string;
@@ -15,9 +22,20 @@ export interface PanelSettings {
   updaterMode: UpdaterMode;
   debugRaw: boolean;
   theme: ThemeMode;
+  assistantProvider: string;
+  assistantFallbackProvider: string;
+  assistantModel: string;
+  assistantHfModelId: string;
 }
 
 export const SETTINGS_KEY = 'aegisos.operator.settings.v1';
+
+export const DEFAULT_ASSISTANT_RUNTIME_SETTINGS: AssistantRuntimeSettings = {
+  assistantProvider: '',
+  assistantFallbackProvider: '',
+  assistantModel: '',
+  assistantHfModelId: '',
+};
 
 export const DEFAULT_SETTINGS: PanelSettings = {
   mode: 'auto',
@@ -31,7 +49,57 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   updaterMode: 'off',
   debugRaw: false,
   theme: 'system',
+  ...DEFAULT_ASSISTANT_RUNTIME_SETTINGS,
 };
+
+const MODEL_TOKEN_PATTERN = /^[A-Za-z0-9._:/@+-]+$/;
+
+function cleanRuntimeValue(value: string): string {
+  return value.trim();
+}
+
+export function getAssistantRuntimeSettings(settings: PanelSettings): AssistantRuntimeSettings {
+  return {
+    assistantProvider: settings.assistantProvider,
+    assistantFallbackProvider: settings.assistantFallbackProvider,
+    assistantModel: settings.assistantModel,
+    assistantHfModelId: settings.assistantHfModelId,
+  };
+}
+
+export function assistantRuntimeOptionsFromSettings(settings: PanelSettings): {
+  provider?: string;
+  fallbackProvider?: string;
+  model?: string;
+  hfModelId?: string;
+} {
+  return {
+    provider: cleanRuntimeValue(settings.assistantProvider) || undefined,
+    fallbackProvider: cleanRuntimeValue(settings.assistantFallbackProvider) || undefined,
+    model: cleanRuntimeValue(settings.assistantModel) || undefined,
+    hfModelId: cleanRuntimeValue(settings.assistantHfModelId) || undefined,
+  };
+}
+
+export function validateAssistantRuntimeSettings(settings: AssistantRuntimeSettings): string {
+  const provider = cleanRuntimeValue(settings.assistantProvider).toLowerCase();
+  const model = cleanRuntimeValue(settings.assistantModel);
+  const hfModelId = cleanRuntimeValue(settings.assistantHfModelId);
+
+  if (model && !MODEL_TOKEN_PATTERN.test(model)) {
+    return 'Model may only include letters, numbers, dot, dash, underscore, slash, colon, plus, or @.';
+  }
+  if (hfModelId && !MODEL_TOKEN_PATTERN.test(hfModelId)) {
+    return 'HF model id may only include letters, numbers, dot, dash, underscore, slash, colon, plus, or @.';
+  }
+  if (provider === 'transformers' && model) {
+    return 'Use HF model id for provider=transformers; leave Model empty.';
+  }
+  if (provider === 'ollama' && hfModelId) {
+    return 'Use Model for provider=ollama; leave HF model id empty.';
+  }
+  return '';
+}
 
 export function loadSettings(): PanelSettings {
   const raw = globalThis.localStorage?.getItem(SETTINGS_KEY);
@@ -44,6 +112,11 @@ export function loadSettings(): PanelSettings {
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
+      assistantProvider: typeof parsed.assistantProvider === 'string' ? parsed.assistantProvider : '',
+      assistantFallbackProvider:
+        typeof parsed.assistantFallbackProvider === 'string' ? parsed.assistantFallbackProvider : '',
+      assistantModel: typeof parsed.assistantModel === 'string' ? parsed.assistantModel : '',
+      assistantHfModelId: typeof parsed.assistantHfModelId === 'string' ? parsed.assistantHfModelId : '',
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

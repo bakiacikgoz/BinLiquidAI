@@ -4,7 +4,11 @@ import {
   listenAssistantEvents,
   startAssistantTurn,
 } from '../bridge';
-import type { PanelSettings } from '../settings';
+import {
+  assistantRuntimeOptionsFromSettings,
+  type AssistantRuntimeSettings,
+  type PanelSettings,
+} from '../settings';
 import { buildAssistantPrompt } from './assistantPromptBuilder';
 import {
   createAssistantSession,
@@ -25,7 +29,7 @@ export type AssistantContextSnapshot = {
 };
 
 export type AssistantSessionActions = {
-  send: (message: string) => Promise<void>;
+  send: (message: string, runtimeSettings?: AssistantRuntimeSettings) => Promise<void>;
   newChat: () => void;
   applyEvent: (event: AssistantStreamEvent) => void;
   markApprovalDetailLoaded: (approvalId: string, detail: unknown) => void;
@@ -85,7 +89,7 @@ export function useAssistantSession(
   }, [applyEvent]);
 
   const send = useCallback(
-    async (message: string) => {
+    async (message: string, runtimeSettings?: AssistantRuntimeSettings) => {
       const userMessage = message.trim();
       if (!userMessage || ['starting', 'streaming'].includes(stateRef.current.status)) {
         return;
@@ -122,6 +126,7 @@ export function useAssistantSession(
         userMessage,
         compiledPrompt: prompt.compiledPrompt,
         profile: settings.profile,
+        ...assistantRuntimeOptionsFromSettings({ ...settings, ...runtimeSettings }),
       };
 
       try {

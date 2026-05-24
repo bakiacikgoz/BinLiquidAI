@@ -9,8 +9,9 @@ test('operations workspace runs safe preview operation tabs', async ({ page }) =
   await page.getByRole('button', { name: 'Who am I', exact: true }).click();
   await expect(operationOutput(page)).toContainText('qa-operator');
 
+  await page.getByLabel('Permission').fill('runtime.audit');
   await page.getByRole('button', { name: 'Check permission', exact: true }).click();
-  await expect(operationOutput(page)).toContainText('runtime.run');
+  await expect(operationOutput(page)).toContainText('runtime.audit');
 
   await page.getByRole('button', { name: 'Qualification', exact: true }).click();
   await page.getByRole('button', { name: 'Metrics snapshot', exact: true }).click();

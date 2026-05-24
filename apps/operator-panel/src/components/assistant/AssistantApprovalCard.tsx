@@ -33,6 +33,9 @@ export function AssistantApprovalCard({
   onExecute: (approvalId: string) => void;
 }) {
   const approved = approval.status === 'approved';
+  const disabledActionReason = disabled ? disabledReason : '';
+  const approveDisabledReason = approved ? 'Approval is already approved.' : disabledActionReason;
+  const executeDisabledReason = approved ? disabledActionReason : 'Approval must be approved before execution.';
   return (
     <Card className="assistant-approval-card">
       <div className="assistant-card-head">
@@ -58,6 +61,8 @@ export function AssistantApprovalCard({
         </Button>
         <Button
           disabled={disabled || approved}
+          title={approveDisabledReason || undefined}
+          data-disabled-reason={approveDisabledReason || undefined}
           icon={<Icon name="check" />}
           variant="primary"
           onClick={() => onApprove(approval.approvalId)}
@@ -66,6 +71,8 @@ export function AssistantApprovalCard({
         </Button>
         <Button
           disabled={disabled}
+          title={disabledActionReason || undefined}
+          data-disabled-reason={disabledActionReason || undefined}
           icon={<Icon name="reject" />}
           variant="danger"
           onClick={() => onReject(approval.approvalId)}
@@ -74,6 +81,8 @@ export function AssistantApprovalCard({
         </Button>
         <Button
           disabled={disabled || !approved}
+          title={executeDisabledReason || undefined}
+          data-disabled-reason={executeDisabledReason || undefined}
           icon={<Icon name="play" />}
           variant="secondary"
           onClick={() => onExecute(approval.approvalId)}

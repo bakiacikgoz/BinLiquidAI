@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  decideApproval,
+  executeApproval,
+  exportRunArtifacts,
   getComputerUseSessionState,
   getComputerUseSummary,
   handshake,
@@ -86,6 +89,27 @@ describe('bridge preview fallback', () => {
     expect(payload.processId).toBeNull();
   });
 
+  it('applies preview config resolve provider and model overrides', async () => {
+    const payload = await resolveConfig(
+      { ...DEFAULT_SETTINGS },
+      {
+        provider: 'ollama',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      },
+    );
+    const record = payload as Record<string, unknown>;
+    const resolved = record.resolved as Record<string, unknown>;
+    const sourceMap = record.source_map as Record<string, unknown>;
+
+    expect(resolved.llm_provider).toBe('ollama');
+    expect(resolved.fallback_provider).toBe('transformers');
+    expect(resolved.model_name).toBe('qwen3.5:4b');
+    expect(resolved.hf_model_id).toBe('Qwen/Qwen2.5');
+    expect(sourceMap.model_name).toBe('cli');
+  });
+
   it('returns preview computer-use summary payloads', async () => {
     const payload = await getComputerUseSummary({ ...DEFAULT_SETTINGS }, 2);
     const record = payload as Record<string, unknown>;
@@ -128,12 +152,16 @@ describe('bridge preview fallback', () => {
   });
 
   it('returns runtime-shaped preview payloads for approvals and runs', async () => {
-    const [approval, runs, artifact, events] = await Promise.all([
-      showApproval({ ...DEFAULT_SETTINGS }, 'apr_preview'),
-      listRuns({ ...DEFAULT_SETTINGS }),
-      readArtifact({ ...DEFAULT_SETTINGS }, 'job-preview', 'status.json'),
-      tailEvents({ ...DEFAULT_SETTINGS }, 'job-preview', 0),
-    ]);
+    const [approval, runs, artifact, events, approvalDecision, approvalExecution, exportPayload] =
+      await Promise.all([
+        showApproval({ ...DEFAULT_SETTINGS }, 'apr_preview'),
+        listRuns({ ...DEFAULT_SETTINGS }),
+        readArtifact({ ...DEFAULT_SETTINGS }, 'job-preview', 'status.json'),
+        tailEvents({ ...DEFAULT_SETTINGS }, 'job-preview', 0),
+        decideApproval({ ...DEFAULT_SETTINGS }, 'apr_preview', true, 'qa-operator', 'preview smoke'),
+        executeApproval({ ...DEFAULT_SETTINGS }, 'apr_preview', 'qa-operator'),
+        exportRunArtifacts({ ...DEFAULT_SETTINGS }, 'job-preview', './exports/job-preview'),
+      ]);
 
     const approvalRecord = approval as Record<string, unknown>;
     expect(approvalRecord.contract_version).toBe('2.0');
@@ -152,5 +180,14 @@ describe('bridge preview fallback', () => {
 
     expect(events.contractVersion).toBe('2.0');
     expect(events.events.length).toBeGreaterThan(0);
+
+    expect((approvalDecision as Record<string, unknown>).approval_id).toBe('apr_preview');
+    expect(((approvalDecision as Record<string, unknown>).ticket as Record<string, unknown>).status).toBe(
+      'approved',
+    );
+    expect(((approvalExecution as Record<string, unknown>).ticket as Record<string, unknown>).status).toBe(
+      'executed',
+    );
+    expect((exportPayload as Record<string, unknown>).export_dir).toBe('./exports/job-preview');
   });
 });

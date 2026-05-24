@@ -1241,6 +1241,29 @@ pub async fn bridge_assistant_start_turn(
             Ok(value) => value,
             Err(error) => return BridgeResult::err(error),
         };
+    let provider =
+        match normalize_optional_cli_token(provider.as_deref(), "provider", "assistant start") {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
+    let fallback_provider = match normalize_optional_cli_token(
+        fallback_provider.as_deref(),
+        "fallback_provider",
+        "assistant start",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let model = match normalize_optional_cli_token(model.as_deref(), "model", "assistant start") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let hf_model_id =
+        match normalize_optional_cli_token(hf_model_id.as_deref(), "hf_model_id", "assistant start")
+        {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
 
     let resource_dir = app_resource_dir(&app);
     let resolved = match resolve_cli_command(&config, resource_dir.as_deref()) {
@@ -2175,6 +2198,34 @@ fn normalize_computer_use_runtime(value: Option<&str>) -> Result<Option<String>,
     ))
 }
 
+fn normalize_optional_cli_token(
+    value: Option<&str>,
+    field: &str,
+    command: &str,
+) -> Result<Option<String>, BridgeError> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    let normalized = raw.trim();
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+    let valid = normalized.len() <= 256
+        && normalized.chars().all(|ch| {
+            ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | ':' | '/' | '@' | '+' | '-')
+        });
+    if valid {
+        return Ok(Some(normalized.to_string()));
+    }
+    Err(BridgeError::new(
+        "INVALID_INPUT",
+        format!("{field} contains unsupported characters"),
+        "",
+        command,
+        false,
+    ))
+}
+
 fn resolve_root_dir(root_dir: &str) -> Result<PathBuf, BridgeError> {
     let normalized = root_dir.trim();
     if normalized.is_empty() {
@@ -2538,6 +2589,29 @@ mod tests {
     }
 
     #[test]
+    fn normalize_optional_cli_token_accepts_model_ids_and_rejects_unsafe_text() {
+        assert_eq!(
+            normalize_optional_cli_token(Some(" qwen3.5:4b "), "model", "assistant start")
+                .expect("model"),
+            Some("qwen3.5:4b".to_string())
+        );
+        assert_eq!(
+            normalize_optional_cli_token(Some("Qwen/Qwen2.5-Instruct@q4"), "hf_model_id", "assistant start")
+                .expect("hf model"),
+            Some("Qwen/Qwen2.5-Instruct@q4".to_string())
+        );
+        assert_eq!(
+            normalize_optional_cli_token(Some(" "), "model", "assistant start").expect("blank"),
+            None
+        );
+        let invalid =
+            normalize_optional_cli_token(Some("qwen3.5:4b --unsafe"), "model", "assistant start")
+                .expect_err("invalid");
+        assert_eq!(invalid.code, "INVALID_INPUT");
+        assert!(!invalid.retryable);
+    }
+
+    #[test]
     fn parse_assistant_json_line_valid_token() {
         let payload = parse_assistant_json_line(
             r#"{"event":"token","data":{"text":"Hello"}}"#,
@@ -2593,10 +2667,10 @@ mod tests {
             &config,
             "compiled prompt",
             "session-1",
-            Some("openai"),
-            None,
-            Some("gpt-test"),
-            None,
+            Some("ollama"),
+            Some("transformers"),
+            Some("qwen3.5:4b"),
+            Some("Qwen/Qwen2.5"),
         );
 
         assert!(args
@@ -2609,10 +2683,56 @@ mod tests {
             .any(|pair| pair[0] == "--session-id" && pair[1] == "session-1"));
         assert!(args
             .windows(2)
-            .any(|pair| pair[0] == "--provider" && pair[1] == "openai"));
+            .any(|pair| pair[0] == "--provider" && pair[1] == "ollama"));
         assert!(args
             .windows(2)
-            .any(|pair| pair[0] == "--model" && pair[1] == "gpt-test"));
+            .any(|pair| pair[0] == "--fallback-provider" && pair[1] == "transformers"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--model" && pair[1] == "qwen3.5:4b"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--hf-model-id" && pair[1] == "Qwen/Qwen2.5"));
+    }
+
+    #[test]
+    fn assistant_command_preview_redacts_compiled_prompt() {
+        let preview = format_assistant_command_preview(
+            "binliquid",
+            &[],
+            &[
+                "chat".to_string(),
+                "--once".to_string(),
+                "secret prompt body".to_string(),
+                "--stdio-json".to_string(),
+            ],
+        );
+
+        assert!(preview.contains("[compiled_prompt]"));
+        assert!(!preview.contains("secret prompt body"));
+    }
+
+    #[test]
+    fn assistant_stdio_json_smoke_parses_token_and_final_events() {
+        let token = parse_assistant_json_line(
+            r#"{"event":"token","data":{"text":"Hi"}}"#,
+            "turn-smoke",
+            "session-smoke",
+            1,
+        )
+        .expect("token");
+        let final_event = parse_assistant_json_line(
+            r#"{"event":"final","data":{"final_text":"Done"}}"#,
+            "turn-smoke",
+            "session-smoke",
+            2,
+        )
+        .expect("final");
+
+        assert_eq!(token.event, "token");
+        assert_eq!(token.data["text"], "Hi");
+        assert_eq!(final_event.event, "final");
+        assert_eq!(final_event.data["final_text"], "Done");
     }
 
     #[test]

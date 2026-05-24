@@ -10,9 +10,12 @@ vi.mock('./bridge', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./bridge')>();
   return {
     ...actual,
+    checkPermission: vi.fn(actual.checkPermission),
     decideApproval: vi.fn(actual.decideApproval),
     executeApproval: vi.fn(actual.executeApproval),
+    exportRunArtifacts: vi.fn(actual.exportRunArtifacts),
     fetchIdentity: vi.fn(actual.fetchIdentity),
+    resolveConfig: vi.fn(actual.resolveConfig),
     submitComputerUseRun: vi.fn(actual.submitComputerUseRun),
     submitTeamRun: vi.fn(actual.submitTeamRun),
   };
@@ -105,6 +108,29 @@ describe('App integration flows', () => {
     expect(bridge.submitComputerUseRun).not.toHaveBeenCalled();
   });
 
+  it('executes the Mission Control approval CTA through explicit bridge args', async () => {
+    const { user } = renderApp({ operatorId: 'qa-operator' });
+
+    expect(await screen.findByRole('heading', { name: 'Mission Control' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Onayla ve Devam Et/i }));
+
+    await waitFor(() => {
+      expect(bridge.decideApproval).toHaveBeenCalledWith(
+        expect.any(Object),
+        'apr_20260308_device_action',
+        true,
+        'qa-operator',
+        'mission control approval',
+      );
+      expect(bridge.executeApproval).toHaveBeenCalledWith(
+        expect.any(Object),
+        'apr_20260308_device_action',
+        'qa-operator',
+      );
+    });
+    expect(await screen.findByText('Onay akışı tamamlandı')).toBeInTheDocument();
+  });
+
   it('disables approval mutations without operator id and approves with explicit confirmation when configured', async () => {
     const emptyOperator = renderApp();
     await openView(emptyOperator.user, 'Onaylar');
@@ -129,6 +155,16 @@ describe('App integration flows', () => {
       );
     });
     expect(await screen.findByText('Approve OK')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Execute' }));
+    await waitFor(() => {
+      expect(bridge.executeApproval).toHaveBeenCalledWith(
+        expect.any(Object),
+        'apr_20260308_device_action',
+        'qa-operator',
+      );
+    });
+    expect(await screen.findByText('Execute OK')).toBeInTheDocument();
   });
 
   it('requires debug raw and confirmation before exposing full artifact payloads', async () => {
@@ -148,6 +184,47 @@ describe('App integration flows', () => {
     expect(await screen.findByRole('button', { name: 'Hide raw' })).toBeInTheDocument();
   });
 
+  it('exports selected run artifacts with the prompt target passed to the bridge', async () => {
+    const { user } = renderApp({ operatorId: 'qa-operator' });
+
+    await openView(user, 'Çalıştırmalar');
+    const exportButton = await screen.findByRole('button', { name: 'Export' });
+    await waitFor(() => expect(exportButton).not.toBeDisabled());
+    await user.click(exportButton);
+
+    await waitFor(() => {
+      expect(window.prompt).toHaveBeenCalledWith('Export directory', './exports/run_20260308_0910');
+      expect(bridge.exportRunArtifacts).toHaveBeenCalledWith(
+        expect.any(Object),
+        'run_20260308_0910',
+        './exports/run-preview',
+      );
+    });
+    expect(await screen.findByText('Export completed')).toBeInTheDocument();
+  });
+
+  it('refreshes system config with assistant runtime override args', async () => {
+    const { user } = renderApp({
+      assistantProvider: 'ollama',
+      assistantFallbackProvider: 'transformers',
+      assistantModel: 'qwen3.5:4b',
+    });
+
+    await openView(user, 'Sistem Sağlığı');
+    await user.click(screen.getByRole('button', { name: 'Refresh config' }));
+
+    await waitFor(() => {
+      expect(bridge.resolveConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ assistantProvider: 'ollama', assistantModel: 'qwen3.5:4b' }),
+        expect.objectContaining({
+          provider: 'ollama',
+          fallbackProvider: 'transformers',
+          model: 'qwen3.5:4b',
+        }),
+      );
+    });
+  });
+
   it('runs operations through preview bridge fixtures and persists settings changes', async () => {
     const { user } = renderApp({ operatorId: 'qa-operator' });
 
@@ -156,6 +233,10 @@ describe('App integration flows', () => {
 
     await waitFor(() => expect(bridge.fetchIdentity).toHaveBeenCalledWith(expect.any(Object)));
     expect((await screen.findAllByText(/qa-operator/)).length).toBeGreaterThan(0);
+    await user.clear(screen.getByLabelText('Permission'));
+    await user.type(screen.getByLabelText('Permission'), 'runtime.audit');
+    await user.click(screen.getByRole('button', { name: 'Check permission' }));
+    await waitFor(() => expect(bridge.checkPermission).toHaveBeenCalledWith(expect.any(Object), 'runtime.audit'));
 
     await openView(user, 'Ayarlar');
     const operatorInput = screen.getByLabelText('Operator ID');

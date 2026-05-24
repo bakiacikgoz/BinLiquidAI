@@ -9,6 +9,14 @@ test('approval mutation controls are disabled without an operator id', async ({ 
   await expect(page.getByRole('button', { name: 'Approve', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Reject', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Execute', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveAttribute(
+    'title',
+    'Set operator id to continue',
+  );
+  await expect(page.getByRole('button', { name: 'Reject', exact: true })).toHaveAttribute(
+    'data-disabled-reason',
+    'Set operator id to continue',
+  );
 
   consoleHealth.assertNoCriticalErrors();
 });

@@ -8,6 +8,16 @@ import { Icon } from '../primitives/Icon';
 import { StatusDot } from '../primitives/StatusDot';
 import type { PendingApprovalSummary, SystemHealthSummary, SystemHealthStatus } from '../shell/RightRail';
 
+export type AssistantRuntimeSummary = {
+  selectedProvider: string;
+  selectedModel: string;
+  selectedFallbackProvider: string;
+  selectedHfModelId: string;
+  effectiveProvider: string;
+  effectiveModel: string;
+  effectiveHfModelId: string;
+};
+
 function healthTone(health: SystemHealthStatus): 'success' | 'warning' | 'error' | 'info' {
   if (health === 'Healthy') {
     return 'success';
@@ -76,6 +86,7 @@ export function AssistantRightRail({
   systemHealth,
   pendingApprovals,
   selectedRunId,
+  runtimeSummary,
   onRefreshContext,
   onViewApprovals,
   onViewRuns,
@@ -84,6 +95,7 @@ export function AssistantRightRail({
   systemHealth: SystemHealthSummary;
   pendingApprovals: PendingApprovalSummary[];
   selectedRunId: string;
+  runtimeSummary: AssistantRuntimeSummary;
   onRefreshContext: () => void;
   onViewApprovals: () => void;
   onViewRuns: () => void;
@@ -96,6 +108,34 @@ export function AssistantRightRail({
 
   return (
     <aside className={`assistant-right-rail assistant-right-rail-${mode}`} aria-label="Assistant context rail">
+      <RailSection title="Assistant Runtime">
+        <dl className="assistant-rail-dl assistant-runtime-dl">
+          <div>
+            <dt>Selected</dt>
+            <dd>
+              {runtimeSummary.selectedProvider} / {runtimeSummary.selectedModel}
+            </dd>
+          </div>
+          <div>
+            <dt>Fallback</dt>
+            <dd>{runtimeSummary.selectedFallbackProvider}</dd>
+          </div>
+          <div>
+            <dt>HF model</dt>
+            <dd>{runtimeSummary.selectedHfModelId}</dd>
+          </div>
+          <div>
+            <dt>Effective</dt>
+            <dd>
+              {runtimeSummary.effectiveProvider} / {runtimeSummary.effectiveModel}
+            </dd>
+          </div>
+          <div>
+            <dt>Effective HF</dt>
+            <dd>{runtimeSummary.effectiveHfModelId}</dd>
+          </div>
+        </dl>
+      </RailSection>
       {mode === 'welcome' ? (
         <>
           <RailSection title="System Health">

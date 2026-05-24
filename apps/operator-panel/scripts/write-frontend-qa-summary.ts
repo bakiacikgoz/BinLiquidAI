@@ -14,6 +14,9 @@ type QaSummary = {
     total: number;
     tested: number;
     untested: number;
+    working: number;
+    disabledWithReason: number;
+    removedUntilReady: number;
     deadControls: number;
     missingHandlers: number;
     noopHandlers: number;
@@ -45,6 +48,12 @@ type QaSummary = {
     viewportCount: number | null;
     maxHorizontalOverflowPx: number | null;
   };
+  bridgeConfidence: {
+    previewE2e: SuiteStatus;
+    bridgeUnit: SuiteStatus;
+    tauriBridgeSmoke: SuiteStatus;
+    liveCliSmoke: SuiteStatus;
+  };
   artifacts: {
     root: string;
     controlInventory: string;
@@ -52,6 +61,8 @@ type QaSummary = {
     e2eReport: string;
     accessibilityReport: string;
     responsiveReport: string;
+    tauriBridgeSmoke: string;
+    liveCliSmoke: string;
   };
   blockers: string[];
 };
@@ -178,6 +189,18 @@ function relativeArtifact(filePath: string): string {
   return path.relative(REPO_ROOT, filePath);
 }
 
+function readSmokeStatus(filePath: string): SuiteStatus {
+  const payload = readJson(filePath);
+  const status = readString(payload, 'status');
+  if (status === 'passed') {
+    return 'passed';
+  }
+  if (status === 'failed') {
+    return 'failed';
+  }
+  return 'skipped';
+}
+
 function buildSummary(): QaSummary {
   fs.mkdirSync(OUTPUT_ROOT, { recursive: true });
 
@@ -190,6 +213,8 @@ function buildSummary(): QaSummary {
   const accessibilityMarkdownPath = path.join(OUTPUT_ROOT, 'accessibility', 'accessibility-report.md');
   const responsivePath = path.join(OUTPUT_ROOT, 'responsive', 'responsive-report.json');
   const responsiveMarkdownPath = path.join(OUTPUT_ROOT, 'responsive', 'responsive-report.md');
+  const tauriBridgeSmokePath = path.join(OUTPUT_ROOT, 'tauri-bridge-smoke.json');
+  const liveCliSmokePath = path.join(OUTPUT_ROOT, 'live-cli-smoke.json');
 
   const inventory = readJson(inventoryPath);
   const e2eLastRun = readJson(e2eLastRunPath);
@@ -199,6 +224,7 @@ function buildSummary(): QaSummary {
   const accessibilityCounts = asRecord(accessibility?.counts);
   const playwrightStats = collectPlaywrightStats(e2eResults);
   const responsiveStats = collectResponsiveMaxOverflow(responsive);
+  const inventoryControls = Array.isArray(inventory?.controls) ? inventory.controls.map((control) => asRecord(control)) : [];
 
   const criticalFindings = readNumber(inventory, 'criticalFindings') ?? 0;
   const highFindings = readNumber(inventory, 'highFindings') ?? 0;
@@ -207,6 +233,8 @@ function buildSummary(): QaSummary {
   const keyboardFailures = readNumber(accessibilityCounts, 'keyboardFailures');
   const e2eStatus = readString(e2eLastRun, 'status');
   const e2eSuiteStatus: SuiteStatus = e2eStatus === 'passed' ? 'passed' : e2eStatus ? 'failed' : 'skipped';
+  const tauriBridgeSmokeStatus = readSmokeStatus(tauriBridgeSmokePath);
+  const liveCliSmokeStatus = readSmokeStatus(liveCliSmokePath);
   const accessibilityStatus: SuiteStatus =
     accessibility === null
       ? 'skipped'
@@ -221,6 +249,8 @@ function buildSummary(): QaSummary {
     ...(highFindings > 0 ? [`High UI control findings: ${highFindings}`] : []),
     ...(E2E_REQUIRED && e2eSuiteStatus === 'skipped' ? ['Playwright E2E did not run'] : []),
     ...(e2eSuiteStatus === 'failed' ? ['Playwright E2E failed'] : []),
+    ...(tauriBridgeSmokeStatus === 'failed' ? ['Tauri bridge smoke failed'] : []),
+    ...(liveCliSmokeStatus === 'failed' ? ['Live CLI smoke failed'] : []),
     ...(accessibilityStatus === 'failed' ? ['Accessibility smoke failed'] : []),
     ...(responsiveStatus === 'failed' ? ['Responsive smoke failed'] : []),
   ];
@@ -231,8 +261,17 @@ function buildSummary(): QaSummary {
     packageVersion: readPackageVersion(),
     controls: {
       total: readNumber(inventory, 'totalControls') ?? 0,
-      tested: (readNumber(inventory, 'totalControls') ?? 0) - (readNumber(inventory, 'needsManualReview') ?? 0),
-      untested: readNumber(inventory, 'needsManualReview') ?? 0,
+      tested: inventoryControls.filter((control) => readString(control, 'testCoverage') === 'covered').length,
+      untested: inventoryControls.filter((control) => readString(control, 'testCoverage') === 'missing').length,
+      working:
+        readNumber(inventory, 'workingControls') ??
+        inventoryControls.filter((control) => readString(control, 'status') === 'working').length,
+      disabledWithReason:
+        readNumber(inventory, 'disabledWithReasonControls') ??
+        inventoryControls.filter((control) => readString(control, 'status') === 'disabled_with_reason').length,
+      removedUntilReady:
+        readNumber(inventory, 'removedUntilReadyControls') ??
+        inventoryControls.filter((control) => readString(control, 'status') === 'removed_until_ready').length,
       deadControls: Array.isArray(inventory?.findings)
         ? inventory.findings
             .map((finding) => readString(asRecord(finding), 'rule'))
@@ -241,12 +280,8 @@ function buildSummary(): QaSummary {
       missingHandlers: readNumber(inventory, 'missingHandlers') ?? 0,
       noopHandlers: readNumber(inventory, 'noopHandlers') ?? 0,
       disabledWithoutReason: readNumber(inventory, 'disabledWithoutReason') ?? 0,
-      bridgeBound: Array.isArray(inventory?.controls)
-        ? inventory.controls.filter((control) => Boolean(readString(asRecord(control), 'bridgeFunction'))).length
-        : 0,
-      bridgeMutations: Array.isArray(inventory?.controls)
-        ? inventory.controls.filter((control) => readString(asRecord(control), 'risk') === 'bridge_mutation').length
-        : 0,
+      bridgeBound: inventoryControls.filter((control) => Boolean(readString(control, 'bridgeFunction'))).length,
+      bridgeMutations: inventoryControls.filter((control) => readString(control, 'risk') === 'bridge_mutation').length,
     },
     findings: {
       critical: criticalFindings,
@@ -280,6 +315,12 @@ function buildSummary(): QaSummary {
       viewportCount: responsiveStats.viewportCount,
       maxHorizontalOverflowPx: responsiveStats.maxOverflow,
     },
+    bridgeConfidence: {
+      previewE2e: e2eSuiteStatus,
+      bridgeUnit: STATIC_PASSED ? 'passed' : 'skipped',
+      tauriBridgeSmoke: tauriBridgeSmokeStatus,
+      liveCliSmoke: liveCliSmokeStatus,
+    },
     artifacts: {
       root: relativeArtifact(OUTPUT_ROOT),
       controlInventory: relativeArtifact(inventoryPath),
@@ -287,6 +328,8 @@ function buildSummary(): QaSummary {
       e2eReport: relativeArtifact(e2eReportPath),
       accessibilityReport: relativeArtifact(accessibilityMarkdownPath),
       responsiveReport: relativeArtifact(responsiveMarkdownPath),
+      tauriBridgeSmoke: relativeArtifact(tauriBridgeSmokePath),
+      liveCliSmoke: relativeArtifact(liveCliSmokePath),
     },
     blockers,
   };
@@ -314,6 +357,12 @@ function writeSummary(summary: QaSummary): void {
     `- High UI findings: ${summary.findings.high}`,
     `- Medium UI findings: ${summary.findings.medium}`,
     `- Low UI findings: ${summary.findings.low}`,
+    `- Total controls: ${summary.controls.total}`,
+    `- Working controls: ${summary.controls.working}`,
+    `- Disabled with reason: ${summary.controls.disabledWithReason}`,
+    `- Removed until ready: ${summary.controls.removedUntilReady}`,
+    `- Controls with test coverage evidence: ${summary.controls.tested}`,
+    `- Controls missing test coverage evidence: ${summary.controls.untested}`,
     `- Dead controls: ${summary.controls.deadControls}`,
     `- Missing handlers: ${summary.controls.missingHandlers}`,
     `- Disabled without explicit reason: ${summary.controls.disabledWithoutReason}`,
@@ -324,6 +373,13 @@ function writeSummary(summary: QaSummary): void {
     `- Accessibility: ${summary.accessibility.status}; critical violations ${summary.accessibility.criticalViolations ?? 'n/a'}, unnamed controls ${summary.accessibility.unnamedControls ?? 'n/a'}`,
     `- Responsive: ${summary.responsive.status}; max horizontal overflow ${summary.responsive.maxHorizontalOverflowPx ?? 'n/a'}px`,
     '',
+    '## Bridge Confidence',
+    '',
+    `- Preview E2E: ${summary.bridgeConfidence.previewE2e}`,
+    `- Bridge unit: ${summary.bridgeConfidence.bridgeUnit}`,
+    `- Tauri bridge smoke: ${summary.bridgeConfidence.tauriBridgeSmoke}`,
+    `- Live CLI smoke: ${summary.bridgeConfidence.liveCliSmoke}`,
+    '',
     '## Artifacts',
     '',
     `- Control inventory: ${summary.artifacts.controlInventory}`,
@@ -331,6 +387,8 @@ function writeSummary(summary: QaSummary): void {
     `- Playwright report: ${summary.artifacts.e2eReport}`,
     `- Accessibility report: ${summary.artifacts.accessibilityReport}`,
     `- Responsive report: ${summary.artifacts.responsiveReport}`,
+    `- Tauri bridge smoke: ${summary.artifacts.tauriBridgeSmoke}`,
+    `- Live CLI smoke: ${summary.artifacts.liveCliSmoke}`,
     '',
     '## Blockers',
     '',

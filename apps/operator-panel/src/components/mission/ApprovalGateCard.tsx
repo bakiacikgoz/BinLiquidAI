@@ -18,6 +18,8 @@ export function ApprovalGateCard({
   onEdit: () => void;
   onReject: () => void;
 }) {
+  const unavailableReason = hasApproval ? disabledReason : 'Bu çalıştırma için bekleyen operatör onayı bulunmuyor.';
+  const mutationDisabledReason = disabled ? disabledReason : unavailableReason;
   return (
     <div className="mc-card approval-gate-card">
       <span className="mc-kicker">ONAY KAPISI</span>
@@ -40,14 +42,35 @@ export function ApprovalGateCard({
       </div>
       {disabled && hasApproval ? <p className="approval-disabled-reason">{disabledReason}</p> : null}
       <div className="approval-actions">
-        <Button icon={<Icon name="check" />} variant="primary" disabled={!hasApproval || disabled} onClick={onApprove}>
+        <Button
+          icon={<Icon name="check" />}
+          variant="primary"
+          disabled={!hasApproval || disabled}
+          title={!hasApproval || disabled ? mutationDisabledReason : undefined}
+          data-disabled-reason={!hasApproval || disabled ? mutationDisabledReason : undefined}
+          onClick={onApprove}
+        >
           Onayla ve Devam Et
         </Button>
         <div className="approval-secondary-actions">
-          <Button icon={<Icon name="edit" />} variant="secondary" disabled={!hasApproval} onClick={onEdit}>
+          <Button
+            icon={<Icon name="edit" />}
+            variant="secondary"
+            disabled={!hasApproval}
+            title={!hasApproval ? unavailableReason : undefined}
+            data-disabled-reason={!hasApproval ? unavailableReason : undefined}
+            onClick={onEdit}
+          >
             Düzenle
           </Button>
-          <Button icon={<Icon name="reject" />} variant="danger" disabled={!hasApproval || disabled} onClick={onReject}>
+          <Button
+            icon={<Icon name="reject" />}
+            variant="danger"
+            disabled={!hasApproval || disabled}
+            title={!hasApproval || disabled ? mutationDisabledReason : undefined}
+            data-disabled-reason={!hasApproval || disabled ? mutationDisabledReason : undefined}
+            onClick={onReject}
+          >
             Reddet
           </Button>
         </div>

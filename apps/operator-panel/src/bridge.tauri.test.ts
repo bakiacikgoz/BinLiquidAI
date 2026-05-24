@@ -1,0 +1,273 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { DEFAULT_SETTINGS } from './settings';
+
+type BridgeModule = typeof import('./bridge');
+
+function mockTauriInvoke(data: unknown = {}): ReturnType<typeof vi.fn> {
+  const invoke = vi.fn().mockResolvedValue({
+    ok: true,
+    data,
+    error: null,
+  });
+
+  vi.stubGlobal('__TAURI_INTERNALS__', {});
+  vi.doMock('@tauri-apps/api/core', () => ({ invoke }));
+  vi.doMock('@tauri-apps/api/event', () => ({ listen: vi.fn() }));
+  return invoke;
+}
+
+async function importBridgeWithInvoke(data?: unknown): Promise<{
+  invoke: ReturnType<typeof vi.fn>;
+  bridge: BridgeModule;
+}> {
+  const invoke = mockTauriInvoke(data);
+  return {
+    invoke,
+    bridge: await import('./bridge'),
+  };
+}
+
+describe('bridge tauri contract', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.doUnmock('@tauri-apps/api/core');
+    vi.doUnmock('@tauri-apps/api/event');
+    vi.resetModules();
+  });
+
+  it('passes handshake config to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      uiVersion: '0.5.0-beta.1',
+      coreVersion: '0.4.1',
+      contractVersion: '2.0',
+      capabilities: {},
+      doctor: {},
+    });
+
+    await bridge.handshake({
+      ...DEFAULT_SETTINGS,
+      mode: 'external',
+      cliPath: '/usr/local/bin/binliquid',
+      profile: 'balanced',
+      rootDir: '.binliquid/team/jobs',
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_handshake',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          mode: 'external',
+          cliPath: '/usr/local/bin/binliquid',
+          profile: 'balanced',
+          rootDir: '.binliquid/team/jobs',
+        }),
+      }),
+    );
+  });
+
+  it('passes assistant provider and model options to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      contractVersion: '2.0',
+      assistantTurnId: 'turn-tauri',
+      sessionId: 'session-tauri',
+      processId: 42,
+      status: 'started',
+    });
+
+    await bridge.startAssistantTurn(
+      { ...DEFAULT_SETTINGS },
+      {
+        assistantTurnId: 'turn-tauri',
+        sessionId: 'session-tauri',
+        userMessage: 'hello',
+        compiledPrompt: 'compiled prompt',
+        profile: 'balanced',
+        provider: 'auto',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      },
+    );
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_assistant_start_turn',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          profile: 'balanced',
+          timeoutMs: 120000,
+        }),
+        assistantTurnId: 'turn-tauri',
+        sessionId: 'session-tauri',
+        compiledPrompt: 'compiled prompt',
+        provider: 'auto',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      }),
+    );
+  });
+
+  it('passes config resolve provider and model overrides to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({ contract_version: '2.0', status: 'ok' });
+
+    await bridge.resolveConfig(
+      { ...DEFAULT_SETTINGS, profile: 'balanced' },
+      {
+        provider: 'ollama',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      },
+    );
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_config_resolve',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'balanced' }),
+        provider: 'ollama',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      }),
+    );
+  });
+
+  it('passes team submit model metadata and run identifiers to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0', jobId: 'job-live' });
+
+    await bridge.submitTeamRun(
+      { ...DEFAULT_SETTINGS },
+      {
+        specPath: 'examples/team/restricted_pilot.yaml',
+        request: 'inspect queue',
+        caseId: 'case-1',
+        jobId: 'job-ui-1',
+        provider: 'ollama',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      },
+    );
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_team_submit',
+      expect.objectContaining({
+        config: expect.objectContaining({ rootDir: DEFAULT_SETTINGS.rootDir }),
+        specPath: 'examples/team/restricted_pilot.yaml',
+        request: 'inspect queue',
+        caseId: 'case-1',
+        jobId: 'job-ui-1',
+        provider: 'ollama',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      }),
+    );
+  });
+
+  it('passes approval decide and execute actor args to the Tauri commands', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({ contract_version: '2.0' });
+
+    await bridge.decideApproval({ ...DEFAULT_SETTINGS }, 'apr-1', false, 'qa-operator', 'operator rejected');
+    await bridge.executeApproval({ ...DEFAULT_SETTINGS }, 'apr-1', 'qa-operator');
+
+    expect(invoke).toHaveBeenNthCalledWith(
+      1,
+      'bridge_approval_decide',
+      expect.objectContaining({
+        approvalId: 'apr-1',
+        approve: false,
+        operatorId: 'qa-operator',
+        reason: 'operator rejected',
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      'bridge_approval_execute',
+      expect.objectContaining({
+        approvalId: 'apr-1',
+        operatorId: 'qa-operator',
+      }),
+    );
+  });
+
+  it('passes computer-use submit and control args to the Tauri commands', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0', jobId: 'job-cu' });
+
+    await bridge.submitComputerUseRun(
+      { ...DEFAULT_SETTINGS },
+      {
+        request: 'open the dashboard',
+        caseId: 'case-cu',
+        jobId: 'job-cu',
+        mode: 'step_approval',
+        runtime: 'vision-first',
+        provider: 'ollama',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      },
+    );
+    await bridge.pauseComputerUseSession({ ...DEFAULT_SETTINGS }, 'job-cu');
+    await bridge.resumeComputerUseSession({ ...DEFAULT_SETTINGS }, 'job-cu');
+    await bridge.stopComputerUseSession({ ...DEFAULT_SETTINGS }, 'job-cu');
+
+    expect(invoke).toHaveBeenNthCalledWith(
+      1,
+      'bridge_computer_use_submit',
+      expect.objectContaining({
+        request: 'open the dashboard',
+        caseId: 'case-cu',
+        jobId: 'job-cu',
+        mode: 'step_approval',
+        runtime: 'vision-first',
+        provider: 'ollama',
+        fallbackProvider: 'transformers',
+        model: 'qwen3.5:4b',
+        hfModelId: 'Qwen/Qwen2.5',
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      'bridge_computer_use_pause',
+      expect.objectContaining({ jobId: 'job-cu' }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      3,
+      'bridge_computer_use_resume',
+      expect.objectContaining({ jobId: 'job-cu' }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      4,
+      'bridge_computer_use_stop',
+      expect.objectContaining({ jobId: 'job-cu' }),
+    );
+  });
+
+  it('passes artifact read and run export args to the Tauri commands', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0' });
+
+    await bridge.readArtifact({ ...DEFAULT_SETTINGS, rootDir: '.binliquid/jobs' }, 'job-1', 'status.json', 4096);
+    await bridge.exportRunArtifacts({ ...DEFAULT_SETTINGS }, 'job-1', './exports/job-1');
+
+    expect(invoke).toHaveBeenNthCalledWith(
+      1,
+      'bridge_read_artifact',
+      expect.objectContaining({
+        rootDir: '.binliquid/jobs',
+        jobId: 'job-1',
+        artifactName: 'status.json',
+        maxBytes: 4096,
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      'bridge_team_export',
+      expect.objectContaining({
+        jobId: 'job-1',
+        exportDir: './exports/job-1',
+      }),
+    );
+  });
+});
