@@ -1,0 +1,19 @@
+{
+  "type": "action_proposal",
+  "payload": {
+    "version": "control-plane.action-proposal/v1",
+    "correlation_id": "corr-demo-001",
+    "run_id": "cp-run-demo",
+    "agent_id": "external-agent",
+    "phase": "tool",
+    "action_id": "create_ticket",
+    "action_type": "external_write",
+    "target_kind": "jira_ticket",
+    "target_ref": "project:OPS",
+    "risk_class": "external_write",
+    "effect_summary": "Create a remediation ticket in the OPS queue.",
+    "args_fingerprint": "sha256:demo",
+    "idempotency_key": "run:cp-run-demo:create_ticket",
+    "payload_redacted": true
+  }
+}

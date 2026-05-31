@@ -1,0 +1,139 @@
+{
+  "$defs": {
+    "RunStatus": {
+      "enum": [
+        "created",
+        "policy_evaluating",
+        "policy_blocked",
+        "approval_pending",
+        "approval_rejected",
+        "approved",
+        "executing",
+        "blocked",
+        "failed",
+        "completed",
+        "evidence_exported",
+        "verified"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "title": "Agent Id",
+      "type": "string"
+    },
+    "approval_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Approval Ids",
+      "type": "array"
+    },
+    "artifact_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Artifact Refs",
+      "type": "array"
+    },
+    "blocking_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocking Reasons",
+      "type": "array"
+    },
+    "completed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed At"
+    },
+    "evidence_pack_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Pack Id"
+    },
+    "identity_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Identity Ref"
+    },
+    "input_hash": {
+      "title": "Input Hash",
+      "type": "string"
+    },
+    "next_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Next Actions",
+      "type": "array"
+    },
+    "policy_hash": {
+      "title": "Policy Hash",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus"
+    },
+    "submitted_by": {
+      "title": "Submitted By",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.run/v1",
+      "default": "control-plane.run/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "agent_id",
+    "profile",
+    "status",
+    "submitted_by",
+    "input_hash",
+    "policy_hash"
+  ],
+  "title": "ControlPlaneRunSummary",
+  "type": "object"
+}

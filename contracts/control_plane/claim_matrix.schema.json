@@ -1,0 +1,69 @@
+{
+  "$defs": {
+    "ClaimItem": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking_reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Reasons",
+          "type": "array"
+        },
+        "claim_id": {
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "required_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Evidence",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/ClaimStatus"
+        }
+      },
+      "required": [
+        "claim_id",
+        "status"
+      ],
+      "title": "ClaimItem",
+      "type": "object"
+    },
+    "ClaimStatus": {
+      "enum": [
+        "allowed",
+        "conditional",
+        "blocked",
+        "deferred"
+      ],
+      "title": "ClaimStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/ClaimItem"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.claim-matrix/v1",
+      "default": "control-plane.claim-matrix/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "title": "ClaimMatrix",
+  "type": "object"
+}

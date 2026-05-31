@@ -4,6 +4,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from binliquid.control_plane.models import (
+    ClaimMatrix,
+    ControlPlaneRunSummary,
+    EvidencePackManifest,
+    EvidenceVerifyResult,
+    PolicySimulationResult,
+    ReadinessReport,
+)
 from binliquid.governance.models import ApprovalTicket
 from binliquid.team.models import JobRun, TaskRun, TeamEvent
 
@@ -206,6 +214,34 @@ class OperatorCapabilitiesPayload(ContractModel):
     features: OperatorFeatureFlagsContract
     commands: OperatorCommandCapabilitiesContract
     artifact_schema: dict[str, str] = Field(default_factory=dict, alias="artifactSchema")
+
+
+class ControlPlaneAgentListPayloadContract(ContractModel):
+    agents: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ControlPlaneRunSummaryPayloadContract(ControlPlaneRunSummary):
+    pass
+
+
+class ControlPlanePolicySimulationPayloadContract(PolicySimulationResult):
+    pass
+
+
+class ControlPlaneEvidenceExportPayloadContract(EvidencePackManifest):
+    pass
+
+
+class ControlPlaneEvidenceVerifyPayloadContract(EvidenceVerifyResult):
+    pass
+
+
+class ControlPlaneReadinessPayloadContract(ReadinessReport):
+    pass
+
+
+class ControlPlaneClaimMatrixPayloadContract(ClaimMatrix):
+    pass
 
 
 class BridgeHandshakeContract(ContractModel):

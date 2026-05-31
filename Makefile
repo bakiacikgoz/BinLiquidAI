@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-gate agent-control-plane-v1-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -90,6 +90,22 @@ vision-gate:
 		--markdown artifacts/computer_use/MACOS_SUPERVISED_V2_GATE.md \
 		--json
 
+control-plane-schemas:
+	uv run python scripts/generate_control_plane_contract_schemas.py
+
+control-plane-gate:
+	uv run pytest -q \
+		tests/test_control_plane_models.py \
+		tests/test_control_plane_registry.py \
+		tests/test_control_plane_policy_simulator.py \
+		tests/test_control_plane_evidence_pack.py \
+		tests/test_control_plane_claim_guard.py \
+		tests/test_control_plane_cli.py
+	uv run python scripts/generate_control_plane_contract_schemas.py
+	git diff --exit-code contracts/control_plane
+	uv run binliquid control-plane doctor --profile enterprise --json
+	uv run python scripts/evaluate_control_plane_claims.py --profile enterprise --json
+
 ui-gate:
 	corepack pnpm --dir apps/operator-panel qa:frontend
 
@@ -102,10 +118,19 @@ rust-gate:
 mainline-gate:
 	uv run --extra dev ruff check .
 	uv run --extra dev pytest -q
+	$(MAKE) control-plane-gate
 	$(MAKE) vision-gate
 	$(MAKE) ui-gate
 	$(MAKE) rust-gate
 	git diff --check
+
+agent-control-plane-v1-gate:
+	$(MAKE) control-plane-gate
+	$(MAKE) enterprise-gate
+	$(MAKE) pilot-gate
+	$(MAKE) ui-gate
+	$(MAKE) rust-gate
+	uv run python scripts/build_control_plane_release_pack.py --profile enterprise --output artifacts/release-pack/control-plane-v1 --json
 
 qualification-run:
 	uv run binliquid qualification run \

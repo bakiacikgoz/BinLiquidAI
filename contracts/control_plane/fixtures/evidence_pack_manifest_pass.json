@@ -1,0 +1,28 @@
+{
+  "version": "control-plane.evidence-pack/v1",
+  "pack_id": "evp-cp-run-fixture",
+  "run_id": "cp-run-fixture",
+  "agent_id": "governed-ops",
+  "profile": "enterprise",
+  "runtime_version": "0.4.1",
+  "git_commit": "fixture",
+  "generated_at": "2026-05-31T00:00:00Z",
+  "items": [],
+  "redaction_summary": {
+    "raw_screenshots_persisted": 0,
+    "secrets_redacted": true,
+    "pii_redaction_enabled": true
+  },
+  "verification": {
+    "hash_chain_verified": true,
+    "signature_verified": true,
+    "replay_verified": true
+  },
+  "signature": {
+    "mode": "ed25519_local_file",
+    "key_id": "enterprise-signing-current",
+    "algorithm": "ed25519",
+    "signature_ref": "manifest.integrity.signature"
+  },
+  "warnings": []
+}

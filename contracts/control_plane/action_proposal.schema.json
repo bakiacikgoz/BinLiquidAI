@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "RiskClass": {
+      "enum": [
+        "read_only",
+        "local_write",
+        "external_write",
+        "mutation",
+        "destructive",
+        "credential_sensitive",
+        "financial_or_legal",
+        "security_sensitive",
+        "computer_use_visual",
+        "unknown"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "title": "Action Id",
+      "type": "string"
+    },
+    "action_type": {
+      "default": "control_plane_action",
+      "title": "Action Type",
+      "type": "string"
+    },
+    "agent_id": {
+      "title": "Agent Id",
+      "type": "string"
+    },
+    "args_fingerprint": {
+      "default": "sha256:unknown",
+      "title": "Args Fingerprint",
+      "type": "string"
+    },
+    "correlation_id": {
+      "title": "Correlation Id",
+      "type": "string"
+    },
+    "effect_summary": {
+      "title": "Effect Summary",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "payload_redacted": {
+      "default": true,
+      "title": "Payload Redacted",
+      "type": "boolean"
+    },
+    "phase": {
+      "default": "tool",
+      "enum": [
+        "task",
+        "tool",
+        "handoff",
+        "memory_write",
+        "device_action"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "title": "Requested At",
+      "type": "string"
+    },
+    "risk_class": {
+      "$ref": "#/$defs/RiskClass",
+      "default": "unknown"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "target_kind": {
+      "title": "Target Kind",
+      "type": "string"
+    },
+    "target_ref": {
+      "default": "",
+      "title": "Target Ref",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.action-proposal/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "correlation_id",
+    "run_id",
+    "agent_id",
+    "action_id",
+    "target_kind",
+    "effect_summary",
+    "idempotency_key"
+  ],
+  "title": "ActionProposal",
+  "type": "object"
+}

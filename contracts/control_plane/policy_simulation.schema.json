@@ -1,0 +1,167 @@
+{
+  "$defs": {
+    "ControlPlaneDecisionAction": {
+      "enum": [
+        "allow",
+        "deny",
+        "require_approval",
+        "unknown"
+      ],
+      "title": "ControlPlaneDecisionAction",
+      "type": "string"
+    },
+    "ControlPlanePolicyDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "title": "Action Id",
+          "type": "string"
+        },
+        "approval_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Id"
+        },
+        "decision_action": {
+          "$ref": "#/$defs/ControlPlaneDecisionAction"
+        },
+        "matched_rule_path": {
+          "title": "Matched Rule Path",
+          "type": "string"
+        },
+        "phase": {
+          "title": "Phase",
+          "type": "string"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "qualification_required": {
+          "default": false,
+          "title": "Qualification Required",
+          "type": "boolean"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "risk_class": {
+          "$ref": "#/$defs/RiskClass"
+        }
+      },
+      "required": [
+        "action_id",
+        "phase",
+        "risk_class",
+        "decision_action",
+        "reason_code",
+        "matched_rule_path",
+        "policy_hash"
+      ],
+      "title": "ControlPlanePolicyDecision",
+      "type": "object"
+    },
+    "PolicySimulationSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "default": 0,
+          "title": "Allow",
+          "type": "integer"
+        },
+        "deny": {
+          "default": 0,
+          "title": "Deny",
+          "type": "integer"
+        },
+        "require_approval": {
+          "default": 0,
+          "title": "Require Approval",
+          "type": "integer"
+        },
+        "unknown": {
+          "default": 0,
+          "title": "Unknown",
+          "type": "integer"
+        }
+      },
+      "title": "PolicySimulationSummary",
+      "type": "object"
+    },
+    "RiskClass": {
+      "enum": [
+        "read_only",
+        "local_write",
+        "external_write",
+        "mutation",
+        "destructive",
+        "credential_sensitive",
+        "financial_or_legal",
+        "security_sensitive",
+        "computer_use_visual",
+        "unknown"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "title": "Agent Id",
+      "type": "string"
+    },
+    "blocking_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocking Reasons",
+      "type": "array"
+    },
+    "decisions": {
+      "items": {
+        "$ref": "#/$defs/ControlPlanePolicyDecision"
+      },
+      "title": "Decisions",
+      "type": "array"
+    },
+    "overall_status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Overall Status",
+      "type": "string"
+    },
+    "policy_hash": {
+      "title": "Policy Hash",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/PolicySimulationSummary"
+    },
+    "version": {
+      "const": "control-plane.policy-simulation/v1",
+      "default": "control-plane.policy-simulation/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id",
+    "policy_hash",
+    "overall_status",
+    "summary"
+  ],
+  "title": "PolicySimulationResult",
+  "type": "object"
+}

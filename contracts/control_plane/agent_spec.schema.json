@@ -1,0 +1,246 @@
+{
+  "$defs": {
+    "AgentEvidenceRequirements": {
+      "additionalProperties": false,
+      "properties": {
+        "replay_required": {
+          "default": true,
+          "title": "Replay Required",
+          "type": "boolean"
+        },
+        "signed_pack_required": {
+          "default": true,
+          "title": "Signed Pack Required",
+          "type": "boolean"
+        }
+      },
+      "title": "AgentEvidenceRequirements",
+      "type": "object"
+    },
+    "AgentOwner": {
+      "additionalProperties": false,
+      "properties": {
+        "contact": {
+          "title": "Contact",
+          "type": "string"
+        },
+        "team": {
+          "title": "Team",
+          "type": "string"
+        }
+      },
+      "required": [
+        "team",
+        "contact"
+      ],
+      "title": "AgentOwner",
+      "type": "object"
+    },
+    "AgentQualification": {
+      "additionalProperties": false,
+      "properties": {
+        "minimum_level": {
+          "default": "pilot",
+          "enum": [
+            "development",
+            "pilot",
+            "enterprise",
+            "ga"
+          ],
+          "title": "Minimum Level",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "status": {
+          "default": "missing",
+          "enum": [
+            "missing",
+            "development",
+            "pilot",
+            "enterprise",
+            "ga"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "title": "AgentQualification",
+      "type": "object"
+    },
+    "DeclaredAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_type": {
+          "default": "control_plane_action",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "effect": {
+          "title": "Effect",
+          "type": "string"
+        },
+        "phase": {
+          "default": "tool",
+          "enum": [
+            "task",
+            "tool",
+            "handoff",
+            "memory_write",
+            "device_action"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "risk_class": {
+          "$ref": "#/$defs/RiskClass"
+        },
+        "target_kind": {
+          "title": "Target Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "risk_class",
+        "target_kind",
+        "effect"
+      ],
+      "title": "DeclaredAction",
+      "type": "object"
+    },
+    "ExecutionSurface": {
+      "enum": [
+        "core_runtime",
+        "team_runtime",
+        "external_stdio",
+        "computer_use_live",
+        "operator_panel"
+      ],
+      "title": "ExecutionSurface",
+      "type": "string"
+    },
+    "RiskClass": {
+      "enum": [
+        "read_only",
+        "local_write",
+        "external_write",
+        "mutation",
+        "destructive",
+        "credential_sensitive",
+        "financial_or_legal",
+        "security_sensitive",
+        "computer_use_visual",
+        "unknown"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    },
+    "RuntimeKind": {
+      "enum": [
+        "binliquid_core",
+        "binliquid_team",
+        "external_stdio",
+        "external_http",
+        "computer_use_adapter"
+      ],
+      "title": "RuntimeKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "title": "Agent Id",
+      "type": "string"
+    },
+    "allowed_surfaces": {
+      "items": {
+        "$ref": "#/$defs/ExecutionSurface"
+      },
+      "title": "Allowed Surfaces",
+      "type": "array"
+    },
+    "blocked_surfaces": {
+      "items": {
+        "$ref": "#/$defs/ExecutionSurface"
+      },
+      "title": "Blocked Surfaces",
+      "type": "array"
+    },
+    "declared_actions": {
+      "items": {
+        "$ref": "#/$defs/DeclaredAction"
+      },
+      "title": "Declared Actions",
+      "type": "array"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Description",
+      "type": "string"
+    },
+    "display_name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Display Name",
+      "type": "string"
+    },
+    "evidence": {
+      "$ref": "#/$defs/AgentEvidenceRequirements"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "owner": {
+      "$ref": "#/$defs/AgentOwner"
+    },
+    "policy_profile": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Policy Profile"
+    },
+    "profile": {
+      "default": "enterprise",
+      "title": "Profile",
+      "type": "string"
+    },
+    "qualification": {
+      "$ref": "#/$defs/AgentQualification"
+    },
+    "runtime_kind": {
+      "$ref": "#/$defs/RuntimeKind"
+    },
+    "version": {
+      "const": "control-plane.agent/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "agent_id",
+    "display_name",
+    "runtime_kind",
+    "owner"
+  ],
+  "title": "AgentSpec",
+  "type": "object"
+}

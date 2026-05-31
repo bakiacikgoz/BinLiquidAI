@@ -1,0 +1,32 @@
+version: "control-plane.agent/v1"
+agent_id: "team-governed-ops"
+display_name: "Team Governed Ops"
+description: "Team runtime wrapper for the governed ops pilot workflow."
+runtime_kind: "binliquid_team"
+profile: "restricted"
+policy_profile: "restricted"
+owner:
+  team: "platform-security"
+  contact: "ops-owner"
+allowed_surfaces:
+  - "team_runtime"
+blocked_surfaces:
+  - "computer_use_live"
+declared_actions:
+  - action_id: "triage_incident"
+    phase: "task"
+    risk_class: "read_only"
+    target_kind: "incident_queue"
+    effect: "triage"
+  - action_id: "create_ticket"
+    phase: "tool"
+    risk_class: "external_write"
+    target_kind: "ticket"
+    effect: "create"
+qualification:
+  required: true
+  minimum_level: "pilot"
+  status: "missing"
+evidence:
+  signed_pack_required: true
+  replay_required: true

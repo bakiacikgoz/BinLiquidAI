@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "agents": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Agents",
+      "type": "array"
+    }
+  },
+  "title": "ControlPlaneAgentListPayloadContract",
+  "type": "object"
+}

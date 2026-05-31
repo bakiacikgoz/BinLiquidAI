@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+import pytest
+
+from binliquid.control_plane.models import AgentSpec
+from binliquid.control_plane.registry import load_agent_spec
+
+
+def test_agent_spec_loads_example() -> None:
+    spec = load_agent_spec("examples/control_plane/agent_governed_ops.yaml")
+
+    assert spec.agent_id == "governed-ops"
+    assert spec.policy_profile == "enterprise"
+    assert spec.declared_actions[1].risk_class == "mutation"
+
+
+def test_agent_spec_rejects_overlapping_surfaces() -> None:
+    payload = {
+        "version": "control-plane.agent/v1",
+        "agent_id": "bad-agent",
+        "display_name": "Bad Agent",
+        "runtime_kind": "binliquid_core",
+        "owner": {"team": "platform", "contact": "owner"},
+        "allowed_surfaces": ["core_runtime"],
+        "blocked_surfaces": ["core_runtime"],
+        "declared_actions": [],
+    }
+
+    with pytest.raises(ValueError, match="overlap"):
+        AgentSpec.model_validate(payload)
+
+
+def test_agent_spec_rejects_unknown_field() -> None:
+    payload = {
+        "version": "control-plane.agent/v1",
+        "agent_id": "bad-agent",
+        "display_name": "Bad Agent",
+        "runtime_kind": "binliquid_core",
+        "owner": {"team": "platform", "contact": "owner"},
+        "declared_actions": [],
+        "unexpected": True,
+    }
+
+    with pytest.raises(ValueError, match="unexpected"):
+        AgentSpec.model_validate(payload)

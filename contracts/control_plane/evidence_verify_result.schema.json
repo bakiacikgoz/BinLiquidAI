@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blocking_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocking Reasons",
+      "type": "array"
+    },
+    "hash_chain_verified": {
+      "title": "Hash Chain Verified",
+      "type": "boolean"
+    },
+    "replay_verified": {
+      "title": "Replay Verified",
+      "type": "boolean"
+    },
+    "required_items_present": {
+      "title": "Required Items Present",
+      "type": "boolean"
+    },
+    "signature_verified": {
+      "title": "Signature Verified",
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "hash_chain_verified",
+    "signature_verified",
+    "required_items_present",
+    "replay_verified"
+  ],
+  "title": "EvidenceVerifyResult",
+  "type": "object"
+}

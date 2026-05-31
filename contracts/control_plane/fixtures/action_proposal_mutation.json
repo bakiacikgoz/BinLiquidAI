@@ -1,0 +1,16 @@
+{
+  "version": "control-plane.action-proposal/v1",
+  "correlation_id": "corr-fixture-001",
+  "run_id": "cp-run-fixture",
+  "agent_id": "governed-ops",
+  "phase": "tool",
+  "action_id": "restart_service",
+  "action_type": "command",
+  "target_kind": "service",
+  "target_ref": "svc:internal-worker",
+  "risk_class": "mutation",
+  "effect_summary": "Restart internal worker service.",
+  "args_fingerprint": "sha256:fixture",
+  "idempotency_key": "run:cp-run-fixture:restart_service",
+  "payload_redacted": true
+}

@@ -1,0 +1,38 @@
+version: "control-plane.agent/v1"
+agent_id: "governed-ops"
+display_name: "Governed Ops Agent"
+description: "Approval-heavy internal ops workflow under policy control."
+runtime_kind: "binliquid_team"
+profile: "enterprise"
+policy_profile: "enterprise"
+owner:
+  team: "platform-security"
+  contact: "ops-owner"
+allowed_surfaces:
+  - "team_runtime"
+  - "core_runtime"
+blocked_surfaces:
+  - "computer_use_live"
+declared_actions:
+  - action_id: "inspect_queue"
+    phase: "task"
+    risk_class: "read_only"
+    target_kind: "internal_queue"
+    effect: "read_status"
+  - action_id: "restart_service"
+    phase: "tool"
+    risk_class: "mutation"
+    target_kind: "service"
+    effect: "restart"
+qualification:
+  required: true
+  minimum_level: "pilot"
+  status: "missing"
+evidence:
+  signed_pack_required: true
+  replay_required: true
+metadata:
+  tags:
+    - "pilot"
+    - "governance"
+    - "ops"

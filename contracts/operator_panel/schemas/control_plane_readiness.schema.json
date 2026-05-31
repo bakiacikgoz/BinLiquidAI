@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blocking_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocking Reasons",
+      "type": "array"
+    },
+    "checks": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "title": "Checks",
+      "type": "object"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.readiness/v1",
+      "default": "control-plane.readiness/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "profile",
+    "status"
+  ],
+  "title": "ControlPlaneReadinessPayloadContract",
+  "type": "object"
+}

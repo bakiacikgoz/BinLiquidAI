@@ -105,6 +105,7 @@ def collect_metrics_snapshot(config: RuntimeConfig) -> dict[str, Any]:
             "task_lag_count": task_lag_count,
             "operator_action_count": operator_action_count,
         },
+        "control_plane": _control_plane_metrics(),
         "backup_restore": _maintenance_timestamps(config),
         "dashboard_sections": [
             "runtime_health",
@@ -144,6 +145,57 @@ def collect_metrics_snapshot(config: RuntimeConfig) -> dict[str, Any]:
     return snapshot
 
 
+def _control_plane_metrics() -> dict[str, Any]:
+    root = Path(".binliquid/control-plane")
+    agents_file = root / "agents.json"
+    runs_root = root / "runs"
+    agents_registered = 0
+    if agents_file.exists():
+        try:
+            payload = json.loads(agents_file.read_text(encoding="utf-8"))
+            agents = payload.get("agents", {})
+            if isinstance(agents, dict):
+                agents_registered = len(agents)
+        except json.JSONDecodeError:
+            agents_registered = 0
+    runs_submitted = 0
+    runs_blocked = 0
+    if runs_root.exists():
+        for path in runs_root.glob("*.json"):
+            runs_submitted += 1
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            status = str(payload.get("run", {}).get("status", ""))
+            if status in {"policy_blocked", "blocked", "failed"}:
+                runs_blocked += 1
+    claim_blocked = 0
+    claim_matrix = Path("artifacts/control_plane_claim_matrix.json")
+    if claim_matrix.exists():
+        try:
+            payload = json.loads(claim_matrix.read_text(encoding="utf-8"))
+            claims = payload.get("claims", [])
+            if isinstance(claims, list):
+                claim_blocked = sum(
+                    1
+                    for item in claims
+                    if isinstance(item, dict) and item.get("status") == "blocked"
+                )
+        except json.JSONDecodeError:
+            claim_blocked = 0
+    return {
+        "control_plane_agents_registered": agents_registered,
+        "control_plane_runs_submitted": runs_submitted,
+        "control_plane_runs_blocked": runs_blocked,
+        "control_plane_policy_denies": 0,
+        "control_plane_approval_pending_age_seconds": 0,
+        "control_plane_evidence_verify_failures": 0,
+        "control_plane_claims_blocked": claim_blocked,
+        "control_plane_computer_use_live_claim_blocked": 1,
+    }
+
+
 def write_prometheus_textfile(snapshot: dict[str, Any], destination: str | Path) -> str:
     path = Path(destination)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -157,6 +209,14 @@ def write_prometheus_textfile(snapshot: dict[str, Any], destination: str | Path)
         f"binliquid_replay_verify_failure_total {snapshot['audit']['replay_verify_failure_count']}",
         f"binliquid_memory_conflict_total {snapshot['concurrency']['memory_conflict_count']}",
         f"binliquid_fallback_mode_total {snapshot['concurrency']['fallback_mode_count']}",
+        (
+            "binliquid_control_plane_agents_registered "
+            f"{snapshot['control_plane']['control_plane_agents_registered']}"
+        ),
+        (
+            "binliquid_control_plane_claims_blocked "
+            f"{snapshot['control_plane']['control_plane_claims_blocked']}"
+        ),
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return str(path)

@@ -36,6 +36,14 @@ from binliquid.computer_use.vision_runtime.replay import (
     verify_replay,
 )
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
+from binliquid.control_plane.adapter_contracts import evaluate_action_proposal_file
+from binliquid.control_plane.claim_guard import ClaimGuard
+from binliquid.control_plane.errors import ControlPlaneError
+from binliquid.control_plane.evidence_pack import EvidencePackBuilder
+from binliquid.control_plane.policy_simulator import PolicySimulator
+from binliquid.control_plane.readiness import build_readiness_report
+from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
+from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import Planner
@@ -106,6 +114,13 @@ computer_use_vision_app = typer.Typer(help="Vision-first computer use commands")
 computer_use_qualification_app = typer.Typer(help="Computer-use qualification commands")
 computer_use_provider_app = typer.Typer(help="Computer-use provider readiness commands")
 team_app = typer.Typer(help="Team runtime commands")
+control_plane_app = typer.Typer(help="Agent Control Plane commands")
+control_plane_agent_app = typer.Typer(help="Control Plane agent registry commands")
+control_plane_policy_app = typer.Typer(help="Control Plane policy commands")
+control_plane_run_app = typer.Typer(help="Control Plane run commands")
+control_plane_evidence_app = typer.Typer(help="Control Plane evidence commands")
+control_plane_claims_app = typer.Typer(help="Control Plane claim guard commands")
+control_plane_adapter_app = typer.Typer(help="External adapter contract commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -128,6 +143,13 @@ computer_use_app.add_typer(computer_use_vision_app, name="vision")
 computer_use_app.add_typer(computer_use_qualification_app, name="qualification")
 computer_use_app.add_typer(computer_use_provider_app, name="provider")
 app.add_typer(team_app, name="team")
+app.add_typer(control_plane_app, name="control-plane")
+control_plane_app.add_typer(control_plane_agent_app, name="agent")
+control_plane_app.add_typer(control_plane_policy_app, name="policy")
+control_plane_app.add_typer(control_plane_run_app, name="run")
+control_plane_app.add_typer(control_plane_evidence_app, name="evidence")
+control_plane_app.add_typer(control_plane_claims_app, name="claims")
+control_plane_app.add_typer(control_plane_adapter_app, name="adapter")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -697,6 +719,324 @@ def _parse_computer_use_runtime(runtime: str) -> str:
     if normalized not in aliases:
         raise ValueError(f"unsupported computer use runtime: {runtime}")
     return aliases[normalized]
+
+
+def _control_plane_registry(root_dir: str = ".binliquid/control-plane") -> AgentRegistry:
+    return AgentRegistry(root_dir=root_dir)
+
+
+def _control_plane_coordinator(
+    *,
+    profile: str,
+    root_dir: str = ".binliquid/control-plane",
+) -> ControlPlaneRunCoordinator:
+    config = RuntimeConfig.from_profile(profile)
+    return ControlPlaneRunCoordinator(
+        config=config,
+        registry=_control_plane_registry(root_dir),
+        root_dir=root_dir,
+    )
+
+
+def _emit_payload(payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        for key, value in payload.items():
+            typer.echo(f"{key}={value}")
+
+
+def _control_plane_error(exc: ControlPlaneError, *, json_output: bool) -> None:
+    payload = {"status": "error", "error_code": exc.error_code, "error": str(exc)}
+    _emit_payload(payload, json_output=json_output)
+
+
+@control_plane_app.command("doctor")
+def control_plane_doctor(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(
+        ".binliquid/control-plane",
+        "--root-dir",
+        help="Control Plane state root.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    registry_root = Path(root_dir)
+    registry_root.mkdir(parents=True, exist_ok=True)
+    policy_available = (not config.governance.enabled) or Path(
+        config.governance.policy_path
+    ).exists()
+    identity_payload = describe_actor(config)
+    identity_available = (not config.identity.enabled) or bool(identity_payload.get("verified"))
+    signing = key_status(config)
+    signing_available = (
+        config.security.mode != "enterprise"
+        or (
+            signing.get("enterprise_compatible") is True
+            and signing.get("private_key_present") is True
+            and int(signing.get("trusted_key_count") or 0) > 0
+        )
+    )
+    readiness = build_readiness_report(config)
+    blocking_reasons: list[str] = []
+    if not policy_available:
+        blocking_reasons.append("POLICY_UNAVAILABLE")
+    if not identity_available:
+        blocking_reasons.append(str(identity_payload.get("error_code") or "IDENTITY_UNAVAILABLE"))
+    if not signing_available:
+        blocking_reasons.append("SIGNING_UNAVAILABLE")
+    blocking_reasons.extend(readiness.blocking_reasons)
+    blocking_reasons = sorted(set(blocking_reasons))
+    payload = {
+        "status": "healthy" if not blocking_reasons else "blocked",
+        "profile": profile,
+        "policy_available": policy_available,
+        "identity_available": identity_available,
+        "signing_available": signing_available,
+        "registry_available": registry_root.exists(),
+        "evidence_export_available": True,
+        "claim_guard_available": True,
+        "blocking_reasons": blocking_reasons,
+    }
+    _emit_payload(payload, json_output=json_output)
+
+
+@control_plane_agent_app.command("register")
+def control_plane_agent_register(
+    spec: str = typer.Option(..., "--spec", help="AgentSpec YAML/JSON path"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    actor: str = typer.Option("cli:operator", "--actor", help="Registry actor"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    _ = profile
+    try:
+        loaded = load_agent_spec(spec)
+        result = _control_plane_registry(root_dir).register(loaded, actor=actor)
+    except ControlPlaneError as exc:
+        _control_plane_error(exc, json_output=json_output)
+        raise typer.Exit(code=1) from None
+    _emit_payload(result.model_dump(mode="json"), json_output=json_output)
+
+
+@control_plane_agent_app.command("list")
+def control_plane_agent_list(
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    agents = _control_plane_registry(root_dir).list_agents()
+    payload = {
+        "agents": [
+            {
+                "agent_id": item.agent_id,
+                "display_name": item.spec.display_name,
+                "runtime_kind": item.spec.runtime_kind,
+                "status": item.status,
+                "readiness": item.readiness,
+                "last_run_id": item.last_run_id,
+            }
+            for item in agents
+        ]
+    }
+    _emit_payload(payload, json_output=json_output)
+
+
+@control_plane_agent_app.command("show")
+def control_plane_agent_show(
+    agent_id: str = typer.Option(..., "--agent-id", help="Agent ID"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        record = _control_plane_registry(root_dir).get(agent_id)
+    except ControlPlaneError as exc:
+        _control_plane_error(exc, json_output=json_output)
+        raise typer.Exit(code=1) from None
+    _emit_payload(record.model_dump(mode="json"), json_output=json_output)
+
+
+@control_plane_agent_app.command("disable")
+def control_plane_agent_disable(
+    agent_id: str = typer.Option(..., "--agent-id", help="Agent ID"),
+    reason: str = typer.Option(..., "--reason", help="Disable reason"),
+    actor: str = typer.Option("cli:operator", "--actor", help="Registry actor"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        record = _control_plane_registry(root_dir).disable(agent_id, reason=reason, actor=actor)
+    except ControlPlaneError as exc:
+        _control_plane_error(exc, json_output=json_output)
+        raise typer.Exit(code=1) from None
+    _emit_payload(record.model_dump(mode="json"), json_output=json_output)
+
+
+@control_plane_policy_app.command("simulate")
+def control_plane_policy_simulate(
+    agent_id: str = typer.Option(..., "--agent-id", help="Agent ID"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        registry = _control_plane_registry(root_dir)
+        record = registry.get(agent_id)
+        result = PolicySimulator(config=RuntimeConfig.from_profile(profile)).simulate_agent(
+            record.spec
+        )
+        registry.update_record(
+            record.model_copy(
+                update={
+                    "readiness": "blocked"
+                    if result.overall_status == "blocked"
+                    else "policy_simulated"
+                }
+            )
+        )
+    except ControlPlaneError as exc:
+        _control_plane_error(exc, json_output=json_output)
+        raise typer.Exit(code=1) from None
+    _emit_payload(result.model_dump(mode="json"), json_output=json_output)
+    if result.overall_status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@control_plane_run_app.command("submit")
+def control_plane_run_submit(
+    agent_id: str = typer.Option(..., "--agent-id", help="Agent ID"),
+    once: str = typer.Option(..., "--once", help="Single governed run request"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    actor: str = typer.Option("cli:operator", "--actor", help="Submitting actor"),
+    mode: str = typer.Option("supervised", "--mode", help="dry_run|supervised|execute"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        summary = _control_plane_coordinator(profile=profile, root_dir=root_dir).submit_run(
+            agent_id=agent_id,
+            user_input=once,
+            actor=actor,
+            mode=mode,
+        )
+    except (ControlPlaneError, FileNotFoundError) as exc:
+        payload = {
+            "status": "error",
+            "error_code": getattr(exc, "error_code", "RUN_SUBMIT_FAILED"),
+            "error": str(exc),
+        }
+        _emit_payload(payload, json_output=json_output)
+        raise typer.Exit(code=1) from None
+    _emit_payload(summary.model_dump(mode="json"), json_output=json_output)
+    if summary.status in {"policy_blocked", "blocked", "failed"}:
+        raise typer.Exit(code=3)
+
+
+@control_plane_run_app.command("status")
+def control_plane_run_status(
+    run_id: str = typer.Option(..., "--run-id", help="Control Plane run ID"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        summary = _control_plane_coordinator(profile=profile, root_dir=root_dir).get_status(
+            run_id=run_id
+        )
+    except (ControlPlaneError, FileNotFoundError) as exc:
+        payload = {
+            "status": "error",
+            "error_code": getattr(exc, "error_code", "RUN_NOT_FOUND"),
+            "error": str(exc),
+        }
+        _emit_payload(payload, json_output=json_output)
+        raise typer.Exit(code=1) from None
+    _emit_payload(summary.model_dump(mode="json"), json_output=json_output)
+
+
+@control_plane_run_app.command("list")
+def control_plane_run_list(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    runs = _control_plane_coordinator(profile=profile, root_dir=root_dir).list_runs()
+    _emit_payload(
+        {"items": [item.model_dump(mode="json") for item in runs]},
+        json_output=json_output,
+    )
+
+
+@control_plane_evidence_app.command("export")
+def control_plane_evidence_export(
+    run_id: str = typer.Option(..., "--run-id", help="Control Plane run ID"),
+    output_dir: str | None = typer.Option(
+        None,
+        "--output",
+        "--output-dir",
+        help="Evidence output directory.",
+    ),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing evidence dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    target = output_dir or f"artifacts/control-plane/evidence/{run_id}"
+    try:
+        manifest = EvidencePackBuilder(
+            config=RuntimeConfig.from_profile(profile),
+            root_dir=root_dir,
+        ).export_for_run(run_id=run_id, output_dir=target, force=force)
+    except Exception as exc:  # noqa: BLE001
+        payload = {
+            "status": "error",
+            "error_code": getattr(exc, "error_code", "EVIDENCE_EXPORT_FAILED"),
+            "error": str(exc),
+        }
+        _emit_payload(payload, json_output=json_output)
+        raise typer.Exit(code=1) from None
+    _emit_payload(manifest.model_dump(mode="json"), json_output=json_output)
+
+
+@control_plane_evidence_app.command("verify")
+def control_plane_evidence_verify(
+    path: str = typer.Option(..., "--path", help="Evidence manifest path"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    result = EvidencePackBuilder(
+        config=RuntimeConfig.from_profile(profile),
+        root_dir=root_dir,
+    ).verify(manifest_path=path)
+    _emit_payload(result.model_dump(mode="json"), json_output=json_output)
+    if result.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@control_plane_claims_app.command("verify")
+def control_plane_claims_verify(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    evidence_root: str = typer.Option("artifacts", "--evidence-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    matrix = ClaimGuard(config=RuntimeConfig.from_profile(profile)).evaluate(
+        evidence_root=evidence_root
+    )
+    _emit_payload(matrix.model_dump(mode="json"), json_output=json_output)
+
+
+@control_plane_adapter_app.command("evaluate")
+def control_plane_adapter_evaluate(
+    input_path: str = typer.Option(..., "--input", help="Action proposal JSON path"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = evaluate_action_proposal_file(
+        path=input_path,
+        simulator=PolicySimulator(config=RuntimeConfig.from_profile(profile)),
+    )
+    _emit_payload(payload, json_output=json_output)
 
 
 @config_app.command("resolve")

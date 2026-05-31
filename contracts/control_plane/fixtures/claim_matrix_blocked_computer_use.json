@@ -1,0 +1,18 @@
+{
+  "version": "control-plane.claim-matrix/v1",
+  "generated_at": "2026-05-31T00:00:00Z",
+  "claims": [
+    {
+      "claim_id": "live-windows-computer-use",
+      "status": "blocked",
+      "required_evidence": [
+        "platform_qualification",
+        "signed_trusted_evidence"
+      ],
+      "blocking_reasons": [
+        "SIGNED_PLATFORM_QUALIFICATION_MISSING",
+        "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+      ]
+    }
+  ]
+}

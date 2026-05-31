@@ -1,0 +1,189 @@
+{
+  "$defs": {
+    "EvidencePackItem": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "title": "EvidencePackItem",
+      "type": "object"
+    },
+    "EvidenceSignatureSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "default": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Key Id"
+        },
+        "mode": {
+          "default": "unsigned",
+          "title": "Mode",
+          "type": "string"
+        },
+        "signature_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signature Ref"
+        }
+      },
+      "title": "EvidenceSignatureSummary",
+      "type": "object"
+    },
+    "EvidenceVerificationSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "hash_chain_verified": {
+          "default": false,
+          "title": "Hash Chain Verified",
+          "type": "boolean"
+        },
+        "replay_verified": {
+          "default": false,
+          "title": "Replay Verified",
+          "type": "boolean"
+        },
+        "signature_verified": {
+          "default": false,
+          "title": "Signature Verified",
+          "type": "boolean"
+        }
+      },
+      "title": "EvidenceVerificationSummary",
+      "type": "object"
+    },
+    "RedactionSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "pii_redaction_enabled": {
+          "default": true,
+          "title": "Pii Redaction Enabled",
+          "type": "boolean"
+        },
+        "raw_screenshots_persisted": {
+          "default": 0,
+          "title": "Raw Screenshots Persisted",
+          "type": "integer"
+        },
+        "secrets_redacted": {
+          "default": true,
+          "title": "Secrets Redacted",
+          "type": "boolean"
+        }
+      },
+      "title": "RedactionSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "title": "Agent Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "git_commit": {
+      "title": "Git Commit",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/EvidencePackItem"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "pack_id": {
+      "title": "Pack Id",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "redaction_summary": {
+      "$ref": "#/$defs/RedactionSummary"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "runtime_version": {
+      "title": "Runtime Version",
+      "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/EvidenceSignatureSummary"
+    },
+    "verification": {
+      "$ref": "#/$defs/EvidenceVerificationSummary"
+    },
+    "version": {
+      "const": "control-plane.evidence-pack/v1",
+      "default": "control-plane.evidence-pack/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "pack_id",
+    "run_id",
+    "agent_id",
+    "profile",
+    "runtime_version",
+    "git_commit"
+  ],
+  "title": "ControlPlaneEvidenceExportPayloadContract",
+  "type": "object"
+}
