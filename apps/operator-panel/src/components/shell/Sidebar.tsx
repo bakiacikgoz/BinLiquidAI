@@ -1,20 +1,8 @@
 import { Icon, type IconName } from '../primitives/Icon';
 import { StatusDot } from '../primitives/StatusDot';
+import { routeGroups, type RouteId } from '../../routeRegistry';
 
-export type ShellViewKey =
-  | 'dashboard'
-  | 'agents'
-  | 'workspace'
-  | 'assistant'
-  | 'tasks'
-  | 'approvals'
-  | 'runs'
-  | 'evidence'
-  | 'policy'
-  | 'system'
-  | 'surfaces'
-  | 'operations'
-  | 'settings';
+export type ShellViewKey = RouteId;
 
 export type SidebarGroup = {
   title: string;
@@ -23,7 +11,6 @@ export type SidebarGroup = {
     key: ShellViewKey;
     label: string;
     icon: IconName;
-    activeWhen?: ShellViewKey[];
     badgeCount?: number;
   }>;
 };
@@ -50,50 +37,23 @@ export function Sidebar({
   onNavigate: (view: ShellViewKey) => void;
 }) {
   const assistantEnabled = import.meta.env.VITE_OPERATOR_PANEL_ASSISTANT !== '0';
-  const groups: SidebarGroup[] = [
-    {
-      title: 'ÇALIŞMA ALANI',
-      items: [
-        { id: 'dashboard', key: 'dashboard', label: 'Dashboard', icon: 'home' },
-        { id: 'agents', key: 'agents', label: 'Agents', icon: 'users' },
-        { id: 'runs', key: 'runs', label: 'Çalıştırmalar', icon: 'terminal' },
-        { id: 'approvals', key: 'approvals', label: 'Onaylar', icon: 'check', badgeCount: pendingApprovalCount },
-        { id: 'evidence', key: 'evidence', label: 'Evidence', icon: 'archive' },
-        { id: 'policy', key: 'policy', label: 'Policy', icon: 'policy' },
-        { id: 'surfaces', key: 'surfaces', label: 'Execution Surfaces', icon: 'shield' },
-        { id: 'mission-control', key: 'workspace', label: 'Mission Control', icon: 'target' },
-        ...(assistantEnabled
-          ? [{ id: 'ai-assistant', key: 'assistant' as const, label: 'AI Assistant', icon: 'sparkle' as const }]
-          : []),
-        { id: 'tasks', key: 'tasks', label: 'Görevler', icon: 'list' },
-      ],
-    },
-    {
-      title: 'SİSTEM',
-      items: [
-        { id: 'system-health', key: 'system', label: 'Sistem Sağlığı', icon: 'layers' },
-        { id: 'operations', key: 'operations', label: 'Yürütmeler', icon: 'clipboard' },
-        { id: 'settings', key: 'settings', label: 'Ayarlar', icon: 'settings' },
-      ],
-    },
-    {
-      title: 'OPERASYONLAR',
-      items: [
-        { id: 'logs', key: 'runs', label: 'Loglar', icon: 'logs', activeWhen: [] },
-        { id: 'reports', key: 'operations', label: 'Raporlar', icon: 'report', activeWhen: [] },
-        { id: 'warnings', key: 'operations', label: 'Uyarılar', icon: 'bell', activeWhen: [], badgeCount: warningCount },
-        { id: 'plans', key: 'tasks', label: 'Planlamalar', icon: 'play', activeWhen: [] },
-      ],
-    },
-    {
-      title: 'YÖNETİM',
-      items: [
-        { id: 'users', key: 'operations', label: 'Kullanıcılar', icon: 'users', activeWhen: [] },
-        { id: 'roles', key: 'operations', label: 'Roller', icon: 'user', activeWhen: [] },
-        { id: 'policies', key: 'operations', label: 'Politikalar', icon: 'policy', activeWhen: [] },
-      ],
-    },
-  ];
+  const groups: SidebarGroup[] = routeGroups.map((group) => ({
+    title: group.title,
+    items: group.routes
+      .filter((item) => assistantEnabled || item.routeId !== 'assistant')
+      .map((item) => ({
+        id: item.id,
+        key: item.routeId,
+        label: item.label,
+        icon: item.icon,
+        badgeCount:
+          item.badgeKey === 'pendingApprovals'
+            ? pendingApprovalCount
+            : item.badgeKey === 'warnings'
+              ? warningCount
+              : undefined,
+      })),
+  }));
 
   const sidebarClassName = [
     'sidebar',
@@ -129,8 +89,7 @@ export function Sidebar({
           <div className="premium-nav-group" key={group.title}>
             <span>{group.title}</span>
             {group.items.map((item) => {
-              const activeTargets = item.activeWhen ?? [item.key];
-              const isActive = activeTargets.includes(activeView);
+              const isActive = item.key === activeView;
               const badge = item.badgeCount && item.badgeCount > 0 ? String(item.badgeCount) : '';
               return (
                 <button

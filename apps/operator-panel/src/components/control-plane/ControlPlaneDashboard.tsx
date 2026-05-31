@@ -15,9 +15,11 @@ export function ControlPlaneDashboard({
   const agentList = asControlPlaneAgentList(agents);
   const claimMatrix = asControlPlaneClaimMatrix(claims);
   const blockedClaims = claimMatrix.claims.filter((claim) => claim.status === 'blocked').length;
+  const conditionalClaims = claimMatrix.claims.filter((claim) => claim.status === 'conditional').length;
+  const allowedClaims = claimMatrix.claims.filter((claim) => claim.status === 'allowed').length;
 
   return (
-    <section className="workspace">
+    <section className="workspace" data-testid="page-primary-region">
       <div className="workspace-header">
         <div>
           <p className="workspace-kicker">Agent Control Plane</p>
@@ -45,6 +47,49 @@ export function ControlPlaneDashboard({
           <h3>Claim Guard</h3>
           <p className="metric">{blockedClaims}</p>
           <small>blocked claims</small>
+        </article>
+      </div>
+      <div className="section-grid two-up">
+        <article className="page-card">
+          <h3>Safety posture</h3>
+          <div className="metric-list">
+            <div className="metric-row">
+              <span>Readiness</span>
+              <strong>{String(doctorRecord.status ?? 'unknown')}</strong>
+            </div>
+            <div className="metric-row">
+              <span>Allowed claims</span>
+              <strong>{allowedClaims}</strong>
+            </div>
+            <div className="metric-row">
+              <span>Conditional claims</span>
+              <strong>{conditionalClaims}</strong>
+            </div>
+            <div className="metric-row">
+              <span>Fail-closed execution</span>
+              <strong>enabled</strong>
+            </div>
+          </div>
+        </article>
+        <article className="page-card">
+          <h3>Next actions</h3>
+          <div className="run-list">
+            <article className="run-list-item">
+              <strong>Review pending approvals</strong>
+              <span>Confirm actor, policy decision, and execution status before mutating.</span>
+              <small>Approvals</small>
+            </article>
+            <article className="run-list-item">
+              <strong>Verify evidence pack</strong>
+              <span>Check hash chain, signature, replay, and redaction summary.</span>
+              <small>Evidence</small>
+            </article>
+            <article className="run-list-item">
+              <strong>Simulate policy</strong>
+              <span>Dry-run actions before submitting governed runs.</span>
+              <small>Policy</small>
+            </article>
+          </div>
         </article>
       </div>
     </section>

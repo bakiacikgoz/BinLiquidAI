@@ -91,24 +91,21 @@ import { ControlPlaneDashboard } from './components/control-plane/ControlPlaneDa
 import { EvidencePackView } from './components/control-plane/EvidencePackView';
 import { ExecutionSurfacesView } from './components/control-plane/ExecutionSurfacesView';
 import { PolicySimulationView } from './components/control-plane/PolicySimulationView';
+import {
+  AlertsPage,
+  LogsPage,
+  PlansPage,
+  PolicyPacksPage,
+  ReportsPage,
+  RolesPage,
+  UsersPage,
+} from './components/product-pages/ProductizedPages';
 import { AppShell } from './components/shell/AppShell';
 import { RightRail } from './components/shell/RightRail';
 import type { ShellViewKey } from './components/shell/Sidebar';
+import type { RouteId } from './routeRegistry';
 
-type ViewKey =
-  | 'dashboard'
-  | 'agents'
-  | 'workspace'
-  | 'assistant'
-  | 'tasks'
-  | 'approvals'
-  | 'runs'
-  | 'evidence'
-  | 'policy'
-  | 'system'
-  | 'surfaces'
-  | 'operations'
-  | 'settings';
+type ViewKey = RouteId;
 type RunTabKey = 'overview' | 'stream' | 'approvals' | 'artifacts' | 'replay' | 'diagnostics';
 type OperationTabKey = 'identity' | 'qualification' | 'security' | 'keys' | 'support' | 'maintenance';
 type AutomationMode = 'assisted' | 'supervised';
@@ -1309,7 +1306,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         {activeView === 'policy' ? <PolicySimulationView simulation={controlPlanePolicy} /> : null}
 
         {activeView === 'evidence' ? (
-          <section className="workspace">
+          <section className="workspace" data-testid="page-primary-region">
             <div className="workspace-header">
               <div>
                 <p className="workspace-kicker">Evidence</p>
@@ -1392,7 +1389,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'tasks' ? (
-          <section className="workspace">
+          <section className="workspace" data-testid="page-primary-region">
             <div className="workspace-header">
               <div>
                 <p className="workspace-kicker">{t.tasksKicker}</p>
@@ -1660,7 +1657,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'approvals' ? (
-          <section className="workspace">
+          <section className="workspace" data-testid="page-primary-region">
             <div className="workspace-header">
               <div>
                 <p className="workspace-kicker">{t.approvalsKicker}</p>
@@ -1737,7 +1734,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'runs' ? (
-          <section className="workspace">
+          <section className="workspace" data-testid="page-primary-region">
             <div className="workspace-header">
               <div>
                 <p className="workspace-kicker">{t.runsKicker}</p>
@@ -1901,7 +1898,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'system' ? (
-          <section className="workspace">
+          <section className="workspace" data-testid="page-primary-region">
             <div className="workspace-header">
               <div>
                 <p className="workspace-kicker">{t.systemKicker}</p>
@@ -1963,7 +1960,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'operations' ? (
-          <section className="workspace">
+          <section className="workspace" data-testid="page-primary-region">
             <div className="workspace-header">
               <div>
                 <p className="workspace-kicker">{t.operationsKicker}</p>
@@ -2298,7 +2295,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'settings' ? (
-          <section className="workspace">
+          <section className="workspace" data-testid="page-primary-region">
             <div className="workspace-header">
               <div>
                 <p className="workspace-kicker">{t.settingsKicker}</p>
@@ -2400,6 +2397,30 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             </div>
           </section>
         ) : null}
+
+        {activeView === 'logs' ? <LogsPage events={events} runItems={runItems} /> : null}
+
+        {activeView === 'reports' ? (
+          <ReportsPage operationOutputs={operationOutputs} claims={controlPlaneClaims} />
+        ) : null}
+
+        {activeView === 'alerts' ? (
+          <AlertsPage
+            driftEvents={driftEvents}
+            pendingApprovals={pendingApprovals}
+            claims={controlPlaneClaims}
+          />
+        ) : null}
+
+        {activeView === 'plans' ? <PlansPage profile={settings.profile} /> : null}
+
+        {activeView === 'users' ? (
+          <UsersPage operatorId={settings.operatorId.trim()} profile={settings.profile} />
+        ) : null}
+
+        {activeView === 'roles' ? <RolesPage profile={settings.profile} /> : null}
+
+        {activeView === 'policy-packs' ? <PolicyPacksPage claims={controlPlaneClaims} /> : null}
     </AppShell>
   );
 }

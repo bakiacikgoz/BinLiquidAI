@@ -79,7 +79,7 @@ export function MissionControlView({
   onReject,
 }: MissionControlViewProps) {
   return (
-    <section className="mission-control-view">
+    <section className="mission-control-view" data-testid="page-primary-region">
       <div className="mission-title-row">
         <div className="mission-title">
           <h1>Mission Control</h1>

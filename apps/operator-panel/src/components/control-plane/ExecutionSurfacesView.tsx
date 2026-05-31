@@ -1,7 +1,7 @@
 export function ExecutionSurfacesView({ computerUseCapability }: { computerUseCapability: unknown }) {
   const capability = asRecord(computerUseCapability);
   return (
-    <section className="workspace">
+    <section className="workspace" data-testid="page-primary-region">
       <div className="workspace-header">
         <div>
           <p className="workspace-kicker">Execution Boundaries</p>
@@ -22,18 +22,34 @@ export function ExecutionSurfacesView({ computerUseCapability }: { computerUseCa
           <h3>Computer-use</h3>
           <p className="metric">{String(capability.status ?? 'blocked')}</p>
           <small>{String(capability.reasonCode ?? 'COMPUTER_USE_NOT_QUALIFIED')}</small>
-          <span
-            className="ghost-btn"
-            title="Live computer-use is disabled until qualification evidence is present."
-            data-disabled-reason="Live computer-use is disabled until qualification evidence is present."
-          >
-            Start live
-          </span>
+          <div className="warning-inline">Live start disabled until qualification evidence is present.</div>
         </article>
         <article className="page-card">
           <h3>Public desktop installer</h3>
           <p className="metric">blocked</p>
           <small>HAT_B_EVIDENCE_MISSING</small>
+        </article>
+        <article className="page-card">
+          <h3>External adapters</h3>
+          <p className="metric">contract only</p>
+          <small>adapter evaluation required before execution</small>
+        </article>
+        <article className="page-card">
+          <h3>Qualification checklist</h3>
+          <div className="metric-list">
+            <div className="metric-row">
+              <span>Signed platform evidence</span>
+              <strong>missing</strong>
+            </div>
+            <div className="metric-row">
+              <span>Replay verification</span>
+              <strong>required</strong>
+            </div>
+            <div className="metric-row">
+              <span>Supervised opt-in</span>
+              <strong>required</strong>
+            </div>
+          </div>
         </article>
       </div>
     </section>

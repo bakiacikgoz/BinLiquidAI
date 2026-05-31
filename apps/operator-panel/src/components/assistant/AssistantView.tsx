@@ -70,7 +70,11 @@ export function AssistantView({
     state.status === 'awaiting_approval' ? 'approval' : state.turns.length > 0 ? 'transcript' : 'welcome';
 
   return (
-    <section className={`assistant-surface assistant-surface-${surfaceState}`} aria-labelledby="assistant-title">
+    <section
+      className={`assistant-surface assistant-surface-${surfaceState}`}
+      aria-labelledby="assistant-title"
+      data-testid="page-primary-region"
+    >
       <header className="assistant-top-chrome">
         <div className="assistant-context-switcher" aria-label="Assistant workspace context">
           <div className="assistant-top-select assistant-top-select-wide">

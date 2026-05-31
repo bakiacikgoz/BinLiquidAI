@@ -1,0 +1,28 @@
+import { describe, expect, it } from 'vitest';
+
+import { routeGroups, routes } from './routeRegistry';
+
+describe('routeRegistry', () => {
+  it('keeps visible navigation routes unique and free of aliases', () => {
+    const routeIds = routes.map((route) => route.routeId);
+    const labels = routes.map((route) => route.label);
+    const ids = routes.map((route) => route.id);
+
+    expect(new Set(routeIds).size).toBe(routeIds.length);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('declares every productization navigation group with route headings', () => {
+    expect(routeGroups.length).toBeGreaterThan(0);
+    for (const group of routeGroups) {
+      expect(group.title).toBeTruthy();
+      expect(group.routes.length).toBeGreaterThan(0);
+      for (const route of group.routes) {
+        expect(route.heading).toBeTruthy();
+        expect(route.label).toBeTruthy();
+        expect(route.routeId).toBeTruthy();
+      }
+    }
+  });
+});
