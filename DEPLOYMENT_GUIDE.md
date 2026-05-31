@@ -1,5 +1,10 @@
 # Deployment Guide
 
+This guide targets the self-hosted Agent Control Plane boundary. Deployments
+should expose the governed runtime through registry, policy simulation,
+approval, evidence and claim-guard workflows before any production-readiness
+claim is made.
+
 ## Reference Deployment
 
 ### Linux Runtime Host

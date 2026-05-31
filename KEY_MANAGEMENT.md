@@ -1,5 +1,9 @@
 # Key Management
 
+Agent Control Plane evidence packs use the enterprise signing boundary. In
+enterprise mode, unsigned evidence can be generated for diagnostics but cannot
+support a readiness or release claim.
+
 ## Goal
 
 Enterprise artifacts must be signed with asymmetric keys and verified against a trusted public key set.
@@ -32,6 +36,7 @@ The following must be signed:
 
 - team audit envelopes
 - core governance audit envelopes
+- control-plane evidence manifests
 - pilot and GA readiness reports
 - support bundle manifests
 - backup manifests

@@ -1,5 +1,9 @@
 # Security Baseline
 
+Agent Control Plane deployments must preserve fail-closed policy evaluation,
+verified identity for enterprise mutations, signed evidence packs, and
+claim-guard blocks for unsupported desktop or computer-use claims.
+
 ## Scope
 
 This baseline defines the minimum acceptable security posture for `enterprise` profile deployments of BinLiquid / AegisOS.
@@ -15,6 +19,7 @@ It applies to self-hosted, single-tenant installations where the runtime and its
 - PII redaction must stay enabled for governance and artifact output.
 - Mutating Team Runtime and governance actions require a verified identity assertion.
 - Audit and operational artifacts must use asymmetric signing in enterprise mode.
+- Control Plane evidence manifests must be signed and verifiable in enterprise mode.
 - Metrics export defaults to file/textfile output only. Network listeners are opt-in.
 - Memory, approval, checkpoint, audit, team artifact, and backup roots must be separated.
 

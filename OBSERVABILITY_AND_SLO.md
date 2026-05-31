@@ -1,5 +1,9 @@
 # Observability And SLO
 
+Control Plane observability must make agent registry state, governed runs,
+approval backlog, evidence verification and blocked claims visible without
+opening a default network listener.
+
 ## Default Export Model
 
 Enterprise deployments default to file-based observability.
@@ -22,6 +26,7 @@ Default outputs:
 - runnable lag and task age
 - operator and admin action counts
 - backup, restore, and migration timestamps
+- control-plane agents, runs, policy decisions, evidence verification failures and blocked claims
 
 ## Dashboard Views
 

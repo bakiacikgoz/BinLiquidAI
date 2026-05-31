@@ -1,5 +1,9 @@
 # Install
 
+After installation, validate the Agent Control Plane boundary with
+`uv run binliquid control-plane doctor --profile enterprise --json` before
+claiming governed agent production-readiness.
+
 ## Supported Baseline
 
 - Linux runtime host for primary deployment

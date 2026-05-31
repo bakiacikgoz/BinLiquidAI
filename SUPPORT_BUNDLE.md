@@ -1,5 +1,9 @@
 # Support Bundle
 
+Support bundles are part of the Agent Control Plane evidence story. They must
+remain redacted and may be referenced by control-plane evidence manifests, but
+they do not by themselves authorize public desktop or live computer-use claims.
+
 ## Goal
 
 The support bundle provides a redacted, signed export that gives operators and support engineers enough evidence to triage runtime issues without handing over raw secrets or unrestricted logs.

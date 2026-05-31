@@ -1,5 +1,9 @@
 # Qualification Matrix
 
+This matrix now applies to the self-hosted Agent Control Plane product boundary:
+agent registry, governed run coordination, policy simulation, approval
+lifecycle, replay/audit, signed evidence, support bundle and claim guard.
+
 ## Purpose
 
 This document defines the evidence required before BinLiquid / AegisOS can be described as `enterprise deployment-ready under defined constraints`.

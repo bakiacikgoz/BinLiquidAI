@@ -1,17 +1,28 @@
-# BinLiquid (AegisOS)
+# BinLiquid / AegisOS
 
-**BinLiquid** is a private, security-first agentic runtime for local/offline and enterprise-controlled environments. It is designed for governed AI execution where planning, routing, memory, approvals, auditability, and operational safety matter more than unrestricted autonomy.
+**BinLiquid / AegisOS** is a self-hosted Agent Control Plane for governed AI
+agent production readiness. It helps operators register agents, simulate policy
+decisions, enforce approval lifecycle, bind runs to verified identity, preserve
+audit/replay artifacts, export signed evidence packs, and block unsupported
+release claims before agents are trusted in production-like workflows.
 
-BinLiquid currently provides four major surfaces:
+Product boundary: [Agent Control Plane Product Boundary](docs/AGENT_CONTROL_PLANE_PRODUCT_BOUNDARY.md).
 
-1. **Core Runtime** — the production-grade single-assistant foundation for planning, routing, provider fallback, specialist execution, scoped memory, and governance.
-2. **Team Runtime** — a governed multi-agent execution layer with delegated handoff, bounded concurrency, shared/scoped memory, approval gates, checkpointing, and replayable audit traces.
-3. **Operator Panel** — a Tauri-based desktop control surface for monitoring, approvals, capabilities, run state, and local operator workflows.
-4. **Computer-Use Runtime** — a qualification-gated desktop/web automation foundation. The current vision-first path is designed around screenshots, visual interpretation, policy checks, approval gates, controlled action execution, verification, and replay/audit artifacts.
+BinLiquid currently provides four control-plane surfaces:
+
+1. **Control Plane Core** — agent registry, run coordination, policy simulation, evidence pack export/verify, readiness checks and claim guard.
+2. **Governed Runtime** — existing core and team runtime execution backends with planning, routing, scoped memory, policy decisions, approvals, checkpointing and replayable audit traces.
+3. **Operator Console** — a Tauri-based control surface for dashboard, agents, runs, approvals, evidence, policy, system state and execution surfaces.
+4. **Qualified Execution Surfaces** — fail-closed execution adapters. Computer-use is retained only as a supervised, opt-in, qualification-gated surface and is disabled by default for live desktop operation.
 
 > **Status summary**
 >
-> BinLiquid Core Runtime is the most mature production-grade foundation of the project. Team Runtime is pilot-hardened for controlled/restricted profiles. Enterprise deployment readiness is implemented under a constrained self-hosted envelope, but broader GA claims still require signed qualification evidence. Vision-first computer-use is implemented as a fail-closed, qualification-gated foundation; live desktop automation is disabled by default and must not be described as generally available across platforms.
+> Control Plane Core is the primary product direction. Governed Runtime and Team
+> Runtime are the execution backends. Enterprise deployment readiness remains a
+> constrained self-hosted envelope that requires signed qualification and GA
+> readiness evidence for broader claims. Computer-use is a fail-closed,
+> qualification-gated execution surface; live desktop automation is disabled by
+> default and must not be described as generally available across platforms.
 
 ---
 
@@ -39,6 +50,7 @@ BinLiquid should **not** currently be marketed as:
 - a universally production-ready high-concurrency agent platform,
 - a fully qualified live desktop automation product across macOS, Windows, and Linux,
 - a system that can safely execute irreversible user actions without explicit approval,
+- a public desktop release without signing/notarization/clean-machine evidence,
 - a cloud-hosted multi-tenant control plane.
 
 ---
@@ -117,9 +129,19 @@ uv run python -m binliquid operator capabilities --json
 ```
 
 Operator capabilities advertise `computerUseSummaryJson=true` when the summary
-bridge is available. The Operator Panel default runtime selection is
-`vision-first`; live start remains disabled until the vision runtime reports a
-fail-closed qualified capability.
+bridge is available. In the Agent Control Plane product boundary, computer-use
+appears under **Qualified Execution Surfaces** and live start remains disabled
+until the vision runtime reports a fail-closed qualified capability.
+
+Control Plane quick commands:
+
+```bash
+uv run binliquid control-plane doctor --profile enterprise --json
+uv run binliquid control-plane agent register --spec examples/control_plane/agent_governed_ops.yaml --profile enterprise --json
+uv run binliquid control-plane policy simulate --agent-id governed-ops --profile enterprise --json
+uv run binliquid control-plane run submit --agent-id governed-ops --once "Inspect queue and draft remediation" --profile enterprise --json
+uv run binliquid control-plane claims verify --profile enterprise --json
+```
 
 ---
 
