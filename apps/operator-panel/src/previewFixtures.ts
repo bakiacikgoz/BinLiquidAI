@@ -620,3 +620,94 @@ export function previewMigratePlan() {
 export function previewMigrateApplyDryRun() {
   return cloneValue(previewBundle.operations.migrateApplyDryRun);
 }
+
+export function previewControlPlaneDoctor(settings: PanelSettings) {
+  return {
+    status: 'healthy',
+    profile: settings.profile,
+    policy_available: true,
+    identity_available: true,
+    signing_available: true,
+    registry_available: true,
+    evidence_export_available: true,
+    claim_guard_available: true,
+    blocking_reasons: [],
+  };
+}
+
+export function previewControlPlaneAgentList() {
+  return {
+    agents: [
+      {
+        agent_id: 'governed-ops',
+        display_name: 'Governed Ops Agent',
+        runtime_kind: 'binliquid_team',
+        status: 'registered',
+        readiness: 'policy_simulated',
+        last_run_id: 'cp-run-preview-001',
+      },
+    ],
+  };
+}
+
+export function previewControlPlanePolicySimulation() {
+  return {
+    version: 'control-plane.policy-simulation/v1',
+    agent_id: 'governed-ops',
+    policy_hash: 'sha256:preview',
+    overall_status: 'conditional',
+    summary: { allow: 1, require_approval: 1, deny: 0, unknown: 0 },
+    decisions: [
+      {
+        action_id: 'inspect_queue',
+        phase: 'task',
+        risk_class: 'read_only',
+        decision_action: 'allow',
+        reason_code: 'RISK_READ_ONLY_ALLOWED',
+        matched_rule_path: 'risk_defaults[read_only]',
+        policy_hash: 'sha256:preview',
+        approval_id: null,
+        qualification_required: false,
+      },
+      {
+        action_id: 'restart_service',
+        phase: 'tool',
+        risk_class: 'mutation',
+        decision_action: 'require_approval',
+        reason_code: 'RISK_REQUIRES_APPROVAL',
+        matched_rule_path: 'risk_defaults[mutation]',
+        policy_hash: 'sha256:preview',
+        approval_id: 'apr-preview-control-plane',
+        qualification_required: false,
+      },
+    ],
+    blocking_reasons: [],
+  };
+}
+
+export function previewControlPlaneClaims() {
+  return {
+    version: 'control-plane.claim-matrix/v1',
+    generated_at: '2026-05-31T00:00:00Z',
+    claims: [
+      {
+        claim_id: 'enterprise-self-hosted-agent-control-plane',
+        status: 'conditional',
+        required_evidence: ['security_baseline', 'qualification', 'ga_readiness', 'signed_evidence_pack'],
+        blocking_reasons: ['SIGNED_EVIDENCE_PACK_MISSING'],
+      },
+      {
+        claim_id: 'public-desktop-installer',
+        status: 'blocked',
+        required_evidence: ['macos_notarization', 'windows_signed_rc', 'clean_machine_smoke'],
+        blocking_reasons: ['HAT_B_EVIDENCE_MISSING'],
+      },
+      {
+        claim_id: 'live-windows-computer-use',
+        status: 'blocked',
+        required_evidence: ['platform_qualification', 'signed_trusted_evidence'],
+        blocking_reasons: ['WINDOWS_COMPUTER_USE_NOT_QUALIFIED'],
+      },
+    ],
+  };
+}

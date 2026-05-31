@@ -193,6 +193,21 @@ pub struct AssistantStreamEventPayload {
     data: Value,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlPlaneRunSubmitPayload {
+    agent_id: String,
+    prompt: String,
+    operator_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlPlaneEvidenceExportPayload {
+    run_id: String,
+    output_dir: Option<String>,
+}
+
 #[derive(Debug)]
 struct RawCliOutput {
     stdout: String,
@@ -382,6 +397,222 @@ pub async fn bridge_approval_execute(
             actor,
             "--profile".to_string(),
             config.profile(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_control_plane_doctor(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "control-plane".to_string(),
+            "doctor".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_control_plane_agent_list(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "control-plane".to_string(),
+            "agent".to_string(),
+            "list".to_string(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_control_plane_agent_register(
+    config: BridgeConfig,
+    spec_path: String,
+) -> BridgeResult<Value> {
+    let spec = match normalize_required_path(&spec_path, "spec_path", "control-plane agent") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "control-plane".to_string(),
+            "agent".to_string(),
+            "register".to_string(),
+            "--spec".to_string(),
+            spec,
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_control_plane_policy_simulate(
+    config: BridgeConfig,
+    agent_id: String,
+) -> BridgeResult<Value> {
+    let agent = match normalize_control_plane_id(&agent_id, "agent_id") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "control-plane".to_string(),
+            "policy".to_string(),
+            "simulate".to_string(),
+            "--agent-id".to_string(),
+            agent,
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_control_plane_run_submit(
+    config: BridgeConfig,
+    payload: ControlPlaneRunSubmitPayload,
+) -> BridgeResult<Value> {
+    let agent = match normalize_control_plane_id(&payload.agent_id, "agent_id") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let prompt = match normalize_required_text(&payload.prompt, "prompt", "control-plane run") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let actor = match normalize_actor(&payload.operator_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "control-plane".to_string(),
+            "run".to_string(),
+            "submit".to_string(),
+            "--agent-id".to_string(),
+            agent,
+            "--once".to_string(),
+            prompt,
+            "--actor".to_string(),
+            actor,
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_control_plane_evidence_export(
+    config: BridgeConfig,
+    payload: ControlPlaneEvidenceExportPayload,
+) -> BridgeResult<Value> {
+    let run_id = match normalize_control_plane_id(&payload.run_id, "run_id") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let mut args = vec![
+        "control-plane".to_string(),
+        "evidence".to_string(),
+        "export".to_string(),
+        "--run-id".to_string(),
+        run_id,
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    if let Some(output_dir) = payload.output_dir {
+        if !output_dir.trim().is_empty() {
+            args.push("--output".to_string());
+            args.push(output_dir.trim().to_string());
+        }
+    }
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_control_plane_evidence_verify(
+    config: BridgeConfig,
+    manifest_path: String,
+) -> BridgeResult<Value> {
+    let path = match normalize_required_path(&manifest_path, "manifest_path", "evidence verify") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "control-plane".to_string(),
+            "evidence".to_string(),
+            "verify".to_string(),
+            "--path".to_string(),
+            path,
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_control_plane_claims_verify(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "control-plane".to_string(),
+            "claims".to_string(),
+            "verify".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
         ],
     )
     .await
@@ -2169,6 +2400,25 @@ fn normalize_job_id(job_id: &str) -> Result<String, BridgeError> {
             "Invalid job_id format.",
             "",
             "job_id validation",
+            false,
+        ));
+    }
+    Ok(normalized.to_string())
+}
+
+fn normalize_control_plane_id(value: &str, field: &str) -> Result<String, BridgeError> {
+    let normalized = value.trim();
+    let valid = !normalized.is_empty()
+        && normalized.len() <= 160
+        && normalized
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'));
+    if !valid {
+        return Err(BridgeError::new(
+            "INVALID_INPUT",
+            format!("Invalid {field} format."),
+            "",
+            "control-plane id validation",
             false,
         ));
     }

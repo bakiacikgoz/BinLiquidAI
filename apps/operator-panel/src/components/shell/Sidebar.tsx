@@ -2,12 +2,17 @@ import { Icon, type IconName } from '../primitives/Icon';
 import { StatusDot } from '../primitives/StatusDot';
 
 export type ShellViewKey =
+  | 'dashboard'
+  | 'agents'
   | 'workspace'
   | 'assistant'
   | 'tasks'
   | 'approvals'
   | 'runs'
+  | 'evidence'
+  | 'policy'
   | 'system'
+  | 'surfaces'
   | 'operations'
   | 'settings';
 
@@ -49,22 +54,25 @@ export function Sidebar({
     {
       title: 'ÇALIŞMA ALANI',
       items: [
+        { id: 'dashboard', key: 'dashboard', label: 'Dashboard', icon: 'home' },
+        { id: 'agents', key: 'agents', label: 'Agents', icon: 'users' },
+        { id: 'runs', key: 'runs', label: 'Çalıştırmalar', icon: 'terminal' },
+        { id: 'approvals', key: 'approvals', label: 'Onaylar', icon: 'check', badgeCount: pendingApprovalCount },
+        { id: 'evidence', key: 'evidence', label: 'Evidence', icon: 'archive' },
+        { id: 'policy', key: 'policy', label: 'Policy', icon: 'policy' },
+        { id: 'surfaces', key: 'surfaces', label: 'Execution Surfaces', icon: 'shield' },
         { id: 'mission-control', key: 'workspace', label: 'Mission Control', icon: 'target' },
         ...(assistantEnabled
           ? [{ id: 'ai-assistant', key: 'assistant' as const, label: 'AI Assistant', icon: 'sparkle' as const }]
           : []),
-        { id: 'runs', key: 'runs', label: 'Çalıştırmalar', icon: 'terminal' },
         { id: 'tasks', key: 'tasks', label: 'Görevler', icon: 'list' },
-        { id: 'approvals', key: 'approvals', label: 'Onaylar', icon: 'check', badgeCount: pendingApprovalCount },
-        { id: 'executions', key: 'operations', label: 'Yürütmeler', icon: 'clipboard' },
       ],
     },
     {
       title: 'SİSTEM',
       items: [
         { id: 'system-health', key: 'system', label: 'Sistem Sağlığı', icon: 'layers' },
-        { id: 'resources', key: 'system', label: 'Kaynaklar', icon: 'box', activeWhen: [] },
-        { id: 'connections', key: 'system', label: 'Bağlantılar', icon: 'gauge', activeWhen: [] },
+        { id: 'operations', key: 'operations', label: 'Yürütmeler', icon: 'clipboard' },
         { id: 'settings', key: 'settings', label: 'Ayarlar', icon: 'settings' },
       ],
     },
@@ -104,7 +112,7 @@ export function Sidebar({
         </div>
         <div>
           <h1>AegisOS</h1>
-          <p>Operator Runtime</p>
+          <p>Agent Control Plane</p>
         </div>
         <button
           type="button"

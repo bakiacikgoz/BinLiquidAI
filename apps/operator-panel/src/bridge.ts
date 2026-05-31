@@ -14,6 +14,10 @@ import {
   previewBackupCreate,
   previewBackupVerify,
   previewComputerUseControl,
+  previewControlPlaneAgentList,
+  previewControlPlaneClaims,
+  previewControlPlaneDoctor,
+  previewControlPlanePolicySimulation,
   previewComputerUseSummary,
   previewComputerUseSessionState,
   previewComputerUseSubmitResponse,
@@ -147,6 +151,17 @@ export interface KeyRotatePlanOptions {
   retireAfter?: string;
 }
 
+export interface ControlPlaneRunSubmitOptions {
+  agentId: string;
+  prompt: string;
+  operatorId: string;
+}
+
+export interface ControlPlaneEvidenceExportOptions {
+  runId: string;
+  outputDir?: string;
+}
+
 export type AssistantEventUnlisten = () => void;
 
 export class BridgeError extends Error {
@@ -231,6 +246,135 @@ export async function handshake(settings: PanelSettings): Promise<unknown> {
     return previewHandshake(settings);
   }
   return callBridge('bridge_handshake', { config: toBridgeConfig(settings) });
+}
+
+export async function fetchControlPlaneDoctor(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewControlPlaneDoctor(settings);
+  }
+  return callBridge('bridge_control_plane_doctor', { config: toBridgeConfig(settings) });
+}
+
+export async function listControlPlaneAgents(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewControlPlaneAgentList();
+  }
+  return callBridge('bridge_control_plane_agent_list', { config: toBridgeConfig(settings) });
+}
+
+export async function simulateControlPlanePolicy(
+  settings: PanelSettings,
+  agentId: string,
+): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewControlPlanePolicySimulation();
+  }
+  return callBridge('bridge_control_plane_policy_simulate', {
+    config: toBridgeConfig(settings),
+    agentId,
+  });
+}
+
+export async function submitControlPlaneRun(
+  settings: PanelSettings,
+  options: ControlPlaneRunSubmitOptions,
+): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return {
+      version: 'control-plane.run/v1',
+      run_id: 'cp-run-preview-001',
+      agent_id: options.agentId,
+      profile: settings.profile,
+      status: 'approval_pending',
+      submitted_by: `ui:${options.operatorId}`,
+      identity_ref: 'identity:preview',
+      input_hash: 'sha256:preview',
+      policy_hash: 'sha256:preview',
+      started_at: '2026-05-31T00:00:00Z',
+      completed_at: null,
+      approval_ids: ['apr-preview-control-plane'],
+      artifact_refs: [],
+      evidence_pack_id: null,
+      blocking_reasons: [],
+      next_actions: ['approval.show', 'approval.decide', 'approval.execute'],
+    };
+  }
+  return callBridge('bridge_control_plane_run_submit', {
+    config: toBridgeConfig(settings, 30000),
+    payload: {
+      agentId: options.agentId,
+      prompt: options.prompt,
+      operatorId: options.operatorId,
+    },
+  });
+}
+
+export async function exportControlPlaneEvidence(
+  settings: PanelSettings,
+  options: ControlPlaneEvidenceExportOptions,
+): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return {
+      version: 'control-plane.evidence-pack/v1',
+      pack_id: `evp-${options.runId}`,
+      run_id: options.runId,
+      agent_id: 'governed-ops',
+      profile: settings.profile,
+      runtime_version: '0.4.1',
+      git_commit: 'preview',
+      generated_at: '2026-05-31T00:00:00Z',
+      items: [],
+      redaction_summary: {
+        raw_screenshots_persisted: 0,
+        secrets_redacted: true,
+        pii_redaction_enabled: true,
+      },
+      verification: {
+        hash_chain_verified: true,
+        signature_verified: true,
+        replay_verified: true,
+      },
+      signature: {
+        mode: 'ed25519_local_file',
+        key_id: 'enterprise-signing-current',
+        algorithm: 'ed25519',
+        signature_ref: 'manifest.integrity.signature',
+      },
+      warnings: [],
+    };
+  }
+  return callBridge('bridge_control_plane_evidence_export', {
+    config: toBridgeConfig(settings, 60000),
+    payload: { runId: options.runId, outputDir: options.outputDir },
+  });
+}
+
+export async function verifyControlPlaneEvidence(
+  settings: PanelSettings,
+  manifestPath: string,
+): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return {
+      status: 'pass',
+      hash_chain_verified: true,
+      signature_verified: true,
+      required_items_present: true,
+      replay_verified: true,
+      blocking_reasons: [],
+      warnings: [],
+    };
+  }
+  return callBridge('bridge_control_plane_evidence_verify', {
+    config: toBridgeConfig(settings, 30000),
+    manifestPath,
+  });
+}
+
+export async function verifyControlPlaneClaims(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewControlPlaneClaims();
+  }
+  return callBridge('bridge_control_plane_claims_verify', { config: toBridgeConfig(settings) });
 }
 
 export async function fetchApprovals(settings: PanelSettings): Promise<unknown> {

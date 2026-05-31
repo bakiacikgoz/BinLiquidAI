@@ -10,6 +10,7 @@ import {
   executeApproval,
   exportRunArtifacts,
   exportSupportBundle,
+  fetchControlPlaneDoctor,
   fetchApprovals,
   getComputerUseSummary,
   getComputerUseSessionState,
@@ -19,6 +20,7 @@ import {
   fetchSecurityBaseline,
   getRunReplay,
   getRunStatus,
+  listControlPlaneAgents,
   handshake,
   isBridgePreviewMode,
   listRuns,
@@ -30,6 +32,7 @@ import {
   resumeTeamRun,
   rotateKeyPlan,
   runQualification,
+  simulateControlPlanePolicy,
   snapshotMetrics,
   stopComputerUseSession,
   submitComputerUseRun,
@@ -38,6 +41,7 @@ import {
   verifyBackup,
   verifyRestore,
   verifySignedArtifact,
+  verifyControlPlaneClaims,
   showApproval,
 } from './bridge';
 import {
@@ -81,11 +85,30 @@ import { MissionControlView } from './components/mission/MissionControlView';
 import { ComputerUseOperationsCard } from './components/mission/ComputerUseOperationsCard';
 import { AssistantView, type AssistantViewCopy } from './components/assistant/AssistantView';
 import { AssistantRightRail, type AssistantRuntimeSummary } from './components/assistant/AssistantRightRail';
+import { AgentRegistryView } from './components/control-plane/AgentRegistryView';
+import { ClaimBoundaryBanner } from './components/control-plane/ClaimBoundaryBanner';
+import { ControlPlaneDashboard } from './components/control-plane/ControlPlaneDashboard';
+import { EvidencePackView } from './components/control-plane/EvidencePackView';
+import { ExecutionSurfacesView } from './components/control-plane/ExecutionSurfacesView';
+import { PolicySimulationView } from './components/control-plane/PolicySimulationView';
 import { AppShell } from './components/shell/AppShell';
 import { RightRail } from './components/shell/RightRail';
 import type { ShellViewKey } from './components/shell/Sidebar';
 
-type ViewKey = 'workspace' | 'assistant' | 'tasks' | 'approvals' | 'runs' | 'system' | 'operations' | 'settings';
+type ViewKey =
+  | 'dashboard'
+  | 'agents'
+  | 'workspace'
+  | 'assistant'
+  | 'tasks'
+  | 'approvals'
+  | 'runs'
+  | 'evidence'
+  | 'policy'
+  | 'system'
+  | 'surfaces'
+  | 'operations'
+  | 'settings';
 type RunTabKey = 'overview' | 'stream' | 'approvals' | 'artifacts' | 'replay' | 'diagnostics';
 type OperationTabKey = 'identity' | 'qualification' | 'security' | 'keys' | 'support' | 'maintenance';
 type AutomationMode = 'assisted' | 'supervised';
@@ -210,6 +233,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [handshakeData, setHandshakeData] = useState<unknown>(null);
   const [configData, setConfigData] = useState<unknown>(null);
   const [handshakeError, setHandshakeError] = useState<BridgeErrorPayload | null>(null);
+  const [controlPlaneDoctor, setControlPlaneDoctor] = useState<unknown>(null);
+  const [controlPlaneAgents, setControlPlaneAgents] = useState<unknown>({ agents: [] });
+  const [controlPlanePolicy, setControlPlanePolicy] = useState<unknown>(null);
+  const [controlPlaneClaims, setControlPlaneClaims] = useState<unknown>({ claims: [] });
+  const [controlPlaneEvidence] = useState<unknown>(null);
 
   const [approvalsData, setApprovalsData] = useState<unknown>({ pending: [] });
   const [selectedApprovalId, setSelectedApprovalId] = useState('');
@@ -440,12 +468,33 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
+  async function refreshControlPlane() {
+    try {
+      const [doctorPayload, agentsPayload, claimsPayload, policyPayload] = await Promise.all([
+        fetchControlPlaneDoctor(settings).catch((error) => ({ status: 'blocked', error: getErrorPayload(error)?.message })),
+        listControlPlaneAgents(settings).catch(() => ({ agents: [] })),
+        verifyControlPlaneClaims(settings).catch(() => ({ claims: [] })),
+        simulateControlPlanePolicy(settings, 'governed-ops').catch(() => null),
+      ]);
+      setControlPlaneDoctor(doctorPayload);
+      setControlPlaneAgents(agentsPayload);
+      setControlPlaneClaims(claimsPayload);
+      setControlPlanePolicy(policyPayload);
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
   async function refreshCore() {
     await Promise.all([
       refreshHandshake(),
       refreshConfig(),
       refreshApprovals(),
       refreshRuns(),
+      refreshControlPlane(),
     ]);
   }
 
@@ -1244,6 +1293,50 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <div>{`${handshakeError.code}: ${handshakeError.message}`}</div>
             <small>{handshakeError.command}</small>
           </div>
+        ) : null}
+
+        {activeView === 'dashboard' ? (
+          <ControlPlaneDashboard
+            doctor={controlPlaneDoctor}
+            agents={controlPlaneAgents}
+            claims={controlPlaneClaims}
+            pendingApprovals={pendingApprovals.length}
+          />
+        ) : null}
+
+        {activeView === 'agents' ? <AgentRegistryView agents={controlPlaneAgents} /> : null}
+
+        {activeView === 'policy' ? <PolicySimulationView simulation={controlPlanePolicy} /> : null}
+
+        {activeView === 'evidence' ? (
+          <section className="workspace">
+            <div className="workspace-header">
+              <div>
+                <p className="workspace-kicker">Evidence</p>
+                <h2>Signed Evidence</h2>
+                <p className="workspace-lead">Manifest integrity, replay verification and release boundaries.</p>
+              </div>
+              <div className="workspace-actions">
+                <button
+                  className="ghost-btn"
+                  type="button"
+                  onClick={() => void refreshControlPlane()}
+                >
+                  Refresh claims
+                </button>
+              </div>
+            </div>
+            <div className="section-grid two-up">
+              <EvidencePackView evidence={controlPlaneEvidence} />
+              <ClaimBoundaryBanner claims={controlPlaneClaims} />
+            </div>
+          </section>
+        ) : null}
+
+        {activeView === 'surfaces' ? (
+          <ExecutionSurfacesView
+            computerUseCapability={computerUseVisionCapability.capabilityResolution}
+          />
         ) : null}
 
         {activeView === 'workspace' ? (
