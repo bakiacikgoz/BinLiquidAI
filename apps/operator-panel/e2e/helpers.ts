@@ -165,6 +165,5 @@ export async function expectNoHorizontalOverflow(page: Page, context: string): P
 export function operationOutput(page: Page) {
   return page
     .locator('article.page-card')
-    .filter({ has: page.getByRole('heading', { name: 'Operation output', exact: true }) })
-    .locator('pre');
+    .filter({ has: page.getByRole('heading', { name: 'Operation output', exact: true }) });
 }

@@ -17,10 +17,10 @@ test('runs workspace exposes artifact, replay, and diagnostics tabs safely', asy
   const showRaw = page.getByRole('button', { name: 'Show raw', exact: true });
   await expect(showRaw).toBeDisabled();
   await expect(showRaw).toHaveAttribute('title', 'Ham payload modu ayarlardan açılmalı.');
-  await expect(page.locator('.artifact-panel pre')).toContainText('contract_version');
+  await expect(page.getByTestId('artifact-summary')).toContainText('contract_version');
 
   await page.getByRole('button', { name: 'Replay', exact: true }).click();
-  await expect(page.locator('pre')).toContainText('audit-hash-preview');
+  await expect(page.getByTestId('run-replay-summary')).toContainText('audit-hash-preview');
 
   await page.getByRole('button', { name: 'Diagnostics', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Drift signals', exact: true })).toBeVisible();

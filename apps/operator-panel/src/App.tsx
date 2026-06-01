@@ -91,6 +91,7 @@ import { ControlPlaneDashboard } from './components/control-plane/ControlPlaneDa
 import { EvidencePackView } from './components/control-plane/EvidencePackView';
 import { ExecutionSurfacesView } from './components/control-plane/ExecutionSurfacesView';
 import { PolicySimulationView } from './components/control-plane/PolicySimulationView';
+import { RawInspector } from './components/control-plane/RawInspector';
 import {
   AlertsPage,
   LogsPage,
@@ -119,6 +120,11 @@ type Toast = {
 type AppContentProps = {
   settings: PanelSettings;
   updateSettings: (next: Partial<PanelSettings>) => void;
+};
+
+type PayloadSummaryRow = {
+  path: string;
+  value: string;
 };
 
 type TaskFormState = {
@@ -191,7 +197,98 @@ function getErrorPayload(error: unknown): BridgeErrorPayload | null {
 }
 
 function JsonPanel({ value }: { value: unknown }) {
-  return <pre className="json-panel">{JSON.stringify(value ?? {}, null, 2)}</pre>;
+  return <RawInspector value={value} />;
+}
+
+function PayloadSummary({
+  value,
+  title = 'Summary',
+  maxItems = 14,
+  testId,
+}: {
+  value: unknown;
+  title?: string;
+  maxItems?: number;
+  testId?: string;
+}) {
+  const rows = flattenPayloadSummary(value, maxItems);
+
+  return (
+    <div className="payload-summary" data-testid={testId}>
+      <p className="card-label">{title}</p>
+      {rows.length > 0 ? (
+        <dl className="metric-list payload-summary-list">
+          {rows.map((row) => (
+            <div className="metric-row" key={row.path}>
+              <dt>{row.path}</dt>
+              <dd>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="supporting">No summary fields available.</p>
+      )}
+    </div>
+  );
+}
+
+function flattenPayloadSummary(value: unknown, maxItems: number): PayloadSummaryRow[] {
+  const rows: PayloadSummaryRow[] = [];
+  const seen = new WeakSet<object>();
+
+  function visit(current: unknown, path: string, depth: number) {
+    if (rows.length >= maxItems || depth > 5) {
+      return;
+    }
+
+    const scalar = formatPayloadScalar(current);
+    if (scalar !== null) {
+      if (path) {
+        rows.push({ path, value: scalar });
+      }
+      return;
+    }
+
+    if (Array.isArray(current)) {
+      const scalarItems = current.map(formatPayloadScalar).filter((item): item is string => item !== null);
+      if (scalarItems.length === current.length && path) {
+        rows.push({ path, value: truncateSummaryValue(scalarItems.slice(0, 6).join(', ')) });
+        return;
+      }
+      current.slice(0, 4).forEach((item, index) => visit(item, path ? `${path}[${index}]` : `[${index}]`, depth + 1));
+      return;
+    }
+
+    if (current && typeof current === 'object') {
+      if (seen.has(current)) {
+        return;
+      }
+      seen.add(current);
+      Object.entries(current as Record<string, unknown>).forEach(([key, item]) => {
+        visit(item, path ? `${path}.${key}` : key, depth + 1);
+      });
+    }
+  }
+
+  visit(value, '', 0);
+  return rows;
+}
+
+function formatPayloadScalar(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return value ? truncateSummaryValue(value) : '(empty)';
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (value === null) {
+    return 'null';
+  }
+  return null;
+}
+
+function truncateSummaryValue(value: string): string {
+  return value.length > 140 ? `${value.slice(0, 137)}...` : value;
 }
 
 function mergeRunStatusWithSessionState(runStatusPayload: unknown, sessionStatePayload: unknown): unknown {
@@ -1727,7 +1824,14 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
               <article className="page-card">
                 <h3>{t.selectedApproval}</h3>
-                {selectedApprovalId ? <JsonPanel value={selectedApproval} /> : <p className="supporting">{t.noSelection}</p>}
+                {selectedApprovalId ? (
+                  <>
+                    <PayloadSummary value={selectedApproval} title="Approval summary" maxItems={18} />
+                    <JsonPanel value={selectedApproval} />
+                  </>
+                ) : (
+                  <p className="supporting">{t.noSelection}</p>
+                )}
               </article>
             </div>
           </section>
@@ -1819,7 +1923,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </div>
 
                 {!selectedRunId ? <p className="supporting">{t.selectRun}</p> : null}
-                {selectedRunId && runTab === 'overview' ? <JsonPanel value={runStatus} /> : null}
+                {selectedRunId && runTab === 'overview' ? (
+                  <>
+                    <PayloadSummary value={runStatus} title="Run summary" maxItems={18} />
+                    <JsonPanel value={runStatus} />
+                  </>
+                ) : null}
 
                 {selectedRunId && runTab === 'stream' ? (
                   <div className="timeline-panel">
@@ -1827,11 +1936,18 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     {events.length === 0 ? <p className="supporting">{t.noData}</p> : null}
                     {events.map((item, index) => {
                       const row = asRecord(item);
+                      const eventData = asRecord(row.data);
+                      const dataKeys = Object.keys(eventData);
                       return (
                         <div className="timeline-event" key={`${index}-${readString(row, 'timestamp', String(index))}`}>
                           <strong>{readString(row, 'event', 'event')}</strong>
                           <span>{readString(row, 'timestamp')}</span>
-                          <code>{JSON.stringify(row.data ?? {}, null, 2)}</code>
+                          {dataKeys.length > 0 ? (
+                            <span className="supporting">Payload keys: {dataKeys.slice(0, 4).join(', ')}</span>
+                          ) : (
+                            <span className="supporting">No structured payload fields.</span>
+                          )}
+                          <RawInspector value={eventData} label="Event raw payload" />
                         </div>
                       );
                     })}
@@ -1840,7 +1956,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
                 {selectedRunId && runTab === 'approvals' ? (
                   linkedApprovals.length > 0 ? (
-                    <JsonPanel value={linkedApprovals} />
+                    <>
+                      <PayloadSummary value={linkedApprovals} title="Approval summary" maxItems={18} />
+                      <JsonPanel value={linkedApprovals} />
+                    </>
                   ) : (
                     <p className="supporting">{t.noLinkedApprovals}</p>
                   )
@@ -1874,20 +1993,43 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                         {showRawArtifact ? t.hideRaw : t.showRaw}
                       </button>
                     </div>
+                    <PayloadSummary
+                      value={showRawArtifact ? parsedArtifact : artifactValue}
+                      title="Artifact summary"
+                      maxItems={20}
+                      testId="artifact-summary"
+                    />
                     <JsonPanel value={showRawArtifact ? parsedArtifact : artifactValue} />
                   </div>
                 ) : null}
 
-                {selectedRunId && runTab === 'replay' ? <JsonPanel value={runReplay} /> : null}
+                {selectedRunId && runTab === 'replay' ? (
+                  <>
+                    <PayloadSummary value={runReplay} title="Replay summary" maxItems={20} testId="run-replay-summary" />
+                    <JsonPanel value={runReplay} />
+                  </>
+                ) : null}
 
                 {selectedRunId && runTab === 'diagnostics' ? (
                   <div className="section-grid">
                     <article className="inner-card">
                       <h3>{t.driftSignals}</h3>
-                      {driftEvents.length > 0 ? <JsonPanel value={driftEvents} /> : <p className="supporting">{t.noDrift}</p>}
+                      {driftEvents.length > 0 ? (
+                        <>
+                          <PayloadSummary value={driftEvents} title="Drift summary" maxItems={12} />
+                          <JsonPanel value={driftEvents} />
+                        </>
+                      ) : (
+                        <p className="supporting">{t.noDrift}</p>
+                      )}
                     </article>
                     <article className="inner-card">
                       <h3>{t.systemContext}</h3>
+                      <PayloadSummary
+                        value={{ doctor: handshakeRecord.doctor ?? {}, config: configData ?? {} }}
+                        title="System summary"
+                        maxItems={12}
+                      />
                       <JsonPanel value={{ doctor: handshakeRecord.doctor ?? {}, config: configData ?? {} }} />
                     </article>
                   </div>
@@ -1941,18 +2083,39 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <div className="section-grid two-up">
               <article className="page-card">
                 <h3>{t.doctor}</h3>
+                <PayloadSummary value={doctor} title="Doctor summary" maxItems={12} />
                 <JsonPanel value={doctor} />
               </article>
               <article className="page-card">
                 <h3>{t.effectiveConfig}</h3>
+                <dl className="metric-list">
+                  <div className="metric-row">
+                    <dt>{t.profile}</dt>
+                    <dd>{readString(assistantResolvedConfig, 'profile_name', settings.profile)}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>{t.provider}</dt>
+                    <dd>{readString(assistantResolvedConfig, 'llm_provider', '-')}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>{t.model}</dt>
+                    <dd>{readString(assistantResolvedConfig, 'model_name', '-')}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>{t.hfModelId}</dt>
+                    <dd>{readString(assistantResolvedConfig, 'hf_model_id', '-')}</dd>
+                  </div>
+                </dl>
                 <JsonPanel value={configRecord} />
               </article>
               <article className="page-card">
                 <h3>{t.capabilities}</h3>
+                <PayloadSummary value={capabilities} title="Capabilities summary" maxItems={12} />
                 <JsonPanel value={capabilities} />
               </article>
               <article className="page-card">
                 <h3>{t.capabilityContract}</h3>
+                <PayloadSummary value={{ profiles: supportedProfiles, features }} title="Contract summary" maxItems={12} />
                 <JsonPanel value={{ profiles: supportedProfiles, features }} />
               </article>
             </div>
@@ -2027,6 +2190,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </article>
                 <article className="page-card">
                   <h3>{t.operationOutput}</h3>
+                  <PayloadSummary value={operationOutputs.identity ?? {}} title="Operation summary" maxItems={20} />
                   <JsonPanel value={operationOutputs.identity ?? {}} />
                 </article>
               </div>
@@ -2113,6 +2277,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </article>
                 <article className="page-card">
                   <h3>{t.operationOutput}</h3>
+                  <PayloadSummary value={operationOutput} title="Operation summary" maxItems={20} />
                   <JsonPanel value={operationOutput} />
                 </article>
               </div>
@@ -2128,6 +2293,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </article>
                 <article className="page-card">
                   <h3>{t.operationOutput}</h3>
+                  <PayloadSummary value={operationOutput} title="Operation summary" maxItems={20} />
                   <JsonPanel value={operationOutput} />
                 </article>
               </div>
@@ -2197,6 +2363,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </article>
                 <article className="page-card">
                   <h3>{t.operationOutput}</h3>
+                  <PayloadSummary value={operationOutput} title="Operation summary" maxItems={20} />
                   <JsonPanel value={operationOutput} />
                 </article>
               </div>
@@ -2223,6 +2390,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </article>
                 <article className="page-card">
                   <h3>{t.operationOutput}</h3>
+                  <PayloadSummary value={operationOutput} title="Operation summary" maxItems={20} />
                   <JsonPanel value={operationOutput} />
                 </article>
               </div>
@@ -2287,6 +2455,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </article>
                 <article className="page-card">
                   <h3>{t.operationOutput}</h3>
+                  <PayloadSummary value={operationOutput} title="Operation summary" maxItems={20} />
                   <JsonPanel value={operationOutput} />
                 </article>
               </div>

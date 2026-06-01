@@ -1,3 +1,5 @@
+import { RawInspector } from './RawInspector';
+
 export function AgentDetailView({ agent }: { agent: unknown }) {
-  return <pre className="json-panel">{JSON.stringify(agent ?? {}, null, 2)}</pre>;
+  return <RawInspector value={agent} label="Agent raw payload" />;
 }

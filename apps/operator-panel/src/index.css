@@ -752,6 +752,44 @@ body::before {
   line-height: 1.55;
 }
 
+.raw-inspector {
+  margin-top: 0.8rem;
+}
+
+.raw-inspector summary {
+  cursor: pointer;
+}
+
+.raw-inspector-description {
+  margin: 0.55rem 0 0.8rem;
+}
+
+.payload-summary {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.payload-summary .card-label {
+  margin: 0;
+}
+
+.payload-summary-list .metric-row {
+  align-items: flex-start;
+}
+
+.payload-summary-list dt,
+.payload-summary-list dd {
+  overflow-wrap: anywhere;
+}
+
+.payload-summary-list dt {
+  color: var(--fg-muted);
+}
+
+.payload-summary-list dd {
+  text-align: right;
+}
+
 .toast-zone {
   position: fixed;
   right: var(--space-5);

@@ -1,3 +1,5 @@
+import { RawInspector } from './RawInspector';
+
 export function RunTimelineView({ runs }: { runs: unknown }) {
-  return <pre className="json-panel">{JSON.stringify(runs ?? {}, null, 2)}</pre>;
+  return <RawInspector value={runs} label="Run timeline raw payload" />;
 }

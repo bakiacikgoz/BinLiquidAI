@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Badge, type BadgeTone } from '../primitives/Badge';
 import { Icon } from '../primitives/Icon';
 import { SectionHeader } from '../primitives/SectionHeader';
+import { RawInspector } from '../control-plane/RawInspector';
 import { redactJson } from '../../redactJson';
 import type { ComputerUseCapabilityResolution } from '../../capabilities';
 
@@ -85,7 +86,13 @@ export function RuntimeSummaryCard({
         <ComputerUseCapabilityPanel resolution={computerUseCapabilityResolution} />
       ) : null}
       {showRaw ? (
-        <pre className="json-panel runtime-raw-panel">{JSON.stringify(redactJson(rawJson ?? {}), null, 2)}</pre>
+        <RawInspector
+          value={redactJson(rawJson ?? {})}
+          label="Runtime raw payload"
+          description="Redacted runtime payload for operator debugging."
+          defaultOpen
+          className="runtime-raw-panel"
+        />
       ) : null}
     </div>
   );
