@@ -11,6 +11,7 @@ pub fn run() {
             bridge::bridge_approval_decide,
             bridge::bridge_approval_execute,
             bridge::bridge_control_plane_doctor,
+            bridge::bridge_control_plane_snapshot,
             bridge::bridge_control_plane_agent_list,
             bridge::bridge_control_plane_agent_register,
             bridge::bridge_control_plane_policy_simulate,

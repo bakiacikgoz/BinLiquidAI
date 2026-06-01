@@ -44,6 +44,7 @@ from binliquid.control_plane.policy_simulator import PolicySimulator
 from binliquid.control_plane.readiness import build_readiness_report
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
+from binliquid.control_plane.snapshot import build_control_plane_snapshot
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import Planner
@@ -799,6 +800,33 @@ def control_plane_doctor(
         "claim_guard_available": True,
         "blocking_reasons": blocking_reasons,
     }
+    _emit_payload(payload, json_output=json_output)
+
+
+@control_plane_app.command("snapshot")
+def control_plane_snapshot(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(
+        ".binliquid/control-plane",
+        "--root-dir",
+        help="Control Plane state root.",
+    ),
+    evidence_root: str = typer.Option(
+        "artifacts",
+        "--evidence-root",
+        help="Evidence/report artifact root.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    snapshot = build_control_plane_snapshot(
+        root_dir=root_dir,
+        profile=profile,
+        evidence_root=evidence_root,
+        runtime_mode="cli",
+        bridge_mode="cli",
+        used_fixture=False,
+    )
+    payload = snapshot.model_dump(mode="json", by_alias=True)
     _emit_payload(payload, json_output=json_output)
 
 

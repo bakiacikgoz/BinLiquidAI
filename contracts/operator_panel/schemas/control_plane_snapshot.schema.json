@@ -1,0 +1,1435 @@
+{
+  "$defs": {
+    "AdminSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "permissionMatrix": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Permissionmatrix",
+          "type": "object"
+        },
+        "policyPacks": {
+          "items": {
+            "$ref": "#/$defs/PolicyPackSummary"
+          },
+          "title": "Policypacks",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/RoleSummary"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "source": {
+          "enum": [
+            "local_fixture",
+            "identity_assertion",
+            "external_idp_placeholder"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "users": {
+          "items": {
+            "$ref": "#/$defs/UserSummary"
+          },
+          "title": "Users",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "AdminSummary",
+      "type": "object"
+    },
+    "AgentSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "agentId": {
+          "title": "Agentid",
+          "type": "string"
+        },
+        "displayName": {
+          "title": "Displayname",
+          "type": "string"
+        },
+        "lastEvidencePackId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastevidencepackid"
+        },
+        "lastRunId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastrunid"
+        },
+        "ownerTeam": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ownerteam"
+        },
+        "readiness": {
+          "title": "Readiness",
+          "type": "string"
+        },
+        "runtimeKind": {
+          "title": "Runtimekind",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentId",
+        "displayName",
+        "runtimeKind",
+        "status",
+        "readiness"
+      ],
+      "title": "AgentSummary",
+      "type": "object"
+    },
+    "AlertSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "alertId": {
+          "title": "Alertid",
+          "type": "string"
+        },
+        "linkedEvidencePackId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Linkedevidencepackid"
+        },
+        "linkedRunId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Linkedrunid"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "recommendedAction": {
+          "title": "Recommendedaction",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "resolved"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "alertId",
+        "severity",
+        "status",
+        "title",
+        "reasonCode",
+        "recommendedAction"
+      ],
+      "title": "AlertSummary",
+      "type": "object"
+    },
+    "ApprovalSnapshotSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "actionHash": {
+          "title": "Actionhash",
+          "type": "string"
+        },
+        "actor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actor"
+        },
+        "approvalId": {
+          "title": "Approvalid",
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "disabledReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disabledreason"
+        },
+        "executionStatus": {
+          "title": "Executionstatus",
+          "type": "string"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "title": "Expiresat",
+          "type": "string"
+        },
+        "policyHash": {
+          "title": "Policyhash",
+          "type": "string"
+        },
+        "requestHash": {
+          "title": "Requesthash",
+          "type": "string"
+        },
+        "runId": {
+          "title": "Runid",
+          "type": "string"
+        },
+        "snapshotHash": {
+          "title": "Snapshothash",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "targetKind": {
+          "title": "Targetkind",
+          "type": "string"
+        },
+        "targetRef": {
+          "title": "Targetref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approvalId",
+        "runId",
+        "status",
+        "targetKind",
+        "targetRef",
+        "actionHash",
+        "policyHash",
+        "requestHash",
+        "snapshotHash",
+        "executionStatus",
+        "createdAt",
+        "expiresAt"
+      ],
+      "title": "ApprovalSnapshotSummary",
+      "type": "object"
+    },
+    "DashboardSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "activeAlertCount": {
+          "title": "Activealertcount",
+          "type": "integer"
+        },
+        "agentCount": {
+          "title": "Agentcount",
+          "type": "integer"
+        },
+        "blockedClaimCount": {
+          "title": "Blockedclaimcount",
+          "type": "integer"
+        },
+        "conditionalClaimCount": {
+          "title": "Conditionalclaimcount",
+          "type": "integer"
+        },
+        "evidencePackCount": {
+          "title": "Evidencepackcount",
+          "type": "integer"
+        },
+        "pendingApprovalCount": {
+          "title": "Pendingapprovalcount",
+          "type": "integer"
+        },
+        "runCount": {
+          "title": "Runcount",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentCount",
+        "runCount",
+        "pendingApprovalCount",
+        "evidencePackCount",
+        "activeAlertCount",
+        "blockedClaimCount",
+        "conditionalClaimCount"
+      ],
+      "title": "DashboardSummary",
+      "type": "object"
+    },
+    "DataSourceState": {
+      "additionalProperties": false,
+      "properties": {
+        "ageMs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agems"
+        },
+        "contractVersion": {
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "freshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown"
+          ],
+          "title": "Freshness",
+          "type": "string"
+        },
+        "isMock": {
+          "title": "Ismock",
+          "type": "boolean"
+        },
+        "isSilentFallback": {
+          "title": "Issilentfallback",
+          "type": "boolean"
+        },
+        "lastRefreshUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastrefreshutc"
+        },
+        "mode": {
+          "enum": [
+            "preview_fixture",
+            "tauri_live",
+            "cli_live",
+            "stale_cache",
+            "error"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "sourceReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sourcereason"
+        }
+      },
+      "required": [
+        "mode",
+        "isMock",
+        "isSilentFallback",
+        "freshness",
+        "contractVersion"
+      ],
+      "title": "DataSourceState",
+      "type": "object"
+    },
+    "EvidencePackSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactCount": {
+          "title": "Artifactcount",
+          "type": "integer"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "claimGuardStatus": {
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Claimguardstatus",
+          "type": "string"
+        },
+        "createdAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Createdatutc"
+        },
+        "exportPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exportpath"
+        },
+        "hashChainStatus": {
+          "enum": [
+            "pending",
+            "valid",
+            "broken"
+          ],
+          "title": "Hashchainstatus",
+          "type": "string"
+        },
+        "packId": {
+          "title": "Packid",
+          "type": "string"
+        },
+        "redactionStatus": {
+          "enum": [
+            "passed",
+            "warning",
+            "failed",
+            "unknown"
+          ],
+          "title": "Redactionstatus",
+          "type": "string"
+        },
+        "replayStatus": {
+          "enum": [
+            "not_available",
+            "pending",
+            "passed",
+            "failed"
+          ],
+          "title": "Replaystatus",
+          "type": "string"
+        },
+        "runId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runid"
+        },
+        "signatureStatus": {
+          "enum": [
+            "missing",
+            "pending",
+            "valid",
+            "invalid"
+          ],
+          "title": "Signaturestatus",
+          "type": "string"
+        }
+      },
+      "required": [
+        "packId",
+        "signatureStatus",
+        "hashChainStatus",
+        "replayStatus",
+        "claimGuardStatus",
+        "redactionStatus",
+        "artifactCount"
+      ],
+      "title": "EvidencePackSummary",
+      "type": "object"
+    },
+    "ExecutionSurfaceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "claimId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Claimid"
+        },
+        "humanSummary": {
+          "title": "Humansummary",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked",
+            "not_applicable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "surfaceId": {
+          "title": "Surfaceid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surfaceId",
+        "label",
+        "status",
+        "humanSummary"
+      ],
+      "title": "ExecutionSurfaceSummary",
+      "type": "object"
+    },
+    "LogEventSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "eventId": {
+          "title": "Eventid",
+          "type": "string"
+        },
+        "evidencePackId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidencepackid"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "runId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runid"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "eventId",
+        "timestamp",
+        "severity",
+        "source",
+        "message"
+      ],
+      "title": "LogEventSummary",
+      "type": "object"
+    },
+    "OperationDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "identity",
+            "qualification",
+            "security",
+            "keys",
+            "support",
+            "backup",
+            "restore",
+            "migration"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "disabledReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disabledreason"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "lastResult": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationResultSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "operationId": {
+          "title": "Operationid",
+          "type": "string"
+        },
+        "permission": {
+          "title": "Permission",
+          "type": "string"
+        },
+        "riskLevel": {
+          "enum": [
+            "read_only",
+            "low",
+            "medium",
+            "high",
+            "destructive"
+          ],
+          "title": "Risklevel",
+          "type": "string"
+        },
+        "supportsDryRun": {
+          "title": "Supportsdryrun",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operationId",
+        "category",
+        "label",
+        "description",
+        "riskLevel",
+        "permission",
+        "supportsDryRun",
+        "enabled"
+      ],
+      "title": "OperationDescriptor",
+      "type": "object"
+    },
+    "OperationResultSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "errorCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Errorcode"
+        },
+        "generatedAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generatedatutc"
+        },
+        "status": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "summary"
+      ],
+      "title": "OperationResultSummary",
+      "type": "object"
+    },
+    "PolicyPackSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "packId": {
+          "title": "Packid",
+          "type": "string"
+        },
+        "policyHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policyhash"
+        },
+        "ruleCount": {
+          "default": 0,
+          "title": "Rulecount",
+          "type": "integer"
+        },
+        "sourcePath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sourcepath"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "available",
+            "missing",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "packId",
+        "label",
+        "version",
+        "status"
+      ],
+      "title": "PolicyPackSummary",
+      "type": "object"
+    },
+    "QuickActionSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "disabledReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disabledreason"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actionId",
+        "label",
+        "enabled"
+      ],
+      "title": "QuickActionSummary",
+      "type": "object"
+    },
+    "ReportSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "generatedAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generatedatutc"
+        },
+        "kind": {
+          "enum": [
+            "readiness",
+            "evidence",
+            "qualification",
+            "support",
+            "security",
+            "metrics"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "reportId": {
+          "title": "Reportid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reportId",
+        "kind",
+        "title",
+        "status"
+      ],
+      "title": "ReportSummary",
+      "type": "object"
+    },
+    "RoleSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "assignmentCount": {
+          "default": 0,
+          "title": "Assignmentcount",
+          "type": "integer"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "riskLevel": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Risklevel",
+          "type": "string"
+        },
+        "roleId": {
+          "title": "Roleid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roleId",
+        "label",
+        "riskLevel"
+      ],
+      "title": "RoleSummary",
+      "type": "object"
+    },
+    "RunSnapshotSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "agentId": {
+          "title": "Agentid",
+          "type": "string"
+        },
+        "approvalIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Approvalids",
+          "type": "array"
+        },
+        "artifactRefs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifactrefs",
+          "type": "array"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completedat"
+        },
+        "evidencePackId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidencepackid"
+        },
+        "identityRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Identityref"
+        },
+        "inputHash": {
+          "title": "Inputhash",
+          "type": "string"
+        },
+        "nextActions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Nextactions",
+          "type": "array"
+        },
+        "policyHash": {
+          "title": "Policyhash",
+          "type": "string"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "runId": {
+          "title": "Runid",
+          "type": "string"
+        },
+        "startedAt": {
+          "format": "date-time",
+          "title": "Startedat",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "submittedBy": {
+          "title": "Submittedby",
+          "type": "string"
+        }
+      },
+      "required": [
+        "runId",
+        "agentId",
+        "profile",
+        "status",
+        "submittedBy",
+        "inputHash",
+        "policyHash",
+        "startedAt"
+      ],
+      "title": "RunSnapshotSummary",
+      "type": "object"
+    },
+    "SystemHealthState": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "title": "Confidence",
+          "type": "string"
+        },
+        "humanSummary": {
+          "title": "Humansummary",
+          "type": "string"
+        },
+        "lastDoctorStatus": {
+          "title": "Lastdoctorstatus",
+          "type": "string"
+        },
+        "missingSignals": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missingsignals",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "healthy",
+            "partial",
+            "degraded",
+            "blocked",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "confidence",
+        "lastDoctorStatus",
+        "humanSummary"
+      ],
+      "title": "SystemHealthState",
+      "type": "object"
+    },
+    "SystemSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "additionalProperties": true,
+          "title": "Capabilities",
+          "type": "object"
+        },
+        "configSummary": {
+          "additionalProperties": true,
+          "title": "Configsummary",
+          "type": "object"
+        },
+        "contractVersion": {
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "coreVersion": {
+          "title": "Coreversion",
+          "type": "string"
+        },
+        "doctor": {
+          "additionalProperties": true,
+          "title": "Doctor",
+          "type": "object"
+        },
+        "health": {
+          "$ref": "#/$defs/SystemHealthState"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "rootDir": {
+          "title": "Rootdir",
+          "type": "string"
+        },
+        "sourceMap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Sourcemap",
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "profile",
+        "rootDir",
+        "coreVersion",
+        "contractVersion",
+        "health"
+      ],
+      "title": "SystemSummary",
+      "type": "object"
+    },
+    "UserSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "issuer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Issuer"
+        },
+        "lastSeenUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastseenutc"
+        },
+        "permissions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "expired",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "userId": {
+          "title": "Userid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "userId",
+        "subject",
+        "status"
+      ],
+      "title": "UserSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "admin": {
+      "$ref": "#/$defs/AdminSummary"
+    },
+    "agents": {
+      "items": {
+        "$ref": "#/$defs/AgentSummary"
+      },
+      "title": "Agents",
+      "type": "array"
+    },
+    "alerts": {
+      "items": {
+        "$ref": "#/$defs/AlertSummary"
+      },
+      "title": "Alerts",
+      "type": "array"
+    },
+    "approvals": {
+      "items": {
+        "$ref": "#/$defs/ApprovalSnapshotSummary"
+      },
+      "title": "Approvals",
+      "type": "array"
+    },
+    "contractVersion": {
+      "const": "control-plane.snapshot/v1",
+      "default": "control-plane.snapshot/v1",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "dashboard": {
+      "$ref": "#/$defs/DashboardSummary"
+    },
+    "dataSource": {
+      "$ref": "#/$defs/DataSourceState"
+    },
+    "evidencePacks": {
+      "items": {
+        "$ref": "#/$defs/EvidencePackSummary"
+      },
+      "title": "Evidencepacks",
+      "type": "array"
+    },
+    "executionSurfaces": {
+      "items": {
+        "$ref": "#/$defs/ExecutionSurfaceSummary"
+      },
+      "title": "Executionsurfaces",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "logs": {
+      "items": {
+        "$ref": "#/$defs/LogEventSummary"
+      },
+      "title": "Logs",
+      "type": "array"
+    },
+    "operations": {
+      "items": {
+        "$ref": "#/$defs/OperationDescriptor"
+      },
+      "title": "Operations",
+      "type": "array"
+    },
+    "partialReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Partialreasons",
+      "type": "array"
+    },
+    "policyPacks": {
+      "items": {
+        "$ref": "#/$defs/PolicyPackSummary"
+      },
+      "title": "Policypacks",
+      "type": "array"
+    },
+    "quickActions": {
+      "items": {
+        "$ref": "#/$defs/QuickActionSummary"
+      },
+      "title": "Quickactions",
+      "type": "array"
+    },
+    "reports": {
+      "items": {
+        "$ref": "#/$defs/ReportSummary"
+      },
+      "title": "Reports",
+      "type": "array"
+    },
+    "runs": {
+      "items": {
+        "$ref": "#/$defs/RunSnapshotSummary"
+      },
+      "title": "Runs",
+      "type": "array"
+    },
+    "system": {
+      "$ref": "#/$defs/SystemSummary"
+    }
+  },
+  "required": [
+    "generatedAtUtc",
+    "dataSource",
+    "system",
+    "dashboard",
+    "admin"
+  ],
+  "title": "ControlPlaneSnapshot",
+  "type": "object"
+}

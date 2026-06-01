@@ -1,0 +1,276 @@
+{
+  "admin": {
+    "permissionMatrix": {
+      "viewer": [
+        "config.read"
+      ]
+    },
+    "policyPacks": [
+      {
+        "blockingReasons": [],
+        "label": "Preview runtime policy",
+        "packId": "preview-policy",
+        "policyHash": "sha256:preview-policy",
+        "ruleCount": 4,
+        "sourcePath": "config/policies/default.toml",
+        "status": "active",
+        "version": "v0.3"
+      }
+    ],
+    "roles": [
+      {
+        "assignmentCount": 1,
+        "label": "Viewer",
+        "permissions": [
+          "config.read"
+        ],
+        "riskLevel": "low",
+        "roleId": "viewer"
+      }
+    ],
+    "source": "local_fixture",
+    "users": [
+      {
+        "issuer": "preview",
+        "lastSeenUtc": "2026-06-01T12:00:00Z",
+        "permissions": [
+          "config.read"
+        ],
+        "roles": [
+          "viewer"
+        ],
+        "status": "active",
+        "subject": "preview-operator@example.local",
+        "userId": "preview-operator"
+      }
+    ]
+  },
+  "agents": [
+    {
+      "agentId": "governed-ops",
+      "displayName": "Governed Ops",
+      "lastEvidencePackId": null,
+      "lastRunId": "cp-run-preview",
+      "ownerTeam": "platform",
+      "readiness": "policy_simulated",
+      "runtimeKind": "binliquid_team",
+      "status": "registered"
+    }
+  ],
+  "alerts": [
+    {
+      "alertId": "claim-live-macos-computer-use",
+      "linkedEvidencePackId": null,
+      "linkedRunId": null,
+      "reasonCode": "MACOS_LIVE_DISABLED",
+      "recommendedAction": "Keep the live computer-use claim blocked until qualification evidence exists.",
+      "severity": "error",
+      "status": "active",
+      "title": "Computer-use live claim is blocked"
+    }
+  ],
+  "approvals": [
+    {
+      "actionHash": "sha256:action",
+      "actor": null,
+      "approvalId": "approval-preview",
+      "createdAt": "2026-06-01T12:00:00Z",
+      "disabledReason": null,
+      "executionStatus": "not_executed",
+      "expiresAt": "2026-06-02T12:00:00Z",
+      "policyHash": "sha256:policy",
+      "requestHash": "sha256:request",
+      "runId": "cp-run-preview",
+      "snapshotHash": "sha256:snapshot",
+      "status": "pending",
+      "targetKind": "control_plane_action",
+      "targetRef": "governed-ops:inspect_queue"
+    }
+  ],
+  "contractVersion": "control-plane.snapshot/v1",
+  "dashboard": {
+    "activeAlertCount": 1,
+    "agentCount": 1,
+    "blockedClaimCount": 4,
+    "conditionalClaimCount": 1,
+    "evidencePackCount": 0,
+    "pendingApprovalCount": 1,
+    "runCount": 1
+  },
+  "dataSource": {
+    "ageMs": 0,
+    "contractVersion": "control-plane.snapshot/v1",
+    "freshness": "fresh",
+    "isMock": true,
+    "isSilentFallback": false,
+    "lastRefreshUtc": "2026-06-01T12:00:00Z",
+    "mode": "preview_fixture",
+    "sourceReason": "explicit browser preview fixture"
+  },
+  "evidencePacks": [],
+  "executionSurfaces": [
+    {
+      "claimId": null,
+      "humanSummary": "Core CLI runtime is available for self-hosted operation.",
+      "label": "Core Runtime",
+      "reasonCodes": [],
+      "status": "ready",
+      "surfaceId": "core-runtime"
+    },
+    {
+      "claimId": "live-macos-computer-use",
+      "humanSummary": "Blocked by MACOS_LIVE_DISABLED.",
+      "label": "Computer-use",
+      "reasonCodes": [
+        "MACOS_LIVE_DISABLED"
+      ],
+      "status": "blocked",
+      "surfaceId": "computer-use"
+    }
+  ],
+  "generatedAtUtc": "2026-06-01T12:00:00Z",
+  "logs": [
+    {
+      "eventId": "snapshot-generated",
+      "evidencePackId": null,
+      "message": "Preview control-plane snapshot generated.",
+      "runId": null,
+      "severity": "info",
+      "source": "control-plane.snapshot",
+      "timestamp": "2026-06-01T12:00:00Z"
+    }
+  ],
+  "operations": [
+    {
+      "category": "identity",
+      "description": "Reads the current operator identity assertion.",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Resolve operator identity",
+      "lastResult": {
+        "errorCode": null,
+        "generatedAtUtc": "2026-06-01T12:00:00Z",
+        "status": "passed",
+        "summary": "Preview operator identity is available."
+      },
+      "operationId": "auth.whoami",
+      "permission": "config.read",
+      "riskLevel": "read_only",
+      "supportsDryRun": true
+    }
+  ],
+  "partialReasons": [
+    "DATA_SOURCE_PREVIEW_FIXTURE",
+    "metrics_snapshot",
+    "qualification_report"
+  ],
+  "policyPacks": [
+    {
+      "blockingReasons": [],
+      "label": "Preview runtime policy",
+      "packId": "preview-policy",
+      "policyHash": "sha256:preview-policy",
+      "ruleCount": 4,
+      "sourcePath": "config/policies/default.toml",
+      "status": "active",
+      "version": "v0.3"
+    }
+  ],
+  "quickActions": [
+    {
+      "actionId": "approval.review",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Review pending approvals"
+    },
+    {
+      "actionId": "computer-use.live-start",
+      "disabledReason": "COMPUTER_USE_CLAIM_BLOCKED",
+      "enabled": false,
+      "label": "Start live computer-use"
+    }
+  ],
+  "reports": [
+    {
+      "blockingReasons": [
+        "QUALIFICATION_MISSING"
+      ],
+      "generatedAtUtc": null,
+      "kind": "qualification",
+      "path": null,
+      "reportId": "qualification",
+      "status": "missing",
+      "title": "Qualification report"
+    }
+  ],
+  "runs": [
+    {
+      "agentId": "governed-ops",
+      "approvalIds": [
+        "approval-preview"
+      ],
+      "artifactRefs": [],
+      "blockingReasons": [],
+      "completedAt": null,
+      "evidencePackId": null,
+      "identityRef": "identity:preview",
+      "inputHash": "sha256:input",
+      "nextActions": [
+        "approval.show",
+        "approval.decide",
+        "approval.execute"
+      ],
+      "policyHash": "sha256:policy",
+      "profile": "enterprise",
+      "runId": "cp-run-preview",
+      "startedAt": "2026-06-01T12:00:00Z",
+      "status": "approval_pending",
+      "submittedBy": "ui:preview"
+    }
+  ],
+  "system": {
+    "capabilities": {
+      "claimGuard": true,
+      "computerUseLive": false,
+      "controlPlaneSnapshot": true,
+      "evidenceExport": true
+    },
+    "configSummary": {
+      "governanceEnabled": true,
+      "identityEnabled": false,
+      "keysProvider": "disabled",
+      "piiRedactionEnabled": true,
+      "policyFailMode": "fail_closed",
+      "privacyMode": true
+    },
+    "contractVersion": "2.0",
+    "coreVersion": "preview",
+    "doctor": {
+      "blocking_reasons": [],
+      "status": "healthy"
+    },
+    "health": {
+      "blockingReasons": [],
+      "confidence": "low",
+      "humanSummary": "Preview fixture is available but cannot prove live pilot readiness.",
+      "lastDoctorStatus": "healthy",
+      "missingSignals": [
+        "metrics_snapshot",
+        "qualification_report"
+      ],
+      "status": "partial"
+    },
+    "profile": "enterprise",
+    "rootDir": ".binliquid/control-plane",
+    "sourceMap": {
+      "agents": "preview fixture",
+      "approvals": "preview fixture",
+      "claims": "preview fixture",
+      "reports": "preview fixture",
+      "runs": "preview fixture"
+    },
+    "warnings": [
+      "Preview data is not pilot evidence."
+    ]
+  }
+}

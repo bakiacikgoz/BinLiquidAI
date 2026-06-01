@@ -14,6 +14,7 @@ from binliquid.control_plane.models import (  # noqa: E402
     AgentSpec,
     ClaimMatrix,
     ControlPlaneRunSummary,
+    ControlPlaneSnapshot,
     EvidencePackManifest,
     EvidenceVerifyResult,
     PolicySimulationResult,
@@ -30,6 +31,11 @@ SCHEMAS = {
     "evidence_verify_result": EvidenceVerifyResult,
     "readiness_report": ReadinessReport,
     "claim_matrix": ClaimMatrix,
+    "control_plane_snapshot": ControlPlaneSnapshot,
+}
+
+OPERATOR_PANEL_SCHEMAS = {
+    "control_plane_snapshot": ControlPlaneSnapshot,
 }
 
 
@@ -38,6 +44,13 @@ def main() -> None:
     root.mkdir(parents=True, exist_ok=True)
     for name, model in SCHEMAS.items():
         (root / f"{name}.schema.json").write_text(
+            json.dumps(model.model_json_schema(), ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+    operator_root = REPO_ROOT / "contracts" / "operator_panel" / "schemas"
+    operator_root.mkdir(parents=True, exist_ok=True)
+    for name, model in OPERATOR_PANEL_SCHEMAS.items():
+        (operator_root / f"{name}.schema.json").write_text(
             json.dumps(model.model_json_schema(), ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
         )

@@ -1,0 +1,254 @@
+export type DataSourceMode = 'preview_fixture' | 'tauri_live' | 'cli_live' | 'stale_cache' | 'error';
+export type DataFreshness = 'fresh' | 'stale' | 'unknown';
+export type HealthStatus = 'healthy' | 'partial' | 'degraded' | 'blocked' | 'unknown';
+export type SurfaceStatus = 'ready' | 'conditional' | 'blocked' | 'not_applicable';
+
+export interface DataSourceState {
+  mode: DataSourceMode;
+  isMock: boolean;
+  isSilentFallback: boolean;
+  lastRefreshUtc: string | null;
+  ageMs: number | null;
+  freshness: DataFreshness;
+  contractVersion: string;
+  sourceReason?: string | null;
+}
+
+export interface SystemHealthState {
+  status: HealthStatus;
+  confidence: 'high' | 'medium' | 'low';
+  missingSignals: string[];
+  blockingReasons: string[];
+  lastDoctorStatus: string;
+  humanSummary: string;
+}
+
+export interface SystemSummary {
+  profile: string;
+  rootDir: string;
+  coreVersion: string;
+  contractVersion: string;
+  health: SystemHealthState;
+  doctor: Record<string, unknown>;
+  capabilities: Record<string, unknown>;
+  configSummary: Record<string, unknown>;
+  sourceMap: Record<string, string>;
+  warnings: string[];
+}
+
+export interface DashboardSummary {
+  agentCount: number;
+  runCount: number;
+  pendingApprovalCount: number;
+  evidencePackCount: number;
+  activeAlertCount: number;
+  blockedClaimCount: number;
+  conditionalClaimCount: number;
+}
+
+export interface AgentSummary {
+  agentId: string;
+  displayName: string;
+  runtimeKind: string;
+  status: string;
+  readiness: string;
+  ownerTeam?: string | null;
+  lastRunId?: string | null;
+  lastEvidencePackId?: string | null;
+}
+
+export interface RunSnapshotSummary {
+  runId: string;
+  agentId: string;
+  profile: string;
+  status: string;
+  submittedBy: string;
+  identityRef?: string | null;
+  inputHash: string;
+  policyHash: string;
+  startedAt: string;
+  completedAt?: string | null;
+  approvalIds: string[];
+  artifactRefs: string[];
+  evidencePackId?: string | null;
+  blockingReasons: string[];
+  nextActions: string[];
+}
+
+export interface ApprovalSnapshotSummary {
+  approvalId: string;
+  runId: string;
+  status: string;
+  targetKind: string;
+  targetRef: string;
+  actionHash: string;
+  policyHash: string;
+  requestHash: string;
+  snapshotHash: string;
+  executionStatus: string;
+  createdAt: string;
+  expiresAt: string;
+  actor?: string | null;
+  disabledReason?: string | null;
+}
+
+export interface EvidencePackSummary {
+  packId: string;
+  runId?: string | null;
+  createdAtUtc?: string | null;
+  signatureStatus: 'missing' | 'pending' | 'valid' | 'invalid';
+  hashChainStatus: 'pending' | 'valid' | 'broken';
+  replayStatus: 'not_available' | 'pending' | 'passed' | 'failed';
+  claimGuardStatus: 'ready' | 'conditional' | 'blocked';
+  redactionStatus: 'passed' | 'warning' | 'failed' | 'unknown';
+  artifactCount: number;
+  exportPath?: string | null;
+  blockingReasons: string[];
+}
+
+export interface PolicyPackSummary {
+  packId: string;
+  label: string;
+  version: string;
+  status: 'active' | 'available' | 'missing' | 'blocked';
+  policyHash?: string | null;
+  ruleCount: number;
+  sourcePath?: string | null;
+  blockingReasons: string[];
+}
+
+export interface ExecutionSurfaceSummary {
+  surfaceId: string;
+  label: string;
+  status: SurfaceStatus;
+  claimId?: string | null;
+  reasonCodes: string[];
+  humanSummary: string;
+}
+
+export interface LogEventSummary {
+  eventId: string;
+  timestamp: string;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  source: string;
+  message: string;
+  runId?: string | null;
+  evidencePackId?: string | null;
+}
+
+export interface AlertSummary {
+  alertId: string;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  status: 'active' | 'resolved';
+  title: string;
+  reasonCode: string;
+  recommendedAction: string;
+  linkedRunId?: string | null;
+  linkedEvidencePackId?: string | null;
+}
+
+export interface ReportSummary {
+  reportId: string;
+  kind: 'readiness' | 'evidence' | 'qualification' | 'support' | 'security' | 'metrics';
+  title: string;
+  status: 'ready' | 'conditional' | 'blocked' | 'missing';
+  path?: string | null;
+  generatedAtUtc?: string | null;
+  blockingReasons: string[];
+}
+
+export interface OperationResultSummary {
+  status: 'not_run' | 'passed' | 'failed' | 'blocked';
+  summary: string;
+  generatedAtUtc?: string | null;
+  errorCode?: string | null;
+}
+
+export interface OperationDescriptor {
+  operationId: string;
+  category: 'identity' | 'qualification' | 'security' | 'keys' | 'support' | 'backup' | 'restore' | 'migration';
+  label: string;
+  description: string;
+  riskLevel: 'read_only' | 'low' | 'medium' | 'high' | 'destructive';
+  permission: string;
+  supportsDryRun: boolean;
+  enabled: boolean;
+  disabledReason?: string | null;
+  lastResult?: OperationResultSummary | null;
+}
+
+export interface UserSummary {
+  userId: string;
+  subject: string;
+  issuer?: string | null;
+  status: 'active' | 'expired' | 'unknown';
+  roles: string[];
+  permissions: string[];
+  lastSeenUtc?: string | null;
+}
+
+export interface RoleSummary {
+  roleId: string;
+  label: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  permissions: string[];
+  assignmentCount: number;
+}
+
+export interface AdminSummary {
+  users: UserSummary[];
+  roles: RoleSummary[];
+  policyPacks: PolicyPackSummary[];
+  permissionMatrix: Record<string, string[]>;
+  source: 'local_fixture' | 'identity_assertion' | 'external_idp_placeholder';
+}
+
+export interface QuickActionSummary {
+  actionId: string;
+  label: string;
+  enabled: boolean;
+  disabledReason?: string | null;
+}
+
+export interface ControlPlaneSnapshot {
+  contractVersion: 'control-plane.snapshot/v1';
+  generatedAtUtc: string;
+  dataSource: DataSourceState;
+  system: SystemSummary;
+  dashboard: DashboardSummary;
+  agents: AgentSummary[];
+  runs: RunSnapshotSummary[];
+  approvals: ApprovalSnapshotSummary[];
+  evidencePacks: EvidencePackSummary[];
+  policyPacks: PolicyPackSummary[];
+  executionSurfaces: ExecutionSurfaceSummary[];
+  logs: LogEventSummary[];
+  alerts: AlertSummary[];
+  reports: ReportSummary[];
+  operations: OperationDescriptor[];
+  admin: AdminSummary;
+  quickActions: QuickActionSummary[];
+  partialReasons: string[];
+}
+
+export interface UiError {
+  code: string;
+  message: string;
+}
+
+export interface EmptyState {
+  title: string;
+  detail: string;
+}
+
+export interface PageViewModel<TData> {
+  pageId: string;
+  title: string;
+  subtitle?: string;
+  dataSource: DataSourceState;
+  loading: boolean;
+  error?: UiError;
+  empty?: EmptyState;
+  data: TData;
+  debug?: unknown;
+}

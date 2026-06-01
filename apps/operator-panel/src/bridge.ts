@@ -18,6 +18,7 @@ import {
   previewControlPlaneClaims,
   previewControlPlaneDoctor,
   previewControlPlanePolicySimulation,
+  previewControlPlaneSnapshot,
   previewComputerUseSummary,
   previewComputerUseSessionState,
   previewComputerUseSubmitResponse,
@@ -42,6 +43,7 @@ import {
 } from './previewFixtures';
 import type { PanelSettings } from './settings';
 import type { ComputerUseRuntimeChoice } from './capabilities';
+import type { ControlPlaneSnapshot } from './control-plane/types';
 
 export type BridgeErrorCode =
   | 'INVALID_INPUT'
@@ -253,6 +255,13 @@ export async function fetchControlPlaneDoctor(settings: PanelSettings): Promise<
     return previewControlPlaneDoctor(settings);
   }
   return callBridge('bridge_control_plane_doctor', { config: toBridgeConfig(settings) });
+}
+
+export async function fetchControlPlaneSnapshot(settings: PanelSettings): Promise<ControlPlaneSnapshot> {
+  if (isBridgePreviewMode()) {
+    return previewControlPlaneSnapshot(settings) as ControlPlaneSnapshot;
+  }
+  return callBridge('bridge_control_plane_snapshot', { config: toBridgeConfig(settings, 30000) });
 }
 
 export async function listControlPlaneAgents(settings: PanelSettings): Promise<unknown> {

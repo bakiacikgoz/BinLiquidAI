@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-gate agent-control-plane-v1-gate operator-panel-productization-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate agent-control-plane-v1-gate operator-panel-productization-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -93,6 +93,11 @@ vision-gate:
 control-plane-schemas:
 	uv run python scripts/generate_control_plane_contract_schemas.py
 
+control-plane-snapshot-gate:
+	uv run binliquid control-plane snapshot --json
+	uv run pytest -q tests/test_control_plane_snapshot.py
+	corepack pnpm --dir apps/operator-panel test -- controlPlaneSnapshot
+
 control-plane-gate:
 	uv run pytest -q \
 		tests/test_control_plane_models.py \
@@ -100,10 +105,12 @@ control-plane-gate:
 		tests/test_control_plane_policy_simulator.py \
 		tests/test_control_plane_evidence_pack.py \
 		tests/test_control_plane_claim_guard.py \
-		tests/test_control_plane_cli.py
+		tests/test_control_plane_cli.py \
+		tests/test_control_plane_snapshot.py
 	uv run python scripts/generate_control_plane_contract_schemas.py
 	git diff --exit-code contracts/control_plane
 	uv run binliquid control-plane doctor --profile enterprise --json
+	uv run binliquid control-plane snapshot --profile enterprise --json
 	uv run python scripts/evaluate_control_plane_claims.py --profile enterprise --json
 
 ui-gate:

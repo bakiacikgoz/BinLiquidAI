@@ -1,3 +1,4 @@
+import previewControlPlaneSnapshotFixture from '../../../contracts/operator_panel/fixtures/control_plane_snapshot_preview.json';
 import previewBundle from '../../../contracts/operator_panel/fixtures/operator_panel_preview.json';
 
 export {
@@ -710,4 +711,11 @@ export function previewControlPlaneClaims() {
       },
     ],
   };
+}
+
+export function previewControlPlaneSnapshot(settings: PanelSettings) {
+  const payload = cloneValue(previewControlPlaneSnapshotFixture);
+  payload.system.profile = settings.profile;
+  payload.dataSource.sourceReason = 'explicit browser preview fixture';
+  return payload;
 }

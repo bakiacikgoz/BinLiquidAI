@@ -426,6 +426,25 @@ pub async fn bridge_control_plane_doctor(config: BridgeConfig) -> BridgeResult<V
 }
 
 #[tauri::command]
+pub async fn bridge_control_plane_snapshot(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "control-plane".to_string(),
+            "snapshot".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
 pub async fn bridge_control_plane_agent_list(config: BridgeConfig) -> BridgeResult<Value> {
     match run_cli_json_owned(
         &config,

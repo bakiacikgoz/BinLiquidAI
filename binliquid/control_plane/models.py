@@ -319,3 +319,256 @@ class ReadinessReport(StrictModel):
     checks: dict[str, bool] = Field(default_factory=dict)
     blocking_reasons: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class DataSourceState(StrictModel):
+    mode: Literal["preview_fixture", "tauri_live", "cli_live", "stale_cache", "error"]
+    is_mock: bool = Field(alias="isMock")
+    is_silent_fallback: bool = Field(alias="isSilentFallback")
+    last_refresh_utc: datetime | None = Field(default=None, alias="lastRefreshUtc")
+    age_ms: int | None = Field(default=None, alias="ageMs")
+    freshness: Literal["fresh", "stale", "unknown"]
+    contract_version: str = Field(alias="contractVersion")
+    source_reason: str | None = Field(default=None, alias="sourceReason")
+
+
+class SystemHealthState(StrictModel):
+    status: Literal["healthy", "partial", "degraded", "blocked", "unknown"]
+    confidence: Literal["high", "medium", "low"]
+    missing_signals: list[str] = Field(default_factory=list, alias="missingSignals")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    last_doctor_status: str = Field(alias="lastDoctorStatus")
+    human_summary: str = Field(alias="humanSummary")
+
+
+class SystemSummary(StrictModel):
+    profile: str
+    root_dir: str = Field(alias="rootDir")
+    core_version: str = Field(alias="coreVersion")
+    contract_version: str = Field(alias="contractVersion")
+    health: SystemHealthState
+    doctor: dict[str, Any] = Field(default_factory=dict)
+    capabilities: dict[str, Any] = Field(default_factory=dict)
+    config_summary: dict[str, Any] = Field(default_factory=dict, alias="configSummary")
+    source_map: dict[str, str] = Field(default_factory=dict, alias="sourceMap")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class DashboardSummary(StrictModel):
+    agent_count: int = Field(alias="agentCount")
+    run_count: int = Field(alias="runCount")
+    pending_approval_count: int = Field(alias="pendingApprovalCount")
+    evidence_pack_count: int = Field(alias="evidencePackCount")
+    active_alert_count: int = Field(alias="activeAlertCount")
+    blocked_claim_count: int = Field(alias="blockedClaimCount")
+    conditional_claim_count: int = Field(alias="conditionalClaimCount")
+
+
+class AgentSummary(StrictModel):
+    agent_id: str = Field(alias="agentId")
+    display_name: str = Field(alias="displayName")
+    runtime_kind: str = Field(alias="runtimeKind")
+    status: str
+    readiness: str
+    owner_team: str | None = Field(default=None, alias="ownerTeam")
+    last_run_id: str | None = Field(default=None, alias="lastRunId")
+    last_evidence_pack_id: str | None = Field(default=None, alias="lastEvidencePackId")
+
+
+class RunSnapshotSummary(StrictModel):
+    run_id: str = Field(alias="runId")
+    agent_id: str = Field(alias="agentId")
+    profile: str
+    status: str
+    submitted_by: str = Field(alias="submittedBy")
+    identity_ref: str | None = Field(default=None, alias="identityRef")
+    input_hash: str = Field(alias="inputHash")
+    policy_hash: str = Field(alias="policyHash")
+    started_at: datetime = Field(alias="startedAt")
+    completed_at: datetime | None = Field(default=None, alias="completedAt")
+    approval_ids: list[str] = Field(default_factory=list, alias="approvalIds")
+    artifact_refs: list[str] = Field(default_factory=list, alias="artifactRefs")
+    evidence_pack_id: str | None = Field(default=None, alias="evidencePackId")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    next_actions: list[str] = Field(default_factory=list, alias="nextActions")
+
+
+class ApprovalSnapshotSummary(StrictModel):
+    approval_id: str = Field(alias="approvalId")
+    run_id: str = Field(alias="runId")
+    status: str
+    target_kind: str = Field(alias="targetKind")
+    target_ref: str = Field(alias="targetRef")
+    action_hash: str = Field(alias="actionHash")
+    policy_hash: str = Field(alias="policyHash")
+    request_hash: str = Field(alias="requestHash")
+    snapshot_hash: str = Field(alias="snapshotHash")
+    execution_status: str = Field(alias="executionStatus")
+    created_at: datetime = Field(alias="createdAt")
+    expires_at: datetime = Field(alias="expiresAt")
+    actor: str | None = None
+    disabled_reason: str | None = Field(default=None, alias="disabledReason")
+
+
+class EvidencePackSummary(StrictModel):
+    pack_id: str = Field(alias="packId")
+    run_id: str | None = Field(default=None, alias="runId")
+    created_at_utc: datetime | None = Field(default=None, alias="createdAtUtc")
+    signature_status: Literal["missing", "pending", "valid", "invalid"] = Field(
+        alias="signatureStatus"
+    )
+    hash_chain_status: Literal["pending", "valid", "broken"] = Field(alias="hashChainStatus")
+    replay_status: Literal["not_available", "pending", "passed", "failed"] = Field(
+        alias="replayStatus"
+    )
+    claim_guard_status: Literal["ready", "conditional", "blocked"] = Field(
+        alias="claimGuardStatus"
+    )
+    redaction_status: Literal["passed", "warning", "failed", "unknown"] = Field(
+        alias="redactionStatus"
+    )
+    artifact_count: int = Field(alias="artifactCount")
+    export_path: str | None = Field(default=None, alias="exportPath")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
+class PolicyPackSummary(StrictModel):
+    pack_id: str = Field(alias="packId")
+    label: str
+    version: str
+    status: Literal["active", "available", "missing", "blocked"]
+    policy_hash: str | None = Field(default=None, alias="policyHash")
+    rule_count: int = Field(default=0, alias="ruleCount")
+    source_path: str | None = Field(default=None, alias="sourcePath")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
+class ExecutionSurfaceSummary(StrictModel):
+    surface_id: str = Field(alias="surfaceId")
+    label: str
+    status: Literal["ready", "conditional", "blocked", "not_applicable"]
+    claim_id: str | None = Field(default=None, alias="claimId")
+    reason_codes: list[str] = Field(default_factory=list, alias="reasonCodes")
+    human_summary: str = Field(alias="humanSummary")
+
+
+class LogEventSummary(StrictModel):
+    event_id: str = Field(alias="eventId")
+    timestamp: datetime = Field(alias="timestamp")
+    severity: Literal["info", "warning", "error", "critical"]
+    source: str
+    message: str
+    run_id: str | None = Field(default=None, alias="runId")
+    evidence_pack_id: str | None = Field(default=None, alias="evidencePackId")
+
+
+class AlertSummary(StrictModel):
+    alert_id: str = Field(alias="alertId")
+    severity: Literal["info", "warning", "error", "critical"]
+    status: Literal["active", "resolved"]
+    title: str
+    reason_code: str = Field(alias="reasonCode")
+    recommended_action: str = Field(alias="recommendedAction")
+    linked_run_id: str | None = Field(default=None, alias="linkedRunId")
+    linked_evidence_pack_id: str | None = Field(default=None, alias="linkedEvidencePackId")
+
+
+class ReportSummary(StrictModel):
+    report_id: str = Field(alias="reportId")
+    kind: Literal["readiness", "evidence", "qualification", "support", "security", "metrics"]
+    title: str
+    status: Literal["ready", "conditional", "blocked", "missing"]
+    path: str | None = None
+    generated_at_utc: datetime | None = Field(default=None, alias="generatedAtUtc")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
+class OperationResultSummary(StrictModel):
+    status: Literal["not_run", "passed", "failed", "blocked"]
+    summary: str
+    generated_at_utc: datetime | None = Field(default=None, alias="generatedAtUtc")
+    error_code: str | None = Field(default=None, alias="errorCode")
+
+
+class OperationDescriptor(StrictModel):
+    operation_id: str = Field(alias="operationId")
+    category: Literal[
+        "identity",
+        "qualification",
+        "security",
+        "keys",
+        "support",
+        "backup",
+        "restore",
+        "migration",
+    ]
+    label: str
+    description: str
+    risk_level: Literal["read_only", "low", "medium", "high", "destructive"] = Field(
+        alias="riskLevel"
+    )
+    permission: str
+    supports_dry_run: bool = Field(alias="supportsDryRun")
+    enabled: bool
+    disabled_reason: str | None = Field(default=None, alias="disabledReason")
+    last_result: OperationResultSummary | None = Field(default=None, alias="lastResult")
+
+
+class UserSummary(StrictModel):
+    user_id: str = Field(alias="userId")
+    subject: str
+    issuer: str | None = None
+    status: Literal["active", "expired", "unknown"]
+    roles: list[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
+    last_seen_utc: datetime | None = Field(default=None, alias="lastSeenUtc")
+
+
+class RoleSummary(StrictModel):
+    role_id: str = Field(alias="roleId")
+    label: str
+    risk_level: Literal["low", "medium", "high"] = Field(alias="riskLevel")
+    permissions: list[str] = Field(default_factory=list)
+    assignment_count: int = Field(default=0, alias="assignmentCount")
+
+
+class AdminSummary(StrictModel):
+    users: list[UserSummary] = Field(default_factory=list)
+    roles: list[RoleSummary] = Field(default_factory=list)
+    policy_packs: list[PolicyPackSummary] = Field(default_factory=list, alias="policyPacks")
+    permission_matrix: dict[str, list[str]] = Field(default_factory=dict, alias="permissionMatrix")
+    source: Literal["local_fixture", "identity_assertion", "external_idp_placeholder"]
+
+
+class QuickActionSummary(StrictModel):
+    action_id: str = Field(alias="actionId")
+    label: str
+    enabled: bool
+    disabled_reason: str | None = Field(default=None, alias="disabledReason")
+
+
+class ControlPlaneSnapshot(StrictModel):
+    contract_version: Literal["control-plane.snapshot/v1"] = Field(
+        default="control-plane.snapshot/v1",
+        alias="contractVersion",
+    )
+    generated_at_utc: datetime = Field(alias="generatedAtUtc")
+    data_source: DataSourceState = Field(alias="dataSource")
+    system: SystemSummary
+    dashboard: DashboardSummary
+    agents: list[AgentSummary] = Field(default_factory=list)
+    runs: list[RunSnapshotSummary] = Field(default_factory=list)
+    approvals: list[ApprovalSnapshotSummary] = Field(default_factory=list)
+    evidence_packs: list[EvidencePackSummary] = Field(default_factory=list, alias="evidencePacks")
+    policy_packs: list[PolicyPackSummary] = Field(default_factory=list, alias="policyPacks")
+    execution_surfaces: list[ExecutionSurfaceSummary] = Field(
+        default_factory=list,
+        alias="executionSurfaces",
+    )
+    logs: list[LogEventSummary] = Field(default_factory=list)
+    alerts: list[AlertSummary] = Field(default_factory=list)
+    reports: list[ReportSummary] = Field(default_factory=list)
+    operations: list[OperationDescriptor] = Field(default_factory=list)
+    admin: AdminSummary
+    quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
+    partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

@@ -133,6 +133,33 @@ describe('bridge tauri contract', () => {
     );
   });
 
+  it('passes control-plane snapshot requests to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      contractVersion: 'control-plane.snapshot/v1',
+      dataSource: {
+        mode: 'tauri_live',
+        isMock: false,
+        isSilentFallback: false,
+        lastRefreshUtc: '2026-06-01T12:00:00Z',
+        ageMs: 0,
+        freshness: 'fresh',
+        contractVersion: 'control-plane.snapshot/v1',
+      },
+    });
+
+    await bridge.fetchControlPlaneSnapshot({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_control_plane_snapshot',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          profile: 'enterprise',
+          timeoutMs: 30000,
+        }),
+      }),
+    );
+  });
+
   it('passes team submit model metadata and run identifiers to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0', jobId: 'job-live' });
 
