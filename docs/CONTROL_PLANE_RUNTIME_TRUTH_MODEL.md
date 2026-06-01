@@ -54,7 +54,7 @@ unless their signed qualification evidence exists.
 
 ## Validation
 
-The initial gate is:
+The snapshot gate is:
 
 ```bash
 make control-plane-snapshot-gate
@@ -62,3 +62,25 @@ make control-plane-snapshot-gate
 
 It runs the snapshot CLI, backend snapshot tests, and the Operator Panel snapshot
 loader tests.
+
+The release-candidate gate is:
+
+```bash
+make pilot-readiness-gate
+```
+
+That gate also checks no-primary-raw-JSON coverage, i18n coverage,
+productized-page screenshots, evidence verification, Tauri bridge smoke, and the
+pilot readiness artifact report.
+
+## Artifact Rules
+
+`artifacts/pilot-readiness/control-plane-snapshot.json` is the release-pack copy
+of the snapshot used by the pilot readiness assertion.
+
+`artifacts/pilot-readiness/PILOT_READINESS_REPORT.md` must not claim live
+evidence when the snapshot source is `preview_fixture`. Preview data is valid for
+deterministic UI and contract testing only.
+
+If the source is `tauri_live` or `cli_live`, `isSilentFallback` must be `false`.
+Any live path that falls back to preview data is a fail-closed condition.

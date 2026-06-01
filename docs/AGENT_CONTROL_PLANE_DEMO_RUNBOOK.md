@@ -1,22 +1,19 @@
 # Agent Control Plane Demo Runbook
 
-1. Register the governed ops agent.
-2. Simulate policy decisions.
-3. Submit a governed run.
-4. Inspect the approval-required result.
-5. Export the evidence pack.
-6. Verify the evidence manifest.
-7. Verify the claim matrix.
+The canonical pilot demo runbook is now `docs/PILOT_DEMO_RUNBOOK.md`.
+
+Use this compatibility checklist when an older handoff references this file:
+
+1. Run `make pilot-readiness-gate`.
+2. Open the Operator Panel in preview or Tauri mode.
+3. Walk the deterministic pilot flow from Dashboard through Execution Surfaces.
+4. Verify the latest evidence pack.
+5. Confirm the claim guard matrix keeps computer-use live execution blocked.
+
+CLI smoke commands:
 
 ```bash
-uv run binliquid control-plane agent register --spec examples/control_plane/agent_governed_ops.yaml --profile enterprise --json
-uv run binliquid control-plane policy simulate --agent-id governed-ops --profile enterprise --json
-uv run binliquid control-plane run submit --agent-id governed-ops --once "Inspect queue and draft remediation" --profile enterprise --json
+uv run binliquid control-plane snapshot --json
 uv run binliquid control-plane claims verify --profile enterprise --json
-```
-
-For a deterministic local summary:
-
-```bash
 uv run python scripts/run_control_plane_demo.py --profile enterprise --json
 ```
