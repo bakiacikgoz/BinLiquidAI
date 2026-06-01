@@ -790,6 +790,94 @@ body::before {
   text-align: right;
 }
 
+.runtime-truth-banner {
+  margin: 0 var(--space-8) var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  padding: 0.85rem 1rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr);
+  gap: var(--space-4);
+}
+
+.runtime-truth-banner > div,
+.runtime-truth-banner dl {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.runtime-truth-banner strong,
+.runtime-truth-banner span,
+.runtime-truth-banner dt,
+.runtime-truth-banner dd {
+  overflow-wrap: anywhere;
+}
+
+.runtime-truth-banner span,
+.runtime-truth-banner dt {
+  color: var(--fg-muted);
+}
+
+.runtime-truth-banner dl {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+}
+
+.runtime-truth-banner dt,
+.runtime-truth-banner dd {
+  margin: 0;
+}
+
+.runtime-truth-banner dd {
+  font-weight: 650;
+}
+
+.runtime-truth-banner-ok {
+  border-left-color: var(--color-success);
+}
+
+.runtime-truth-banner-warning,
+.runtime-truth-banner-loading {
+  border-left-color: var(--color-warning);
+}
+
+.runtime-truth-banner-danger {
+  border-left-color: var(--color-error);
+}
+
+.operation-command-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: var(--space-4);
+}
+
+.operation-command-card {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-field) 84%, transparent);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.operation-command-card > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.operation-command-card span,
+.operation-command-card dt,
+.operation-command-card dd {
+  overflow-wrap: anywhere;
+}
+
+.operation-command-card span,
+.operation-command-card dt {
+  color: var(--fg-muted);
+}
+
 .toast-zone {
   position: fixed;
   right: var(--space-5);
@@ -868,6 +956,15 @@ body::before {
   .context-rail {
     grid-column: 1;
     padding: var(--space-6);
+  }
+
+  .runtime-truth-banner {
+    margin-inline: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-truth-banner dl {
+    grid-template-columns: 1fr;
   }
 
   .workspace-stage-grid,

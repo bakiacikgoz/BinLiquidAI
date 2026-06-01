@@ -613,6 +613,23 @@ def _operation_descriptors(
             ),
         ),
         OperationDescriptor(
+            operation_id="qualification.run",
+            category="qualification",
+            label="Run qualification preflight",
+            description=(
+                "Runs a constrained qualification preflight and summarizes missing evidence."
+            ),
+            risk_level="low",
+            permission="qualification.run",
+            supports_dry_run=True,
+            enabled=True,
+            last_result=OperationResultSummary(
+                status="not_run",
+                summary="Qualification has not been run from this snapshot.",
+                generated_at_utc=generated_at,
+            ),
+        ),
+        OperationDescriptor(
             operation_id="keys.status",
             category="keys",
             label="Check signing keys",

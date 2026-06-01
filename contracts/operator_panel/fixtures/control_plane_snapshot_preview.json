@@ -157,6 +157,110 @@
       "permission": "config.read",
       "riskLevel": "read_only",
       "supportsDryRun": true
+    },
+    {
+      "category": "qualification",
+      "description": "Runs a constrained qualification preflight and summarizes missing evidence.",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Run qualification preflight",
+      "lastResult": {
+        "errorCode": null,
+        "generatedAtUtc": "2026-06-01T12:00:00Z",
+        "status": "not_run",
+        "summary": "Qualification has not been run from this preview snapshot."
+      },
+      "operationId": "qualification.run",
+      "permission": "qualification.run",
+      "riskLevel": "low",
+      "supportsDryRun": true
+    },
+    {
+      "category": "security",
+      "description": "Evaluates the enterprise security baseline in read-only mode.",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Evaluate security baseline",
+      "lastResult": {
+        "errorCode": null,
+        "generatedAtUtc": "2026-06-01T12:00:00Z",
+        "status": "not_run",
+        "summary": "Available as a read-only preflight command."
+      },
+      "operationId": "security.baseline",
+      "permission": "audit.read",
+      "riskLevel": "read_only",
+      "supportsDryRun": true
+    },
+    {
+      "category": "keys",
+      "description": "Inspects signing provider readiness without exposing private key material.",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Check signing keys",
+      "lastResult": {
+        "errorCode": null,
+        "generatedAtUtc": "2026-06-01T12:00:00Z",
+        "status": "passed",
+        "summary": "Preview signing key status is readable."
+      },
+      "operationId": "keys.status",
+      "permission": "keys.read",
+      "riskLevel": "read_only",
+      "supportsDryRun": true
+    },
+    {
+      "category": "support",
+      "description": "Creates a redacted support bundle for pilot debugging.",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Export support bundle",
+      "lastResult": {
+        "errorCode": null,
+        "generatedAtUtc": "2026-06-01T12:00:00Z",
+        "status": "not_run",
+        "summary": "No support bundle export has been requested from this snapshot."
+      },
+      "operationId": "support.bundle.export",
+      "permission": "support.export",
+      "riskLevel": "low",
+      "supportsDryRun": false
+    },
+    {
+      "category": "backup",
+      "description": "Creates a self-hosted runtime backup. The UI keeps this action confirmation-gated.",
+      "disabledReason": "CONFIRMATION_REQUIRED",
+      "enabled": false,
+      "label": "Create backup",
+      "lastResult": null,
+      "operationId": "backup.create",
+      "permission": "backup.create",
+      "riskLevel": "medium",
+      "supportsDryRun": false
+    },
+    {
+      "category": "restore",
+      "description": "Verifies a restore target without mutating production state.",
+      "disabledReason": "RESTORE_TARGET_REQUIRED",
+      "enabled": false,
+      "label": "Verify restore",
+      "lastResult": null,
+      "operationId": "restore.verify",
+      "permission": "restore.verify",
+      "riskLevel": "medium",
+      "supportsDryRun": true
+    },
+    {
+      "category": "migration",
+      "description": "Production migration execution is out of scope for pilot UI.",
+      "disabledReason": "DESTRUCTIVE_OPERATION_DISABLED",
+      "enabled": false,
+      "label": "Apply migration",
+      "lastResult": null,
+      "operationId": "migration.apply",
+      "permission": "config.write",
+      "riskLevel": "destructive",
+      "supportsDryRun": true
     }
   ],
   "partialReasons": [

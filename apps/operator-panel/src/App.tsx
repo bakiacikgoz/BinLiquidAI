@@ -11,6 +11,7 @@ import {
   exportRunArtifacts,
   exportSupportBundle,
   fetchControlPlaneDoctor,
+  fetchControlPlaneSnapshot,
   fetchApprovals,
   getComputerUseSummary,
   getComputerUseSessionState,
@@ -91,7 +92,9 @@ import { ControlPlaneDashboard } from './components/control-plane/ControlPlaneDa
 import { EvidencePackView } from './components/control-plane/EvidencePackView';
 import { ExecutionSurfacesView } from './components/control-plane/ExecutionSurfacesView';
 import { PolicySimulationView } from './components/control-plane/PolicySimulationView';
+import { OperationCommandList } from './components/control-plane/OperationCommandCard';
 import { RawInspector } from './components/control-plane/RawInspector';
+import { RuntimeTruthBanner } from './components/control-plane/RuntimeTruthBanner';
 import {
   AlertsPage,
   LogsPage,
@@ -103,6 +106,8 @@ import {
 } from './components/product-pages/ProductizedPages';
 import { AppShell } from './components/shell/AppShell';
 import { RightRail } from './components/shell/RightRail';
+import { loadControlPlaneSnapshot } from './control-plane/snapshot';
+import type { ControlPlaneSnapshot, OperationDescriptor, PageViewModel } from './control-plane/types';
 import type { ShellViewKey } from './components/shell/Sidebar';
 import type { RouteId } from './routeRegistry';
 
@@ -291,6 +296,13 @@ function truncateSummaryValue(value: string): string {
   return value.length > 140 ? `${value.slice(0, 137)}...` : value;
 }
 
+function operationCategoriesForTab(tab: OperationTabKey): OperationDescriptor['category'][] {
+  if (tab === 'maintenance') {
+    return ['backup', 'restore', 'migration'];
+  }
+  return [tab];
+}
+
 function mergeRunStatusWithSessionState(runStatusPayload: unknown, sessionStatePayload: unknown): unknown {
   const runRecord = asRecord(runStatusPayload);
   const sessionRecord = asRecord(sessionStatePayload);
@@ -332,6 +344,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [controlPlanePolicy, setControlPlanePolicy] = useState<unknown>(null);
   const [controlPlaneClaims, setControlPlaneClaims] = useState<unknown>({ claims: [] });
   const [controlPlaneEvidence] = useState<unknown>(null);
+  const [controlPlaneSnapshotVm, setControlPlaneSnapshotVm] =
+    useState<PageViewModel<ControlPlaneSnapshot> | null>(null);
 
   const [approvalsData, setApprovalsData] = useState<unknown>({ pending: [] });
   const [selectedApprovalId, setSelectedApprovalId] = useState('');
@@ -564,12 +578,19 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
   async function refreshControlPlane() {
     try {
-      const [doctorPayload, agentsPayload, claimsPayload, policyPayload] = await Promise.all([
+      const [snapshotVm, doctorPayload, agentsPayload, claimsPayload, policyPayload] = await Promise.all([
+        loadControlPlaneSnapshot(
+          {
+            getControlPlaneSnapshot: () => fetchControlPlaneSnapshot(settings),
+          },
+          { forceRefresh: true },
+        ),
         fetchControlPlaneDoctor(settings).catch((error) => ({ status: 'blocked', error: getErrorPayload(error)?.message })),
         listControlPlaneAgents(settings).catch(() => ({ agents: [] })),
         verifyControlPlaneClaims(settings).catch(() => ({ claims: [] })),
         simulateControlPlanePolicy(settings, 'governed-ops').catch(() => null),
       ]);
+      setControlPlaneSnapshotVm(snapshotVm);
       setControlPlaneDoctor(doctorPayload);
       setControlPlaneAgents(agentsPayload);
       setControlPlaneClaims(claimsPayload);
@@ -1059,6 +1080,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const parsedArtifact = asRecord(selectedArtifactPayload);
   const artifactValue = parsedArtifact.payload;
   const operationOutput = operationOutputs[operationTab] ?? {};
+  const controlPlaneSnapshot = controlPlaneSnapshotVm && !controlPlaneSnapshotVm.error ? controlPlaneSnapshotVm.data : null;
+  const operationDescriptors = controlPlaneSnapshot?.operations ?? [];
   const workspaceSnapshot = buildWorkspaceSnapshot({
     runStatus,
     sessionState: computerUseState,
@@ -1388,6 +1411,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <small>{handshakeError.command}</small>
           </div>
         ) : null}
+        <RuntimeTruthBanner viewModel={controlPlaneSnapshotVm} />
 
         {activeView === 'dashboard' ? (
           <ControlPlaneDashboard
@@ -2168,6 +2192,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <div className="section-grid two-up">
                 <article className="page-card">
                   <h3>{t.identity}</h3>
+                  <OperationCommandList
+                    operations={operationDescriptors}
+                    categories={operationCategoriesForTab('identity')}
+                    emptyMessage="Identity operation descriptors are loading from the control-plane snapshot."
+                  />
                   <div className="stack-actions">
                     <button className="action-btn" type="button" onClick={() => void runOperation('identity', () => fetchIdentity(settings))}>
                       {t.whoAmI}
@@ -2200,6 +2229,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <div className="section-grid two-up">
                 <article className="page-card">
                   <h3>{t.qualification}</h3>
+                  <OperationCommandList
+                    operations={operationDescriptors}
+                    categories={operationCategoriesForTab('qualification')}
+                    emptyMessage="Qualification operation descriptors are loading from the control-plane snapshot."
+                  />
                   <div className="form-grid compact-grid">
                     <label className="field">
                       <span>{t.mode}</span>
@@ -2287,6 +2321,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <div className="section-grid two-up">
                 <article className="page-card">
                   <h3>{t.security}</h3>
+                  <OperationCommandList
+                    operations={operationDescriptors}
+                    categories={operationCategoriesForTab('security')}
+                    emptyMessage="Security operation descriptors are loading from the control-plane snapshot."
+                  />
                   <button className="action-btn" type="button" onClick={() => void runOperation('security', () => fetchSecurityBaseline(settings))}>
                     {t.securityBaseline}
                   </button>
@@ -2303,6 +2342,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <div className="section-grid two-up">
                 <article className="page-card">
                   <h3>{t.keys}</h3>
+                  <OperationCommandList
+                    operations={operationDescriptors}
+                    categories={operationCategoriesForTab('keys')}
+                    emptyMessage="Key operation descriptors are loading from the control-plane snapshot."
+                  />
                   <label className="field">
                     <span>{t.verifyPath}</span>
                     <input
@@ -2373,6 +2417,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <div className="section-grid two-up">
                 <article className="page-card">
                   <h3>{t.support}</h3>
+                  <OperationCommandList
+                    operations={operationDescriptors}
+                    categories={operationCategoriesForTab('support')}
+                    emptyMessage="Support operation descriptors are loading from the control-plane snapshot."
+                  />
                   <label className="field">
                     <span>{t.outputPathOptional}</span>
                     <input
@@ -2400,6 +2449,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <div className="section-grid two-up">
                 <article className="page-card">
                   <h3>{t.maintenance}</h3>
+                  <OperationCommandList
+                    operations={operationDescriptors}
+                    categories={operationCategoriesForTab('maintenance')}
+                    emptyMessage="Maintenance operation descriptors are loading from the control-plane snapshot."
+                  />
                   <div className="form-grid compact-grid">
                     <label className="field">
                       <span>{t.outputDirOptional}</span>
@@ -2567,10 +2621,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           </section>
         ) : null}
 
-        {activeView === 'logs' ? <LogsPage events={events} runItems={runItems} /> : null}
+        {activeView === 'logs' ? <LogsPage events={events} runItems={runItems} snapshot={controlPlaneSnapshot} /> : null}
 
         {activeView === 'reports' ? (
-          <ReportsPage operationOutputs={operationOutputs} claims={controlPlaneClaims} />
+          <ReportsPage operationOutputs={operationOutputs} claims={controlPlaneClaims} snapshot={controlPlaneSnapshot} />
         ) : null}
 
         {activeView === 'alerts' ? (
@@ -2578,18 +2632,19 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             driftEvents={driftEvents}
             pendingApprovals={pendingApprovals}
             claims={controlPlaneClaims}
+            snapshot={controlPlaneSnapshot}
           />
         ) : null}
 
-        {activeView === 'plans' ? <PlansPage profile={settings.profile} /> : null}
+        {activeView === 'plans' ? <PlansPage profile={settings.profile} snapshot={controlPlaneSnapshot} /> : null}
 
         {activeView === 'users' ? (
-          <UsersPage operatorId={settings.operatorId.trim()} profile={settings.profile} />
+          <UsersPage operatorId={settings.operatorId.trim()} profile={settings.profile} snapshot={controlPlaneSnapshot} />
         ) : null}
 
-        {activeView === 'roles' ? <RolesPage profile={settings.profile} /> : null}
+        {activeView === 'roles' ? <RolesPage profile={settings.profile} snapshot={controlPlaneSnapshot} /> : null}
 
-        {activeView === 'policy-packs' ? <PolicyPacksPage claims={controlPlaneClaims} /> : null}
+        {activeView === 'policy-packs' ? <PolicyPacksPage claims={controlPlaneClaims} snapshot={controlPlaneSnapshot} /> : null}
     </AppShell>
   );
 }
