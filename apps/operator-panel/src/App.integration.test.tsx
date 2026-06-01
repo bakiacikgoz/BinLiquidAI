@@ -18,6 +18,7 @@ vi.mock('./bridge', async (importOriginal) => {
     resolveConfig: vi.fn(actual.resolveConfig),
     submitComputerUseRun: vi.fn(actual.submitComputerUseRun),
     submitTeamRun: vi.fn(actual.submitTeamRun),
+    verifyControlPlaneEvidence: vi.fn(actual.verifyControlPlaneEvidence),
   };
 });
 
@@ -201,6 +202,25 @@ describe('App integration flows', () => {
       );
     });
     expect(await screen.findByText('Export completed')).toBeInTheDocument();
+  });
+
+  it('verifies the latest evidence pack from the control-plane snapshot', async () => {
+    const { user } = renderApp({ operatorId: 'qa-operator' });
+
+    await openView(user, 'Evidence');
+    expect(await screen.findByText('evp-preview-run')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Verify latest' }));
+
+    await waitFor(() => {
+      expect(bridge.verifyControlPlaneEvidence).toHaveBeenCalledWith(
+        expect.any(Object),
+        'artifacts/control-plane/evidence/evp-preview-run/manifest.json',
+      );
+    });
+    expect(await screen.findByText('Evidence verification completed')).toBeInTheDocument();
+    expect(screen.getByText('pass')).toBeInTheDocument();
+    expect(screen.getAllByText('passed').length).toBeGreaterThanOrEqual(3);
   });
 
   it('refreshes system config with assistant runtime override args', async () => {

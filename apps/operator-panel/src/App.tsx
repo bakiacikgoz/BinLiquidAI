@@ -39,6 +39,7 @@ import {
   submitComputerUseRun,
   submitTeamRun,
   tailEvents,
+  verifyControlPlaneEvidence,
   verifyBackup,
   verifyRestore,
   verifySignedArtifact,
@@ -107,7 +108,7 @@ import {
 import { AppShell } from './components/shell/AppShell';
 import { RightRail } from './components/shell/RightRail';
 import { loadControlPlaneSnapshot } from './control-plane/snapshot';
-import type { ControlPlaneSnapshot, OperationDescriptor, PageViewModel } from './control-plane/types';
+import type { ControlPlaneSnapshot, EvidencePackSummary, OperationDescriptor, PageViewModel } from './control-plane/types';
 import type { ShellViewKey } from './components/shell/Sidebar';
 import type { RouteId } from './routeRegistry';
 
@@ -303,6 +304,10 @@ function operationCategoriesForTab(tab: OperationTabKey): OperationDescriptor['c
   return [tab];
 }
 
+function manifestPathForEvidencePack(pack: EvidencePackSummary | null | undefined): string {
+  return pack?.exportPath ? `${pack.exportPath.replace(/\/$/, '')}/manifest.json` : '';
+}
+
 function mergeRunStatusWithSessionState(runStatusPayload: unknown, sessionStatePayload: unknown): unknown {
   const runRecord = asRecord(runStatusPayload);
   const sessionRecord = asRecord(sessionStatePayload);
@@ -343,7 +348,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [controlPlaneAgents, setControlPlaneAgents] = useState<unknown>({ agents: [] });
   const [controlPlanePolicy, setControlPlanePolicy] = useState<unknown>(null);
   const [controlPlaneClaims, setControlPlaneClaims] = useState<unknown>({ claims: [] });
-  const [controlPlaneEvidence] = useState<unknown>(null);
+  const [controlPlaneEvidenceVerifyResult, setControlPlaneEvidenceVerifyResult] = useState<unknown>(null);
   const [controlPlaneSnapshotVm, setControlPlaneSnapshotVm] =
     useState<PageViewModel<ControlPlaneSnapshot> | null>(null);
 
@@ -1027,6 +1032,25 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
+  async function onVerifyEvidencePack() {
+    if (!selectedEvidenceManifestPath) {
+      pushToast('error', 'No evidence manifest is available to verify.');
+      return;
+    }
+
+    try {
+      const payload = await verifyControlPlaneEvidence(settings, selectedEvidenceManifestPath);
+      setControlPlaneEvidenceVerifyResult(payload);
+      pushToast('ok', 'Evidence verification completed');
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        setControlPlaneEvidenceVerifyResult(parsed);
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    }
+  }
+
   async function onApproveAndContinue() {
     if (!selectedApprovalId || !canMutate) {
       pushToast('error', t.setOperatorId);
@@ -1082,6 +1106,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const operationOutput = operationOutputs[operationTab] ?? {};
   const controlPlaneSnapshot = controlPlaneSnapshotVm && !controlPlaneSnapshotVm.error ? controlPlaneSnapshotVm.data : null;
   const operationDescriptors = controlPlaneSnapshot?.operations ?? [];
+  const evidencePacks = controlPlaneSnapshot?.evidencePacks ?? [];
+  const selectedEvidencePack = evidencePacks[0] ?? null;
+  const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
     runStatus,
     sessionState: computerUseState,
@@ -1445,7 +1472,13 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               </div>
             </div>
             <div className="section-grid two-up">
-              <EvidencePackView evidence={controlPlaneEvidence} locale={locale} />
+              <EvidencePackView
+                evidencePacks={evidencePacks}
+                verifyResult={controlPlaneEvidenceVerifyResult}
+                verifyDisabledReason={selectedEvidenceManifestPath ? '' : 'No evidence manifest is available to verify.'}
+                locale={locale}
+                onVerify={() => void onVerifyEvidencePack()}
+              />
               <ClaimBoundaryBanner claims={controlPlaneClaims} />
             </div>
           </section>

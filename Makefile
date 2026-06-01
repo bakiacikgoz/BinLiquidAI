@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -112,6 +112,11 @@ control-plane-gate:
 	uv run binliquid control-plane doctor --profile enterprise --json
 	uv run binliquid control-plane snapshot --profile enterprise --json
 	uv run python scripts/evaluate_control_plane_claims.py --profile enterprise --json
+
+evidence-pack-gate:
+	uv run pytest -q tests/test_control_plane_evidence_pack.py
+	corepack pnpm --dir apps/operator-panel test -- EvidencePackView
+	corepack pnpm --dir apps/operator-panel test:e2e -- evidence.spec.ts
 
 ui-gate:
 	corepack pnpm --dir apps/operator-panel qa:frontend

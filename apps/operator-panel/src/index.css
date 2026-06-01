@@ -878,6 +878,33 @@ body::before {
   color: var(--fg-muted);
 }
 
+.page-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.page-card-header > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.page-card-header h3,
+.page-card-header p {
+  margin: 0;
+}
+
+.evidence-pack-view {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.compact-metric-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .toast-zone {
   position: fixed;
   right: var(--space-5);

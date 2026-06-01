@@ -49,7 +49,7 @@
     {
       "agentId": "governed-ops",
       "displayName": "Governed Ops",
-      "lastEvidencePackId": null,
+      "lastEvidencePackId": "evp-preview-run",
       "lastRunId": "cp-run-preview",
       "ownerTeam": "platform",
       "readiness": "policy_simulated",
@@ -93,7 +93,7 @@
     "agentCount": 1,
     "blockedClaimCount": 4,
     "conditionalClaimCount": 1,
-    "evidencePackCount": 0,
+    "evidencePackCount": 1,
     "pendingApprovalCount": 1,
     "runCount": 1
   },
@@ -107,7 +107,23 @@
     "mode": "preview_fixture",
     "sourceReason": "explicit browser preview fixture"
   },
-  "evidencePacks": [],
+  "evidencePacks": [
+    {
+      "artifactCount": 9,
+      "blockingReasons": [
+        "QUALIFICATION_REPORT_MISSING"
+      ],
+      "claimGuardStatus": "conditional",
+      "createdAtUtc": "2026-06-01T12:00:00Z",
+      "exportPath": "artifacts/control-plane/evidence/evp-preview-run",
+      "hashChainStatus": "valid",
+      "packId": "evp-preview-run",
+      "redactionStatus": "passed",
+      "replayStatus": "passed",
+      "runId": "cp-run-preview",
+      "signatureStatus": "valid"
+    }
+  ],
   "executionSurfaces": [
     {
       "claimId": null,
@@ -288,6 +304,12 @@
       "label": "Review pending approvals"
     },
     {
+      "actionId": "evidence.verify",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Verify latest evidence pack"
+    },
+    {
       "actionId": "computer-use.live-start",
       "disabledReason": "COMPUTER_USE_CLAIM_BLOCKED",
       "enabled": false,
@@ -305,6 +327,17 @@
       "reportId": "qualification",
       "status": "missing",
       "title": "Qualification report"
+    },
+    {
+      "blockingReasons": [
+        "QUALIFICATION_REPORT_MISSING"
+      ],
+      "generatedAtUtc": "2026-06-01T12:00:00Z",
+      "kind": "evidence",
+      "path": "artifacts/control-plane/evidence/evp-preview-run",
+      "reportId": "evidence-evp-preview-run",
+      "status": "conditional",
+      "title": "Evidence pack evp-preview-run"
     }
   ],
   "runs": [
@@ -316,7 +349,7 @@
       "artifactRefs": [],
       "blockingReasons": [],
       "completedAt": null,
-      "evidencePackId": null,
+      "evidencePackId": "evp-preview-run",
       "identityRef": "identity:preview",
       "inputHash": "sha256:input",
       "nextActions": [
