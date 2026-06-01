@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -126,6 +126,28 @@ operator-panel-i18n-gate:
 
 operator-panel-productization-gate:
 	corepack pnpm --dir apps/operator-panel qa:productization
+
+operator-panel-tauri-smoke:
+	corepack pnpm --dir apps/operator-panel tauri:smoke
+
+pilot-readiness-gate:
+	uv run ruff check .
+	uv run pytest -q
+	uv run python -m compileall binliquid
+	uv run python -m binliquid control-plane snapshot --json
+	corepack pnpm --dir apps/operator-panel test
+	corepack pnpm --dir apps/operator-panel lint
+	corepack pnpm --dir apps/operator-panel build
+	corepack pnpm --dir apps/operator-panel test:e2e
+	corepack pnpm --dir apps/operator-panel exec tsx scripts/assert-productized-pages.ts
+	corepack pnpm --dir apps/operator-panel exec tsx scripts/assert-no-primary-raw-json.ts
+	corepack pnpm --dir apps/operator-panel exec tsx scripts/assert-i18n-coverage.ts
+	cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml
+	$(MAKE) agent-control-plane-v1-gate
+	$(MAKE) operator-panel-tauri-smoke
+	corepack pnpm --dir apps/operator-panel pilot:assert
+	$(MAKE) evidence-pack-gate
+	git diff --check
 
 ui-e2e-gate:
 	corepack pnpm --dir apps/operator-panel test:e2e

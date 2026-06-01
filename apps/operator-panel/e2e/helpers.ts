@@ -113,7 +113,12 @@ export async function gotoOperatorPanel(page: Page, settings: Partial<E2eSetting
 export async function openPrimaryView(page: Page, navName: string, headingName: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Ana navigasyon' });
   await nav.getByRole('button', { name: navName, exact: true }).click();
-  await expect(page.getByRole('heading', { name: headingName, exact: true })).toBeVisible();
+  const pageHeading = page.getByRole('heading', { name: headingName, exact: true, level: 2 });
+  if ((await pageHeading.count()) > 0) {
+    await expect(pageHeading).toBeVisible();
+  } else {
+    await expect(page.getByRole('heading', { name: headingName, exact: true, level: 1 })).toBeVisible();
+  }
   await expectFrameworkOverlayAbsent(page);
 }
 
