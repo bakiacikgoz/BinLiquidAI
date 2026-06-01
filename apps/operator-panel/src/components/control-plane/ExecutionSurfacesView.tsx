@@ -1,5 +1,16 @@
-export function ExecutionSurfacesView({ computerUseCapability }: { computerUseCapability: unknown }) {
+import { formatReasonCode } from '../../control-plane/reasonCodes';
+import type { UiLocale } from '../../i18n';
+
+export function ExecutionSurfacesView({
+  computerUseCapability,
+  locale = 'en',
+}: {
+  computerUseCapability: unknown;
+  locale?: UiLocale;
+}) {
   const capability = asRecord(computerUseCapability);
+  const computerUseReason =
+    typeof capability.reasonCode === 'string' ? capability.reasonCode : 'COMPUTER_USE_CLAIM_BLOCKED';
   return (
     <section className="workspace" data-testid="page-primary-region">
       <div className="workspace-header">
@@ -21,13 +32,13 @@ export function ExecutionSurfacesView({ computerUseCapability }: { computerUseCa
         <article className="page-card">
           <h3>Computer-use</h3>
           <p className="metric">{String(capability.status ?? 'blocked')}</p>
-          <small>{String(capability.reasonCode ?? 'COMPUTER_USE_NOT_QUALIFIED')}</small>
+          <small>{formatReasonCode(computerUseReason, locale)}</small>
           <div className="warning-inline">Live start disabled until qualification evidence is present.</div>
         </article>
         <article className="page-card">
           <h3>Public desktop installer</h3>
           <p className="metric">blocked</p>
-          <small>HAT_B_EVIDENCE_MISSING</small>
+          <small>{formatReasonCode('HAT_B_EVIDENCE_MISSING', locale)}</small>
         </article>
         <article className="page-card">
           <h3>External adapters</h3>

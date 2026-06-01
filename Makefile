@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate agent-control-plane-v1-gate operator-panel-productization-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -115,6 +115,9 @@ control-plane-gate:
 
 ui-gate:
 	corepack pnpm --dir apps/operator-panel qa:frontend
+
+operator-panel-i18n-gate:
+	corepack pnpm --dir apps/operator-panel i18n:coverage
 
 operator-panel-productization-gate:
 	corepack pnpm --dir apps/operator-panel qa:productization

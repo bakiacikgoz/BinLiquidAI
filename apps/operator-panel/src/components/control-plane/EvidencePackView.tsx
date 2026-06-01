@@ -1,4 +1,7 @@
-export function EvidencePackView({ evidence }: { evidence: unknown }) {
+import { formatReasonCode } from '../../control-plane/reasonCodes';
+import type { UiLocale } from '../../i18n';
+
+export function EvidencePackView({ evidence, locale = 'en' }: { evidence: unknown; locale?: UiLocale }) {
   const record = asRecord(evidence);
   const verification = asRecord(record.verification);
   return (
@@ -50,12 +53,12 @@ export function EvidencePackView({ evidence }: { evidence: unknown }) {
             <article className="run-list-item">
               <strong>Qualification report</strong>
               <span>Required before promoting the self-hosted control-plane claim from conditional.</span>
-              <small>QUALIFICATION_REPORT_MISSING</small>
+              <small>{formatReasonCode('QUALIFICATION_REPORT_MISSING', locale)}</small>
             </article>
             <article className="run-list-item">
               <strong>Platform live evidence</strong>
               <span>Required before any live computer-use claim can be opened.</span>
-              <small>SIGNED_PLATFORM_QUALIFICATION_MISSING</small>
+              <small>{formatReasonCode('SIGNED_PLATFORM_QUALIFICATION_MISSING', locale)}</small>
             </article>
           </div>
         </article>

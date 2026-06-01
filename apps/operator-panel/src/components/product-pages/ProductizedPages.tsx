@@ -12,6 +12,7 @@ import {
   type ProductPageRow,
 } from '../../control-plane/mappers/governance';
 import type { ControlPlaneSnapshot } from '../../control-plane/types';
+import type { UiLocale } from '../../i18n';
 
 type ProductPageProps = {
   events?: unknown[];
@@ -23,6 +24,7 @@ type ProductPageProps = {
   operatorId?: string;
   profile?: string;
   snapshot?: ControlPlaneSnapshot | null;
+  locale?: UiLocale;
 };
 
 function ProductPageShell({
@@ -108,8 +110,8 @@ export function LogsPage({ events = [], runItems = [], snapshot }: ProductPagePr
   );
 }
 
-export function ReportsPage({ operationOutputs = {}, claims, snapshot }: ProductPageProps) {
-  const model = buildReportsPageModel(snapshot, { operationOutputs, claims });
+export function ReportsPage({ operationOutputs = {}, claims, snapshot, locale = 'en' }: ProductPageProps) {
+  const model = buildReportsPageModel(snapshot, { operationOutputs, claims }, locale);
   return (
     <ProductPageShell
       kicker="Readiness evidence"
@@ -139,8 +141,8 @@ export function ReportsPage({ operationOutputs = {}, claims, snapshot }: Product
   );
 }
 
-export function AlertsPage({ driftEvents = [], pendingApprovals = [], claims, snapshot }: ProductPageProps) {
-  const model = buildAlertsPageModel(snapshot, { driftEvents, pendingApprovals, claims });
+export function AlertsPage({ driftEvents = [], pendingApprovals = [], claims, snapshot, locale = 'en' }: ProductPageProps) {
+  const model = buildAlertsPageModel(snapshot, { driftEvents, pendingApprovals, claims }, locale);
   return (
     <ProductPageShell
       kicker="Alert inbox"
@@ -166,8 +168,8 @@ export function AlertsPage({ driftEvents = [], pendingApprovals = [], claims, sn
   );
 }
 
-export function PlansPage({ profile = 'balanced', snapshot }: ProductPageProps) {
-  const model = buildPlansPageModel(snapshot, profile);
+export function PlansPage({ profile = 'balanced', snapshot, locale = 'en' }: ProductPageProps) {
+  const model = buildPlansPageModel(snapshot, profile, locale);
   return (
     <ProductPageShell
       kicker="Plan templates"
@@ -220,8 +222,8 @@ export function RolesPage({ profile = 'balanced', snapshot }: ProductPageProps) 
   );
 }
 
-export function PolicyPacksPage({ claims, snapshot }: ProductPageProps) {
-  const model = buildPolicyPacksPageModel(snapshot, claims);
+export function PolicyPacksPage({ claims, snapshot, locale = 'en' }: ProductPageProps) {
+  const model = buildPolicyPacksPageModel(snapshot, claims, locale);
   return (
     <ProductPageShell
       kicker="Admin policy"

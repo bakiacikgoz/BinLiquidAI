@@ -1,4 +1,6 @@
 import type { ControlPlaneSnapshot } from '../types';
+import type { UiLocale } from '../../i18n';
+import { formatReasonCode, formatReasonCodeList, getReasonCodeMessage } from '../reasonCodes';
 
 export type ProductPageMetric = {
   label: string;
@@ -95,6 +97,7 @@ export function buildLogsPageModel(snapshot: ControlPlaneSnapshot | null | undef
 export function buildReportsPageModel(
   snapshot: ControlPlaneSnapshot | null | undefined,
   fallback: ReportsFallback,
+  locale: UiLocale = 'en',
 ): ProductPageModel {
   if (snapshot) {
     return {
@@ -112,7 +115,7 @@ export function buildReportsPageModel(
           ? snapshot.reports.slice(0, 8).map((item) => ({
               id: item.reportId,
               title: item.title,
-              meta: item.path || item.blockingReasons.join(', ') || item.kind,
+              meta: item.path || formatReasonCodeList(item.blockingReasons, locale) || item.kind,
               status: item.status,
             }))
           : [{ id: 'empty-report', title: 'No reports loaded', meta: sourceDetail(snapshot), status: 'missing' }],
@@ -142,7 +145,11 @@ export function buildReportsPageModel(
   };
 }
 
-export function buildAlertsPageModel(snapshot: ControlPlaneSnapshot | null | undefined, fallback: AlertsFallback): ProductPageModel {
+export function buildAlertsPageModel(
+  snapshot: ControlPlaneSnapshot | null | undefined,
+  fallback: AlertsFallback,
+  locale: UiLocale = 'en',
+): ProductPageModel {
   if (snapshot) {
     const activeAlerts = snapshot.alerts.filter((item) => item.status === 'active');
     return {
@@ -156,7 +163,7 @@ export function buildAlertsPageModel(snapshot: ControlPlaneSnapshot | null | und
           ? snapshot.alerts.slice(0, 8).map((item) => ({
               id: item.alertId,
               title: item.title,
-              meta: `${item.reasonCode} / ${item.recommendedAction}`,
+              meta: `${formatReasonCode(item.reasonCode, locale)} / ${item.recommendedAction}`,
               status: `${item.severity}:${item.status}`,
             }))
           : [{ id: 'no-alerts', title: 'No open alert records', meta: sourceDetail(snapshot), status: 'clear' }],
@@ -197,7 +204,11 @@ export function buildAlertsPageModel(snapshot: ControlPlaneSnapshot | null | und
   };
 }
 
-export function buildPlansPageModel(snapshot: ControlPlaneSnapshot | null | undefined, profile: string): ProductPageModel {
+export function buildPlansPageModel(
+  snapshot: ControlPlaneSnapshot | null | undefined,
+  profile: string,
+  locale: UiLocale = 'en',
+): ProductPageModel {
   if (snapshot) {
     return {
       metrics: [
@@ -210,7 +221,7 @@ export function buildPlansPageModel(snapshot: ControlPlaneSnapshot | null | unde
           ? snapshot.quickActions.map((item) => ({
               id: item.actionId,
               title: item.label,
-              meta: item.disabledReason || 'ready',
+              meta: item.disabledReason ? formatReasonCode(item.disabledReason, locale) : 'ready',
               status: item.enabled ? 'enabled' : 'blocked',
             }))
           : [{ id: 'no-actions', title: 'No quick actions loaded', meta: sourceDetail(snapshot), status: 'empty' }],
@@ -303,7 +314,11 @@ export function buildRolesPageModel(snapshot: ControlPlaneSnapshot | null | unde
   };
 }
 
-export function buildPolicyPacksPageModel(snapshot: ControlPlaneSnapshot | null | undefined, claims: unknown): ProductPageModel {
+export function buildPolicyPacksPageModel(
+  snapshot: ControlPlaneSnapshot | null | undefined,
+  claims: unknown,
+  locale: UiLocale = 'en',
+): ProductPageModel {
   if (snapshot) {
     const packs = snapshot.policyPacks.length > 0 ? snapshot.policyPacks : snapshot.admin.policyPacks;
     return {
@@ -318,7 +333,10 @@ export function buildPolicyPacksPageModel(snapshot: ControlPlaneSnapshot | null 
               id: item.packId,
               title: item.label,
               meta: `${item.version} / ${item.sourcePath || item.policyHash || 'no source'}`,
-              status: item.blockingReasons.length > 0 ? item.blockingReasons.join(', ') : item.status,
+              status:
+                item.blockingReasons.length > 0
+                  ? item.blockingReasons.map((reason) => getReasonCodeMessage(reason, locale)).join(', ')
+                  : item.status,
             }))
           : [{ id: 'no-policy-packs', title: 'No policy packs loaded', meta: sourceDetail(snapshot), status: 'missing' }],
     };

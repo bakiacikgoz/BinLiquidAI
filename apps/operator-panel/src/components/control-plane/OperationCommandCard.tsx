@@ -1,12 +1,15 @@
+import { getReasonCodeMessage } from '../../control-plane/reasonCodes';
 import type { OperationDescriptor } from '../../control-plane/types';
+import type { UiLocale } from '../../i18n';
 
 type OperationCommandListProps = {
   operations: OperationDescriptor[];
   categories: OperationDescriptor['category'][];
   emptyMessage: string;
+  locale: UiLocale;
 };
 
-export function OperationCommandList({ operations, categories, emptyMessage }: OperationCommandListProps) {
+export function OperationCommandList({ operations, categories, emptyMessage, locale }: OperationCommandListProps) {
   const visibleOperations = operations.filter((operation) => categories.includes(operation.category));
 
   if (visibleOperations.length === 0) {
@@ -16,14 +19,19 @@ export function OperationCommandList({ operations, categories, emptyMessage }: O
   return (
     <div className="operation-command-list">
       {visibleOperations.map((operation) => (
-        <OperationCommandCard operation={operation} key={operation.operationId} />
+        <OperationCommandCard operation={operation} locale={locale} key={operation.operationId} />
       ))}
     </div>
   );
 }
 
-export function OperationCommandCard({ operation }: { operation: OperationDescriptor }) {
+export function OperationCommandCard({ operation, locale }: { operation: OperationDescriptor; locale: UiLocale }) {
   const lastResult = operation.lastResult;
+  const actionState = operation.enabled
+    ? 'enabled'
+    : operation.disabledReason
+      ? getReasonCodeMessage(operation.disabledReason, locale)
+      : 'disabled';
 
   return (
     <article className="operation-command-card">
@@ -50,7 +58,7 @@ export function OperationCommandCard({ operation }: { operation: OperationDescri
         </div>
         <div className="metric-row">
           <dt>Action state</dt>
-          <dd>{operation.enabled ? 'enabled' : operation.disabledReason || 'disabled'}</dd>
+          <dd>{actionState}</dd>
         </div>
         {lastResult ? (
           <div className="metric-row">

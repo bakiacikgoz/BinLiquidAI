@@ -1411,7 +1411,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <small>{handshakeError.command}</small>
           </div>
         ) : null}
-        <RuntimeTruthBanner viewModel={controlPlaneSnapshotVm} />
+        <RuntimeTruthBanner viewModel={controlPlaneSnapshotVm} locale={locale} />
 
         {activeView === 'dashboard' ? (
           <ControlPlaneDashboard
@@ -1424,7 +1424,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'agents' ? <AgentRegistryView agents={controlPlaneAgents} /> : null}
 
-        {activeView === 'policy' ? <PolicySimulationView simulation={controlPlanePolicy} /> : null}
+        {activeView === 'policy' ? <PolicySimulationView simulation={controlPlanePolicy} locale={locale} /> : null}
 
         {activeView === 'evidence' ? (
           <section className="workspace" data-testid="page-primary-region">
@@ -1445,7 +1445,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               </div>
             </div>
             <div className="section-grid two-up">
-              <EvidencePackView evidence={controlPlaneEvidence} />
+              <EvidencePackView evidence={controlPlaneEvidence} locale={locale} />
               <ClaimBoundaryBanner claims={controlPlaneClaims} />
             </div>
           </section>
@@ -1454,6 +1454,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         {activeView === 'surfaces' ? (
           <ExecutionSurfacesView
             computerUseCapability={computerUseVisionCapability.capabilityResolution}
+            locale={locale}
           />
         ) : null}
 
@@ -2196,6 +2197,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     operations={operationDescriptors}
                     categories={operationCategoriesForTab('identity')}
                     emptyMessage="Identity operation descriptors are loading from the control-plane snapshot."
+                    locale={locale}
                   />
                   <div className="stack-actions">
                     <button className="action-btn" type="button" onClick={() => void runOperation('identity', () => fetchIdentity(settings))}>
@@ -2233,6 +2235,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     operations={operationDescriptors}
                     categories={operationCategoriesForTab('qualification')}
                     emptyMessage="Qualification operation descriptors are loading from the control-plane snapshot."
+                    locale={locale}
                   />
                   <div className="form-grid compact-grid">
                     <label className="field">
@@ -2325,6 +2328,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     operations={operationDescriptors}
                     categories={operationCategoriesForTab('security')}
                     emptyMessage="Security operation descriptors are loading from the control-plane snapshot."
+                    locale={locale}
                   />
                   <button className="action-btn" type="button" onClick={() => void runOperation('security', () => fetchSecurityBaseline(settings))}>
                     {t.securityBaseline}
@@ -2346,6 +2350,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     operations={operationDescriptors}
                     categories={operationCategoriesForTab('keys')}
                     emptyMessage="Key operation descriptors are loading from the control-plane snapshot."
+                    locale={locale}
                   />
                   <label className="field">
                     <span>{t.verifyPath}</span>
@@ -2421,6 +2426,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     operations={operationDescriptors}
                     categories={operationCategoriesForTab('support')}
                     emptyMessage="Support operation descriptors are loading from the control-plane snapshot."
+                    locale={locale}
                   />
                   <label className="field">
                     <span>{t.outputPathOptional}</span>
@@ -2453,6 +2459,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     operations={operationDescriptors}
                     categories={operationCategoriesForTab('maintenance')}
                     emptyMessage="Maintenance operation descriptors are loading from the control-plane snapshot."
+                    locale={locale}
                   />
                   <div className="form-grid compact-grid">
                     <label className="field">
@@ -2624,7 +2631,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         {activeView === 'logs' ? <LogsPage events={events} runItems={runItems} snapshot={controlPlaneSnapshot} /> : null}
 
         {activeView === 'reports' ? (
-          <ReportsPage operationOutputs={operationOutputs} claims={controlPlaneClaims} snapshot={controlPlaneSnapshot} />
+          <ReportsPage
+            operationOutputs={operationOutputs}
+            claims={controlPlaneClaims}
+            snapshot={controlPlaneSnapshot}
+            locale={locale}
+          />
         ) : null}
 
         {activeView === 'alerts' ? (
@@ -2633,10 +2645,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             pendingApprovals={pendingApprovals}
             claims={controlPlaneClaims}
             snapshot={controlPlaneSnapshot}
+            locale={locale}
           />
         ) : null}
 
-        {activeView === 'plans' ? <PlansPage profile={settings.profile} snapshot={controlPlaneSnapshot} /> : null}
+        {activeView === 'plans' ? <PlansPage profile={settings.profile} snapshot={controlPlaneSnapshot} locale={locale} /> : null}
 
         {activeView === 'users' ? (
           <UsersPage operatorId={settings.operatorId.trim()} profile={settings.profile} snapshot={controlPlaneSnapshot} />
@@ -2644,7 +2657,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'roles' ? <RolesPage profile={settings.profile} snapshot={controlPlaneSnapshot} /> : null}
 
-        {activeView === 'policy-packs' ? <PolicyPacksPage claims={controlPlaneClaims} snapshot={controlPlaneSnapshot} /> : null}
+        {activeView === 'policy-packs' ? (
+          <PolicyPacksPage claims={controlPlaneClaims} snapshot={controlPlaneSnapshot} locale={locale} />
+        ) : null}
     </AppShell>
   );
 }

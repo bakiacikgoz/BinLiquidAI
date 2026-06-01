@@ -1,11 +1,14 @@
 import { describeDataSource } from '../../control-plane/dataSource';
+import { formatReasonCodeList } from '../../control-plane/reasonCodes';
 import type { ControlPlaneSnapshot, PageViewModel } from '../../control-plane/types';
+import type { UiLocale } from '../../i18n';
 
 type RuntimeTruthBannerProps = {
   viewModel: PageViewModel<ControlPlaneSnapshot> | null;
+  locale: UiLocale;
 };
 
-export function RuntimeTruthBanner({ viewModel }: RuntimeTruthBannerProps) {
+export function RuntimeTruthBanner({ viewModel, locale }: RuntimeTruthBannerProps) {
   if (!viewModel) {
     return (
       <aside className="runtime-truth-banner runtime-truth-banner-loading" data-testid="runtime-truth-banner">
@@ -46,7 +49,7 @@ export function RuntimeTruthBanner({ viewModel }: RuntimeTruthBannerProps) {
         {partialReasons.length > 0 ? (
           <div>
             <dt>Partial reasons</dt>
-            <dd>{partialReasons.slice(0, 3).join(', ')}</dd>
+            <dd>{formatReasonCodeList(partialReasons.slice(0, 3), locale)}</dd>
           </div>
         ) : null}
       </dl>

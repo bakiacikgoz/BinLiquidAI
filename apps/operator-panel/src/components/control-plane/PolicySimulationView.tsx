@@ -1,4 +1,7 @@
-export function PolicySimulationView({ simulation }: { simulation: unknown }) {
+import { formatReasonCode } from '../../control-plane/reasonCodes';
+import type { UiLocale } from '../../i18n';
+
+export function PolicySimulationView({ simulation, locale = 'en' }: { simulation: unknown; locale?: UiLocale }) {
   const record = asRecord(simulation);
   const decisions = Array.isArray(record.decisions) ? record.decisions : [];
   return (
@@ -14,11 +17,12 @@ export function PolicySimulationView({ simulation }: { simulation: unknown }) {
         {decisions.length > 0 ? (
           decisions.map((item) => {
             const decision = asRecord(item);
+            const reasonCode = typeof decision.reason_code === 'string' ? decision.reason_code : '';
             return (
               <article className="run-list-item" key={String(decision.action_id)}>
                 <strong>{String(decision.action_id ?? '-')}</strong>
                 <span>{String(decision.decision_action ?? '-')}</span>
-                <small>{String(decision.reason_code ?? '-')}</small>
+                <small>{reasonCode ? formatReasonCode(reasonCode, locale) : '-'}</small>
               </article>
             );
           })
