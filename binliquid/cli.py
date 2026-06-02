@@ -43,6 +43,7 @@ from binliquid.control_plane.errors import ControlPlaneError
 from binliquid.control_plane.evidence_index import build_evidence_index
 from binliquid.control_plane.evidence_pack import EvidencePackBuilder
 from binliquid.control_plane.external_gateway import submit_external_action_file
+from binliquid.control_plane.operations_runner import dry_run_operation
 from binliquid.control_plane.policy_packs import (
     diff_policy_packs,
     load_policy_pack_manifest,
@@ -141,6 +142,7 @@ control_plane_adapter_app = typer.Typer(help="External adapter contract commands
 control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
 control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
 control_plane_reports_app = typer.Typer(help="Control Plane reports and alerts commands")
+control_plane_operations_app = typer.Typer(help="Control Plane operation workflow commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -173,6 +175,7 @@ control_plane_app.add_typer(control_plane_adapter_app, name="adapter")
 control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
 control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
 control_plane_app.add_typer(control_plane_reports_app, name="reports")
+control_plane_app.add_typer(control_plane_operations_app, name="operations")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -1192,6 +1195,28 @@ def control_plane_reports_manifest(
     manifest = build_reports_alerts_logs_manifest(snapshot=snapshot, output_dir=output_dir)
     _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
     if manifest.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@control_plane_operations_app.command("dry-run")
+def control_plane_operations_dry_run(
+    operation_id: str = typer.Option(..., "--operation-id", help="Operation ID"),
+    actor_id: str = typer.Option("identity-disabled", "--actor-id", help="Actor ID"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    evidence_root: str = typer.Option("artifacts", "--evidence-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    result = dry_run_operation(
+        config=RuntimeConfig.from_profile(profile),
+        operation_id=operation_id,
+        actor_id=actor_id,
+        root_dir=root_dir,
+        evidence_root=evidence_root,
+        dry_run=True,
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
         raise typer.Exit(code=3)
 
 

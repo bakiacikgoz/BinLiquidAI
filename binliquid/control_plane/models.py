@@ -728,6 +728,36 @@ class OperationDescriptor(StrictModel):
     last_result: OperationResultSummary | None = Field(default=None, alias="lastResult")
 
 
+class OperationWorkflowRequest(StrictModel):
+    version: Literal["control-plane.operation-workflow-request/v1"] = (
+        "control-plane.operation-workflow-request/v1"
+    )
+    operation_id: str = Field(alias="operationId")
+    actor_id: str = Field(alias="actorId")
+    dry_run: bool = Field(default=True, alias="dryRun")
+    requested_at: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="requestedAt")
+
+
+class OperationWorkflowResult(StrictModel):
+    version: Literal["control-plane.operation-workflow-result/v1"] = (
+        "control-plane.operation-workflow-result/v1"
+    )
+    operation_id: str = Field(alias="operationId")
+    actor_id: str = Field(alias="actorId")
+    status: Literal["passed", "blocked", "requires_approval"]
+    dry_run: bool = Field(alias="dryRun")
+    permission: str
+    risk_level: Literal["read_only", "low", "medium", "high", "destructive"] = Field(
+        alias="riskLevel"
+    )
+    reason_code: str = Field(alias="reasonCode")
+    next_actions: list[str] = Field(default_factory=list, alias="nextActions")
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+
+
 class UserSummary(StrictModel):
     user_id: str = Field(alias="userId")
     subject: str

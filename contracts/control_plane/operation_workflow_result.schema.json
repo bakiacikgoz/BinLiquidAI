@@ -1,0 +1,74 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "actorId": {
+      "title": "Actorid",
+      "type": "string"
+    },
+    "dryRun": {
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "nextActions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Nextactions",
+      "type": "array"
+    },
+    "operationId": {
+      "title": "Operationid",
+      "type": "string"
+    },
+    "permission": {
+      "title": "Permission",
+      "type": "string"
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "riskLevel": {
+      "enum": [
+        "read_only",
+        "low",
+        "medium",
+        "high",
+        "destructive"
+      ],
+      "title": "Risklevel",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "blocked",
+        "requires_approval"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.operation-workflow-result/v1",
+      "default": "control-plane.operation-workflow-result/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "operationId",
+    "actorId",
+    "status",
+    "dryRun",
+    "permission",
+    "riskLevel",
+    "reasonCode"
+  ],
+  "title": "OperationWorkflowResult",
+  "type": "object"
+}

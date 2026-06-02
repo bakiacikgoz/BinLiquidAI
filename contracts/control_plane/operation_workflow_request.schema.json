@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "actorId": {
+      "title": "Actorid",
+      "type": "string"
+    },
+    "dryRun": {
+      "default": true,
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "operationId": {
+      "title": "Operationid",
+      "type": "string"
+    },
+    "requestedAt": {
+      "format": "date-time",
+      "title": "Requestedat",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.operation-workflow-request/v1",
+      "default": "control-plane.operation-workflow-request/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "operationId",
+    "actorId"
+  ],
+  "title": "OperationWorkflowRequest",
+  "type": "object"
+}
