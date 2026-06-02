@@ -148,52 +148,73 @@ class ApprovalStore:
             created_at=now,
         )
         with self._conn() as conn:
-            conn.execute(
-                """
-                INSERT INTO approvals (
-                    approval_id, version, run_id, status, target_kind, target_ref, action_hash,
-                    policy_hash, request_hash, snapshot_hash,
-                    snapshot_json, expires_at, actor, decision_reason, execution_status,
-                    executed_at, execution_error_code, execution_contract_hash,
-                    resume_token_ref, resume_claimed_job_id, resume_claimed_at,
-                    consumed_by_job_id, consumed_at,
-                    idempotency_key, created_at, decided_at
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO approvals (
+                        approval_id, version, run_id, status, target_kind, target_ref, action_hash,
+                        policy_hash, request_hash, snapshot_hash,
+                        snapshot_json, expires_at, actor, decision_reason, execution_status,
+                        executed_at, execution_error_code, execution_contract_hash,
+                        resume_token_ref, resume_claimed_job_id, resume_claimed_at,
+                        consumed_by_job_id, consumed_at,
+                        idempotency_key, created_at, decided_at
+                    )
+                    VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    )
+                    """,
+                    (
+                        ticket.approval_id,
+                        ticket.version,
+                        ticket.run_id,
+                        ticket.status.value,
+                        ticket.target_kind,
+                        ticket.target_ref,
+                        ticket.action_hash,
+                        ticket.policy_hash,
+                        ticket.request_hash,
+                        ticket.snapshot_hash,
+                        json.dumps(ticket.snapshot, ensure_ascii=False, sort_keys=True),
+                        ticket.expires_at.isoformat(),
+                        ticket.actor,
+                        ticket.decision_reason,
+                        ticket.execution_status.value,
+                        ticket.executed_at.isoformat() if ticket.executed_at else None,
+                        ticket.execution_error_code,
+                        ticket.execution_contract_hash,
+                        ticket.resume_token_ref,
+                        ticket.resume_claimed_job_id,
+                        ticket.resume_claimed_at.isoformat()
+                        if ticket.resume_claimed_at
+                        else None,
+                        ticket.consumed_by_job_id,
+                        ticket.consumed_at.isoformat() if ticket.consumed_at else None,
+                        ticket.idempotency_key,
+                        ticket.created_at.isoformat(),
+                        ticket.decided_at.isoformat() if ticket.decided_at else None,
+                    ),
                 )
-                VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                )
-                """,
-                (
-                    ticket.approval_id,
-                    ticket.version,
-                    ticket.run_id,
-                    ticket.status.value,
-                    ticket.target_kind,
-                    ticket.target_ref,
-                    ticket.action_hash,
-                    ticket.policy_hash,
-                    ticket.request_hash,
-                    ticket.snapshot_hash,
-                    json.dumps(ticket.snapshot, ensure_ascii=False, sort_keys=True),
-                    ticket.expires_at.isoformat(),
-                    ticket.actor,
-                    ticket.decision_reason,
-                    ticket.execution_status.value,
-                    ticket.executed_at.isoformat() if ticket.executed_at else None,
-                    ticket.execution_error_code,
-                    ticket.execution_contract_hash,
-                    ticket.resume_token_ref,
-                    ticket.resume_claimed_job_id,
-                    ticket.resume_claimed_at.isoformat() if ticket.resume_claimed_at else None,
-                    ticket.consumed_by_job_id,
-                    ticket.consumed_at.isoformat() if ticket.consumed_at else None,
-                    ticket.idempotency_key,
-                    ticket.created_at.isoformat(),
-                    ticket.decided_at.isoformat() if ticket.decided_at else None,
-                ),
-            )
+            except sqlite3.IntegrityError:
+                existing = self._get_by_idempotency_key(conn, idempotency_key)
+                if existing is not None:
+                    return existing
+                raise
         return ticket
+
+    def _get_by_idempotency_key(
+        self,
+        conn: sqlite3.Connection,
+        idempotency_key: str,
+    ) -> ApprovalTicket | None:
+        row = conn.execute(
+            "SELECT * FROM approvals WHERE idempotency_key = ?",
+            (idempotency_key,),
+        ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_ticket(row)
 
     def list_pending(self) -> list[ApprovalTicket]:
         self.expire_pending()

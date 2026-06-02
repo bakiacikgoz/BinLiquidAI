@@ -48,7 +48,7 @@ class ExternalAgentGateway:
         self.approvals = ApprovalStore(config.governance.approval_store_path)
 
     def submit_action(self, request: ExternalActionRequest) -> ExternalActionResponse:
-        run_id = _new_gateway_run_id()
+        run_id = _gateway_run_id(request.request_id)
         evidence_ref = f"external-gateway/evidence/{request.request_id}.json"
         try:
             record = self.registry.get(request.agent_id)
@@ -331,6 +331,6 @@ def _redaction_summary_safe(value: Any) -> bool:
     return True
 
 
-def _new_gateway_run_id() -> str:
-    now = datetime.now(UTC)
-    return f"cp-ext-run-{now.strftime('%Y%m%d-%H%M%S-%f')}"
+def _gateway_run_id(request_id: str) -> str:
+    safe = "".join(char if char.isalnum() or char in {"-", "_"} else "-" for char in request_id)
+    return f"cp-ext-run-{safe[:72]}"

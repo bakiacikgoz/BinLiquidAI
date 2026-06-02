@@ -43,6 +43,34 @@ def test_external_agent_manifest_read_only_allowed(tmp_path: Path) -> None:
 
 
 def test_external_agent_pilot_suite_covers_policy_outcomes(tmp_path: Path) -> None:
+    kwargs = {
+        "examples_root": REPO_ROOT / "examples/external_agents",
+        "output_path": tmp_path / "external-agent-pilot-report.json",
+        "config": _config(tmp_path),
+        "root_dir": tmp_path / "control-plane",
+    }
+    report = run_external_agent_pilot_suite(**kwargs)
+    repeated = run_external_agent_pilot_suite(**kwargs)
+
+    assert report["status"] == "pass"
+    assert repeated["status"] == "pass"
+    first_approvals = {
+        case["case"]: case["approvalId"] for case in report["cases"] if case["approvalId"]
+    }
+    repeated_approvals = {
+        case["case"]: case["approvalId"] for case in repeated["cases"] if case["approvalId"]
+    }
+    assert repeated_approvals == first_approvals
+
+    decisions = {case["case"]: case["policyDecision"] for case in report["cases"]}
+    assert decisions["read_only_inventory_agent"] == "allow"
+    assert decisions["ops_remediation_agent"] == "require_approval"
+    assert decisions["destructive_blocked_agent"] == "deny"
+
+
+def test_external_agent_pilot_suite_covers_policy_outcomes_with_fresh_root(
+    tmp_path: Path,
+) -> None:
     report = run_external_agent_pilot_suite(
         examples_root=REPO_ROOT / "examples/external_agents",
         output_path=tmp_path / "external-agent-pilot-report.json",
