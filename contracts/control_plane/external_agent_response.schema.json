@@ -1,0 +1,194 @@
+{
+  "$defs": {
+    "ControlPlaneDecisionAction": {
+      "enum": [
+        "allow",
+        "deny",
+        "require_approval",
+        "unknown"
+      ],
+      "title": "ControlPlaneDecisionAction",
+      "type": "string"
+    },
+    "ControlPlanePolicyDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "title": "Action Id",
+          "type": "string"
+        },
+        "approval_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval Id"
+        },
+        "decision_action": {
+          "$ref": "#/$defs/ControlPlaneDecisionAction"
+        },
+        "matched_rule_path": {
+          "title": "Matched Rule Path",
+          "type": "string"
+        },
+        "phase": {
+          "title": "Phase",
+          "type": "string"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "qualification_required": {
+          "default": false,
+          "title": "Qualification Required",
+          "type": "boolean"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "risk_class": {
+          "$ref": "#/$defs/RiskClass"
+        }
+      },
+      "required": [
+        "action_id",
+        "phase",
+        "risk_class",
+        "decision_action",
+        "reason_code",
+        "matched_rule_path",
+        "policy_hash"
+      ],
+      "title": "ControlPlanePolicyDecision",
+      "type": "object"
+    },
+    "RiskClass": {
+      "enum": [
+        "read_only",
+        "local_write",
+        "external_write",
+        "mutation",
+        "destructive",
+        "credential_sensitive",
+        "financial_or_legal",
+        "security_sensitive",
+        "computer_use_visual",
+        "unknown"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "title": "Agentid",
+      "type": "string"
+    },
+    "approvalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approvalid"
+    },
+    "dryRun": {
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "generatedAt": {
+      "format": "date-time",
+      "title": "Generatedat",
+      "type": "string"
+    },
+    "nextActions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Nextactions",
+      "type": "array"
+    },
+    "policyDecision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ControlPlanePolicyDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "requestId": {
+      "title": "Requestid",
+      "type": "string"
+    },
+    "runId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runid"
+    },
+    "status": {
+      "enum": [
+        "accepted",
+        "requires_approval",
+        "blocked_pending_approval",
+        "denied",
+        "invalid_request",
+        "unknown_agent"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.external-action-response/v1",
+      "default": "control-plane.external-action-response/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requestId",
+    "agentId",
+    "status",
+    "reasonCode",
+    "dryRun"
+  ],
+  "title": "ExternalActionResponse",
+  "type": "object"
+}

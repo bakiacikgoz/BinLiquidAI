@@ -1,0 +1,15 @@
+{
+  "actionKind": "destructive",
+  "actorId": "design-partner-operator",
+  "agentId": "external-agent",
+  "dryRun": true,
+  "intent": "Delete an external production resource.",
+  "payloadHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "payloadRedactionSummary": {
+    "body": "omitted",
+    "redactedFields": 3
+  },
+  "requestId": "ext-destructive-001",
+  "targetRef": "prod-resource:123",
+  "version": "control-plane.external-action-request/v1"
+}

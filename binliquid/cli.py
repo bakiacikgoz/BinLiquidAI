@@ -40,6 +40,7 @@ from binliquid.control_plane.adapter_contracts import evaluate_action_proposal_f
 from binliquid.control_plane.claim_guard import ClaimGuard
 from binliquid.control_plane.errors import ControlPlaneError
 from binliquid.control_plane.evidence_pack import EvidencePackBuilder
+from binliquid.control_plane.external_gateway import submit_external_action_file
 from binliquid.control_plane.policy_simulator import PolicySimulator
 from binliquid.control_plane.readiness import build_readiness_report
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
@@ -122,6 +123,7 @@ control_plane_run_app = typer.Typer(help="Control Plane run commands")
 control_plane_evidence_app = typer.Typer(help="Control Plane evidence commands")
 control_plane_claims_app = typer.Typer(help="Control Plane claim guard commands")
 control_plane_adapter_app = typer.Typer(help="External adapter contract commands")
+control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -151,6 +153,7 @@ control_plane_app.add_typer(control_plane_run_app, name="run")
 control_plane_app.add_typer(control_plane_evidence_app, name="evidence")
 control_plane_app.add_typer(control_plane_claims_app, name="claims")
 control_plane_app.add_typer(control_plane_adapter_app, name="adapter")
+control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -1065,6 +1068,25 @@ def control_plane_adapter_evaluate(
         simulator=PolicySimulator(config=RuntimeConfig.from_profile(profile)),
     )
     _emit_payload(payload, json_output=json_output)
+
+
+@control_plane_gateway_app.command("submit-action")
+def control_plane_gateway_submit_action(
+    input_path: str = typer.Option(..., "--input", help="ExternalActionRequest JSON path"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    response = submit_external_action_file(
+        path=input_path,
+        config=RuntimeConfig.from_profile(profile),
+        registry=_control_plane_registry(root_dir),
+        root_dir=root_dir,
+    )
+    payload = response.model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if response.status in {"denied", "invalid_request", "unknown_agent"}:
+        raise typer.Exit(code=3)
 
 
 @config_app.command("resolve")

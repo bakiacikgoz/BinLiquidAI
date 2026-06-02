@@ -1,0 +1,82 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "actionKind": {
+      "enum": [
+        "read",
+        "mutate",
+        "external_write",
+        "destructive",
+        "credential_sensitive",
+        "unknown"
+      ],
+      "title": "Actionkind",
+      "type": "string"
+    },
+    "actorId": {
+      "title": "Actorid",
+      "type": "string"
+    },
+    "agentId": {
+      "title": "Agentid",
+      "type": "string"
+    },
+    "dryRun": {
+      "default": true,
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "intent": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Intent",
+      "type": "string"
+    },
+    "payloadHash": {
+      "title": "Payloadhash",
+      "type": "string"
+    },
+    "payloadRedactionSummary": {
+      "additionalProperties": true,
+      "title": "Payloadredactionsummary",
+      "type": "object"
+    },
+    "requestId": {
+      "title": "Requestid",
+      "type": "string"
+    },
+    "requestedAt": {
+      "format": "date-time",
+      "title": "Requestedat",
+      "type": "string"
+    },
+    "targetRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Targetref"
+    },
+    "version": {
+      "const": "control-plane.external-action-request/v1",
+      "default": "control-plane.external-action-request/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requestId",
+    "agentId",
+    "actorId",
+    "intent",
+    "actionKind",
+    "payloadHash"
+  ],
+  "title": "ExternalActionRequest",
+  "type": "object"
+}

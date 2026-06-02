@@ -20,6 +20,10 @@ from binliquid.control_plane.models import (  # noqa: E402
     PolicySimulationResult,
     ReadinessReport,
 )
+from binliquid.control_plane.external_contracts import (  # noqa: E402
+    ExternalActionRequest,
+    ExternalActionResponse,
+)
 
 SCHEMAS = {
     "agent_spec": AgentSpec,
@@ -32,6 +36,8 @@ SCHEMAS = {
     "readiness_report": ReadinessReport,
     "claim_matrix": ClaimMatrix,
     "control_plane_snapshot": ControlPlaneSnapshot,
+    "external_agent_request": ExternalActionRequest,
+    "external_agent_response": ExternalActionResponse,
 }
 
 OPERATOR_PANEL_SCHEMAS = {

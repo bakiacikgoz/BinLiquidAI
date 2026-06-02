@@ -1,0 +1,15 @@
+{
+  "actionKind": "external_write",
+  "actorId": "design-partner-operator",
+  "agentId": "external-agent",
+  "dryRun": false,
+  "intent": "Create a remediation ticket in the external service queue.",
+  "payloadHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "payloadRedactionSummary": {
+    "body": "omitted",
+    "redactedFields": 2
+  },
+  "requestId": "ext-mutate-001",
+  "targetRef": "ticketing:OPS",
+  "version": "control-plane.external-action-request/v1"
+}

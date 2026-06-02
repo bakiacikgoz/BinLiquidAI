@@ -1,0 +1,43 @@
+version: "control-plane.agent/v1"
+agent_id: "external-agent"
+display_name: "External Gateway Agent"
+description: "Design partner sample external stdio agent governed by the control plane gateway."
+runtime_kind: "external_stdio"
+profile: "enterprise"
+policy_profile: "enterprise"
+owner:
+  team: "platform-security"
+  contact: "external-owner"
+allowed_surfaces:
+  - "external_stdio"
+blocked_surfaces:
+  - "computer_use_live"
+declared_actions:
+  - action_id: "external_read"
+    phase: "tool"
+    risk_class: "read_only"
+    target_kind: "external_system"
+    effect: "read_status"
+  - action_id: "external_external_write"
+    phase: "tool"
+    risk_class: "external_write"
+    target_kind: "ticketing_system"
+    effect: "create_ticket"
+  - action_id: "external_destructive"
+    phase: "tool"
+    risk_class: "destructive"
+    target_kind: "external_system"
+    effect: "delete_resource"
+qualification:
+  required: true
+  minimum_level: "enterprise"
+  status: "missing"
+evidence:
+  signed_pack_required: true
+  replay_required: true
+metadata:
+  agent_type: "external_stdio"
+  policy_pack_id: "enterprise_default"
+  risk_profile: "guarded"
+  target_release_level: "design_partner_rc"
+  adapter_contract_version: "1.0"

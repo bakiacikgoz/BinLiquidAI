@@ -1,0 +1,15 @@
+{
+  "actionKind": "read",
+  "actorId": "design-partner-operator",
+  "agentId": "external-agent",
+  "dryRun": true,
+  "intent": "Read the open operations queue without changing external systems.",
+  "payloadHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "payloadRedactionSummary": {
+    "body": "omitted",
+    "redactedFields": 0
+  },
+  "requestId": "ext-read-001",
+  "targetRef": "ops-queue",
+  "version": "control-plane.external-action-request/v1"
+}
