@@ -64,7 +64,8 @@ def build_design_partner_rc_status(
             "public-desktop-boundary",
             "Public desktop claim boundary",
             _surface_status(execution_surfaces, "public-desktop-installer") == "blocked",
-            f"public-desktop-installer={_surface_status(execution_surfaces, 'public-desktop-installer')}",
+            "public-desktop-installer="
+            f"{_surface_status(execution_surfaces, 'public-desktop-installer')}",
             blocking=True,
         ),
         _conditional_check(
@@ -76,7 +77,10 @@ def build_design_partner_rc_status(
         _conditional_check(
             "active-alerts",
             "Active alert review",
-            not any(alert.status == "active" and alert.severity in {"error", "critical"} for alert in alerts),
+            not any(
+                alert.status == "active" and alert.severity in {"error", "critical"}
+                for alert in alerts
+            ),
             f"{sum(1 for alert in alerts if alert.status == 'active')} active alert(s)",
         ),
     ]

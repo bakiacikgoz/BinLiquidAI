@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -147,6 +147,27 @@ pilot-readiness-gate:
 	$(MAKE) operator-panel-tauri-smoke
 	corepack pnpm --dir apps/operator-panel pilot:assert
 	$(MAKE) evidence-pack-gate
+	git diff --check
+
+design-partner-rc-gate:
+	uv run ruff check .
+	uv run pytest -q \
+		tests/test_design_partner_rc.py \
+		tests/test_external_agent_gateway.py \
+		tests/test_agent_registry_v2.py \
+		tests/test_policy_packs.py \
+		tests/test_rbac_admin.py \
+		tests/test_evidence_index.py \
+		tests/test_reports_alerts.py \
+		tests/test_operations_runner.py \
+		tests/test_control_plane_snapshot.py
+	uv run python scripts/generate_control_plane_contract_schemas.py
+	corepack pnpm --dir apps/operator-panel test -- controlPlaneMappers controlPlaneSnapshot
+	uv run python scripts/run_external_agent_gateway_smoke.py
+	uv run python scripts/evaluate_policy_pack_promotion.py
+	uv run python scripts/evaluate_evidence_index.py
+	uv run python scripts/evaluate_reports_alerts.py
+	uv run python scripts/generate_design_partner_rc_pack.py --json
 	git diff --check
 
 ui-e2e-gate:
