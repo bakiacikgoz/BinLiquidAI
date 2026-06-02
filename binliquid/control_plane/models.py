@@ -650,6 +650,53 @@ class ReportSummary(StrictModel):
     blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
 
 
+class ReportManifestItem(StrictModel):
+    report_id: str = Field(alias="reportId")
+    kind: Literal[
+        "readiness",
+        "evidence",
+        "qualification",
+        "support",
+        "security",
+        "metrics",
+        "policy",
+        "alerts",
+        "logs",
+    ]
+    title: str
+    status: Literal["ready", "conditional", "blocked", "missing"]
+    path: str
+    generated_at_utc: datetime = Field(alias="generatedAtUtc")
+    summary: str
+
+
+class AlertEvaluation(StrictModel):
+    alert_id: str = Field(alias="alertId")
+    severity: Literal["info", "warning", "critical"]
+    state: Literal["active", "resolved", "suppressed"]
+    source: Literal["snapshot", "evidence", "policy", "approval", "runtime", "ci"]
+    reason_code: str = Field(alias="reasonCode")
+    suggested_action: str = Field(alias="suggestedAction")
+    first_seen_at: datetime = Field(alias="firstSeenAt")
+    last_seen_at: datetime = Field(alias="lastSeenAt")
+
+
+class ReportManifest(StrictModel):
+    version: Literal["control-plane.report-manifest/v1"] = (
+        "control-plane.report-manifest/v1"
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["pass", "conditional", "blocked"]
+    reports: list[ReportManifestItem] = Field(default_factory=list)
+    alerts: list[AlertEvaluation] = Field(default_factory=list)
+    logs_export_ref: str | None = Field(default=None, alias="logsExportRef")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+
+
 class OperationResultSummary(StrictModel):
     status: Literal["not_run", "passed", "failed", "blocked"]
     summary: str

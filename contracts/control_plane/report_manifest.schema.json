@@ -1,0 +1,203 @@
+{
+  "$defs": {
+    "AlertEvaluation": {
+      "additionalProperties": false,
+      "properties": {
+        "alertId": {
+          "title": "Alertid",
+          "type": "string"
+        },
+        "firstSeenAt": {
+          "format": "date-time",
+          "title": "Firstseenat",
+          "type": "string"
+        },
+        "lastSeenAt": {
+          "format": "date-time",
+          "title": "Lastseenat",
+          "type": "string"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "snapshot",
+            "evidence",
+            "policy",
+            "approval",
+            "runtime",
+            "ci"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "active",
+            "resolved",
+            "suppressed"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "suggestedAction": {
+          "title": "Suggestedaction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "alertId",
+        "severity",
+        "state",
+        "source",
+        "reasonCode",
+        "suggestedAction",
+        "firstSeenAt",
+        "lastSeenAt"
+      ],
+      "title": "AlertEvaluation",
+      "type": "object"
+    },
+    "ReportManifestItem": {
+      "additionalProperties": false,
+      "properties": {
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "readiness",
+            "evidence",
+            "qualification",
+            "support",
+            "security",
+            "metrics",
+            "policy",
+            "alerts",
+            "logs"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "reportId": {
+          "title": "Reportid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reportId",
+        "kind",
+        "title",
+        "status",
+        "path",
+        "generatedAtUtc",
+        "summary"
+      ],
+      "title": "ReportManifestItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "alerts": {
+      "items": {
+        "$ref": "#/$defs/AlertEvaluation"
+      },
+      "title": "Alerts",
+      "type": "array"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "logsExportRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Logsexportref"
+    },
+    "reports": {
+      "items": {
+        "$ref": "#/$defs/ReportManifestItem"
+      },
+      "title": "Reports",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.report-manifest/v1",
+      "default": "control-plane.report-manifest/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "ReportManifest",
+  "type": "object"
+}

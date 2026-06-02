@@ -58,6 +58,7 @@ from binliquid.control_plane.rbac_admin import (
 )
 from binliquid.control_plane.readiness import build_readiness_report
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
+from binliquid.control_plane.reports import build_reports_alerts_logs_manifest
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
 from binliquid.control_plane.snapshot import build_control_plane_snapshot
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
@@ -139,6 +140,7 @@ control_plane_claims_app = typer.Typer(help="Control Plane claim guard commands"
 control_plane_adapter_app = typer.Typer(help="External adapter contract commands")
 control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
 control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
+control_plane_reports_app = typer.Typer(help="Control Plane reports and alerts commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -170,6 +172,7 @@ control_plane_app.add_typer(control_plane_claims_app, name="claims")
 control_plane_app.add_typer(control_plane_adapter_app, name="adapter")
 control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
 control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
+control_plane_app.add_typer(control_plane_reports_app, name="reports")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -1164,6 +1167,31 @@ def control_plane_rbac_check(
     )
     _emit_payload(decision.model_dump(mode="json", by_alias=True), json_output=json_output)
     if decision.status == "denied":
+        raise typer.Exit(code=3)
+
+
+@control_plane_reports_app.command("manifest")
+def control_plane_reports_manifest(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    evidence_root: str = typer.Option("artifacts", "--evidence-root"),
+    output_dir: str = typer.Option(
+        "artifacts/design-partner-rc/reports-alerts-logs",
+        "--output-dir",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    snapshot = build_control_plane_snapshot(
+        root_dir=root_dir,
+        profile=profile,
+        evidence_root=evidence_root,
+        runtime_mode="cli",
+        bridge_mode="cli",
+        used_fixture=False,
+    )
+    manifest = build_reports_alerts_logs_manifest(snapshot=snapshot, output_dir=output_dir)
+    _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if manifest.status == "blocked":
         raise typer.Exit(code=3)
 
 

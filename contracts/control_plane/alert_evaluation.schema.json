@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "alertId": {
+      "title": "Alertid",
+      "type": "string"
+    },
+    "firstSeenAt": {
+      "format": "date-time",
+      "title": "Firstseenat",
+      "type": "string"
+    },
+    "lastSeenAt": {
+      "format": "date-time",
+      "title": "Lastseenat",
+      "type": "string"
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "snapshot",
+        "evidence",
+        "policy",
+        "approval",
+        "runtime",
+        "ci"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "active",
+        "resolved",
+        "suppressed"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "suggestedAction": {
+      "title": "Suggestedaction",
+      "type": "string"
+    }
+  },
+  "required": [
+    "alertId",
+    "severity",
+    "state",
+    "source",
+    "reasonCode",
+    "suggestedAction",
+    "firstSeenAt",
+    "lastSeenAt"
+  ],
+  "title": "AlertEvaluation",
+  "type": "object"
+}
