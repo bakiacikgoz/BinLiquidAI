@@ -1,0 +1,15 @@
+{
+  "actionKind": "destructive",
+  "actorId": "pilot-operator",
+  "agentId": "pilot-destructive-agent",
+  "dryRun": false,
+  "intent": "Attempt a destructive action that must remain denied.",
+  "payloadHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "payloadRedactionSummary": {
+    "payloadRedacted": true,
+    "sensitiveValuesFound": false
+  },
+  "requestId": "pilot-destructive-denied",
+  "targetRef": "production:delete-resource",
+  "version": "control-plane.external-action-request/v1"
+}

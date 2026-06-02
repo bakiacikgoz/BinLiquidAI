@@ -1,0 +1,17 @@
+{
+  "agentId": "pilot-destructive-agent",
+  "allowedActions": [
+    "destructive"
+  ],
+  "entrypoint": [
+    "python",
+    "agent.py"
+  ],
+  "evidenceRequired": true,
+  "name": "Destructive Blocked Agent",
+  "owner": "platform-security",
+  "policyPackId": "enterprise_default",
+  "riskProfile": "destructive_denied",
+  "transport": "stdio_json",
+  "version": "control-plane.external-agent-manifest/v1"
+}

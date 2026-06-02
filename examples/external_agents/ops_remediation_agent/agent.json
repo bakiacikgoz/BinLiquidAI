@@ -1,0 +1,17 @@
+{
+  "agentId": "pilot-ops-remediation-agent",
+  "allowedActions": [
+    "external_write"
+  ],
+  "entrypoint": [
+    "python",
+    "agent.py"
+  ],
+  "evidenceRequired": true,
+  "name": "Ops Remediation Agent",
+  "owner": "platform-ops",
+  "policyPackId": "enterprise_default",
+  "riskProfile": "mutation",
+  "transport": "stdio_json",
+  "version": "control-plane.external-agent-manifest/v1"
+}

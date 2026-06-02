@@ -37,6 +37,11 @@ from binliquid.computer_use.vision_runtime.replay import (
 )
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.control_plane.adapter_contracts import evaluate_action_proposal_file
+from binliquid.control_plane.admin_store import (
+    IdentityAssertion,
+    apply_admin_change,
+    propose_admin_change,
+)
 from binliquid.control_plane.agent_registry_v2 import build_agent_registry_v2
 from binliquid.control_plane.claim_guard import ClaimGuard
 from binliquid.control_plane.errors import ControlPlaneError
@@ -46,8 +51,16 @@ from binliquid.control_plane.evidence_corpus import (
 )
 from binliquid.control_plane.evidence_index import build_evidence_index
 from binliquid.control_plane.evidence_pack import EvidencePackBuilder
+from binliquid.control_plane.external_agent_client import run_external_agent_manifest
 from binliquid.control_plane.external_gateway import submit_external_action_file
+from binliquid.control_plane.install_rehearsal import run_install_rehearsal
 from binliquid.control_plane.operations_runner import dry_run_operation
+from binliquid.control_plane.policy_pack_store import (
+    plan_policy_pack_rollback,
+    promote_policy_pack,
+    stage_policy_pack,
+    validate_lifecycle_policy_pack,
+)
 from binliquid.control_plane.policy_packs import (
     diff_policy_packs,
     load_policy_pack_manifest,
@@ -143,10 +156,14 @@ team_app = typer.Typer(help="Team runtime commands")
 control_plane_app = typer.Typer(help="Agent Control Plane commands")
 control_plane_agent_app = typer.Typer(help="Control Plane agent registry commands")
 control_plane_policy_app = typer.Typer(help="Control Plane policy commands")
+control_plane_policy_pack_app = typer.Typer(help="Control Plane policy pack lifecycle commands")
 control_plane_run_app = typer.Typer(help="Control Plane run commands")
 control_plane_evidence_app = typer.Typer(help="Control Plane evidence commands")
 control_plane_claims_app = typer.Typer(help="Control Plane claim guard commands")
 control_plane_qualification_app = typer.Typer(help="Control Plane qualification closure commands")
+control_plane_install_app = typer.Typer(help="Control Plane install rehearsal commands")
+control_plane_external_agent_app = typer.Typer(help="External agent pilot commands")
+control_plane_admin_app = typer.Typer(help="Control Plane governance admin commands")
 control_plane_adapter_app = typer.Typer(help="External adapter contract commands")
 control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
 control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
@@ -177,10 +194,14 @@ app.add_typer(team_app, name="team")
 app.add_typer(control_plane_app, name="control-plane")
 control_plane_app.add_typer(control_plane_agent_app, name="agent")
 control_plane_app.add_typer(control_plane_policy_app, name="policy")
+control_plane_app.add_typer(control_plane_policy_pack_app, name="policy-pack")
 control_plane_app.add_typer(control_plane_run_app, name="run")
 control_plane_app.add_typer(control_plane_evidence_app, name="evidence")
 control_plane_app.add_typer(control_plane_claims_app, name="claims")
 control_plane_app.add_typer(control_plane_qualification_app, name="qualification")
+control_plane_app.add_typer(control_plane_install_app, name="install")
+control_plane_app.add_typer(control_plane_external_agent_app, name="external-agent")
+control_plane_app.add_typer(control_plane_admin_app, name="admin")
 control_plane_app.add_typer(control_plane_adapter_app, name="adapter")
 control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
 control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
@@ -782,6 +803,16 @@ def _emit_payload(payload: dict[str, Any], *, json_output: bool) -> None:
             typer.echo(f"{key}={value}")
 
 
+def _admin_actor(actor_id: str) -> IdentityAssertion:
+    if actor_id in {"enterprise-admin", "ops-team-01", "cli:operator"}:
+        return IdentityAssertion(
+            actor_id=actor_id,
+            roles=["platform_admin", "security_admin"],
+            permissions=["config.write", "policy.promote", "reports.read"],
+        )
+    return IdentityAssertion(actor_id=actor_id, roles=["viewer"], permissions=["reports.read"])
+
+
 def _control_plane_error(exc: ControlPlaneError, *, json_output: bool) -> None:
     payload = {"status": "error", "error_code": exc.error_code, "error": str(exc)}
     _emit_payload(payload, json_output=json_output)
@@ -1232,6 +1263,186 @@ def control_plane_qualification_verify(
     _emit_payload(result, json_output=json_output)
     if result["status"] != "pass":
         raise typer.Exit(code=1)
+
+
+@control_plane_install_app.command("rehearsal")
+def control_plane_install_rehearsal(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    target_root: str = typer.Option(
+        ".binliquid/rehearsal/design-partner",
+        "--target-root",
+        help="Dedicated rehearsal target root.",
+    ),
+    mode: str = typer.Option("source-cli", "--mode", help="source-cli|operator-panel-smoke"),
+    output: str = typer.Option(
+        "artifacts/install-rehearsal/report.json",
+        "--output",
+        help="Install rehearsal JSON report path.",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Skip support bundle archive creation."),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    normalized_mode = mode.replace("-", "_")
+    if normalized_mode not in {"source_cli", "operator_panel_smoke"}:
+        _emit_payload(
+            {
+                "status": "error",
+                "error_code": "INSTALL_REHEARSAL_MODE_INVALID",
+                "error": mode,
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1)
+    report = run_install_rehearsal(
+        target_root=Path(target_root),
+        profile=profile,
+        mode=normalized_mode,  # type: ignore[arg-type]
+        output_path=Path(output),
+        dry_run=dry_run,
+    )
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@control_plane_external_agent_app.command("run")
+def control_plane_external_agent_run(
+    manifest: str = typer.Option(..., "--manifest", help="External agent manifest path."),
+    request: str = typer.Option(..., "--request", help="External action request path."),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    response = run_external_agent_manifest(
+        manifest_path=Path(manifest),
+        request_path=Path(request),
+        config=RuntimeConfig.from_profile(profile),
+        root_dir=Path(root_dir),
+    )
+    _emit_payload(response.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@control_plane_admin_app.command("propose")
+def control_plane_admin_propose(
+    kind: str = typer.Option(..., "--kind", help="user|role|policy-pack"),
+    operation: str = typer.Option(
+        ...,
+        "--operation",
+        help="create|update|deactivate|stage|promote|rollback",
+    ),
+    input_path: str = typer.Option(..., "--input", help="Admin proposal payload JSON."),
+    actor: str = typer.Option("enterprise-admin", "--actor", help="Actor id."),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    dry_run: bool = typer.Option(True, "--dry-run/--no-dry-run"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    normalized_kind = kind.replace("-", "_")
+    payload = json.loads(Path(input_path).read_text(encoding="utf-8"))
+    proposal = propose_admin_change(
+        store_root=Path(root_dir),
+        actor=_admin_actor(actor),
+        kind=normalized_kind,  # type: ignore[arg-type]
+        operation=operation,  # type: ignore[arg-type]
+        payload=payload,
+        dry_run=dry_run,
+        config=RuntimeConfig.from_profile(profile),
+    )
+    _emit_payload(proposal.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if proposal.status == "denied":
+        raise typer.Exit(code=3)
+
+
+@control_plane_admin_app.command("apply")
+def control_plane_admin_apply(
+    proposal_id: str = typer.Option(..., "--proposal-id", help="Proposal id."),
+    approval_id: str = typer.Option(..., "--approval-id", help="Approved approval id."),
+    actor: str = typer.Option("enterprise-admin", "--actor", help="Actor id."),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    result = apply_admin_change(
+        store_root=Path(root_dir),
+        proposal_id=proposal_id,
+        approval_id=approval_id,
+        actor=_admin_actor(actor),
+        config=RuntimeConfig.from_profile(profile),
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@control_plane_policy_pack_app.command("validate")
+def control_plane_policy_pack_lifecycle_validate(
+    manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path."),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    record = validate_lifecycle_policy_pack(
+        manifest=load_policy_pack_manifest(manifest),
+        store_root=Path(root_dir),
+    )
+    _emit_payload(record.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if record.status == "rejected":
+        raise typer.Exit(code=3)
+
+
+@control_plane_policy_pack_app.command("stage")
+def control_plane_policy_pack_lifecycle_stage(
+    manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path."),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    record = stage_policy_pack(
+        manifest=load_policy_pack_manifest(manifest),
+        store_root=Path(root_dir),
+    )
+    _emit_payload(record.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if record.status == "rejected":
+        raise typer.Exit(code=3)
+
+
+@control_plane_policy_pack_app.command("promote")
+def control_plane_policy_pack_lifecycle_promote(
+    manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path."),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    record = promote_policy_pack(
+        manifest=load_policy_pack_manifest(manifest),
+        store_root=Path(root_dir),
+        config=RuntimeConfig.from_profile(profile),
+    )
+    _emit_payload(record.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if record.status == "rejected":
+        raise typer.Exit(code=3)
+
+
+@control_plane_policy_pack_app.command("rollback-plan")
+def control_plane_policy_pack_lifecycle_rollback_plan(
+    policy_pack_id: str = typer.Option(..., "--policy-pack-id"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        record = plan_policy_pack_rollback(
+            policy_pack_id=policy_pack_id,
+            store_root=Path(root_dir),
+        )
+    except ValueError as exc:
+        _emit_payload(
+            {
+                "status": "error",
+                "error_code": "POLICY_PACK_ROLLBACK_UNAVAILABLE",
+                "error": str(exc),
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1) from None
+    _emit_payload(record.model_dump(mode="json", by_alias=True), json_output=json_output)
 
 
 @control_plane_claims_app.command("verify")

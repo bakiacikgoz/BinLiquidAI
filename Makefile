@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate governance-admin-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -142,6 +142,26 @@ evidence-corpus-gate:
 		--evidence-root artifacts/evidence-corpus/valid \
 		--root-dir artifacts/evidence-corpus/index-state \
 		--json
+
+install-rehearsal-gate:
+	uv run pytest -q tests/test_control_plane_install_rehearsal.py
+	uv run python scripts/prepare_enterprise_fixture.py --root .
+	uv run binliquid control-plane install rehearsal \
+		--profile enterprise \
+		--target-root .binliquid/rehearsal/design-partner \
+		--mode source-cli \
+		--output artifacts/install-rehearsal/report.json \
+		--json
+
+external-agent-pilot-gate:
+	uv run pytest -q tests/test_control_plane_external_agent_client.py tests/test_external_agent_gateway.py
+	uv run python scripts/prepare_enterprise_fixture.py --root .
+	uv run python scripts/run_external_agent_pilot.py --json
+
+governance-admin-gate:
+	uv run pytest -q tests/test_control_plane_admin_store.py tests/test_control_plane_policy_pack_lifecycle.py tests/test_rbac_admin.py tests/test_policy_packs.py
+	uv run python scripts/prepare_enterprise_fixture.py --root .
+	uv run python scripts/evaluate_governance_admin.py --json
 
 ui-gate:
 	corepack pnpm --dir apps/operator-panel qa:frontend

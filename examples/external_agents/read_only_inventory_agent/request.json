@@ -1,0 +1,15 @@
+{
+  "actionKind": "read",
+  "actorId": "pilot-operator",
+  "agentId": "pilot-inventory-agent",
+  "dryRun": false,
+  "intent": "Read inventory summary for compliance evidence generation.",
+  "payloadHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "payloadRedactionSummary": {
+    "payloadRedacted": true,
+    "sensitiveValuesFound": false
+  },
+  "requestId": "pilot-read-only-inventory",
+  "targetRef": "inventory:summary",
+  "version": "control-plane.external-action-request/v1"
+}

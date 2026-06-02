@@ -1,0 +1,15 @@
+{
+  "actionKind": "external_write",
+  "actorId": "pilot-operator",
+  "agentId": "pilot-ops-remediation-agent",
+  "dryRun": false,
+  "intent": "Create an ops ticket for approved remediation workflow.",
+  "payloadHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "payloadRedactionSummary": {
+    "payloadRedacted": true,
+    "sensitiveValuesFound": false
+  },
+  "requestId": "pilot-ops-remediation",
+  "targetRef": "ticketing:change-request",
+  "version": "control-plane.external-action-request/v1"
+}

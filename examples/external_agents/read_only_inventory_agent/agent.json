@@ -1,0 +1,17 @@
+{
+  "agentId": "pilot-inventory-agent",
+  "allowedActions": [
+    "read"
+  ],
+  "entrypoint": [
+    "python",
+    "agent.py"
+  ],
+  "evidenceRequired": true,
+  "name": "Read-only Inventory Agent",
+  "owner": "platform-security",
+  "policyPackId": "enterprise_default",
+  "riskProfile": "read_only",
+  "transport": "stdio_json",
+  "version": "control-plane.external-agent-manifest/v1"
+}
