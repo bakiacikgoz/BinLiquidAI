@@ -40,6 +40,10 @@ from binliquid.control_plane.adapter_contracts import evaluate_action_proposal_f
 from binliquid.control_plane.agent_registry_v2 import build_agent_registry_v2
 from binliquid.control_plane.claim_guard import ClaimGuard
 from binliquid.control_plane.errors import ControlPlaneError
+from binliquid.control_plane.evidence_corpus import (
+    build_evidence_verification_corpus,
+    verify_evidence_corpus,
+)
 from binliquid.control_plane.evidence_index import build_evidence_index
 from binliquid.control_plane.evidence_pack import EvidencePackBuilder
 from binliquid.control_plane.external_gateway import submit_external_action_file
@@ -51,6 +55,10 @@ from binliquid.control_plane.policy_packs import (
     validate_policy_pack,
 )
 from binliquid.control_plane.policy_simulator import PolicySimulator
+from binliquid.control_plane.qualification_closure import (
+    generate_enterprise_hat_a_closure,
+    verify_enterprise_hat_a_closure,
+)
 from binliquid.control_plane.rbac_admin import (
     build_rbac_matrix,
 )
@@ -138,6 +146,7 @@ control_plane_policy_app = typer.Typer(help="Control Plane policy commands")
 control_plane_run_app = typer.Typer(help="Control Plane run commands")
 control_plane_evidence_app = typer.Typer(help="Control Plane evidence commands")
 control_plane_claims_app = typer.Typer(help="Control Plane claim guard commands")
+control_plane_qualification_app = typer.Typer(help="Control Plane qualification closure commands")
 control_plane_adapter_app = typer.Typer(help="External adapter contract commands")
 control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
 control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
@@ -171,6 +180,7 @@ control_plane_app.add_typer(control_plane_policy_app, name="policy")
 control_plane_app.add_typer(control_plane_run_app, name="run")
 control_plane_app.add_typer(control_plane_evidence_app, name="evidence")
 control_plane_app.add_typer(control_plane_claims_app, name="claims")
+control_plane_app.add_typer(control_plane_qualification_app, name="qualification")
 control_plane_app.add_typer(control_plane_adapter_app, name="adapter")
 control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
 control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
@@ -1132,6 +1142,96 @@ def control_plane_evidence_index(
     _emit_payload(index.model_dump(mode="json", by_alias=True), json_output=json_output)
     if index.status == "blocked":
         raise typer.Exit(code=3)
+
+
+@control_plane_evidence_app.command("corpus-build")
+def control_plane_evidence_corpus_build(
+    output_root: str = typer.Option(
+        "artifacts/evidence-corpus",
+        "--output-root",
+        help="Evidence corpus output root.",
+    ),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    include_tamper_cases: bool = typer.Option(
+        True,
+        "--tamper-cases/--valid-only",
+        help="Include expected-fail corpus cases.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    manifest = build_evidence_verification_corpus(
+        output_root=Path(output_root),
+        include_tamper_cases=include_tamper_cases,
+        config=RuntimeConfig.from_profile(profile),
+    )
+    _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@control_plane_evidence_app.command("corpus-verify")
+def control_plane_evidence_corpus_verify(
+    corpus_root: str = typer.Option(
+        "artifacts/evidence-corpus",
+        "--corpus-root",
+        help="Evidence corpus root.",
+    ),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str | None = typer.Option(None, "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    report = verify_evidence_corpus(
+        corpus_root=Path(corpus_root),
+        config=RuntimeConfig.from_profile(profile),
+        root_dir=Path(root_dir) if root_dir else None,
+    )
+    _emit_payload(report, json_output=json_output)
+    if report["status"] != "pass":
+        raise typer.Exit(code=1)
+
+
+@control_plane_qualification_app.command("close")
+def control_plane_qualification_close(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    output_root: str = typer.Option(
+        "artifacts/enterprise-hat-a",
+        "--output-root",
+        help="Enterprise Hat A closure output root.",
+    ),
+    qualification_root: str | None = typer.Option(
+        None,
+        "--qualification-root",
+        help="Root containing qualification_report.json.",
+    ),
+    require_signature: bool = typer.Option(
+        True,
+        "--require-signature/--allow-unsigned",
+        help="Require a trusted non-compat signature for readiness.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    closure = generate_enterprise_hat_a_closure(
+        profile=profile,
+        output_root=Path(output_root),
+        qualification_root=Path(qualification_root) if qualification_root else None,
+        require_signature=require_signature,
+    )
+    _emit_payload(closure.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if closure.claim_status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@control_plane_qualification_app.command("verify")
+def control_plane_qualification_verify(
+    input_path: str = typer.Option(..., "--input", help="Enterprise Hat A closure artifact."),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    result = verify_enterprise_hat_a_closure(
+        input_path=Path(input_path),
+        config=RuntimeConfig.from_profile(profile),
+    )
+    _emit_payload(result, json_output=json_output)
+    if result["status"] != "pass":
+        raise typer.Exit(code=1)
 
 
 @control_plane_claims_app.command("verify")

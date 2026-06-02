@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,8 @@ from binliquid.control_plane.models import (
 from binliquid.control_plane.storage import ControlPlaneStore, file_sha256
 from binliquid.enterprise.signing import build_integrity, verify_signed_artifact
 from binliquid.runtime.config import RuntimeConfig
+
+MAX_EVIDENCE_AGE = timedelta(days=30)
 
 
 class EvidencePackBuilder:
@@ -170,6 +172,15 @@ class EvidencePackBuilder:
         replay_verified = bool(manifest.verification.replay_verified)
         if not replay_verified:
             blocking.append("REPLAY_VERIFY_FAILED")
+        if _is_stale(manifest.generated_at):
+            blocking.append("EVIDENCE_STALE")
+        current_commit = _git_commit()
+        if manifest.git_commit not in {current_commit, "unknown"}:
+            blocking.append("GIT_COMMIT_MISMATCH")
+        if manifest.redaction_summary.raw_screenshots_persisted > 0:
+            blocking.append("RAW_SCREENSHOT_PERSISTED")
+        if _qualification_expired(source.parent):
+            blocking.append("QUALIFICATION_EXPIRED")
 
         evidence_ok = required_present and hash_ok and integrity_verified and not blocking
         status = "pass" if evidence_ok else "fail"
@@ -234,3 +245,21 @@ def _git_commit() -> str:
         check=False,
     )
     return proc.stdout.strip() if proc.returncode == 0 else "unknown"
+
+
+def _is_stale(generated_at: datetime) -> bool:
+    value = generated_at
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return datetime.now(UTC) - value.astimezone(UTC) > MAX_EVIDENCE_AGE
+
+
+def _qualification_expired(root: Path) -> bool:
+    path = root / "qualification_status.json"
+    if not path.exists():
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return True
+    return str(payload.get("status") or "").lower() == "expired"

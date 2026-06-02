@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 from binliquid.control_plane.models import ClaimItem, ClaimMatrix, ClaimStatus
+from binliquid.control_plane.qualification_closure import EnterpriseHatAEvidenceClosure
+from binliquid.enterprise.signing import load_signed_artifact
 from binliquid.runtime.config import RuntimeConfig
 
 
@@ -52,7 +55,22 @@ class ClaimGuard:
             "qualification",
             "ga_readiness",
             "signed_evidence_pack",
+            "enterprise_hat_a_closure",
         ]
+        closure = self._enterprise_hat_a_closure(root)
+        if closure is not None:
+            status = {
+                "ready": ClaimStatus.ALLOWED,
+                "conditional": ClaimStatus.CONDITIONAL,
+                "blocked": ClaimStatus.BLOCKED,
+            }[closure.claim_status]
+            return ClaimItem(
+                claim_id="enterprise-self-hosted-agent-control-plane",
+                status=status,
+                required_evidence=required,
+                blocking_reasons=closure.blocking_reasons,
+            )
+
         blockers = []
         if not (root / "security_posture.json").exists():
             blockers.append("SECURITY_BASELINE_MISSING")
@@ -69,6 +87,46 @@ class ClaimGuard:
             required_evidence=required,
             blocking_reasons=blockers,
         )
+
+    def _enterprise_hat_a_closure(self, root: Path) -> EnterpriseHatAEvidenceClosure | None:
+        candidates = [
+            root / "enterprise-hat-a" / "enterprise_hat_a_closure.json",
+            root / "enterprise_hat_a_closure.json",
+            root / "enterprise-hat-a-closure.json",
+        ]
+        closure_path = next((path for path in candidates if path.exists()), None)
+        if closure_path is None:
+            return None
+        signed = load_signed_artifact(path=closure_path, config=self.config)
+        data = signed.get("data") if isinstance(signed.get("data"), dict) else None
+        if data is None:
+            return EnterpriseHatAEvidenceClosure(
+                closure_id="hat_a_invalid",
+                profile=self.config.profile_name,
+                commit_sha="unknown",
+                generatedAtUtc=datetime.fromtimestamp(closure_path.stat().st_mtime, UTC),
+                qualificationReportPath="unknown",
+                signatureStatus="invalid",
+                signatureMode=str(signed.get("signature_mode") or "missing"),
+                baselineStatus="unknown",
+                workloadStatus="unknown",
+                claimStatus="blocked",
+                blockingReasons=["ENTERPRISE_HAT_A_CLOSURE_INVALID"],
+            )
+        closure = EnterpriseHatAEvidenceClosure.model_validate(data)
+        blocking = list(closure.blocking_reasons)
+        if not signed.get("verified"):
+            blocking.append(str(signed.get("error_code") or "CLOSURE_INTEGRITY_INVALID"))
+        if not signed.get("signature_verified"):
+            blocking.append("CLOSURE_SIGNATURE_INVALID")
+        if blocking:
+            return closure.model_copy(
+                update={
+                    "claim_status": "blocked",
+                    "blocking_reasons": sorted(set(blocking)),
+                }
+            )
+        return closure
 
     def _public_desktop_claim(self, root: Path) -> ClaimItem:
         blockers = []

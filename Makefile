@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -117,6 +117,31 @@ evidence-pack-gate:
 	uv run pytest -q tests/test_control_plane_evidence_pack.py
 	corepack pnpm --dir apps/operator-panel test -- EvidencePackView
 	corepack pnpm --dir apps/operator-panel test:e2e -- evidence.spec.ts
+
+enterprise-hat-a-evidence-gate:
+	uv run pytest -q tests/test_control_plane_qualification_closure.py tests/test_control_plane_claim_guard.py
+	uv run python scripts/prepare_enterprise_fixture.py --root .
+	uv run python scripts/generate_enterprise_hat_a_fixture.py --json
+	uv run binliquid control-plane qualification close \
+		--profile enterprise \
+		--qualification-root artifacts/enterprise-hat-a/qualification \
+		--output-root artifacts/enterprise-hat-a \
+		--json
+	uv run binliquid control-plane qualification verify \
+		--profile enterprise \
+		--input artifacts/enterprise-hat-a/enterprise_hat_a_closure.json \
+		--json
+	uv run binliquid control-plane claims verify --profile enterprise --evidence-root artifacts --json
+
+evidence-corpus-gate:
+	uv run pytest -q tests/test_control_plane_evidence_corpus.py tests/test_evidence_index.py
+	uv run python scripts/prepare_enterprise_fixture.py --root .
+	uv run python scripts/evaluate_evidence_corpus.py --json
+	uv run binliquid control-plane evidence index \
+		--profile enterprise \
+		--evidence-root artifacts/evidence-corpus/valid \
+		--root-dir artifacts/evidence-corpus/index-state \
+		--json
 
 ui-gate:
 	corepack pnpm --dir apps/operator-panel qa:frontend
