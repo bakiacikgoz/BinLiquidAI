@@ -1,0 +1,165 @@
+{
+  "$defs": {
+    "PolicyPackRule": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "allow",
+            "require_approval",
+            "deny"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "task",
+            "tool",
+            "handoff",
+            "memory",
+            "action",
+            "claim"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "explain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Explain"
+        },
+        "riskClass": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RiskClass"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ruleId": {
+          "title": "Ruleid",
+          "type": "string"
+        },
+        "targetKind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targetkind"
+        }
+      },
+      "required": [
+        "ruleId",
+        "category",
+        "action"
+      ],
+      "title": "PolicyPackRule",
+      "type": "object"
+    },
+    "RiskClass": {
+      "enum": [
+        "read_only",
+        "local_write",
+        "external_write",
+        "mutation",
+        "destructive",
+        "credential_sensitive",
+        "financial_or_legal",
+        "security_sensitive",
+        "computer_use_visual",
+        "unknown"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "createdAt": {
+      "format": "date-time",
+      "title": "Createdat",
+      "type": "string"
+    },
+    "createdBy": {
+      "title": "Createdby",
+      "type": "string"
+    },
+    "defaultDecision": {
+      "default": "deny",
+      "enum": [
+        "allow",
+        "require_approval",
+        "deny"
+      ],
+      "title": "Defaultdecision",
+      "type": "string"
+    },
+    "policyPackId": {
+      "title": "Policypackid",
+      "type": "string"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/PolicyPackRule"
+      },
+      "title": "Rules",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "control-plane.policy-pack/v1",
+      "default": "control-plane.policy-pack/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "signedManifestRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Signedmanifestref"
+    },
+    "status": {
+      "default": "draft",
+      "enum": [
+        "draft",
+        "staged",
+        "active",
+        "retired"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "policyPackId",
+    "version",
+    "createdBy"
+  ],
+  "title": "PolicyPackManifest",
+  "type": "object"
+}

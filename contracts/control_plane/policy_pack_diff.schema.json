@@ -1,0 +1,77 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "addedRules": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Addedrules",
+      "type": "array"
+    },
+    "basePolicyPackId": {
+      "title": "Basepolicypackid",
+      "type": "string"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "candidatePolicyPackId": {
+      "title": "Candidatepolicypackid",
+      "type": "string"
+    },
+    "changedRules": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changedrules",
+      "type": "array"
+    },
+    "removedRules": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Removedrules",
+      "type": "array"
+    },
+    "riskChanges": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Riskchanges",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.policy-pack-diff/v1",
+      "default": "control-plane.policy-pack-diff/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "basePolicyPackId",
+    "candidatePolicyPackId",
+    "status"
+  ],
+  "title": "PolicyPackDiffResult",
+  "type": "object"
+}

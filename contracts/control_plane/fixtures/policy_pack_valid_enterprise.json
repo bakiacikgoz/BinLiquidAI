@@ -1,0 +1,36 @@
+{
+  "createdAt": "2026-06-02T12:00:00Z",
+  "createdBy": "security-admin",
+  "defaultDecision": "deny",
+  "policyPackId": "enterprise_default",
+  "rules": [
+    {
+      "action": "allow",
+      "category": "action",
+      "explain": "Read-only external status checks are allowed.",
+      "riskClass": "read_only",
+      "ruleId": "external-read-allow",
+      "targetKind": "external_system"
+    },
+    {
+      "action": "require_approval",
+      "category": "action",
+      "explain": "External writes require approval before dispatch.",
+      "riskClass": "external_write",
+      "ruleId": "external-write-approval",
+      "targetKind": "ticketing_system"
+    },
+    {
+      "action": "deny",
+      "category": "action",
+      "explain": "Destructive external actions stay denied for Design Partner RC.",
+      "riskClass": "destructive",
+      "ruleId": "external-destructive-deny",
+      "targetKind": "external_system"
+    }
+  ],
+  "schemaVersion": "control-plane.policy-pack/v1",
+  "signedManifestRef": "signatures/policy_pack_valid_enterprise.sig",
+  "status": "staged",
+  "version": "2026.06.02-rc"
+}

@@ -37,6 +37,7 @@ from binliquid.control_plane.storage import file_sha256
 from binliquid.enterprise.identity import describe_actor
 from binliquid.enterprise.signing import key_status
 from binliquid.governance.approval_store import ApprovalStore
+from binliquid.governance.policy import load_policy
 from binliquid.runtime.config import RuntimeConfig
 
 SNAPSHOT_CONTRACT_VERSION = "control-plane.snapshot/v1"
@@ -335,15 +336,29 @@ def _evidence_pack_summaries(
 def _active_policy_pack(config: RuntimeConfig) -> PolicyPackSummary:
     policy_path = Path(config.governance.policy_path)
     exists = policy_path.exists()
+    rule_count = 0
+    blocking_reasons: list[str] = [] if exists else ["POLICY_FILE_MISSING"]
+    if exists:
+        try:
+            policy = load_policy(policy_path).policy
+            rule_count = (
+                len(policy.task_rules)
+                + len(policy.tool_rules)
+                + len(policy.approval_rules)
+                + len(policy.handoff_rules)
+                + len(policy.memory_scope_rules)
+            )
+        except Exception:  # noqa: BLE001
+            blocking_reasons.append("POLICY_FILE_INVALID")
     return PolicyPackSummary(
         pack_id="active-runtime-policy",
         label="Active runtime policy",
         version=config.governance.decision_engine_version,
         status="active" if exists else "missing",
         policy_hash=f"sha256:{file_sha256(policy_path)}" if exists else None,
-        rule_count=0,
+        rule_count=rule_count,
         source_path=str(policy_path),
-        blocking_reasons=[] if exists else ["POLICY_FILE_MISSING"],
+        blocking_reasons=blocking_reasons,
     )
 
 

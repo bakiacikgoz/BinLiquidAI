@@ -498,6 +498,73 @@ class PolicyPackSummary(StrictModel):
     blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
 
 
+class PolicyPackRule(StrictModel):
+    rule_id: str = Field(alias="ruleId")
+    category: Literal["task", "tool", "handoff", "memory", "action", "claim"]
+    action: Literal["allow", "require_approval", "deny"]
+    risk_class: RiskClass | None = Field(default=None, alias="riskClass")
+    target_kind: str | None = Field(default=None, alias="targetKind")
+    explain: str | None = None
+
+
+class PolicyPackManifest(StrictModel):
+    schema_version: Literal["control-plane.policy-pack/v1"] = Field(
+        default="control-plane.policy-pack/v1",
+        alias="schemaVersion",
+    )
+    policy_pack_id: str = Field(alias="policyPackId")
+    version: str
+    status: Literal["draft", "staged", "active", "retired"] = "draft"
+    default_decision: Literal["allow", "require_approval", "deny"] = Field(
+        default="deny",
+        alias="defaultDecision",
+    )
+    rules: list[PolicyPackRule] = Field(default_factory=list)
+    created_by: str = Field(alias="createdBy")
+    signed_manifest_ref: str | None = Field(default=None, alias="signedManifestRef")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), alias="createdAt")
+
+
+class PolicyPackValidationResult(StrictModel):
+    version: Literal["control-plane.policy-pack-validation/v1"] = (
+        "control-plane.policy-pack-validation/v1"
+    )
+    policy_pack_id: str = Field(alias="policyPackId")
+    policy_version: str = Field(alias="policyVersion")
+    status: Literal["pass", "conditional", "blocked"]
+    rule_count: int = Field(alias="ruleCount")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PolicyPackDiffResult(StrictModel):
+    version: Literal["control-plane.policy-pack-diff/v1"] = "control-plane.policy-pack-diff/v1"
+    base_policy_pack_id: str = Field(alias="basePolicyPackId")
+    candidate_policy_pack_id: str = Field(alias="candidatePolicyPackId")
+    added_rules: list[str] = Field(default_factory=list, alias="addedRules")
+    removed_rules: list[str] = Field(default_factory=list, alias="removedRules")
+    changed_rules: list[str] = Field(default_factory=list, alias="changedRules")
+    risk_changes: list[str] = Field(default_factory=list, alias="riskChanges")
+    status: Literal["pass", "conditional", "blocked"]
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PolicyPackPromotionDryRun(StrictModel):
+    version: Literal["control-plane.policy-pack-promotion/v1"] = (
+        "control-plane.policy-pack-promotion/v1"
+    )
+    policy_pack_id: str = Field(alias="policyPackId")
+    policy_version: str = Field(alias="policyVersion")
+    dry_run: bool = Field(alias="dryRun")
+    status: Literal["pass", "conditional", "blocked"]
+    would_promote: bool = Field(alias="wouldPromote")
+    activation_audit_ref: str | None = Field(default=None, alias="activationAuditRef")
+    validation: PolicyPackValidationResult
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ExecutionSurfaceSummary(StrictModel):
     surface_id: str = Field(alias="surfaceId")
     label: str

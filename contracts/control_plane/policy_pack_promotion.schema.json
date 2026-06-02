@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "PolicyPackValidationResult": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "policyPackId": {
+          "title": "Policypackid",
+          "type": "string"
+        },
+        "policyVersion": {
+          "title": "Policyversion",
+          "type": "string"
+        },
+        "ruleCount": {
+          "title": "Rulecount",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "version": {
+          "const": "control-plane.policy-pack-validation/v1",
+          "default": "control-plane.policy-pack-validation/v1",
+          "title": "Version",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "policyPackId",
+        "policyVersion",
+        "status",
+        "ruleCount"
+      ],
+      "title": "PolicyPackValidationResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "activationAuditRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Activationauditref"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "dryRun": {
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "policyPackId": {
+      "title": "Policypackid",
+      "type": "string"
+    },
+    "policyVersion": {
+      "title": "Policyversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "validation": {
+      "$ref": "#/$defs/PolicyPackValidationResult"
+    },
+    "version": {
+      "const": "control-plane.policy-pack-promotion/v1",
+      "default": "control-plane.policy-pack-promotion/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "wouldPromote": {
+      "title": "Wouldpromote",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "policyPackId",
+    "policyVersion",
+    "dryRun",
+    "status",
+    "wouldPromote",
+    "validation"
+  ],
+  "title": "PolicyPackPromotionDryRun",
+  "type": "object"
+}

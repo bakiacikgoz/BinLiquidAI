@@ -1,0 +1,20 @@
+{
+  "createdAt": "2026-06-02T12:00:00Z",
+  "createdBy": "security-admin",
+  "defaultDecision": "allow",
+  "policyPackId": "unsafe_allow",
+  "rules": [
+    {
+      "action": "allow",
+      "category": "action",
+      "explain": "This unsafe rule should be blocked.",
+      "riskClass": "destructive",
+      "ruleId": "destructive-allow",
+      "targetKind": "external_system"
+    }
+  ],
+  "schemaVersion": "control-plane.policy-pack/v1",
+  "signedManifestRef": null,
+  "status": "draft",
+  "version": "2026.06.02-unsafe"
+}

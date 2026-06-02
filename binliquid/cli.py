@@ -42,6 +42,12 @@ from binliquid.control_plane.claim_guard import ClaimGuard
 from binliquid.control_plane.errors import ControlPlaneError
 from binliquid.control_plane.evidence_pack import EvidencePackBuilder
 from binliquid.control_plane.external_gateway import submit_external_action_file
+from binliquid.control_plane.policy_packs import (
+    diff_policy_packs,
+    load_policy_pack_manifest,
+    promote_policy_pack_dry_run,
+    validate_policy_pack,
+)
 from binliquid.control_plane.policy_simulator import PolicySimulator
 from binliquid.control_plane.readiness import build_readiness_report
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
@@ -918,6 +924,69 @@ def control_plane_policy_simulate(
         raise typer.Exit(code=1) from None
     _emit_payload(result.model_dump(mode="json"), json_output=json_output)
     if result.overall_status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@control_plane_policy_app.command("pack-validate")
+def control_plane_policy_pack_validate(
+    manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        result = validate_policy_pack(load_policy_pack_manifest(manifest))
+    except ValueError as exc:
+        _emit_payload(
+            {"status": "error", "error_code": "POLICY_PACK_MANIFEST_INVALID", "error": str(exc)},
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1) from None
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@control_plane_policy_app.command("pack-diff")
+def control_plane_policy_pack_diff(
+    base: str = typer.Option(..., "--base", help="Current/base policy pack manifest JSON"),
+    candidate: str = typer.Option(..., "--candidate", help="Candidate policy pack manifest JSON"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        result = diff_policy_packs(
+            base=load_policy_pack_manifest(base),
+            candidate=load_policy_pack_manifest(candidate),
+        )
+    except ValueError as exc:
+        _emit_payload(
+            {"status": "error", "error_code": "POLICY_PACK_MANIFEST_INVALID", "error": str(exc)},
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1) from None
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@control_plane_policy_app.command("pack-promote-dry-run")
+def control_plane_policy_pack_promote_dry_run(
+    manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    try:
+        result = promote_policy_pack_dry_run(
+            manifest=load_policy_pack_manifest(manifest),
+            root_dir=root_dir,
+            dry_run=True,
+        )
+    except ValueError as exc:
+        _emit_payload(
+            {"status": "error", "error_code": "POLICY_PACK_MANIFEST_INVALID", "error": str(exc)},
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1) from None
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
         raise typer.Exit(code=3)
 
 
