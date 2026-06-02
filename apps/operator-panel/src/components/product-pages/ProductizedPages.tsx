@@ -121,19 +121,19 @@ export function ReportsPage({ operationOutputs = {}, claims, snapshot, locale = 
       rows={model.rows}
     >
       <article className="page-card">
-        <h3>Report actions</h3>
+        <h3>Pilot launch report</h3>
         <div className="metric-list">
           <div className="metric-row">
-            <span>Generate</span>
-            <strong>Operations &gt; Qualification</strong>
+            <span>Status</span>
+            <strong>{snapshot?.pilotLaunch.status ?? 'unknown'}</strong>
           </div>
           <div className="metric-row">
-            <span>Verify</span>
-            <strong>Evidence center</strong>
+            <span>Report</span>
+            <strong>{snapshot?.pilotLaunch.artifactRoot ?? 'missing'}</strong>
           </div>
           <div className="metric-row">
-            <span>Share</span>
-            <strong>Support bundle</strong>
+            <span>Metrics</span>
+            <strong>{snapshot?.pilotLaunch.pilotMetrics.status ?? 'unknown'}</strong>
           </div>
         </div>
       </article>
@@ -197,8 +197,17 @@ export function UsersPage({ operatorId = '', profile = 'balanced', snapshot }: P
       rows={model.rows}
     >
       <article className="page-card">
-        <h3>Permission checks</h3>
-        <p className="supporting">Use Yürütmeler &gt; Identity to run live permission checks against the selected profile.</p>
+        <h3>Admin proposals</h3>
+        <div className="metric-list">
+          <div className="metric-row">
+            <span>Pending</span>
+            <strong>{snapshot?.pilotLaunch.adminProposals.filter((item) => item.status !== 'applied').length ?? 0}</strong>
+          </div>
+          <div className="metric-row">
+            <span>Apply gate</span>
+            <strong>approval required</strong>
+          </div>
+        </div>
       </article>
     </ProductPageShell>
   );
@@ -215,8 +224,17 @@ export function RolesPage({ profile = 'balanced', snapshot }: ProductPageProps) 
       rows={model.rows}
     >
       <article className="page-card">
-        <h3>Fail-closed rule</h3>
-        <p className="supporting">Unsafe actions remain disabled until identity and permission checks are satisfied.</p>
+        <h3>Admin proposals</h3>
+        <div className="metric-list">
+          <div className="metric-row">
+            <span>Role proposals</span>
+            <strong>{snapshot?.pilotLaunch.adminProposals.filter((item) => item.kind === 'role').length ?? 0}</strong>
+          </div>
+          <div className="metric-row">
+            <span>Audit</span>
+            <strong>signed on apply</strong>
+          </div>
+        </div>
       </article>
     </ProductPageShell>
   );
@@ -233,8 +251,17 @@ export function PolicyPacksPage({ claims, snapshot, locale = 'en' }: ProductPage
       rows={model.rows}
     >
       <article className="page-card">
-        <h3>Assignment rules</h3>
-        <p className="supporting">Policy pack edits are represented here as read-only until signed admin workflows are wired.</p>
+        <h3>Lifecycle proposals</h3>
+        <div className="metric-list">
+          <div className="metric-row">
+            <span>Policy proposals</span>
+            <strong>{snapshot?.pilotLaunch.adminProposals.filter((item) => item.kind === 'policy_pack').length ?? 0}</strong>
+          </div>
+          <div className="metric-row">
+            <span>Rollback</span>
+            <strong>plan required</strong>
+          </div>
+        </div>
       </article>
     </ProductPageShell>
   );

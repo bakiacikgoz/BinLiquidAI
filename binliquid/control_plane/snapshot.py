@@ -31,6 +31,7 @@ from binliquid.control_plane.models import (
     SystemHealthState,
     SystemSummary,
 )
+from binliquid.control_plane.pilot_launch_readiness import build_pilot_launch_readiness_status
 from binliquid.control_plane.rbac_admin import build_admin_summary
 from binliquid.control_plane.registry import AgentRegistry
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
@@ -153,6 +154,12 @@ def build_control_plane_snapshot(
         execution_surfaces=execution_surfaces,
         generated_at=generated_at,
     )
+    pilot_launch = build_pilot_launch_readiness_status(
+        artifact_root=Path(evidence_root),
+        claims=claims.model_dump(mode="json"),
+        alerts=alerts,
+        generated_at=generated_at,
+    )
     logs = _logs(generated_at=generated_at, runs=runs, approvals=approvals, alerts=alerts)
     operations = _operation_descriptors(config=config, generated_at=generated_at)
     admin = _admin_summary(config)
@@ -196,6 +203,7 @@ def build_control_plane_snapshot(
         operations=operations,
         admin=admin,
         design_partner_rc=design_partner_rc,
+        pilot_launch=pilot_launch,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )
@@ -424,33 +432,75 @@ def _report_summaries(
     *,
     evidence_packs: list[EvidencePackSummary],
 ) -> list[ReportSummary]:
+    artifact_root = _pilot_artifact_root(evidence_root)
     candidates = [
         (
             "security-baseline",
             "security",
             "Security baseline",
-            evidence_root / "security_posture.json",
+            artifact_root / "security_posture.json",
         ),
         (
             "qualification",
             "qualification",
             "Qualification report",
-            evidence_root / "qualification_report.json",
+            artifact_root / "qualification_report.json",
         ),
         (
             "ga-readiness",
             "readiness",
             "GA readiness report",
-            evidence_root / "ga_readiness_report.json",
+            artifact_root / "ga_readiness_report.json",
         ),
-        ("metrics", "metrics", "Metrics snapshot", evidence_root / "metrics_snapshot.json"),
+        ("metrics", "metrics", "Metrics snapshot", artifact_root / "metrics_snapshot.json"),
         (
             "support-bundle",
             "support",
             "Support bundle manifest",
-            evidence_root / "support_bundle_manifest.json",
+            artifact_root / "support_bundle_manifest.json",
         ),
-        ("team-pilot", "readiness", "Team pilot report", evidence_root / "team_pilot_report.json"),
+        (
+            "team-pilot",
+            "readiness",
+            "Team pilot report",
+            artifact_root / "team_pilot_report.json",
+        ),
+        (
+            "pilot-launch",
+            "readiness",
+            "Pilot launch report",
+            artifact_root / "design-partner-pilot" / "PILOT_LAUNCH_REPORT.md",
+        ),
+        (
+            "enterprise-hat-a",
+            "qualification",
+            "Enterprise Hat A closure",
+            artifact_root / "enterprise-hat-a" / "ENTERPRISE_HAT_A_CLOSURE.md",
+        ),
+        (
+            "install-rehearsal",
+            "readiness",
+            "Install rehearsal report",
+            artifact_root / "install-rehearsal" / "INSTALL_REHEARSAL_REPORT.md",
+        ),
+        (
+            "evidence-corpus",
+            "evidence",
+            "Evidence corpus report",
+            artifact_root / "evidence-corpus" / "corpus_verification_report.json",
+        ),
+        (
+            "security-review",
+            "security",
+            "Security review pack",
+            artifact_root / "security-review" / "SECURITY_REVIEW_SUMMARY.md",
+        ),
+        (
+            "pilot-metrics",
+            "metrics",
+            "Pilot metrics",
+            artifact_root / "design-partner-pilot" / "pilot_metrics.json",
+        ),
     ]
     reports = [
         ReportSummary(
@@ -663,6 +713,21 @@ def _operation_descriptors(
             ),
         ),
         OperationDescriptor(
+            operation_id="install.rehearsal",
+            category="qualification",
+            label="Run install rehearsal",
+            description="Runs the design partner source/CLI install rehearsal in a scoped root.",
+            risk_level="low",
+            permission="qualification.run",
+            supports_dry_run=True,
+            enabled=True,
+            last_result=OperationResultSummary(
+                status="not_run",
+                summary="Available through the pilot launch operations surface.",
+                generated_at_utc=generated_at,
+            ),
+        ),
+        OperationDescriptor(
             operation_id="keys.status",
             category="keys",
             label="Check signing keys",
@@ -692,6 +757,21 @@ def _operation_descriptors(
             last_result=OperationResultSummary(
                 status="not_run",
                 summary="No support bundle export has been requested from this snapshot.",
+                generated_at_utc=generated_at,
+            ),
+        ),
+        OperationDescriptor(
+            operation_id="security.review",
+            category="security",
+            label="Generate security review",
+            description="Generates the pilot security review pack and no-secret scan.",
+            risk_level="read_only",
+            permission="audit.read",
+            supports_dry_run=True,
+            enabled=True,
+            last_result=OperationResultSummary(
+                status="not_run",
+                summary="Available as a security review pack generation command.",
                 generated_at_utc=generated_at,
             ),
         ),
@@ -900,6 +980,13 @@ def _enterprise_claim_status(claims: dict[str, Any]) -> str:
         ):
             return str(claim.get("status", "conditional"))
     return "conditional"
+
+
+def _pilot_artifact_root(path: Path) -> Path:
+    parts = path.parts
+    if "evidence-corpus" in parts:
+        return Path(*parts[: parts.index("evidence-corpus")]) or Path(".")
+    return path
 
 
 def _surface_status(claim_status: str) -> str:

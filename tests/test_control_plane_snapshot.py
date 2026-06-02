@@ -145,7 +145,14 @@ def test_control_plane_snapshot_cli_contract(tmp_path: Path) -> None:
     assert parsed.design_partner_rc.status == "conditional"
     assert parsed.design_partner_rc.blockers == []
     assert "evidence-index" in parsed.design_partner_rc.warnings
+    assert parsed.pilot_launch.schema_version == "control-plane.pilot-launch-readiness/v1"
+    assert parsed.pilot_launch.status in {"conditional", "blocked"}
+    assert parsed.pilot_launch.install_rehearsal.status == "missing"
     assert parsed.operations
+    assert {operation.operation_id for operation in parsed.operations} >= {
+        "install.rehearsal",
+        "security.review",
+    }
     assert {operation.category for operation in parsed.operations} >= {
         "identity",
         "qualification",
@@ -170,6 +177,9 @@ def test_operator_panel_preview_snapshot_fixture_is_contract_valid() -> None:
     assert parsed.system.health.status == "partial"
     assert parsed.design_partner_rc.status == "conditional"
     assert "preview-source" in parsed.design_partner_rc.warnings
+    assert parsed.pilot_launch.status == "conditional"
+    assert parsed.pilot_launch.evidence_corpus.status == "ready"
+    assert parsed.pilot_launch.admin_proposals
     assert {operation.category for operation in parsed.operations} >= {
         "identity",
         "qualification",

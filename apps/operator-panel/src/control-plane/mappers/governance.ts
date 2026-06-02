@@ -100,6 +100,22 @@ export function buildReportsPageModel(
   locale: UiLocale = 'en',
 ): ProductPageModel {
   if (snapshot) {
+    const pilotRows: ProductPageRow[] = snapshot.pilotLaunch
+      ? [
+          {
+            id: 'pilot-launch-status',
+            title: 'Pilot Launch Candidate',
+            meta: snapshot.pilotLaunch.headline,
+            status: snapshot.pilotLaunch.status,
+          },
+          {
+            id: 'pilot-launch-metrics',
+            title: 'Pilot metrics',
+            meta: snapshot.pilotLaunch.pilotMetrics.path || snapshot.pilotLaunch.pilotMetrics.detail,
+            status: snapshot.pilotLaunch.pilotMetrics.status,
+          },
+        ]
+      : [];
     return {
       metrics: [
         { label: 'Reports', value: snapshot.reports.length, detail: sourceDetail(snapshot) },
@@ -108,16 +124,19 @@ export function buildReportsPageModel(
           value: snapshot.reports.filter((item) => item.status === 'ready').length,
           detail: 'generated artifacts',
         },
-        { label: 'Evidence packs', value: snapshot.evidencePacks.length, detail: 'included in snapshot' },
+        { label: 'Pilot launch', value: snapshot.pilotLaunch.status, detail: snapshot.pilotLaunch.artifactRoot },
       ],
       rows:
         snapshot.reports.length > 0
-          ? snapshot.reports.slice(0, 8).map((item) => ({
-              id: item.reportId,
-              title: item.title,
-              meta: item.path || formatReasonCodeList(item.blockingReasons, locale) || item.kind,
-              status: item.status,
-            }))
+          ? [
+              ...pilotRows,
+              ...snapshot.reports.slice(0, 8).map((item) => ({
+                id: item.reportId,
+                title: item.title,
+                meta: item.path || formatReasonCodeList(item.blockingReasons, locale) || item.kind,
+                status: item.status,
+              })),
+            ]
           : [{ id: 'empty-report', title: 'No reports loaded', meta: sourceDetail(snapshot), status: 'missing' }],
     };
   }
@@ -256,12 +275,22 @@ export function buildUsersPageModel(
       ],
       rows:
         snapshot.admin.users.length > 0
-          ? snapshot.admin.users.map((item) => ({
-              id: item.userId,
-              title: item.subject,
-              meta: `${item.roles.join(', ') || 'no roles'} / ${item.permissions.join(', ') || 'no permissions'}`,
-              status: item.status,
-            }))
+          ? [
+              ...snapshot.pilotLaunch.adminProposals
+                .filter((item) => item.kind === 'user')
+                .map((item) => ({
+                  id: item.proposalId,
+                  title: `${item.operation} proposal`,
+                  meta: `${item.permissionRequired} / ${item.approvalId || 'approval pending'}`,
+                  status: item.status,
+                })),
+              ...snapshot.admin.users.map((item) => ({
+                id: item.userId,
+                title: item.subject,
+                meta: `${item.roles.join(', ') || 'no roles'} / ${item.permissions.join(', ') || 'no permissions'}`,
+                status: item.status,
+              })),
+            ]
           : [{ id: 'no-users', title: 'No operator identities loaded', meta: snapshot.admin.source, status: 'empty' }],
     };
   }
@@ -290,12 +319,22 @@ export function buildRolesPageModel(snapshot: ControlPlaneSnapshot | null | unde
       ],
       rows:
         snapshot.admin.roles.length > 0
-          ? snapshot.admin.roles.map((item) => ({
-              id: item.roleId,
-              title: item.label,
-              meta: item.permissions.join(', ') || 'no permissions',
-              status: `${item.riskLevel} risk / ${item.assignmentCount} assignments`,
-            }))
+          ? [
+              ...snapshot.pilotLaunch.adminProposals
+                .filter((item) => item.kind === 'role')
+                .map((item) => ({
+                  id: item.proposalId,
+                  title: `${item.operation} proposal`,
+                  meta: `${item.permissionRequired} / ${item.auditEnvelopePath || 'audit pending'}`,
+                  status: item.status,
+                })),
+              ...snapshot.admin.roles.map((item) => ({
+                id: item.roleId,
+                title: item.label,
+                meta: item.permissions.join(', ') || 'no permissions',
+                status: `${item.riskLevel} risk / ${item.assignmentCount} assignments`,
+              })),
+            ]
           : [{ id: 'no-roles', title: 'No role definitions loaded', meta: snapshot.admin.source, status: 'empty' }],
     };
   }
@@ -329,15 +368,25 @@ export function buildPolicyPacksPageModel(
       ],
       rows:
         packs.length > 0
-          ? packs.map((item) => ({
-              id: item.packId,
-              title: item.label,
-              meta: `${item.version} / ${item.sourcePath || item.policyHash || 'no source'}`,
-              status:
-                item.blockingReasons.length > 0
-                  ? item.blockingReasons.map((reason) => getReasonCodeMessage(reason, locale)).join(', ')
-                  : item.status,
-            }))
+          ? [
+              ...snapshot.pilotLaunch.adminProposals
+                .filter((item) => item.kind === 'policy_pack')
+                .map((item) => ({
+                  id: item.proposalId,
+                  title: `${item.operation} proposal`,
+                  meta: `${item.permissionRequired} / ${item.approvalId || 'approval pending'}`,
+                  status: item.status,
+                })),
+              ...packs.map((item) => ({
+                id: item.packId,
+                title: item.label,
+                meta: `${item.version} / ${item.sourcePath || item.policyHash || 'no source'}`,
+                status:
+                  item.blockingReasons.length > 0
+                    ? item.blockingReasons.map((reason) => getReasonCodeMessage(reason, locale)).join(', ')
+                    : item.status,
+              })),
+            ]
           : [{ id: 'no-policy-packs', title: 'No policy packs loaded', meta: sourceDetail(snapshot), status: 'missing' }],
     };
   }

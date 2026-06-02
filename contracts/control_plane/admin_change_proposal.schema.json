@@ -1,0 +1,136 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "actor": {
+      "title": "Actor",
+      "type": "string"
+    },
+    "afterHash": {
+      "title": "Afterhash",
+      "type": "string"
+    },
+    "approvalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approvalid"
+    },
+    "auditEnvelopePath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Auditenvelopepath"
+    },
+    "beforeHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Beforehash"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "diffSummary": {
+      "additionalProperties": true,
+      "title": "Diffsummary",
+      "type": "object"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "user",
+        "role",
+        "policy_pack"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "operation": {
+      "enum": [
+        "create",
+        "update",
+        "deactivate",
+        "stage",
+        "promote",
+        "rollback"
+      ],
+      "title": "Operation",
+      "type": "string"
+    },
+    "permissionRequired": {
+      "title": "Permissionrequired",
+      "type": "string"
+    },
+    "policyDecision": {
+      "enum": [
+        "allow",
+        "deny",
+        "require_approval"
+      ],
+      "title": "Policydecision",
+      "type": "string"
+    },
+    "proposalId": {
+      "title": "Proposalid",
+      "type": "string"
+    },
+    "status": {
+      "default": "proposed",
+      "enum": [
+        "proposed",
+        "dry_run_passed",
+        "approval_required",
+        "approved",
+        "applied",
+        "signed_audited",
+        "denied",
+        "expired",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "default": "control-plane.admin-change-proposal/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposalId",
+    "kind",
+    "operation",
+    "actor",
+    "permissionRequired",
+    "afterHash",
+    "policyDecision"
+  ],
+  "title": "AdminChangeProposal",
+  "type": "object"
+}

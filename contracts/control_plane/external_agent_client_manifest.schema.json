@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "title": "Agentid",
+      "type": "string"
+    },
+    "allowedActions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowedactions",
+      "type": "array"
+    },
+    "entrypoint": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Entrypoint",
+      "type": "array"
+    },
+    "evidenceRequired": {
+      "default": true,
+      "title": "Evidencerequired",
+      "type": "boolean"
+    },
+    "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "owner": {
+      "default": "pilot",
+      "title": "Owner",
+      "type": "string"
+    },
+    "policyPackId": {
+      "default": "enterprise_default",
+      "title": "Policypackid",
+      "type": "string"
+    },
+    "riskProfile": {
+      "enum": [
+        "read_only",
+        "mutation",
+        "destructive_denied"
+      ],
+      "title": "Riskprofile",
+      "type": "string"
+    },
+    "transport": {
+      "const": "stdio_json",
+      "default": "stdio_json",
+      "title": "Transport",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.external-agent-manifest/v1",
+      "default": "control-plane.external-agent-manifest/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "agentId",
+    "name",
+    "riskProfile",
+    "entrypoint"
+  ],
+  "title": "ExternalAgentPilotManifest",
+  "type": "object"
+}

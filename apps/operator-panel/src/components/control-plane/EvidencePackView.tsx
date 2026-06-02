@@ -1,11 +1,12 @@
 import { formatReasonCode, formatReasonCodeList } from '../../control-plane/reasonCodes';
-import type { EvidencePackSummary } from '../../control-plane/types';
+import type { EvidencePackSummary, PilotLaunchReadinessStatus, PilotLaunchStatusTile } from '../../control-plane/types';
 import type { UiLocale } from '../../i18n';
 
 type EvidencePackViewProps = {
   evidencePacks: EvidencePackSummary[];
   verifyResult: unknown;
   verifyDisabledReason?: string;
+  pilotLaunch?: PilotLaunchReadinessStatus | null;
   locale?: UiLocale;
   onVerify: () => void;
 };
@@ -14,6 +15,7 @@ export function EvidencePackView({
   evidencePacks,
   verifyResult,
   verifyDisabledReason = '',
+  pilotLaunch,
   locale = 'en',
   onVerify,
 }: EvidencePackViewProps) {
@@ -90,6 +92,11 @@ export function EvidencePackView({
         </article>
       </div>
 
+      <div className="section-grid two-up">
+        <PilotEvidenceTile tile={pilotLaunch?.enterpriseHatA} fallbackLabel="Enterprise Hat A" />
+        <PilotEvidenceTile tile={pilotLaunch?.evidenceCorpus} fallbackLabel="Evidence corpus" />
+      </div>
+
       <div className="run-list">
         {blockingReasons.map((reason) => (
           <article className="run-list-item" key={reason}>
@@ -98,6 +105,25 @@ export function EvidencePackView({
             <small>{selectedPack ? 'pack blocker' : 'required before ready claim'}</small>
           </article>
         ))}
+      </div>
+    </article>
+  );
+}
+
+function PilotEvidenceTile({
+  tile,
+  fallbackLabel,
+}: {
+  tile?: PilotLaunchStatusTile | null;
+  fallbackLabel: string;
+}) {
+  return (
+    <article className="inner-card">
+      <h3>{tile?.label ?? fallbackLabel}</h3>
+      <div className="metric-list">
+        <MetricRow label="Status" value={tile?.status ?? 'unknown'} />
+        <MetricRow label="Artifact" value={tile?.path ?? 'missing'} />
+        <MetricRow label="Blockers" value={String(tile?.blockingReasons.length ?? 0)} />
       </div>
     </article>
   );

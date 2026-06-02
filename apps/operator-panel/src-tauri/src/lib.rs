@@ -35,6 +35,8 @@ pub fn run() {
             bridge::bridge_auth_whoami,
             bridge::bridge_auth_check,
             bridge::bridge_security_baseline,
+            bridge::bridge_install_rehearsal,
+            bridge::bridge_security_review,
             bridge::bridge_keys_status,
             bridge::bridge_keys_verify,
             bridge::bridge_keys_rotate_plan,

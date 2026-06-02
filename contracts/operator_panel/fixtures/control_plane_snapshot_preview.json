@@ -182,6 +182,112 @@
       "active-alerts"
     ]
   },
+  "pilotLaunch": {
+    "adminProposals": [
+      {
+        "approvalId": "approval-preview",
+        "auditEnvelopePath": null,
+        "kind": "policy_pack",
+        "operation": "promote",
+        "permissionRequired": "policy_pack.promote",
+        "proposalId": "proposal-preview-policy",
+        "status": "approval_required"
+      },
+      {
+        "approvalId": null,
+        "auditEnvelopePath": "artifacts/design-partner-pilot/governance-admin/audit-preview.json",
+        "kind": "role",
+        "operation": "update",
+        "permissionRequired": "rbac.write",
+        "proposalId": "proposal-preview-role",
+        "status": "signed_audited"
+      }
+    ],
+    "artifactRoot": "artifacts",
+    "blockers": [],
+    "claimGuard": {
+      "blockingReasons": [
+        "PREVIEW_SOURCE_NOT_LIVE_EVIDENCE"
+      ],
+      "detail": "enterprise=conditional, publicDesktop=blocked, computerUseBlocked=true",
+      "label": "Claim guard",
+      "path": null,
+      "status": "conditional",
+      "tileId": "claim-guard"
+    },
+    "enterpriseHatA": {
+      "blockingReasons": [
+        "PREVIEW_SOURCE_NOT_LIVE_EVIDENCE"
+      ],
+      "detail": "Signed qualification closure",
+      "label": "Enterprise Hat A",
+      "path": "artifacts/enterprise-hat-a/enterprise_hat_a_closure.json",
+      "status": "conditional",
+      "tileId": "enterprise-hat-a"
+    },
+    "evidenceCorpus": {
+      "blockingReasons": [],
+      "detail": "Valid and negative verification cases",
+      "label": "Evidence corpus",
+      "path": "artifacts/evidence-corpus/corpus_verification_report.json",
+      "status": "ready",
+      "tileId": "evidence-corpus"
+    },
+    "externalAgentPilot": {
+      "blockingReasons": [],
+      "detail": "Gateway examples and policy outcomes",
+      "label": "External agent pilot",
+      "path": "artifacts/design-partner-pilot/external-agent-pilot-report.json",
+      "status": "ready",
+      "tileId": "external-agent-pilot"
+    },
+    "generatedAtUtc": "2026-06-01T12:00:00Z",
+    "governanceAdmin": {
+      "blockingReasons": [],
+      "detail": "Admin proposals, approvals, and signed audit",
+      "label": "Governance admin",
+      "path": "artifacts/design-partner-pilot/governance-admin-report.json",
+      "status": "ready",
+      "tileId": "governance-admin"
+    },
+    "headline": "Pilot launch candidate is conditional.",
+    "installRehearsal": {
+      "blockingReasons": [],
+      "detail": "Clean-root source/CLI rehearsal",
+      "label": "Install rehearsal",
+      "path": "artifacts/install-rehearsal/report.json",
+      "status": "ready",
+      "tileId": "install-rehearsal"
+    },
+    "nextActions": [
+      {
+        "label": "preview-source",
+        "severity": "warning",
+        "target": "Reports"
+      }
+    ],
+    "pilotMetrics": {
+      "blockingReasons": [],
+      "detail": "Aggregate-only launch telemetry",
+      "label": "Pilot metrics",
+      "path": "artifacts/design-partner-pilot/pilot_metrics.json",
+      "status": "ready",
+      "tileId": "pilot-metrics"
+    },
+    "schemaVersion": "control-plane.pilot-launch-readiness/v1",
+    "securityReview": {
+      "blockingReasons": [],
+      "detail": "Threat model, redaction proof, and no-secret scan",
+      "label": "Security review",
+      "path": "artifacts/security-review/security_review_pack.json",
+      "status": "ready",
+      "tileId": "security-review"
+    },
+    "status": "conditional",
+    "warnings": [
+      "preview-source"
+    ]
+  },
   "evidencePacks": [
     {
       "artifactCount": 9,
@@ -285,6 +391,23 @@
       "supportsDryRun": true
     },
     {
+      "category": "qualification",
+      "description": "Runs the design partner source/CLI install rehearsal in a scoped root.",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Run install rehearsal",
+      "lastResult": {
+        "errorCode": null,
+        "generatedAtUtc": "2026-06-01T12:00:00Z",
+        "status": "not_run",
+        "summary": "Available through the pilot launch operations surface."
+      },
+      "operationId": "install.rehearsal",
+      "permission": "qualification.run",
+      "riskLevel": "low",
+      "supportsDryRun": true
+    },
+    {
       "category": "security",
       "description": "Evaluates the enterprise security baseline in read-only mode.",
       "disabledReason": null,
@@ -297,6 +420,23 @@
         "summary": "Available as a read-only preflight command."
       },
       "operationId": "security.baseline",
+      "permission": "audit.read",
+      "riskLevel": "read_only",
+      "supportsDryRun": true
+    },
+    {
+      "category": "security",
+      "description": "Generates the pilot security review pack and no-secret scan.",
+      "disabledReason": null,
+      "enabled": true,
+      "label": "Generate security review",
+      "lastResult": {
+        "errorCode": null,
+        "generatedAtUtc": "2026-06-01T12:00:00Z",
+        "status": "not_run",
+        "summary": "Available as a security review pack generation command."
+      },
+      "operationId": "security.review",
       "permission": "audit.read",
       "riskLevel": "read_only",
       "supportsDryRun": true
@@ -410,6 +550,42 @@
     }
   ],
   "reports": [
+    {
+      "blockingReasons": [],
+      "generatedAtUtc": "2026-06-01T12:00:00Z",
+      "kind": "readiness",
+      "path": "artifacts/design-partner-pilot/PILOT_LAUNCH_REPORT.md",
+      "reportId": "pilot-launch",
+      "status": "conditional",
+      "title": "Pilot launch report"
+    },
+    {
+      "blockingReasons": [],
+      "generatedAtUtc": "2026-06-01T12:00:00Z",
+      "kind": "evidence",
+      "path": "artifacts/evidence-corpus/corpus_verification_report.json",
+      "reportId": "evidence-corpus",
+      "status": "ready",
+      "title": "Evidence corpus report"
+    },
+    {
+      "blockingReasons": [],
+      "generatedAtUtc": "2026-06-01T12:00:00Z",
+      "kind": "security",
+      "path": "artifacts/security-review/SECURITY_REVIEW_SUMMARY.md",
+      "reportId": "security-review",
+      "status": "ready",
+      "title": "Security review pack"
+    },
+    {
+      "blockingReasons": [],
+      "generatedAtUtc": "2026-06-01T12:00:00Z",
+      "kind": "metrics",
+      "path": "artifacts/design-partner-pilot/pilot_metrics.json",
+      "reportId": "pilot-metrics",
+      "status": "ready",
+      "title": "Pilot metrics"
+    },
     {
       "blockingReasons": [
         "QUALIFICATION_MISSING"

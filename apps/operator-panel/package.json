@@ -20,6 +20,7 @@
     "routes:timings": "node --experimental-strip-types scripts/collect-route-timings.ts",
     "i18n:coverage": "node --experimental-strip-types scripts/assert-i18n-coverage.ts",
     "pilot:assert": "node --experimental-strip-types scripts/assert-pilot-readiness.ts",
+    "pilot-launch:assert": "node --experimental-strip-types scripts/assert-pilot-launch-pages.ts",
     "qa:summary": "node --experimental-strip-types scripts/write-frontend-qa-summary.ts",
     "qa:frontend:static": "pnpm audit:ui-controls && pnpm i18n:coverage && pnpm test && pnpm lint && pnpm build && pnpm qa:summary -- --static-passed",
     "qa:frontend": "pnpm audit:ui-controls && pnpm i18n:coverage && pnpm test && pnpm lint && pnpm build && pnpm test:e2e && pnpm qa:summary -- --static-passed --e2e-required",

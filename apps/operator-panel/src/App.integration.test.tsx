@@ -41,7 +41,9 @@ vi.mock('./bridge', async (importOriginal) => {
     executeApproval: vi.fn(actual.executeApproval),
     exportRunArtifacts: vi.fn(actual.exportRunArtifacts),
     fetchIdentity: vi.fn(actual.fetchIdentity),
+    generateSecurityReview: vi.fn(actual.generateSecurityReview),
     resolveConfig: vi.fn(actual.resolveConfig),
+    runInstallRehearsal: vi.fn(actual.runInstallRehearsal),
     submitComputerUseRun: vi.fn(actual.submitComputerUseRun),
     submitTeamRun: vi.fn(actual.submitTeamRun),
     verifyControlPlaneEvidence: vi.fn(actual.verifyControlPlaneEvidence),
@@ -294,6 +296,14 @@ describe('App integration flows', () => {
     await user.type(screen.getByLabelText('Permission'), 'runtime.audit');
     await user.click(screen.getByRole('button', { name: 'Check permission' }));
     await waitFor(() => expect(bridge.checkPermission).toHaveBeenCalledWith(expect.any(Object), 'runtime.audit'));
+
+    await user.click(screen.getByRole('button', { name: 'Qualification' }));
+    await user.click(screen.getByRole('button', { name: 'Install rehearsal' }));
+    await waitFor(() => expect(bridge.runInstallRehearsal).toHaveBeenCalledWith(expect.any(Object), expect.any(Object)));
+
+    await user.click(screen.getByRole('button', { name: 'Security' }));
+    await user.click(screen.getByRole('button', { name: 'Security review' }));
+    await waitFor(() => expect(bridge.generateSecurityReview).toHaveBeenCalledWith(expect.any(Object), expect.any(Object)));
 
     await openView(user, 'Ayarlar');
     const operatorInput = screen.getByLabelText('Operator ID');

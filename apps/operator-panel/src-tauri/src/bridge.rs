@@ -1177,6 +1177,57 @@ pub async fn bridge_security_baseline(config: BridgeConfig) -> BridgeResult<Valu
 }
 
 #[tauri::command]
+pub async fn bridge_install_rehearsal(
+    config: BridgeConfig,
+    target_root: Option<String>,
+    output: Option<String>,
+    mode: Option<String>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "control-plane".to_string(),
+        "install".to_string(),
+        "rehearsal".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--target-root".to_string(),
+        target_root.unwrap_or_else(|| ".binliquid/rehearsal/design-partner".to_string()),
+        "--mode".to_string(),
+        mode.unwrap_or_else(|| "source-cli".to_string()),
+        "--output".to_string(),
+        output.unwrap_or_else(|| "artifacts/install-rehearsal/report.json".to_string()),
+        "--json".to_string(),
+    ];
+    match run_cli_json_owned(&config, std::mem::take(&mut args)).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_security_review(
+    config: BridgeConfig,
+    output_root: Option<String>,
+    evidence_root: Option<String>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "control-plane".to_string(),
+        "security".to_string(),
+        "review".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--output-root".to_string(),
+        output_root.unwrap_or_else(|| "artifacts/security-review".to_string()),
+        "--evidence-root".to_string(),
+        evidence_root.unwrap_or_else(|| "artifacts/evidence-corpus/valid".to_string()),
+        "--json".to_string(),
+    ];
+    match run_cli_json_owned(&config, std::mem::take(&mut args)).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
 pub async fn bridge_keys_status(config: BridgeConfig) -> BridgeResult<Value> {
     match run_cli_json_owned(
         &config,

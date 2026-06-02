@@ -19,6 +19,7 @@ import {
   fetchIdentity,
   fetchKeysStatus,
   fetchSecurityBaseline,
+  generateSecurityReview,
   getRunReplay,
   getRunStatus,
   listControlPlaneAgents,
@@ -32,6 +33,7 @@ import {
   resumeComputerUseSession,
   resumeTeamRun,
   rotateKeyPlan,
+  runInstallRehearsal,
   runQualification,
   simulateControlPlanePolicy,
   snapshotMetrics,
@@ -1107,6 +1109,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const controlPlaneSnapshot = controlPlaneSnapshotVm && !controlPlaneSnapshotVm.error ? controlPlaneSnapshotVm.data : null;
   const operationDescriptors = controlPlaneSnapshot?.operations ?? [];
   const evidencePacks = controlPlaneSnapshot?.evidencePacks ?? [];
+  const pilotLaunch = controlPlaneSnapshot?.pilotLaunch ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -1446,6 +1449,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             agents={controlPlaneAgents}
             claims={controlPlaneClaims}
             pendingApprovals={pendingApprovals.length}
+            pilotLaunch={pilotLaunch}
           />
         ) : null}
 
@@ -1476,6 +1480,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 evidencePacks={evidencePacks}
                 verifyResult={controlPlaneEvidenceVerifyResult}
                 verifyDisabledReason={selectedEvidenceManifestPath ? '' : 'No evidence manifest is available to verify.'}
+                pilotLaunch={pilotLaunch}
                 locale={locale}
                 onVerify={() => void onVerifyEvidencePack()}
               />
@@ -2172,6 +2177,27 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 <JsonPanel value={capabilities} />
               </article>
               <article className="page-card">
+                <h3>Pilot Launch Candidate</h3>
+                <dl className="metric-list">
+                  <div className="metric-row">
+                    <dt>{t.status}</dt>
+                    <dd>{pilotLaunch?.status ?? t.statusUnknown}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>Enterprise Hat A</dt>
+                    <dd>{pilotLaunch?.enterpriseHatA.status ?? t.statusUnknown}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>{t.installRehearsal}</dt>
+                    <dd>{pilotLaunch?.installRehearsal.status ?? t.statusUnknown}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>{t.securityReview}</dt>
+                    <dd>{pilotLaunch?.securityReview.status ?? t.statusUnknown}</dd>
+                  </div>
+                </dl>
+              </article>
+              <article className="page-card">
                 <h3>{t.capabilityContract}</h3>
                 <PayloadSummary value={{ profiles: supportedProfiles, features }} title="Contract summary" maxItems={12} />
                 <JsonPanel value={{ profiles: supportedProfiles, features }} />
@@ -2343,6 +2369,21 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     >
                       {t.runQualification}
                     </button>
+                    <button
+                      className="ghost-btn"
+                      type="button"
+                      onClick={() =>
+                        void runOperation('qualification', () =>
+                          runInstallRehearsal(settings, {
+                            targetRoot: '.binliquid/rehearsal/design-partner',
+                            output: 'artifacts/install-rehearsal/report.json',
+                            mode: 'source-cli',
+                          }),
+                        )
+                      }
+                    >
+                      {t.installRehearsal}
+                    </button>
                   </div>
                 </article>
                 <article className="page-card">
@@ -2365,6 +2406,20 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                   />
                   <button className="action-btn" type="button" onClick={() => void runOperation('security', () => fetchSecurityBaseline(settings))}>
                     {t.securityBaseline}
+                  </button>
+                  <button
+                    className="ghost-btn"
+                    type="button"
+                    onClick={() =>
+                      void runOperation('security', () =>
+                        generateSecurityReview(settings, {
+                          outputRoot: 'artifacts/security-review',
+                          evidenceRoot: 'artifacts/evidence-corpus/valid',
+                        }),
+                      )
+                    }
+                  >
+                    {t.securityReview}
                   </button>
                 </article>
                 <article className="page-card">

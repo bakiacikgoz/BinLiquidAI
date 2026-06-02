@@ -8,10 +8,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from binliquid.control_plane.admin_store import AdminChangeProposal  # noqa: E402
+from binliquid.control_plane.external_agent_client import ExternalAgentPilotManifest  # noqa: E402
 from binliquid.control_plane.external_contracts import (  # noqa: E402
     ExternalActionRequest,
     ExternalActionResponse,
 )
+from binliquid.control_plane.install_rehearsal import InstallRehearsalReport  # noqa: E402
 from binliquid.control_plane.models import (  # noqa: E402
     ActionProposal,
     AgentRecord,
@@ -35,6 +38,7 @@ from binliquid.control_plane.models import (  # noqa: E402
     ReadinessReport,
     ReportManifest,
 )
+from binliquid.control_plane.policy_pack_store import PolicyPackLifecycleRecord  # noqa: E402
 
 SCHEMAS = {
     "agent_spec": AgentSpec,
@@ -58,6 +62,10 @@ SCHEMAS = {
     "readiness_report": ReadinessReport,
     "claim_matrix": ClaimMatrix,
     "control_plane_snapshot": ControlPlaneSnapshot,
+    "install_rehearsal_report": InstallRehearsalReport,
+    "admin_change_proposal": AdminChangeProposal,
+    "policy_pack_lifecycle": PolicyPackLifecycleRecord,
+    "external_agent_client_manifest": ExternalAgentPilotManifest,
     "external_agent_request": ExternalActionRequest,
     "external_agent_response": ExternalActionResponse,
 }

@@ -143,7 +143,44 @@ function emptySnapshot(): ControlPlaneSnapshot {
       warnings: [],
       artifactRoot: 'artifacts/design-partner-rc',
     },
+    pilotLaunch: {
+      schemaVersion: 'control-plane.pilot-launch-readiness/v1',
+      generatedAtUtc: new Date(0).toISOString(),
+      status: 'blocked',
+      headline: 'Pilot launch candidate is blocked.',
+      artifactRoot: 'artifacts/design-partner-pilot',
+      enterpriseHatA: missingPilotTile('enterprise-hat-a', 'Enterprise Hat A'),
+      installRehearsal: missingPilotTile('install-rehearsal', 'Install rehearsal'),
+      externalAgentPilot: missingPilotTile('external-agent-pilot', 'External agent pilot'),
+      governanceAdmin: missingPilotTile('governance-admin', 'Governance admin'),
+      securityReview: missingPilotTile('security-review', 'Security review'),
+      claimGuard: {
+        tileId: 'claim-guard',
+        label: 'Claim guard',
+        status: 'blocked',
+        detail: 'snapshot unavailable',
+        path: null,
+        blockingReasons: ['SNAPSHOT_UNAVAILABLE'],
+      },
+      evidenceCorpus: missingPilotTile('evidence-corpus', 'Evidence corpus'),
+      pilotMetrics: missingPilotTile('pilot-metrics', 'Pilot metrics'),
+      adminProposals: [],
+      nextActions: [{ label: 'SNAPSHOT_UNAVAILABLE', severity: 'blocking', target: 'System' }],
+      blockers: ['SNAPSHOT_UNAVAILABLE'],
+      warnings: [],
+    },
     quickActions: [],
     partialReasons: [],
+  };
+}
+
+function missingPilotTile(tileId: string, label: string) {
+  return {
+    tileId,
+    label,
+    status: 'missing' as const,
+    detail: 'snapshot unavailable',
+    path: null,
+    blockingReasons: ['SNAPSHOT_UNAVAILABLE'],
   };
 }

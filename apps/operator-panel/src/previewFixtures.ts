@@ -570,6 +570,32 @@ export function previewSecurityBaseline() {
   return cloneValue(previewBundle.operations.security);
 }
 
+export function previewInstallRehearsal(targetRoot?: string, output?: string) {
+  return {
+    version: 'control-plane.install-rehearsal/v1',
+    rehearsalId: 'rehearsal-preview',
+    status: 'pass',
+    targetRoot: targetRoot || '.binliquid/rehearsal/design-partner',
+    outputPath: output || 'artifacts/install-rehearsal/report.json',
+    supportBundleSafe: true,
+    rollbackPlanPresent: true,
+    secretScanStatus: 'pass',
+    blockingReasons: [],
+  };
+}
+
+export function previewSecurityReview(outputRoot?: string, evidenceRoot?: string) {
+  return {
+    version: 'control-plane.security-review/v1',
+    status: 'pass',
+    outputRoot: outputRoot || 'artifacts/security-review',
+    evidenceRoot: evidenceRoot || 'artifacts/evidence-corpus/valid',
+    noSecretScan: { status: 'pass', findings: [] },
+    claimConsistency: { status: 'pass', blockingReasons: [] },
+    blockingReasons: [],
+  };
+}
+
 export function previewKeysStatus() {
   return cloneValue(previewBundle.operations.keys);
 }

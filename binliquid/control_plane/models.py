@@ -853,6 +853,60 @@ class DesignPartnerRcStatus(StrictModel):
     artifact_root: str = Field(default="artifacts/design-partner-rc", alias="artifactRoot")
 
 
+class PilotLaunchStatusTile(StrictModel):
+    tile_id: str = Field(alias="tileId")
+    label: str
+    status: Literal["ready", "conditional", "blocked", "missing"]
+    detail: str
+    path: str | None = None
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
+class PilotLaunchNextAction(StrictModel):
+    label: str
+    severity: Literal["info", "warning", "blocking"]
+    target: str
+
+
+class PilotLaunchAdminProposalSummary(StrictModel):
+    proposal_id: str = Field(alias="proposalId")
+    kind: str
+    operation: str
+    status: str
+    permission_required: str = Field(alias="permissionRequired")
+    approval_id: str | None = Field(default=None, alias="approvalId")
+    audit_envelope_path: str | None = Field(default=None, alias="auditEnvelopePath")
+
+
+class PilotLaunchReadinessStatus(StrictModel):
+    schema_version: Literal["control-plane.pilot-launch-readiness/v1"] = Field(
+        default="control-plane.pilot-launch-readiness/v1",
+        alias="schemaVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["ready", "conditional", "blocked"] = "conditional"
+    headline: str
+    artifact_root: str = Field(alias="artifactRoot")
+    enterprise_hat_a: PilotLaunchStatusTile = Field(alias="enterpriseHatA")
+    install_rehearsal: PilotLaunchStatusTile = Field(alias="installRehearsal")
+    external_agent_pilot: PilotLaunchStatusTile = Field(alias="externalAgentPilot")
+    governance_admin: PilotLaunchStatusTile = Field(alias="governanceAdmin")
+    security_review: PilotLaunchStatusTile = Field(alias="securityReview")
+    claim_guard: PilotLaunchStatusTile = Field(alias="claimGuard")
+    evidence_corpus: PilotLaunchStatusTile = Field(alias="evidenceCorpus")
+    pilot_metrics: PilotLaunchStatusTile = Field(alias="pilotMetrics")
+    admin_proposals: list[PilotLaunchAdminProposalSummary] = Field(
+        default_factory=list,
+        alias="adminProposals",
+    )
+    next_actions: list[PilotLaunchNextAction] = Field(default_factory=list, alias="nextActions")
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
@@ -880,5 +934,6 @@ class ControlPlaneSnapshot(StrictModel):
         default_factory=DesignPartnerRcStatus,
         alias="designPartnerRc",
     )
+    pilot_launch: PilotLaunchReadinessStatus = Field(alias="pilotLaunch")
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

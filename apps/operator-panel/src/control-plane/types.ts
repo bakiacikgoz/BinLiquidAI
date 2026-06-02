@@ -232,6 +232,51 @@ export interface DesignPartnerRcStatus {
   artifactRoot: string;
 }
 
+export interface PilotLaunchStatusTile {
+  tileId: string;
+  label: string;
+  status: 'ready' | 'conditional' | 'blocked' | 'missing';
+  detail: string;
+  path?: string | null;
+  blockingReasons: string[];
+}
+
+export interface PilotLaunchNextAction {
+  label: string;
+  severity: 'info' | 'warning' | 'blocking';
+  target: string;
+}
+
+export interface PilotLaunchAdminProposalSummary {
+  proposalId: string;
+  kind: string;
+  operation: string;
+  status: string;
+  permissionRequired: string;
+  approvalId?: string | null;
+  auditEnvelopePath?: string | null;
+}
+
+export interface PilotLaunchReadinessStatus {
+  schemaVersion: 'control-plane.pilot-launch-readiness/v1';
+  generatedAtUtc: string;
+  status: 'ready' | 'conditional' | 'blocked';
+  headline: string;
+  artifactRoot: string;
+  enterpriseHatA: PilotLaunchStatusTile;
+  installRehearsal: PilotLaunchStatusTile;
+  externalAgentPilot: PilotLaunchStatusTile;
+  governanceAdmin: PilotLaunchStatusTile;
+  securityReview: PilotLaunchStatusTile;
+  claimGuard: PilotLaunchStatusTile;
+  evidenceCorpus: PilotLaunchStatusTile;
+  pilotMetrics: PilotLaunchStatusTile;
+  adminProposals: PilotLaunchAdminProposalSummary[];
+  nextActions: PilotLaunchNextAction[];
+  blockers: string[];
+  warnings: string[];
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -250,6 +295,7 @@ export interface ControlPlaneSnapshot {
   operations: OperationDescriptor[];
   admin: AdminSummary;
   designPartnerRc: DesignPartnerRcStatus;
+  pilotLaunch: PilotLaunchReadinessStatus;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

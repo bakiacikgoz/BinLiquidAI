@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "activationAudit": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Activationaudit"
+    },
+    "contentHash": {
+      "title": "Contenthash",
+      "type": "string"
+    },
+    "diffSummary": {
+      "additionalProperties": true,
+      "title": "Diffsummary",
+      "type": "object"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "policyPackId": {
+      "title": "Policypackid",
+      "type": "string"
+    },
+    "policyVersion": {
+      "title": "Policyversion",
+      "type": "string"
+    },
+    "simulationSummary": {
+      "additionalProperties": true,
+      "title": "Simulationsummary",
+      "type": "object"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "validated",
+        "staged",
+        "promoted",
+        "active",
+        "superseded",
+        "rollback_planned",
+        "rolled_back",
+        "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "default": "control-plane.policy-pack-lifecycle/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "policyPackId",
+    "policyVersion",
+    "status",
+    "contentHash"
+  ],
+  "title": "PolicyPackLifecycleRecord",
+  "type": "object"
+}

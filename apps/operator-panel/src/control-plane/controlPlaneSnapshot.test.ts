@@ -185,8 +185,38 @@ function makeSnapshot(overrides: Partial<ControlPlaneSnapshot> = {}): ControlPla
       warnings: ['evidence-index'],
       artifactRoot: 'artifacts/design-partner-rc',
     },
+    pilotLaunch: {
+      schemaVersion: 'control-plane.pilot-launch-readiness/v1',
+      generatedAtUtc,
+      status: 'conditional',
+      headline: 'Pilot launch candidate is conditional.',
+      artifactRoot: 'artifacts',
+      enterpriseHatA: pilotTile('enterprise-hat-a', 'Enterprise Hat A', 'conditional'),
+      installRehearsal: pilotTile('install-rehearsal', 'Install rehearsal', 'ready'),
+      externalAgentPilot: pilotTile('external-agent-pilot', 'External agent pilot', 'ready'),
+      governanceAdmin: pilotTile('governance-admin', 'Governance admin', 'ready'),
+      securityReview: pilotTile('security-review', 'Security review', 'ready'),
+      claimGuard: pilotTile('claim-guard', 'Claim guard', 'conditional'),
+      evidenceCorpus: pilotTile('evidence-corpus', 'Evidence corpus', 'ready'),
+      pilotMetrics: pilotTile('pilot-metrics', 'Pilot metrics', 'ready'),
+      adminProposals: [],
+      nextActions: [{ label: 'enterprise-hat-a', severity: 'warning', target: 'Reports' }],
+      blockers: [],
+      warnings: ['enterprise-hat-a'],
+    },
     quickActions: [],
     partialReasons: ['metrics_snapshot'],
     ...overrides,
+  };
+}
+
+function pilotTile(tileId: string, label: string, status: 'ready' | 'conditional' | 'blocked' | 'missing') {
+  return {
+    tileId,
+    label,
+    status,
+    detail: label,
+    path: `artifacts/${tileId}.json`,
+    blockingReasons: status === 'ready' ? [] : [tileId.toUpperCase().replaceAll('-', '_')],
   };
 }

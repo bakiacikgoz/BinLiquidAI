@@ -19,14 +19,14 @@ describe('governance page mappers', () => {
       'snapshot generated',
     );
     expect(buildReportsPageModel(previewSnapshot, { operationOutputs: {}, claims: {} }).rows[0]?.title).toContain(
-      'Qualification report',
+      'Pilot Launch Candidate',
     );
     expect(buildAlertsPageModel(previewSnapshot, { driftEvents: [], pendingApprovals: [], claims: {} }).rows[0]?.status).toContain(
       'active',
     );
     expect(buildPolicyPacksPageModel(previewSnapshot, {}).rows[0]).toMatchObject({
-      id: 'preview-policy',
-      status: 'active',
+      id: 'proposal-preview-policy',
+      status: 'approval_required',
     });
   });
 
@@ -39,7 +39,7 @@ describe('governance page mappers', () => {
       status: 'active',
     });
     expect(roles.rows[0]).toMatchObject({
-      id: 'viewer',
+      id: 'proposal-preview-role',
     });
   });
 });

@@ -1,0 +1,164 @@
+{
+  "$defs": {
+    "RehearsalStep": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifactpath"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "durationMs": {
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "safeSummary": {
+          "title": "Safesummary",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "skipped",
+            "conditional"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "durationMs",
+        "safeSummary"
+      ],
+      "title": "RehearsalStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "markdownPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Markdownpath"
+    },
+    "mode": {
+      "default": "source_cli",
+      "enum": [
+        "source_cli",
+        "operator_panel_smoke"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rehearsalId": {
+      "title": "Rehearsalid",
+      "type": "string"
+    },
+    "rollbackPlanPresent": {
+      "title": "Rollbackplanpresent",
+      "type": "boolean"
+    },
+    "secretScanStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "not_run"
+      ],
+      "title": "Secretscanstatus",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "conditional"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/RehearsalStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "supportBundleSafe": {
+      "title": "Supportbundlesafe",
+      "type": "boolean"
+    },
+    "targetRoot": {
+      "title": "Targetroot",
+      "type": "string"
+    },
+    "version": {
+      "default": "control-plane.install-rehearsal/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "rehearsalId",
+    "generatedAtUtc",
+    "targetRoot",
+    "profile",
+    "status",
+    "steps",
+    "supportBundleSafe",
+    "rollbackPlanPresent",
+    "secretScanStatus"
+  ],
+  "title": "InstallRehearsalReport",
+  "type": "object"
+}

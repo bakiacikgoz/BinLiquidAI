@@ -12,6 +12,7 @@ test('pilot readiness flow exposes governed run, approval, evidence, reports, an
 
   await openPrimaryView(page, 'Dashboard', 'Dashboard');
   await expect(page.getByTestId('page-primary-region')).toContainText('Policy, approvals, evidence');
+  await expect(page.getByTestId('page-primary-region')).toContainText('Pilot Launch Candidate');
 
   await openPrimaryView(page, 'Agents', 'Agents');
   await expect(page.getByText('Governed Ops Agent', { exact: true })).toBeVisible();
@@ -33,12 +34,14 @@ test('pilot readiness flow exposes governed run, approval, evidence, reports, an
 
   await openPrimaryView(page, 'Evidence', 'Signed Evidence');
   await expect(page.getByText('evp-preview-run', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('page-primary-region')).toContainText('Evidence corpus');
   await page.getByRole('button', { name: 'Verify latest', exact: true }).click();
   await expect(page.getByText('Evidence verification completed', { exact: true })).toBeVisible();
 
   await openPrimaryView(page, 'Raporlar', 'Reports');
+  await expect(page.getByTestId('page-primary-region')).toContainText('Pilot Launch Candidate');
   await expect(page.getByTestId('page-primary-region')).toContainText('Evidence pack evp-preview-run');
-  await expect(page.getByTestId('page-primary-region')).toContainText('Support bundle');
+  await expect(page.getByTestId('page-primary-region')).toContainText('Pilot metrics');
 
   await openPrimaryView(page, 'Yürütmeler', 'Operations');
   await page.getByRole('button', { name: 'Support', exact: true }).click();

@@ -160,6 +160,62 @@ describe('bridge tauri contract', () => {
     );
   });
 
+  it('passes pilot install rehearsal requests to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      version: 'control-plane.install-rehearsal/v1',
+      status: 'pass',
+    });
+
+    await bridge.runInstallRehearsal(
+      { ...DEFAULT_SETTINGS, profile: 'enterprise' },
+      {
+        targetRoot: '.binliquid/rehearsal/design-partner',
+        output: 'artifacts/install-rehearsal/report.json',
+        mode: 'source-cli',
+      },
+    );
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_install_rehearsal',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          profile: 'enterprise',
+          timeoutMs: 120000,
+        }),
+        targetRoot: '.binliquid/rehearsal/design-partner',
+        output: 'artifacts/install-rehearsal/report.json',
+        mode: 'source-cli',
+      }),
+    );
+  });
+
+  it('passes pilot security review requests to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      version: 'control-plane.security-review/v1',
+      status: 'pass',
+    });
+
+    await bridge.generateSecurityReview(
+      { ...DEFAULT_SETTINGS, profile: 'enterprise' },
+      {
+        outputRoot: 'artifacts/security-review',
+        evidenceRoot: 'artifacts/evidence-corpus/valid',
+      },
+    );
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_security_review',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          profile: 'enterprise',
+          timeoutMs: 120000,
+        }),
+        outputRoot: 'artifacts/security-review',
+        evidenceRoot: 'artifacts/evidence-corpus/valid',
+      }),
+    );
+  });
+
   it('passes team submit model metadata and run identifiers to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0', jobId: 'job-live' });
 

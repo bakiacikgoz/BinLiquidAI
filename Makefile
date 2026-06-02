@@ -178,6 +178,7 @@ design-partner-pilot-gate:
 	corepack pnpm --dir apps/operator-panel test
 	corepack pnpm --dir apps/operator-panel lint
 	corepack pnpm --dir apps/operator-panel build
+	corepack pnpm --dir apps/operator-panel pilot-launch:assert
 	corepack pnpm --dir apps/operator-panel test:e2e
 	cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml
 	$(MAKE) enterprise-hat-a-evidence-gate

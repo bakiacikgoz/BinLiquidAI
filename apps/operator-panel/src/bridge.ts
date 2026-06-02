@@ -26,6 +26,7 @@ import {
   previewGaReadiness,
   previewHandshake,
   previewIdentity,
+  previewInstallRehearsal,
   previewKeysStatus,
   previewMigrateApplyDryRun,
   previewMigratePlan,
@@ -37,6 +38,7 @@ import {
   previewRunReplay,
   previewRunSummary,
   previewSecurityBaseline,
+  previewSecurityReview,
   previewSubmitResponse,
   previewSupportBundle,
   previewTailEvents,
@@ -145,6 +147,17 @@ export interface QualificationRunOptions extends ConfigResolveOptions {
 export interface GaReadinessOptions {
   report?: string;
   qualificationReport?: string;
+}
+
+export interface InstallRehearsalOptions {
+  targetRoot?: string;
+  output?: string;
+  mode?: 'source-cli' | 'operator-panel-smoke';
+}
+
+export interface SecurityReviewOptions {
+  outputRoot?: string;
+  evidenceRoot?: string;
 }
 
 export interface KeyRotatePlanOptions {
@@ -689,6 +702,29 @@ export async function fetchSecurityBaseline(settings: PanelSettings): Promise<un
   }
   return callBridge('bridge_security_baseline', {
     config: withTimeout(settings, 30000),
+  });
+}
+
+export async function runInstallRehearsal(settings: PanelSettings, options: InstallRehearsalOptions = {}): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewInstallRehearsal(options.targetRoot, options.output);
+  }
+  return callBridge('bridge_install_rehearsal', {
+    config: withTimeout(settings, 120000),
+    targetRoot: options.targetRoot,
+    output: options.output,
+    mode: options.mode,
+  });
+}
+
+export async function generateSecurityReview(settings: PanelSettings, options: SecurityReviewOptions = {}): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewSecurityReview(options.outputRoot, options.evidenceRoot);
+  }
+  return callBridge('bridge_security_review', {
+    config: withTimeout(settings, 120000),
+    outputRoot: options.outputRoot,
+    evidenceRoot: options.evidenceRoot,
   });
 }
 

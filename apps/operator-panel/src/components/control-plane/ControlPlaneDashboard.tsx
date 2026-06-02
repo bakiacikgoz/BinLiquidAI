@@ -1,15 +1,18 @@
 import { asControlPlaneAgentList, asControlPlaneClaimMatrix } from '../../controlPlaneMappers';
+import type { PilotLaunchReadinessStatus, PilotLaunchStatusTile } from '../../control-plane/types';
 
 export function ControlPlaneDashboard({
   doctor,
   agents,
   claims,
   pendingApprovals,
+  pilotLaunch,
 }: {
   doctor: unknown;
   agents: unknown;
   claims: unknown;
   pendingApprovals: number;
+  pilotLaunch?: PilotLaunchReadinessStatus | null;
 }) {
   const doctorRecord = asRecord(doctor);
   const agentList = asControlPlaneAgentList(agents);
@@ -48,6 +51,11 @@ export function ControlPlaneDashboard({
           <p className="metric">{blockedClaims}</p>
           <small>blocked claims</small>
         </article>
+        <article className="metric-card">
+          <h3>Pilot Launch</h3>
+          <p className="metric">{pilotLaunch?.status ?? 'unknown'}</p>
+          <small>{pilotLaunch?.generatedAtUtc ?? 'no snapshot'}</small>
+        </article>
       </div>
       <div className="section-grid two-up">
         <article className="page-card">
@@ -72,27 +80,43 @@ export function ControlPlaneDashboard({
           </div>
         </article>
         <article className="page-card">
+          <h3>Pilot Launch Candidate</h3>
+          <div className="metric-list">
+            <PilotTileRow tile={pilotLaunch?.enterpriseHatA} fallback="Enterprise Hat A" />
+            <PilotTileRow tile={pilotLaunch?.installRehearsal} fallback="Install rehearsal" />
+            <PilotTileRow tile={pilotLaunch?.securityReview} fallback="Security review" />
+            <PilotTileRow tile={pilotLaunch?.claimGuard} fallback="Claim guard" />
+          </div>
+        </article>
+        <article className="page-card">
           <h3>Next actions</h3>
           <div className="run-list">
-            <article className="run-list-item">
-              <strong>Review pending approvals</strong>
-              <span>Confirm actor, policy decision, and execution status before mutating.</span>
-              <small>Approvals</small>
-            </article>
-            <article className="run-list-item">
-              <strong>Verify evidence pack</strong>
-              <span>Check hash chain, signature, replay, and redaction summary.</span>
-              <small>Evidence</small>
-            </article>
-            <article className="run-list-item">
-              <strong>Simulate policy</strong>
-              <span>Dry-run actions before submitting governed runs.</span>
-              <small>Policy</small>
-            </article>
+            {(pilotLaunch?.nextActions.length ? pilotLaunch.nextActions : defaultNextActions).map((action) => (
+              <article className="run-list-item" key={`${action.target}-${action.label}`}>
+                <strong>{action.label}</strong>
+                <span>{action.target}</span>
+                <small>{action.severity}</small>
+              </article>
+            ))}
           </div>
         </article>
       </div>
     </section>
+  );
+}
+
+const defaultNextActions = [
+  { label: 'Review pending approvals', target: 'Approvals', severity: 'info' as const },
+  { label: 'Verify evidence pack', target: 'Evidence', severity: 'info' as const },
+  { label: 'Simulate policy', target: 'Policy', severity: 'info' as const },
+];
+
+function PilotTileRow({ tile, fallback }: { tile?: PilotLaunchStatusTile | null; fallback: string }) {
+  return (
+    <div className="metric-row">
+      <span>{tile?.label ?? fallback}</span>
+      <strong>{tile?.status ?? 'unknown'}</strong>
+    </div>
   );
 }
 

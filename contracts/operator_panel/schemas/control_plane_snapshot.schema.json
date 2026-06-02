@@ -927,6 +927,247 @@
       "title": "OperationResultSummary",
       "type": "object"
     },
+    "PilotLaunchAdminProposalSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approvalid"
+        },
+        "auditEnvelopePath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auditenvelopepath"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "permissionRequired": {
+          "title": "Permissionrequired",
+          "type": "string"
+        },
+        "proposalId": {
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposalId",
+        "kind",
+        "operation",
+        "status",
+        "permissionRequired"
+      ],
+      "title": "PilotLaunchAdminProposalSummary",
+      "type": "object"
+    },
+    "PilotLaunchNextAction": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "blocking"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "severity",
+        "target"
+      ],
+      "title": "PilotLaunchNextAction",
+      "type": "object"
+    },
+    "PilotLaunchReadinessStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "adminProposals": {
+          "items": {
+            "$ref": "#/$defs/PilotLaunchAdminProposalSummary"
+          },
+          "title": "Adminproposals",
+          "type": "array"
+        },
+        "artifactRoot": {
+          "title": "Artifactroot",
+          "type": "string"
+        },
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "claimGuard": {
+          "$ref": "#/$defs/PilotLaunchStatusTile"
+        },
+        "enterpriseHatA": {
+          "$ref": "#/$defs/PilotLaunchStatusTile"
+        },
+        "evidenceCorpus": {
+          "$ref": "#/$defs/PilotLaunchStatusTile"
+        },
+        "externalAgentPilot": {
+          "$ref": "#/$defs/PilotLaunchStatusTile"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "governanceAdmin": {
+          "$ref": "#/$defs/PilotLaunchStatusTile"
+        },
+        "headline": {
+          "title": "Headline",
+          "type": "string"
+        },
+        "installRehearsal": {
+          "$ref": "#/$defs/PilotLaunchStatusTile"
+        },
+        "nextActions": {
+          "items": {
+            "$ref": "#/$defs/PilotLaunchNextAction"
+          },
+          "title": "Nextactions",
+          "type": "array"
+        },
+        "pilotMetrics": {
+          "$ref": "#/$defs/PilotLaunchStatusTile"
+        },
+        "schemaVersion": {
+          "const": "control-plane.pilot-launch-readiness/v1",
+          "default": "control-plane.pilot-launch-readiness/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "securityReview": {
+          "$ref": "#/$defs/PilotLaunchStatusTile"
+        },
+        "status": {
+          "default": "conditional",
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "headline",
+        "artifactRoot",
+        "enterpriseHatA",
+        "installRehearsal",
+        "externalAgentPilot",
+        "governanceAdmin",
+        "securityReview",
+        "claimGuard",
+        "evidenceCorpus",
+        "pilotMetrics"
+      ],
+      "title": "PilotLaunchReadinessStatus",
+      "type": "object"
+    },
+    "PilotLaunchStatusTile": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tileId": {
+          "title": "Tileid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tileId",
+        "label",
+        "status",
+        "detail"
+      ],
+      "title": "PilotLaunchStatusTile",
+      "type": "object"
+    },
     "PolicyPackSummary": {
       "additionalProperties": false,
       "properties": {
@@ -1532,6 +1773,9 @@
       "title": "Partialreasons",
       "type": "array"
     },
+    "pilotLaunch": {
+      "$ref": "#/$defs/PilotLaunchReadinessStatus"
+    },
     "policyPacks": {
       "items": {
         "$ref": "#/$defs/PolicyPackSummary"
@@ -1569,7 +1813,8 @@
     "dataSource",
     "system",
     "dashboard",
-    "admin"
+    "admin",
+    "pilotLaunch"
   ],
   "title": "ControlPlaneSnapshot",
   "type": "object"
