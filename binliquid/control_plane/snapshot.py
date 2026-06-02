@@ -7,6 +7,7 @@ from typing import Any
 
 from binliquid import __version__
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
+from binliquid.control_plane.agent_registry_v2 import agent_registry_v2_item
 from binliquid.control_plane.claim_guard import ClaimGuard
 from binliquid.control_plane.design_partner_rc import build_design_partner_rc_status
 from binliquid.control_plane.models import (
@@ -201,16 +202,21 @@ def build_control_plane_snapshot(
 def _agent_summaries(registry: AgentRegistry) -> list[AgentSummary]:
     items: list[AgentSummary] = []
     for record in registry.list_agents():
+        registry_item = agent_registry_v2_item(record)
         items.append(
             AgentSummary(
                 agent_id=record.agent_id,
                 display_name=record.spec.display_name,
                 runtime_kind=str(record.spec.runtime_kind),
+                agent_type=registry_item.agent_type,
                 status=str(record.status),
                 readiness=str(record.readiness),
                 owner_team=record.spec.owner.team,
+                policy_pack_id=registry_item.policy_pack_id,
+                risk_profile=registry_item.risk_profile,
                 last_run_id=record.last_run_id,
                 last_evidence_pack_id=record.last_evidence_pack_id,
+                last_evidence_status=registry_item.last_evidence_status,
             )
         )
     return items

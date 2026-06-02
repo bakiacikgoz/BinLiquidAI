@@ -50,11 +50,15 @@ export interface AgentSummary {
   agentId: string;
   displayName: string;
   runtimeKind: string;
+  agentType: 'internal' | 'external_stdio' | 'external_http' | 'computer_use_adapter';
   status: string;
   readiness: string;
   ownerTeam?: string | null;
+  policyPackId?: string | null;
+  riskProfile: 'read_only' | 'guarded' | 'restricted' | 'blocked';
   lastRunId?: string | null;
   lastEvidencePackId?: string | null;
+  lastEvidenceStatus: 'missing' | 'pending' | 'valid' | 'invalid';
 }
 
 export interface RunSnapshotSummary {

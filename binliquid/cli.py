@@ -37,6 +37,7 @@ from binliquid.computer_use.vision_runtime.replay import (
 )
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.control_plane.adapter_contracts import evaluate_action_proposal_file
+from binliquid.control_plane.agent_registry_v2 import build_agent_registry_v2
 from binliquid.control_plane.claim_guard import ClaimGuard
 from binliquid.control_plane.errors import ControlPlaneError
 from binliquid.control_plane.evidence_pack import EvidencePackBuilder
@@ -856,21 +857,8 @@ def control_plane_agent_list(
     root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    agents = _control_plane_registry(root_dir).list_agents()
-    payload = {
-        "agents": [
-            {
-                "agent_id": item.agent_id,
-                "display_name": item.spec.display_name,
-                "runtime_kind": item.spec.runtime_kind,
-                "status": item.status,
-                "readiness": item.readiness,
-                "last_run_id": item.last_run_id,
-            }
-            for item in agents
-        ]
-    }
-    _emit_payload(payload, json_output=json_output)
+    registry = build_agent_registry_v2(_control_plane_registry(root_dir))
+    _emit_payload(registry.model_dump(mode="json"), json_output=json_output)
 
 
 @control_plane_agent_app.command("show")

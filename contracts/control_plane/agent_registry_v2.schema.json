@@ -1,0 +1,170 @@
+{
+  "$defs": {
+    "AgentRegistryV2Item": {
+      "additionalProperties": false,
+      "properties": {
+        "adapterContractVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adaptercontractversion"
+        },
+        "agentId": {
+          "title": "Agentid",
+          "type": "string"
+        },
+        "agentType": {
+          "enum": [
+            "internal",
+            "external_stdio",
+            "external_http",
+            "computer_use_adapter"
+          ],
+          "title": "Agenttype",
+          "type": "string"
+        },
+        "displayName": {
+          "title": "Displayname",
+          "type": "string"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "lastEvidencePackId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastevidencepackid"
+        },
+        "lastEvidenceStatus": {
+          "enum": [
+            "missing",
+            "pending",
+            "valid",
+            "invalid"
+          ],
+          "title": "Lastevidencestatus",
+          "type": "string"
+        },
+        "lastRunId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastrunid"
+        },
+        "ownerContact": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ownercontact"
+        },
+        "ownerTeam": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ownerteam"
+        },
+        "policyPackId": {
+          "title": "Policypackid",
+          "type": "string"
+        },
+        "readiness": {
+          "title": "Readiness",
+          "type": "string"
+        },
+        "riskProfile": {
+          "enum": [
+            "read_only",
+            "guarded",
+            "restricted",
+            "blocked"
+          ],
+          "title": "Riskprofile",
+          "type": "string"
+        },
+        "runtimeKind": {
+          "title": "Runtimekind",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentId",
+        "displayName",
+        "runtimeKind",
+        "agentType",
+        "policyPackId",
+        "riskProfile",
+        "enabled",
+        "status",
+        "readiness",
+        "lastEvidenceStatus",
+        "updatedAt"
+      ],
+      "title": "AgentRegistryV2Item",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agents": {
+      "items": {
+        "$ref": "#/$defs/AgentRegistryV2Item"
+      },
+      "title": "Agents",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.agent-registry/v2",
+      "default": "control-plane.agent-registry/v2",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "title": "AgentRegistryV2Snapshot",
+  "type": "object"
+}

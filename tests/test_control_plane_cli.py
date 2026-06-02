@@ -32,6 +32,23 @@ def test_control_plane_cli_register_simulate_submit_claims(tmp_path) -> None:
     assert register.exit_code == 0
     assert json.loads(register.stdout)["agent_id"] == "governed-ops"
 
+    listed = runner.invoke(
+        app,
+        [
+            "control-plane",
+            "agent",
+            "list",
+            "--root-dir",
+            str(root),
+            "--json",
+        ],
+    )
+    assert listed.exit_code == 0
+    agent_payload = json.loads(listed.stdout)["agents"][0]
+    assert agent_payload["agent_type"] == "internal"
+    assert agent_payload["policy_pack_id"] == "active-runtime-policy"
+    assert agent_payload["last_evidence_status"] == "missing"
+
     simulate = runner.invoke(
         app,
         [

@@ -18,8 +18,10 @@ export function AgentRegistryView({ agents }: { agents: unknown }) {
             {list.agents.map((agent) => (
               <article className="run-list-item" key={agent.agent_id}>
                 <strong>{agent.display_name || agent.agent_id}</strong>
-                <span>{agent.runtime_kind}</span>
+                <span>{`${agent.agent_type} / ${agent.runtime_kind}`}</span>
                 <small>{`${agent.status} / ${agent.readiness}`}</small>
+                <small>{`Policy ${agent.policy_pack_id} / ${agent.risk_profile}`}</small>
+                <small>{`Evidence ${agent.last_evidence_status}`}</small>
               </article>
             ))}
             {list.agents.length === 0 ? (
@@ -35,15 +37,15 @@ export function AgentRegistryView({ agents }: { agents: unknown }) {
           <h3>Governed actions</h3>
           <div className="metric-list">
             <div className="metric-row">
-              <span>Policy simulate</span>
-              <strong>available</strong>
+              <span>External gateway</span>
+              <strong>{list.agents.some((agent) => agent.agent_type.startsWith('external')) ? 'configured' : 'not registered'}</strong>
             </div>
             <div className="metric-row">
-              <span>Submit governed run</span>
-              <strong>identity gated</strong>
+              <span>Approval boundary</span>
+              <strong>external writes gated</strong>
             </div>
             <div className="metric-row">
-              <span>View evidence</span>
+              <span>Evidence status</span>
               <strong>signed pack required</strong>
             </div>
           </div>

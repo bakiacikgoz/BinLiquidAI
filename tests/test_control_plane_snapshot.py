@@ -125,6 +125,9 @@ def test_control_plane_snapshot_cli_contract(tmp_path: Path) -> None:
     assert parsed.data_source.is_mock is False
     assert parsed.data_source.is_silent_fallback is False
     assert parsed.agents[0].agent_id == "governed-ops"
+    assert parsed.agents[0].agent_type == "internal"
+    assert parsed.agents[0].policy_pack_id == "active-runtime-policy"
+    assert parsed.agents[0].last_evidence_status == "missing"
     assert parsed.runs[0].status == "approval_pending"
     assert parsed.approvals
     assert parsed.evidence_packs == []

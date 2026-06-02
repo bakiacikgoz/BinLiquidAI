@@ -57,6 +57,17 @@
           "title": "Agentid",
           "type": "string"
         },
+        "agentType": {
+          "default": "internal",
+          "enum": [
+            "internal",
+            "external_stdio",
+            "external_http",
+            "computer_use_adapter"
+          ],
+          "title": "Agenttype",
+          "type": "string"
+        },
         "displayName": {
           "title": "Displayname",
           "type": "string"
@@ -72,6 +83,17 @@
           ],
           "default": null,
           "title": "Lastevidencepackid"
+        },
+        "lastEvidenceStatus": {
+          "default": "missing",
+          "enum": [
+            "missing",
+            "pending",
+            "valid",
+            "invalid"
+          ],
+          "title": "Lastevidencestatus",
+          "type": "string"
         },
         "lastRunId": {
           "anyOf": [
@@ -97,8 +119,31 @@
           "default": null,
           "title": "Ownerteam"
         },
+        "policyPackId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policypackid"
+        },
         "readiness": {
           "title": "Readiness",
+          "type": "string"
+        },
+        "riskProfile": {
+          "default": "guarded",
+          "enum": [
+            "read_only",
+            "guarded",
+            "restricted",
+            "blocked"
+          ],
+          "title": "Riskprofile",
           "type": "string"
         },
         "runtimeKind": {

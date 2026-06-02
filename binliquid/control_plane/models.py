@@ -368,11 +368,66 @@ class AgentSummary(StrictModel):
     agent_id: str = Field(alias="agentId")
     display_name: str = Field(alias="displayName")
     runtime_kind: str = Field(alias="runtimeKind")
+    agent_type: Literal[
+        "internal",
+        "external_stdio",
+        "external_http",
+        "computer_use_adapter",
+    ] = Field(default="internal", alias="agentType")
     status: str
     readiness: str
     owner_team: str | None = Field(default=None, alias="ownerTeam")
+    policy_pack_id: str | None = Field(default=None, alias="policyPackId")
+    risk_profile: Literal["read_only", "guarded", "restricted", "blocked"] = Field(
+        default="guarded",
+        alias="riskProfile",
+    )
     last_run_id: str | None = Field(default=None, alias="lastRunId")
     last_evidence_pack_id: str | None = Field(default=None, alias="lastEvidencePackId")
+    last_evidence_status: Literal["missing", "pending", "valid", "invalid"] = Field(
+        default="missing",
+        alias="lastEvidenceStatus",
+    )
+
+
+class AgentRegistryV2Item(StrictModel):
+    agent_id: str = Field(alias="agentId")
+    display_name: str = Field(alias="displayName")
+    runtime_kind: str = Field(alias="runtimeKind")
+    agent_type: Literal[
+        "internal",
+        "external_stdio",
+        "external_http",
+        "computer_use_adapter",
+    ] = Field(alias="agentType")
+    owner_team: str | None = Field(default=None, alias="ownerTeam")
+    owner_contact: str | None = Field(default=None, alias="ownerContact")
+    policy_pack_id: str = Field(alias="policyPackId")
+    risk_profile: Literal["read_only", "guarded", "restricted", "blocked"] = Field(
+        alias="riskProfile"
+    )
+    adapter_contract_version: str | None = Field(
+        default=None,
+        alias="adapterContractVersion",
+    )
+    enabled: bool
+    status: str
+    readiness: str
+    last_run_id: str | None = Field(default=None, alias="lastRunId")
+    last_evidence_pack_id: str | None = Field(default=None, alias="lastEvidencePackId")
+    last_evidence_status: Literal["missing", "pending", "valid", "invalid"] = Field(
+        alias="lastEvidenceStatus"
+    )
+    updated_at: datetime = Field(alias="updatedAt")
+
+
+class AgentRegistryV2Snapshot(StrictModel):
+    version: Literal["control-plane.agent-registry/v2"] = "control-plane.agent-registry/v2"
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    agents: list[AgentRegistryV2Item] = Field(default_factory=list)
 
 
 class RunSnapshotSummary(StrictModel):

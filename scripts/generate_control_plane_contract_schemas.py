@@ -11,6 +11,7 @@ if str(REPO_ROOT) not in sys.path:
 from binliquid.control_plane.models import (  # noqa: E402
     ActionProposal,
     AgentRecord,
+    AgentRegistryV2Snapshot,
     AgentSpec,
     ClaimMatrix,
     ControlPlaneRunSummary,
@@ -28,6 +29,7 @@ from binliquid.control_plane.external_contracts import (  # noqa: E402
 SCHEMAS = {
     "agent_spec": AgentSpec,
     "agent_record": AgentRecord,
+    "agent_registry_v2": AgentRegistryV2Snapshot,
     "action_proposal": ActionProposal,
     "policy_simulation": PolicySimulationResult,
     "control_plane_run_summary": ControlPlaneRunSummary,

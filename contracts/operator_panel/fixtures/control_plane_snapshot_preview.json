@@ -48,11 +48,15 @@
   "agents": [
     {
       "agentId": "governed-ops",
+      "agentType": "internal",
       "displayName": "Governed Ops",
+      "lastEvidenceStatus": "pending",
       "lastEvidencePackId": "evp-preview-run",
       "lastRunId": "cp-run-preview",
       "ownerTeam": "platform",
+      "policyPackId": "active-runtime-policy",
       "readiness": "policy_simulated",
+      "riskProfile": "guarded",
       "runtimeKind": "binliquid_team",
       "status": "registered"
     }

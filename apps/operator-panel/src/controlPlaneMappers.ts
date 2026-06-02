@@ -10,9 +10,15 @@ export function asControlPlaneAgentList(value: unknown): ControlPlaneAgentList {
         agent_id: readString(agent, 'agent_id'),
         display_name: readString(agent, 'display_name'),
         runtime_kind: readString(agent, 'runtime_kind'),
+        agent_type: readAgentType(agent, 'agent_type'),
         status: readString(agent, 'status'),
         readiness: readString(agent, 'readiness'),
+        owner_team: readNullableString(agent, 'owner_team'),
+        policy_pack_id: readString(agent, 'policy_pack_id') || 'active-runtime-policy',
+        risk_profile: readRiskProfile(agent, 'risk_profile'),
         last_run_id: readNullableString(agent, 'last_run_id'),
+        last_evidence_pack_id: readNullableString(agent, 'last_evidence_pack_id'),
+        last_evidence_status: readEvidenceStatus(agent, 'last_evidence_status'),
       };
     }),
   };
@@ -50,4 +56,31 @@ function readNullableString(source: Record<string, unknown>, key: string): strin
 
 function readStringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function readAgentType(source: Record<string, unknown>, key: string): ControlPlaneAgentList['agents'][number]['agent_type'] {
+  const value = readString(source, key);
+  if (value === 'external_stdio' || value === 'external_http' || value === 'computer_use_adapter') {
+    return value;
+  }
+  return 'internal';
+}
+
+function readRiskProfile(source: Record<string, unknown>, key: string): ControlPlaneAgentList['agents'][number]['risk_profile'] {
+  const value = readString(source, key);
+  if (value === 'read_only' || value === 'restricted' || value === 'blocked') {
+    return value;
+  }
+  return 'guarded';
+}
+
+function readEvidenceStatus(
+  source: Record<string, unknown>,
+  key: string,
+): ControlPlaneAgentList['agents'][number]['last_evidence_status'] {
+  const value = readString(source, key);
+  if (value === 'pending' || value === 'valid' || value === 'invalid') {
+    return value;
+  }
+  return 'missing';
 }
