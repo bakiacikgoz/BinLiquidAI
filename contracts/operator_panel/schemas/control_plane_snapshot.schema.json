@@ -415,6 +415,99 @@
       "title": "DataSourceState",
       "type": "object"
     },
+    "DesignPartnerRcCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking": {
+          "default": false,
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "checkId": {
+          "title": "Checkid",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "conditional",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "checkId",
+        "label",
+        "status",
+        "detail"
+      ],
+      "title": "DesignPartnerRcCheck",
+      "type": "object"
+    },
+    "DesignPartnerRcStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactRoot": {
+          "default": "artifacts/design-partner-rc",
+          "title": "Artifactroot",
+          "type": "string"
+        },
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/DesignPartnerRcCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "control-plane.design-partner-rc/v1",
+          "default": "control-plane.design-partner-rc/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "default": "conditional",
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "DesignPartnerRcStatus",
+      "type": "object"
+    },
     "EvidencePackSummary": {
       "additionalProperties": false,
       "properties": {
@@ -1350,6 +1443,9 @@
     },
     "dataSource": {
       "$ref": "#/$defs/DataSourceState"
+    },
+    "designPartnerRc": {
+      "$ref": "#/$defs/DesignPartnerRcStatus"
     },
     "evidencePacks": {
       "items": {

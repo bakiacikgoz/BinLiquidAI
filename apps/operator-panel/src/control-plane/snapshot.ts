@@ -126,6 +126,23 @@ function emptySnapshot(): ControlPlaneSnapshot {
       permissionMatrix: {},
       source: 'local_fixture',
     },
+    designPartnerRc: {
+      schemaVersion: 'control-plane.design-partner-rc/v1',
+      generatedAtUtc: new Date(0).toISOString(),
+      status: 'blocked',
+      checks: [
+        {
+          checkId: 'snapshot-load',
+          label: 'Snapshot load',
+          status: 'failed',
+          detail: 'snapshot unavailable',
+          blocking: true,
+        },
+      ],
+      blockers: ['snapshot-load'],
+      warnings: [],
+      artifactRoot: 'artifacts/design-partner-rc',
+    },
     quickActions: [],
     partialReasons: [],
   };

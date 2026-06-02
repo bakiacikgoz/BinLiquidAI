@@ -107,6 +107,77 @@
     "mode": "preview_fixture",
     "sourceReason": "explicit browser preview fixture"
   },
+  "designPartnerRc": {
+    "artifactRoot": "artifacts/design-partner-rc",
+    "blockers": [],
+    "checks": [
+      {
+        "blocking": true,
+        "checkId": "runtime-truth",
+        "detail": "mode=preview_fixture silentFallback=False",
+        "label": "Runtime truth",
+        "status": "passed"
+      },
+      {
+        "blocking": false,
+        "checkId": "preview-source",
+        "detail": "mode=preview_fixture",
+        "label": "Preview source boundary",
+        "status": "conditional"
+      },
+      {
+        "blocking": false,
+        "checkId": "evidence-index",
+        "detail": "1 evidence pack(s)",
+        "label": "Evidence coverage",
+        "status": "passed"
+      },
+      {
+        "blocking": false,
+        "checkId": "reports",
+        "detail": "0 ready report(s)",
+        "label": "Report coverage",
+        "status": "conditional"
+      },
+      {
+        "blocking": true,
+        "checkId": "computer-use-boundary",
+        "detail": "computer-use=blocked",
+        "label": "Computer-use claim boundary",
+        "status": "passed"
+      },
+      {
+        "blocking": true,
+        "checkId": "public-desktop-boundary",
+        "detail": "public-desktop-installer=blocked",
+        "label": "Public desktop claim boundary",
+        "status": "passed"
+      },
+      {
+        "blocking": false,
+        "checkId": "enterprise-hat-a",
+        "detail": "status=conditional",
+        "label": "Enterprise Hat A evidence",
+        "status": "conditional"
+      },
+      {
+        "blocking": false,
+        "checkId": "active-alerts",
+        "detail": "1 active alert(s)",
+        "label": "Active alert review",
+        "status": "conditional"
+      }
+    ],
+    "generatedAtUtc": "2026-06-01T12:00:00Z",
+    "schemaVersion": "control-plane.design-partner-rc/v1",
+    "status": "conditional",
+    "warnings": [
+      "preview-source",
+      "reports",
+      "enterprise-hat-a",
+      "active-alerts"
+    ]
+  },
   "evidencePacks": [
     {
       "artifactCount": 9,
@@ -134,6 +205,14 @@
       "surfaceId": "core-runtime"
     },
     {
+      "claimId": null,
+      "humanSummary": "Team runtime is enabled.",
+      "label": "Team Runtime",
+      "reasonCodes": [],
+      "status": "ready",
+      "surfaceId": "team-runtime"
+    },
+    {
       "claimId": "live-macos-computer-use",
       "humanSummary": "Blocked by MACOS_LIVE_DISABLED.",
       "label": "Computer-use",
@@ -142,6 +221,16 @@
       ],
       "status": "blocked",
       "surfaceId": "computer-use"
+    },
+    {
+      "claimId": "public-desktop-installer",
+      "humanSummary": "Blocked by PUBLIC_DESKTOP_INSTALLER_NOT_QUALIFIED.",
+      "label": "Public Desktop Installer",
+      "reasonCodes": [
+        "PUBLIC_DESKTOP_INSTALLER_NOT_QUALIFIED"
+      ],
+      "status": "blocked",
+      "surfaceId": "public-desktop-installer"
     }
   ],
   "generatedAtUtc": "2026-06-01T12:00:00Z",

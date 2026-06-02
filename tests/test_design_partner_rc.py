@@ -1,0 +1,159 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from binliquid.control_plane.design_partner_rc import build_design_partner_rc_status
+from binliquid.control_plane.models import (
+    AlertSummary,
+    DataSourceState,
+    EvidencePackSummary,
+    ExecutionSurfaceSummary,
+    ReportSummary,
+)
+
+
+def test_design_partner_rc_blocks_silent_fallback() -> None:
+    status = build_design_partner_rc_status(
+        data_source=_data_source(mode="preview_fixture", is_mock=True, is_silent_fallback=True),
+        claims=_claims("allowed"),
+        evidence_packs=[],
+        reports=[],
+        alerts=[],
+        execution_surfaces=_blocked_surfaces(),
+        generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+    )
+
+    assert status.status == "blocked"
+    assert "runtime-truth" in status.blockers
+
+
+def test_design_partner_rc_requires_blocked_desktop_boundaries() -> None:
+    surfaces = [
+        ExecutionSurfaceSummary(
+            surface_id="computer-use",
+            label="Computer-use automation",
+            status="blocked",
+            claim_id="computer-use",
+            reason_codes=["CLAIM_NOT_SUPPORTED"],
+            human_summary="Blocked until qualification evidence exists.",
+        ),
+        ExecutionSurfaceSummary(
+            surface_id="public-desktop-installer",
+            label="Public desktop installer",
+            status="ready",
+            claim_id="public-desktop-installer",
+            reason_codes=[],
+            human_summary="Incorrectly opened surface.",
+        ),
+    ]
+    status = build_design_partner_rc_status(
+        data_source=_data_source(),
+        claims=_claims("allowed"),
+        evidence_packs=[],
+        reports=[],
+        alerts=[],
+        execution_surfaces=surfaces,
+        generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+    )
+
+    assert status.status == "blocked"
+    assert "public-desktop-boundary" in status.blockers
+
+
+def test_design_partner_rc_ready_when_required_evidence_is_present() -> None:
+    status = build_design_partner_rc_status(
+        data_source=_data_source(),
+        claims=_claims("allowed"),
+        evidence_packs=[
+            EvidencePackSummary(
+                pack_id="pack-1",
+                run_id="run-1",
+                created_at_utc=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+                signature_status="valid",
+                hash_chain_status="valid",
+                replay_status="passed",
+                claim_guard_status="ready",
+                redaction_status="passed",
+                artifact_count=3,
+                export_path="artifacts/evidence-pack/pack-1",
+                blocking_reasons=[],
+            )
+        ],
+        reports=[
+            ReportSummary(
+                report_id="readiness",
+                kind="readiness",
+                title="Readiness",
+                status="ready",
+                path="artifacts/readiness/report.json",
+                generated_at_utc=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+                blocking_reasons=[],
+            )
+        ],
+        alerts=[
+            AlertSummary(
+                alert_id="clear",
+                severity="info",
+                status="resolved",
+                title="No active control-plane alerts",
+                reason_code="NO_ACTIVE_ALERTS",
+                recommended_action="Continue monitoring.",
+            )
+        ],
+        execution_surfaces=_blocked_surfaces(),
+        generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+    )
+
+    assert status.status == "ready"
+    assert status.blockers == []
+    assert status.warnings == []
+
+
+def _data_source(
+    *,
+    mode: str = "cli_live",
+    is_mock: bool = False,
+    is_silent_fallback: bool = False,
+) -> DataSourceState:
+    return DataSourceState(
+        mode=mode,
+        is_mock=is_mock,
+        is_silent_fallback=is_silent_fallback,
+        last_refresh_utc=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+        age_ms=0,
+        freshness="fresh",
+        contract_version="control-plane.snapshot/v1",
+        source_reason="test",
+    )
+
+
+def _claims(status: str) -> dict[str, object]:
+    return {
+        "claims": [
+            {
+                "claim_id": "enterprise-self-hosted-agent-control-plane",
+                "status": status,
+            }
+        ]
+    }
+
+
+def _blocked_surfaces() -> list[ExecutionSurfaceSummary]:
+    return [
+        ExecutionSurfaceSummary(
+            surface_id="computer-use",
+            label="Computer-use automation",
+            status="blocked",
+            claim_id="computer-use",
+            reason_codes=["CLAIM_NOT_SUPPORTED"],
+            human_summary="Blocked until qualification evidence exists.",
+        ),
+        ExecutionSurfaceSummary(
+            surface_id="public-desktop-installer",
+            label="Public desktop installer",
+            status="blocked",
+            claim_id="public-desktop-installer",
+            reason_codes=["CLAIM_NOT_SUPPORTED"],
+            human_summary="Blocked until signed installer evidence exists.",
+        ),
+    ]

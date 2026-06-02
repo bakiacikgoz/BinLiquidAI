@@ -138,6 +138,10 @@ def test_control_plane_snapshot_cli_contract(tmp_path: Path) -> None:
     assert parsed.system.health.status == "partial"
     assert "metrics_snapshot" in parsed.system.health.missing_signals
     assert "qualification_report" in parsed.partial_reasons
+    assert parsed.design_partner_rc.schema_version == "control-plane.design-partner-rc/v1"
+    assert parsed.design_partner_rc.status == "conditional"
+    assert parsed.design_partner_rc.blockers == []
+    assert "evidence-index" in parsed.design_partner_rc.warnings
     assert parsed.operations
     assert {operation.category for operation in parsed.operations} >= {
         "identity",
@@ -161,6 +165,8 @@ def test_operator_panel_preview_snapshot_fixture_is_contract_valid() -> None:
     assert parsed.data_source.is_mock is True
     assert parsed.data_source.is_silent_fallback is False
     assert parsed.system.health.status == "partial"
+    assert parsed.design_partner_rc.status == "conditional"
+    assert "preview-source" in parsed.design_partner_rc.warnings
     assert {operation.category for operation in parsed.operations} >= {
         "identity",
         "qualification",

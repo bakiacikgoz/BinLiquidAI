@@ -8,6 +8,7 @@ from typing import Any
 from binliquid import __version__
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.control_plane.claim_guard import ClaimGuard
+from binliquid.control_plane.design_partner_rc import build_design_partner_rc_status
 from binliquid.control_plane.models import (
     AdminSummary,
     AgentSummary,
@@ -140,6 +141,15 @@ def build_control_plane_snapshot(
         reports=reports,
         data_source=data_source,
     )
+    design_partner_rc = build_design_partner_rc_status(
+        data_source=data_source,
+        claims=claims.model_dump(mode="json"),
+        evidence_packs=evidence_packs,
+        reports=reports,
+        alerts=alerts,
+        execution_surfaces=execution_surfaces,
+        generated_at=generated_at,
+    )
     logs = _logs(generated_at=generated_at, runs=runs, approvals=approvals, alerts=alerts)
     operations = _operation_descriptors(config=config, generated_at=generated_at)
     admin = _admin_summary(config)
@@ -182,6 +192,7 @@ def build_control_plane_snapshot(
         reports=reports,
         operations=operations,
         admin=admin,
+        design_partner_rc=design_partner_rc,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )

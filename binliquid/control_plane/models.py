@@ -547,6 +547,30 @@ class QuickActionSummary(StrictModel):
     disabled_reason: str | None = Field(default=None, alias="disabledReason")
 
 
+class DesignPartnerRcCheck(StrictModel):
+    check_id: str = Field(alias="checkId")
+    label: str
+    status: Literal["passed", "conditional", "failed"]
+    detail: str
+    blocking: bool = False
+
+
+class DesignPartnerRcStatus(StrictModel):
+    schema_version: Literal["control-plane.design-partner-rc/v1"] = Field(
+        default="control-plane.design-partner-rc/v1",
+        alias="schemaVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["ready", "conditional", "blocked"] = "conditional"
+    checks: list[DesignPartnerRcCheck] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    artifact_root: str = Field(default="artifacts/design-partner-rc", alias="artifactRoot")
+
+
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
@@ -570,5 +594,9 @@ class ControlPlaneSnapshot(StrictModel):
     reports: list[ReportSummary] = Field(default_factory=list)
     operations: list[OperationDescriptor] = Field(default_factory=list)
     admin: AdminSummary
+    design_partner_rc: DesignPartnerRcStatus = Field(
+        default_factory=DesignPartnerRcStatus,
+        alias="designPartnerRc",
+    )
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

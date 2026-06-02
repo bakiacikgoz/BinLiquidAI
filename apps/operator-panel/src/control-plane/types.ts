@@ -210,6 +210,24 @@ export interface QuickActionSummary {
   disabledReason?: string | null;
 }
 
+export interface DesignPartnerRcCheck {
+  checkId: string;
+  label: string;
+  status: 'passed' | 'conditional' | 'failed';
+  detail: string;
+  blocking: boolean;
+}
+
+export interface DesignPartnerRcStatus {
+  schemaVersion: 'control-plane.design-partner-rc/v1';
+  generatedAtUtc: string;
+  status: 'ready' | 'conditional' | 'blocked';
+  checks: DesignPartnerRcCheck[];
+  blockers: string[];
+  warnings: string[];
+  artifactRoot: string;
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -227,6 +245,7 @@ export interface ControlPlaneSnapshot {
   reports: ReportSummary[];
   operations: OperationDescriptor[];
   admin: AdminSummary;
+  designPartnerRc: DesignPartnerRcStatus;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }
