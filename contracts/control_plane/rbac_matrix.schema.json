@@ -1,0 +1,208 @@
+{
+  "$defs": {
+    "RbacBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "actorId": {
+          "title": "Actorid",
+          "type": "string"
+        },
+        "roleId": {
+          "title": "Roleid",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "local_fixture",
+            "identity_assertion",
+            "external_idp_placeholder"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorId",
+        "roleId",
+        "source"
+      ],
+      "title": "RbacBinding",
+      "type": "object"
+    },
+    "RoleSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "assignmentCount": {
+          "default": 0,
+          "title": "Assignmentcount",
+          "type": "integer"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "riskLevel": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Risklevel",
+          "type": "string"
+        },
+        "roleId": {
+          "title": "Roleid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roleId",
+        "label",
+        "riskLevel"
+      ],
+      "title": "RoleSummary",
+      "type": "object"
+    },
+    "UserSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "issuer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Issuer"
+        },
+        "lastSeenUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastseenutc"
+        },
+        "permissions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "expired",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "userId": {
+          "title": "Userid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "userId",
+        "subject",
+        "status"
+      ],
+      "title": "UserSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "bindings": {
+      "items": {
+        "$ref": "#/$defs/RbacBinding"
+      },
+      "title": "Bindings",
+      "type": "array"
+    },
+    "effectivePermissions": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Effectivepermissions",
+      "type": "object"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "permissions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Permissions",
+      "type": "array"
+    },
+    "roles": {
+      "items": {
+        "$ref": "#/$defs/RoleSummary"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "source": {
+      "enum": [
+        "local_fixture",
+        "identity_assertion",
+        "external_idp_placeholder"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "users": {
+      "items": {
+        "$ref": "#/$defs/UserSummary"
+      },
+      "title": "Users",
+      "type": "array"
+    },
+    "version": {
+      "const": "control-plane.rbac-matrix/v1",
+      "default": "control-plane.rbac-matrix/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source"
+  ],
+  "title": "RbacMatrixSnapshot",
+  "type": "object"
+}

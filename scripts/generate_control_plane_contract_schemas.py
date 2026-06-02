@@ -22,6 +22,8 @@ from binliquid.control_plane.models import (  # noqa: E402
     PolicyPackManifest,
     PolicyPackPromotionDryRun,
     PolicySimulationResult,
+    RbacMatrixSnapshot,
+    RbacPermissionDecision,
     ReadinessReport,
 )
 from binliquid.control_plane.external_contracts import (  # noqa: E402
@@ -38,6 +40,8 @@ SCHEMAS = {
     "policy_pack_manifest": PolicyPackManifest,
     "policy_pack_diff": PolicyPackDiffResult,
     "policy_pack_promotion": PolicyPackPromotionDryRun,
+    "rbac_matrix": RbacMatrixSnapshot,
+    "rbac_decision": RbacPermissionDecision,
     "control_plane_run_summary": ControlPlaneRunSummary,
     "evidence_pack_manifest": EvidencePackManifest,
     "evidence_verify_result": EvidenceVerifyResult,

@@ -31,6 +31,7 @@ from binliquid.control_plane.models import (
     SystemHealthState,
     SystemSummary,
 )
+from binliquid.control_plane.rbac_admin import build_admin_summary
 from binliquid.control_plane.registry import AgentRegistry
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
 from binliquid.control_plane.storage import file_sha256
@@ -737,73 +738,7 @@ def _operation_descriptors(
 
 
 def _admin_summary(config: RuntimeConfig) -> AdminSummary:
-    identity = _describe_actor_safe(config)
-    actor = identity.get("actor") if isinstance(identity.get("actor"), dict) else {}
-    roles = [str(item) for item in actor.get("roles", [])] if isinstance(actor, dict) else []
-    permissions = (
-        [str(item) for item in actor.get("permissions", [])] if isinstance(actor, dict) else []
-    )
-    user_id = (
-        str(actor.get("actor_id") or "operator-unresolved")
-        if isinstance(actor, dict)
-        else "operator-unresolved"
-    )
-    subject = (
-        str(actor.get("subject") or "identity disabled")
-        if isinstance(actor, dict)
-        else "identity disabled"
-    )
-    issuer = (
-        str(actor.get("issuer"))
-        if isinstance(actor, dict) and actor.get("issuer")
-        else None
-    )
-    user_status = (
-        "active" if identity.get("verified") or not config.identity.enabled else "unknown"
-    )
-    user = {
-        "userId": user_id,
-        "subject": subject,
-        "issuer": issuer,
-        "status": user_status,
-        "roles": roles,
-        "permissions": permissions,
-        "lastSeenUtc": datetime.now(UTC),
-    }
-    role_items = [
-        {
-            "roleId": role,
-            "label": role.replace("_", " ").title(),
-            "riskLevel": "high" if "admin" in role else "medium",
-            "permissions": permissions,
-            "assignmentCount": 1,
-        }
-        for role in roles
-    ]
-    if not role_items:
-        role_items.append(
-            {
-                "roleId": "viewer",
-                "label": "Viewer",
-                "riskLevel": "low",
-                "permissions": ["config.read"],
-                "assignmentCount": 1,
-            }
-        )
-    admin_source = (
-        "identity_assertion"
-        if config.identity.enabled and identity.get("verified")
-        else "external_idp_placeholder"
-        if config.identity.enabled
-        else "local_fixture"
-    )
-    return AdminSummary(
-        users=[user],
-        roles=role_items,
-        policy_packs=[_active_policy_pack(config)],
-        permission_matrix={str(item["roleId"]): list(item["permissions"]) for item in role_items},
-        source=admin_source,
-    )
+    return build_admin_summary(config, policy_pack=_active_policy_pack(config))
 
 
 def _describe_actor_safe(config: RuntimeConfig) -> dict[str, Any]:

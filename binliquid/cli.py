@@ -49,6 +49,12 @@ from binliquid.control_plane.policy_packs import (
     validate_policy_pack,
 )
 from binliquid.control_plane.policy_simulator import PolicySimulator
+from binliquid.control_plane.rbac_admin import (
+    build_rbac_matrix,
+)
+from binliquid.control_plane.rbac_admin import (
+    check_permission as check_rbac_permission,
+)
 from binliquid.control_plane.readiness import build_readiness_report
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
@@ -131,6 +137,7 @@ control_plane_evidence_app = typer.Typer(help="Control Plane evidence commands")
 control_plane_claims_app = typer.Typer(help="Control Plane claim guard commands")
 control_plane_adapter_app = typer.Typer(help="External adapter contract commands")
 control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
+control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -161,6 +168,7 @@ control_plane_app.add_typer(control_plane_evidence_app, name="evidence")
 control_plane_app.add_typer(control_plane_claims_app, name="claims")
 control_plane_app.add_typer(control_plane_adapter_app, name="adapter")
 control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
+control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -1112,6 +1120,33 @@ def control_plane_claims_verify(
         evidence_root=evidence_root
     )
     _emit_payload(matrix.model_dump(mode="json"), json_output=json_output)
+
+
+@control_plane_rbac_app.command("matrix")
+def control_plane_rbac_matrix(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    matrix = build_rbac_matrix(RuntimeConfig.from_profile(profile))
+    _emit_payload(matrix.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@control_plane_rbac_app.command("check")
+def control_plane_rbac_check(
+    actor_id: str = typer.Option(..., "--actor-id", help="Actor ID"),
+    permission: str = typer.Option(..., "--permission", help="Permission to check"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    decision = check_rbac_permission(
+        config=RuntimeConfig.from_profile(profile),
+        actor_id=actor_id,
+        permission=permission,
+        dry_run=True,
+    )
+    _emit_payload(decision.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if decision.status == "denied":
+        raise typer.Exit(code=3)
 
 
 @control_plane_adapter_app.command("evaluate")

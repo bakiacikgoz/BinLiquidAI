@@ -1,0 +1,63 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "actorId": {
+      "title": "Actorid",
+      "type": "string"
+    },
+    "dryRun": {
+      "default": true,
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "permission": {
+      "title": "Permission",
+      "type": "string"
+    },
+    "permissions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Permissions",
+      "type": "array"
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "allowed",
+        "denied"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.rbac-decision/v1",
+      "default": "control-plane.rbac-decision/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "actorId",
+    "permission",
+    "status",
+    "reasonCode"
+  ],
+  "title": "RbacPermissionDecision",
+  "type": "object"
+}

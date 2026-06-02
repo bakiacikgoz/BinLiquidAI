@@ -654,6 +654,44 @@ class RoleSummary(StrictModel):
     assignment_count: int = Field(default=0, alias="assignmentCount")
 
 
+class RbacBinding(StrictModel):
+    actor_id: str = Field(alias="actorId")
+    role_id: str = Field(alias="roleId")
+    source: Literal["local_fixture", "identity_assertion", "external_idp_placeholder"]
+
+
+class RbacMatrixSnapshot(StrictModel):
+    version: Literal["control-plane.rbac-matrix/v1"] = "control-plane.rbac-matrix/v1"
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    users: list[UserSummary] = Field(default_factory=list)
+    roles: list[RoleSummary] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
+    bindings: list[RbacBinding] = Field(default_factory=list)
+    effective_permissions: dict[str, list[str]] = Field(
+        default_factory=dict,
+        alias="effectivePermissions",
+    )
+    source: Literal["local_fixture", "identity_assertion", "external_idp_placeholder"]
+
+
+class RbacPermissionDecision(StrictModel):
+    version: Literal["control-plane.rbac-decision/v1"] = "control-plane.rbac-decision/v1"
+    actor_id: str = Field(alias="actorId")
+    permission: str
+    status: Literal["allowed", "denied"]
+    dry_run: bool = Field(default=True, alias="dryRun")
+    reason_code: str = Field(alias="reasonCode")
+    roles: list[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+
+
 class AdminSummary(StrictModel):
     users: list[UserSummary] = Field(default_factory=list)
     roles: list[RoleSummary] = Field(default_factory=list)
