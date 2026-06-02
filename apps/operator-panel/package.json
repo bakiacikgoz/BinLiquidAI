@@ -17,6 +17,7 @@
     "test:responsive": "playwright test e2e/responsive.spec.ts --pass-with-no-tests",
     "audit:ui-controls": "node --experimental-strip-types scripts/audit-ui-controls.ts",
     "assert:no-primary-raw-json": "node --experimental-strip-types scripts/assert-no-primary-raw-json.ts",
+    "routes:timings": "node --experimental-strip-types scripts/collect-route-timings.ts",
     "i18n:coverage": "node --experimental-strip-types scripts/assert-i18n-coverage.ts",
     "pilot:assert": "node --experimental-strip-types scripts/assert-pilot-readiness.ts",
     "qa:summary": "node --experimental-strip-types scripts/write-frontend-qa-summary.ts",

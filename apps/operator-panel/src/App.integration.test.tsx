@@ -6,6 +6,32 @@ import * as bridge from './bridge';
 import { renderOperatorPanel } from './test/render';
 import { DEFAULT_SETTINGS, SETTINGS_KEY, type PanelSettings } from './settings';
 
+type NavigationCase = {
+  nav: string | RegExp;
+  heading: string;
+};
+
+const NAVIGATION_TEST_TIMEOUT_MS = 15_000;
+const WORKSPACE_NAVIGATION_CASES: NavigationCase[] = [
+  { nav: 'Görevler', heading: 'Tasks' },
+  { nav: 'Onaylar', heading: 'Approvals' },
+  { nav: 'Çalıştırmalar', heading: 'Runs' },
+];
+const SYSTEM_NAVIGATION_CASES: NavigationCase[] = [
+  { nav: 'Sistem Sağlığı', heading: 'System' },
+  { nav: 'Yürütmeler', heading: 'Operations' },
+  { nav: 'Ayarlar', heading: 'Settings' },
+];
+const GOVERNANCE_NAVIGATION_CASES: NavigationCase[] = [
+  { nav: 'Loglar', heading: 'Logs' },
+  { nav: 'Raporlar', heading: 'Reports' },
+  { nav: 'Uyarılar', heading: 'Alerts' },
+  { nav: 'Planlamalar', heading: 'Plans' },
+  { nav: 'Kullanıcılar', heading: 'Users' },
+  { nav: 'Roller', heading: 'Roles' },
+  { nav: 'Politikalar', heading: 'Policy Packs' },
+];
+
 vi.mock('./bridge', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./bridge')>();
   return {
@@ -43,6 +69,18 @@ async function openView(user: ReturnType<typeof renderOperatorPanel>['user'], na
   await user.click(screen.getByRole('button', { name: navName }));
 }
 
+async function assertNavigationGroup(cases: NavigationCase[]) {
+  const { user } = renderApp();
+
+  expect(await screen.findByRole('heading', { name: 'Mission Control' })).toBeInTheDocument();
+  expect(screen.getByText('Preview')).toBeInTheDocument();
+
+  for (const item of cases) {
+    await openView(user, item.nav);
+    expect(await screen.findByRole('heading', { name: item.heading, level: 2 })).toBeInTheDocument();
+  }
+}
+
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
@@ -51,30 +89,29 @@ beforeEach(() => {
 });
 
 describe('App integration flows', () => {
-  it('navigates the primary operator views in browser preview mode', async () => {
-    const { user } = renderApp();
+  it(
+    'navigates workspace operator views in browser preview mode',
+    async () => {
+      await assertNavigationGroup(WORKSPACE_NAVIGATION_CASES);
+    },
+    NAVIGATION_TEST_TIMEOUT_MS,
+  );
 
-    expect(await screen.findByRole('heading', { name: 'Mission Control' })).toBeInTheDocument();
-    expect(screen.getByText('Preview')).toBeInTheDocument();
+  it(
+    'navigates system operator views in browser preview mode',
+    async () => {
+      await assertNavigationGroup(SYSTEM_NAVIGATION_CASES);
+    },
+    NAVIGATION_TEST_TIMEOUT_MS,
+  );
 
-    await openView(user, 'Görevler');
-    expect(screen.getByRole('heading', { name: 'Tasks' })).toBeInTheDocument();
-
-    await openView(user, 'Onaylar');
-    expect(screen.getByRole('heading', { name: 'Approvals' })).toBeInTheDocument();
-
-    await openView(user, 'Çalıştırmalar');
-    expect(screen.getByRole('heading', { name: 'Runs' })).toBeInTheDocument();
-
-    await openView(user, 'Sistem Sağlığı');
-    expect(screen.getByRole('heading', { name: 'System' })).toBeInTheDocument();
-
-    await openView(user, 'Yürütmeler');
-    expect(screen.getByRole('heading', { name: 'Operations' })).toBeInTheDocument();
-
-    await openView(user, 'Ayarlar');
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
-  });
+  it(
+    'navigates governance operator views in browser preview mode',
+    async () => {
+      await assertNavigationGroup(GOVERNANCE_NAVIGATION_CASES);
+    },
+    NAVIGATION_TEST_TIMEOUT_MS,
+  );
 
   it('submits a team run through the preview bridge and returns to workspace', async () => {
     const { user } = renderApp({ operatorId: 'qa-operator' });
