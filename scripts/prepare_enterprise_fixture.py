@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -57,7 +58,10 @@ def main() -> None:
     trusted_dir.mkdir(parents=True, exist_ok=True)
     identity_dir.mkdir(parents=True, exist_ok=True)
 
-    private_key = Ed25519PrivateKey.generate()
+    private_seed = hashlib.sha256(
+        f"binliquid-enterprise-fixture:{args.key_id}".encode()
+    ).digest()
+    private_key = Ed25519PrivateKey.from_private_bytes(private_seed)
     private_raw = private_key.private_bytes_raw()
     public_raw = private_key.public_key().public_bytes_raw()
     now = datetime.now(UTC)

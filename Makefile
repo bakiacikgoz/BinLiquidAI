@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate governance-admin-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate governance-admin-gate security-review-pack-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -162,6 +162,32 @@ governance-admin-gate:
 	uv run pytest -q tests/test_control_plane_admin_store.py tests/test_control_plane_policy_pack_lifecycle.py tests/test_rbac_admin.py tests/test_policy_packs.py
 	uv run python scripts/prepare_enterprise_fixture.py --root .
 	uv run python scripts/evaluate_governance_admin.py --json
+
+security-review-pack-gate:
+	uv run pytest -q tests/test_control_plane_security_review.py
+	uv run python scripts/prepare_enterprise_fixture.py --root .
+	uv run binliquid control-plane security review \
+		--profile enterprise \
+		--output-root artifacts/security-review \
+		--evidence-root artifacts/evidence-corpus/valid \
+		--json
+
+design-partner-pilot-gate:
+	uv run ruff check .
+	uv run pytest -q
+	corepack pnpm --dir apps/operator-panel test
+	corepack pnpm --dir apps/operator-panel lint
+	corepack pnpm --dir apps/operator-panel build
+	corepack pnpm --dir apps/operator-panel test:e2e
+	cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml
+	$(MAKE) enterprise-hat-a-evidence-gate
+	$(MAKE) evidence-corpus-gate
+	$(MAKE) install-rehearsal-gate
+	$(MAKE) external-agent-pilot-gate
+	$(MAKE) governance-admin-gate
+	$(MAKE) security-review-pack-gate
+	uv run python scripts/generate_design_partner_pilot_pack.py --output-root artifacts/design-partner-pilot --json
+	git diff --check
 
 ui-gate:
 	corepack pnpm --dir apps/operator-panel qa:frontend

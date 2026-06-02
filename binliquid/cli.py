@@ -55,6 +55,7 @@ from binliquid.control_plane.external_agent_client import run_external_agent_man
 from binliquid.control_plane.external_gateway import submit_external_action_file
 from binliquid.control_plane.install_rehearsal import run_install_rehearsal
 from binliquid.control_plane.operations_runner import dry_run_operation
+from binliquid.control_plane.pilot_pack import generate_design_partner_pilot_pack
 from binliquid.control_plane.policy_pack_store import (
     plan_policy_pack_rollback,
     promote_policy_pack,
@@ -82,6 +83,7 @@ from binliquid.control_plane.readiness import build_readiness_report
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
 from binliquid.control_plane.reports import build_reports_alerts_logs_manifest
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
+from binliquid.control_plane.security_review import generate_security_review_pack
 from binliquid.control_plane.snapshot import build_control_plane_snapshot
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
@@ -164,6 +166,8 @@ control_plane_qualification_app = typer.Typer(help="Control Plane qualification 
 control_plane_install_app = typer.Typer(help="Control Plane install rehearsal commands")
 control_plane_external_agent_app = typer.Typer(help="External agent pilot commands")
 control_plane_admin_app = typer.Typer(help="Control Plane governance admin commands")
+control_plane_security_app = typer.Typer(help="Control Plane security review commands")
+control_plane_pilot_app = typer.Typer(help="Control Plane pilot launch commands")
 control_plane_adapter_app = typer.Typer(help="External adapter contract commands")
 control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
 control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
@@ -202,6 +206,8 @@ control_plane_app.add_typer(control_plane_qualification_app, name="qualification
 control_plane_app.add_typer(control_plane_install_app, name="install")
 control_plane_app.add_typer(control_plane_external_agent_app, name="external-agent")
 control_plane_app.add_typer(control_plane_admin_app, name="admin")
+control_plane_app.add_typer(control_plane_security_app, name="security")
+control_plane_app.add_typer(control_plane_pilot_app, name="pilot")
 control_plane_app.add_typer(control_plane_adapter_app, name="adapter")
 control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
 control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
@@ -1443,6 +1449,52 @@ def control_plane_policy_pack_lifecycle_rollback_plan(
         )
         raise typer.Exit(code=1) from None
     _emit_payload(record.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@control_plane_security_app.command("review")
+def control_plane_security_review(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    output_root: str = typer.Option(
+        "artifacts/security-review",
+        "--output-root",
+        help="Security review output root.",
+    ),
+    evidence_root: str = typer.Option(
+        "artifacts/evidence-corpus/valid",
+        "--evidence-root",
+        help="Evidence root to index for review.",
+    ),
+    support_bundle_path: str | None = typer.Option(None, "--support-bundle-path"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    pack = generate_security_review_pack(
+        output_root=Path(output_root),
+        config=RuntimeConfig.from_profile(profile),
+        support_bundle_path=Path(support_bundle_path) if support_bundle_path else None,
+        evidence_root=evidence_root,
+    )
+    _emit_payload(pack, json_output=json_output)
+    if pack["status"] == "blocked":
+        raise typer.Exit(code=1)
+
+
+@control_plane_pilot_app.command("pack")
+def control_plane_pilot_pack(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    output_root: str = typer.Option(
+        "artifacts/design-partner-pilot",
+        "--output-root",
+        help="Pilot launch pack output root.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    manifest = generate_design_partner_pilot_pack(
+        output_root=Path(output_root),
+        config=RuntimeConfig.from_profile(profile),
+    )
+    _emit_payload(manifest, json_output=json_output)
+    if manifest["status"] == "blocked":
+        raise typer.Exit(code=1)
 
 
 @control_plane_claims_app.command("verify")
