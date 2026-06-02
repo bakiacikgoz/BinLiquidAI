@@ -1,0 +1,212 @@
+{
+  "$defs": {
+    "EvidenceIndexEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "agentId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agentid"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "claimStatus": {
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Claimstatus",
+          "type": "string"
+        },
+        "evidenceId": {
+          "title": "Evidenceid",
+          "type": "string"
+        },
+        "manifestHash": {
+          "title": "Manifesthash",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "redactionStatus": {
+          "enum": [
+            "clean",
+            "warning",
+            "failed",
+            "unknown"
+          ],
+          "title": "Redactionstatus",
+          "type": "string"
+        },
+        "replayStatus": {
+          "enum": [
+            "verified",
+            "failed",
+            "not_available",
+            "unknown"
+          ],
+          "title": "Replaystatus",
+          "type": "string"
+        },
+        "runId": {
+          "title": "Runid",
+          "type": "string"
+        },
+        "signatureStatus": {
+          "enum": [
+            "valid",
+            "invalid",
+            "missing",
+            "unknown"
+          ],
+          "title": "Signaturestatus",
+          "type": "string"
+        },
+        "verifiedAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verifiedatutc"
+        }
+      },
+      "required": [
+        "evidenceId",
+        "runId",
+        "path",
+        "manifestHash",
+        "signatureStatus",
+        "replayStatus",
+        "claimStatus",
+        "redactionStatus"
+      ],
+      "title": "EvidenceIndexEntry",
+      "type": "object"
+    },
+    "EvidenceVerificationHistoryItem": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "evidenceId": {
+          "title": "Evidenceid",
+          "type": "string"
+        },
+        "historyId": {
+          "title": "Historyid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "verifiedAtUtc": {
+          "format": "date-time",
+          "title": "Verifiedatutc",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "historyId",
+        "evidenceId",
+        "status",
+        "verifiedAtUtc"
+      ],
+      "title": "EvidenceVerificationHistoryItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/EvidenceIndexEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "verificationHistory": {
+      "items": {
+        "$ref": "#/$defs/EvidenceVerificationHistoryItem"
+      },
+      "title": "Verificationhistory",
+      "type": "array"
+    },
+    "version": {
+      "const": "control-plane.evidence-index/v1",
+      "default": "control-plane.evidence-index/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "EvidenceIndexSnapshot",
+  "type": "object"
+}

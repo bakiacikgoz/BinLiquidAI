@@ -40,6 +40,7 @@ from binliquid.control_plane.adapter_contracts import evaluate_action_proposal_f
 from binliquid.control_plane.agent_registry_v2 import build_agent_registry_v2
 from binliquid.control_plane.claim_guard import ClaimGuard
 from binliquid.control_plane.errors import ControlPlaneError
+from binliquid.control_plane.evidence_index import build_evidence_index
 from binliquid.control_plane.evidence_pack import EvidencePackBuilder
 from binliquid.control_plane.external_gateway import submit_external_action_file
 from binliquid.control_plane.policy_packs import (
@@ -1108,6 +1109,23 @@ def control_plane_evidence_verify(
     _emit_payload(result.model_dump(mode="json"), json_output=json_output)
     if result.status != "pass":
         raise typer.Exit(code=1)
+
+
+@control_plane_evidence_app.command("index")
+def control_plane_evidence_index(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    evidence_root: str = typer.Option("artifacts", "--evidence-root"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    index = build_evidence_index(
+        config=RuntimeConfig.from_profile(profile),
+        evidence_root=evidence_root,
+        root_dir=root_dir,
+    )
+    _emit_payload(index.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if index.status == "blocked":
+        raise typer.Exit(code=3)
 
 
 @control_plane_claims_app.command("verify")

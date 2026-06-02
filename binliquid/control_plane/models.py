@@ -298,6 +298,51 @@ class EvidenceVerifyResult(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class EvidenceVerificationHistoryItem(StrictModel):
+    history_id: str = Field(alias="historyId")
+    evidence_id: str = Field(alias="evidenceId")
+    status: Literal["pass", "fail"]
+    verified_at_utc: datetime = Field(alias="verifiedAtUtc")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class EvidenceIndexEntry(StrictModel):
+    evidence_id: str = Field(alias="evidenceId")
+    run_id: str = Field(alias="runId")
+    agent_id: str | None = Field(default=None, alias="agentId")
+    path: str
+    manifest_hash: str = Field(alias="manifestHash")
+    signature_status: Literal["valid", "invalid", "missing", "unknown"] = Field(
+        alias="signatureStatus"
+    )
+    replay_status: Literal["verified", "failed", "not_available", "unknown"] = Field(
+        alias="replayStatus"
+    )
+    verified_at_utc: datetime | None = Field(default=None, alias="verifiedAtUtc")
+    claim_status: Literal["ready", "conditional", "blocked"] = Field(alias="claimStatus")
+    redaction_status: Literal["clean", "warning", "failed", "unknown"] = Field(
+        alias="redactionStatus"
+    )
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
+class EvidenceIndexSnapshot(StrictModel):
+    version: Literal["control-plane.evidence-index/v1"] = "control-plane.evidence-index/v1"
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["pass", "conditional", "blocked"]
+    entries: list[EvidenceIndexEntry] = Field(default_factory=list)
+    verification_history: list[EvidenceVerificationHistoryItem] = Field(
+        default_factory=list,
+        alias="verificationHistory",
+    )
+    warnings: list[str] = Field(default_factory=list)
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
 class ClaimItem(StrictModel):
     claim_id: str
     status: ClaimStatus
