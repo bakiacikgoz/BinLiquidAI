@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ValidationError
 
@@ -12,6 +12,8 @@ from binliquid.control_plane.errors import ControlPlaneError
 from binliquid.control_plane.external_contracts import (
     ExternalActionRequest,
     ExternalActionResponse,
+    ExternalAgentRequestV11,
+    ExternalAgentV11Result,
 )
 from binliquid.control_plane.models import (
     ActionProposal,
@@ -29,6 +31,7 @@ from binliquid.governance.approval_store import ApprovalStore
 from binliquid.runtime.config import RuntimeConfig
 
 EXTERNAL_GATEWAY_CONTRACT_VERSION = "control-plane.external-gateway/v1"
+EXTERNAL_GATEWAY_V1_1_CONTRACT_VERSION = "control-plane.external-gateway/v1.1"
 EXTERNAL_RUNTIME_KINDS = {"external_stdio", "external_http"}
 SENSITIVE_REDACTION_KEYS = {"secret", "token", "password", "private_key", "api_key"}
 
@@ -46,6 +49,85 @@ class ExternalAgentGateway:
         self.store = ControlPlaneStore(root_dir)
         self.policy = PolicySimulator(config=config)
         self.approvals = ApprovalStore(config.governance.approval_store_path)
+
+    def submit_action_v1_1(self, request: ExternalAgentRequestV11) -> ExternalAgentV11Result:
+        request_hash = canonical_json_hash(request.model_dump(mode="json", by_alias=True))
+        existing = self._read_v1_1_idempotency(request.idempotency_key)
+        if existing is not None:
+            if existing.get("requestHash") != request_hash:
+                return ExternalAgentV11Result(
+                    requestId=request.request_id,
+                    agentId=request.agent_id,
+                    workflowId=request.workflow_id,
+                    status="invalid_request",
+                    reasonCode="EXTERNAL_AGENT_DUPLICATE_REQUEST",
+                    policyDecision="unknown",
+                    replayStatus="mismatch",
+                    idempotencyStatus="conflict",
+                    requestHash=request_hash,
+                )
+            response_payload = existing.get("response")
+            if isinstance(response_payload, dict):
+                return ExternalAgentV11Result.model_validate(
+                    {
+                        **response_payload,
+                        "replayStatus": "replayed",
+                        "idempotencyStatus": "replayed",
+                    }
+                )
+
+        v1_request = _v1_request_from_v1_1(request)
+        response = self.submit_action(v1_request)
+        result = _v1_1_result_from_v1_response(
+            request=request,
+            response=response,
+            request_hash=request_hash,
+            replay_status="recorded",
+            idempotency_status="created",
+        )
+        self._write_v1_1_evidence(request=request, request_hash=request_hash, result=result)
+        self._write_v1_1_idempotency(
+            request=request,
+            request_hash=request_hash,
+            response=result,
+        )
+        return result
+
+    def replay_v1_1(
+        self,
+        *,
+        request_id: str,
+        expected_request_hash: str | None = None,
+    ) -> dict[str, Any]:
+        evidence_path = f"external-gateway/evidence/{request_id}.json"
+        evidence = self.store.read_json(evidence_path)
+        if not evidence:
+            return {
+                "version": "control-plane.external-agent-replay/v1.1",
+                "requestId": request_id,
+                "status": "missing",
+                "evidenceRef": evidence_path,
+                "reasonCode": "EXTERNAL_AGENT_EVIDENCE_MISSING",
+            }
+        actual_hash = evidence.get("request_hash_v1_1") or evidence.get("request_hash")
+        if expected_request_hash and actual_hash != expected_request_hash:
+            return {
+                "version": "control-plane.external-agent-replay/v1.1",
+                "requestId": request_id,
+                "status": "mismatch",
+                "evidenceRef": evidence_path,
+                "reasonCode": "EXTERNAL_AGENT_REPLAY_MISMATCH",
+                "expectedRequestHash": expected_request_hash,
+                "actualRequestHash": actual_hash,
+            }
+        return {
+            "version": "control-plane.external-agent-replay/v1.1",
+            "requestId": request_id,
+            "status": "verified",
+            "evidenceRef": evidence_path,
+            "reasonCode": "EXTERNAL_AGENT_REPLAY_VERIFIED",
+            "actualRequestHash": actual_hash,
+        }
 
     def submit_action(self, request: ExternalActionRequest) -> ExternalActionResponse:
         run_id = _gateway_run_id(request.request_id)
@@ -254,6 +336,68 @@ class ExternalAgentGateway:
             },
         )
 
+    def _read_v1_1_idempotency(self, idempotency_key: str) -> dict[str, Any] | None:
+        safe_key = _safe_file_key(idempotency_key)
+        return self.store.read_json(f"external-gateway/idempotency/{safe_key}.json")
+
+    def _write_v1_1_idempotency(
+        self,
+        *,
+        request: ExternalAgentRequestV11,
+        request_hash: str,
+        response: ExternalAgentV11Result,
+    ) -> None:
+        safe_key = _safe_file_key(request.idempotency_key)
+        self.store.write_json_atomic(
+            f"external-gateway/idempotency/{safe_key}.json",
+            {
+                "version": EXTERNAL_GATEWAY_V1_1_CONTRACT_VERSION,
+                "idempotencyKey": request.idempotency_key,
+                "requestId": request.request_id,
+                "requestHash": request_hash,
+                "response": response.model_dump(mode="json", by_alias=True),
+                "generatedAt": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    def _write_v1_1_evidence(
+        self,
+        *,
+        request: ExternalAgentRequestV11,
+        request_hash: str,
+        result: ExternalAgentV11Result,
+    ) -> None:
+        evidence_ref = result.evidence_ref
+        if evidence_ref is None:
+            return
+        evidence = self.store.read_json(evidence_ref, default={})
+        if not isinstance(evidence, dict):
+            evidence = {}
+        evidence.update(
+            {
+                "contract_version": EXTERNAL_GATEWAY_V1_1_CONTRACT_VERSION,
+                "workflow_id": request.workflow_id,
+                "idempotency_key": request.idempotency_key,
+                "risk_hint": request.risk_hint,
+                "request_hash_v1_1": request_hash,
+                "request_v1_1": {
+                    "requestId": request.request_id,
+                    "agentId": request.agent_id,
+                    "workflowId": request.workflow_id,
+                    "intent": request.intent,
+                    "actions": [
+                        action.model_dump(mode="json", by_alias=True)
+                        for action in request.actions
+                    ],
+                    "requestedBy": request.requested_by,
+                    "riskHint": request.risk_hint,
+                    "dryRun": request.dry_run,
+                },
+                "result_v1_1": result.model_dump(mode="json", by_alias=True),
+            }
+        )
+        self.store.write_json_atomic(evidence_ref, evidence)
+
 
 def submit_external_action_file(
     *,
@@ -281,6 +425,36 @@ def submit_external_action_file(
         registry=registry,
         root_dir=root_dir,
     ).submit_action(request)
+
+
+def submit_external_action_v1_1_file(
+    *,
+    path: str | Path,
+    config: RuntimeConfig,
+    registry: AgentRegistry,
+    root_dir: str | Path = ".binliquid/control-plane",
+) -> ExternalAgentV11Result:
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        request = ExternalAgentRequestV11.model_validate(payload)
+    except (json.JSONDecodeError, OSError, ValidationError) as exc:
+        _ = exc
+        return ExternalAgentV11Result(
+            requestId="invalid",
+            agentId="unknown",
+            workflowId="unknown",
+            status="invalid_request",
+            reasonCode="EXTERNAL_AGENT_V1_1_CONTRACT_INVALID",
+            policyDecision="unknown",
+            replayStatus="missing",
+            idempotencyStatus="conflict",
+            requestHash="sha256:invalid",
+        )
+    return ExternalAgentGateway(
+        config=config,
+        registry=registry,
+        root_dir=root_dir,
+    ).submit_action_v1_1(request)
 
 
 def _proposal_from_request(*, request: ExternalActionRequest, run_id: str) -> ActionProposal:
@@ -314,6 +488,95 @@ def _risk_for_action_kind(action_kind: str) -> RiskClass:
     }.get(action_kind, RiskClass.UNKNOWN)
 
 
+def _v1_request_from_v1_1(request: ExternalAgentRequestV11) -> ExternalActionRequest:
+    action_kind = _action_kind_for_v1_1(request)
+    target_ref = next((action.target_ref for action in request.actions if action.target_ref), None)
+    return ExternalActionRequest(
+        requestId=request.request_id,
+        agentId=request.agent_id,
+        actorId=request.requested_by,
+        intent=request.intent,
+        actionKind=action_kind,
+        targetRef=target_ref,
+        payloadHash=canonical_json_hash(
+            {
+                "workflowId": request.workflow_id,
+                "actions": [
+                    action.model_dump(mode="json", by_alias=True)
+                    for action in request.actions
+                ],
+                "metadata": request.metadata,
+            }
+        ),
+        payloadRedactionSummary={
+            "payloadRedacted": True,
+            "sensitiveValuesFound": False,
+            "contractVersion": "v1.1",
+        },
+        requestedAt=request.requested_at,
+        dryRun=request.dry_run,
+    )
+
+
+def _action_kind_for_v1_1(
+    request: ExternalAgentRequestV11,
+) -> Literal["read", "mutate", "external_write", "destructive", "credential_sensitive", "unknown"]:
+    by_hint = {
+        "read_only": "read",
+        "mutation": "mutate",
+        "external_write": "external_write",
+        "destructive": "destructive",
+        "credential_sensitive": "credential_sensitive",
+        "unknown": "unknown",
+    }
+    if request.risk_hint != "unknown":
+        return by_hint[request.risk_hint]  # type: ignore[return-value]
+    risk_order = {
+        "destructive": 5,
+        "credential_sensitive": 4,
+        "external_write": 3,
+        "mutate": 2,
+        "unknown": 1,
+        "read": 0,
+    }
+    highest = max((action.kind for action in request.actions), key=lambda item: risk_order[item])
+    return highest
+
+
+def _v1_1_result_from_v1_response(
+    *,
+    request: ExternalAgentRequestV11,
+    response: ExternalActionResponse,
+    request_hash: str,
+    replay_status: Literal["recorded", "replayed", "verified", "mismatch", "missing"],
+    idempotency_status: Literal["created", "replayed", "conflict"],
+) -> ExternalAgentV11Result:
+    decision = "unknown"
+    if response.status == "accepted":
+        decision = "allow"
+    elif response.status in {"requires_approval", "blocked_pending_approval"}:
+        decision = "require_approval"
+    elif response.status == "denied":
+        decision = "deny"
+    status = response.status
+    if status == "requires_approval":
+        status = "blocked_pending_approval"
+    return ExternalAgentV11Result(
+        requestId=request.request_id,
+        agentId=request.agent_id,
+        workflowId=request.workflow_id,
+        status=status,  # type: ignore[arg-type]
+        reasonCode=response.reason_code,
+        policyDecision=decision,  # type: ignore[arg-type]
+        runId=response.run_id,
+        approvalId=response.approval_id,
+        evidenceRef=response.evidence_ref,
+        replayStatus=replay_status,
+        idempotencyStatus=idempotency_status,
+        requestHash=request_hash,
+    )
+
+
 def _redaction_summary_safe(value: Any) -> bool:
     if isinstance(value, dict):
         for key, nested in value.items():
@@ -334,3 +597,10 @@ def _redaction_summary_safe(value: Any) -> bool:
 def _gateway_run_id(request_id: str) -> str:
     safe = "".join(char if char.isalnum() or char in {"-", "_"} else "-" for char in request_id)
     return f"cp-ext-run-{safe[:72]}"
+
+
+def _safe_file_key(value: str) -> str:
+    return "".join(
+        char if char.isalnum() or char in {"-", "_", "."} else "-"
+        for char in value
+    )[:120]

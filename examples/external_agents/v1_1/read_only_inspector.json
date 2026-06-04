@@ -1,0 +1,22 @@
+{
+  "actions": [
+    {
+      "actionId": "inspect.readiness",
+      "effect": "Read redacted readiness status for pilot review.",
+      "kind": "read",
+      "targetRef": "control-plane:readiness"
+    }
+  ],
+  "agentId": "external-agent",
+  "dryRun": false,
+  "idempotencyKey": "v1-1-read-only-inspector",
+  "intent": "Inspect control plane readiness without mutating external systems.",
+  "metadata": {
+    "scenario": "read_only_inspector"
+  },
+  "requestedBy": "pilot-operator",
+  "requestId": "v1-1-read-only-inspector",
+  "riskHint": "read_only",
+  "version": "control-plane.external-agent-request/v1.1",
+  "workflowId": "design-partner-beta.external-agent.read-only"
+}

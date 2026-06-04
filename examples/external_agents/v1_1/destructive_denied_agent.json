@@ -1,0 +1,22 @@
+{
+  "actions": [
+    {
+      "actionId": "resource.delete",
+      "effect": "Attempt to delete a production resource; must be denied.",
+      "kind": "destructive",
+      "targetRef": "production:delete-resource"
+    }
+  ],
+  "agentId": "external-agent",
+  "dryRun": false,
+  "idempotencyKey": "v1-1-destructive-denied-agent",
+  "intent": "Attempt a destructive external action that must remain denied.",
+  "metadata": {
+    "scenario": "destructive_denied_agent"
+  },
+  "requestedBy": "pilot-operator",
+  "requestId": "v1-1-destructive-denied-agent",
+  "riskHint": "destructive",
+  "version": "control-plane.external-agent-request/v1.1",
+  "workflowId": "design-partner-beta.external-agent.destructive"
+}

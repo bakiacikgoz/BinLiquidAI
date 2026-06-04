@@ -1,0 +1,22 @@
+{
+  "actions": [
+    {
+      "actionId": "ticket.create",
+      "effect": "Create an external change ticket after policy approval.",
+      "kind": "external_write",
+      "targetRef": "ticketing:change-request"
+    }
+  ],
+  "agentId": "external-agent",
+  "dryRun": false,
+  "idempotencyKey": "v1-1-approval-required-writer",
+  "intent": "Create an ops ticket for a design partner remediation workflow.",
+  "metadata": {
+    "scenario": "approval_required_writer"
+  },
+  "requestedBy": "pilot-operator",
+  "requestId": "v1-1-approval-required-writer",
+  "riskHint": "external_write",
+  "version": "control-plane.external-agent-request/v1.1",
+  "workflowId": "design-partner-beta.external-agent.external-write"
+}

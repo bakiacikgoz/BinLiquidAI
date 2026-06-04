@@ -52,7 +52,11 @@ from binliquid.control_plane.evidence_corpus import (
 from binliquid.control_plane.evidence_index import build_evidence_index
 from binliquid.control_plane.evidence_pack import EvidencePackBuilder
 from binliquid.control_plane.external_agent_client import run_external_agent_manifest
-from binliquid.control_plane.external_gateway import submit_external_action_file
+from binliquid.control_plane.external_gateway import (
+    ExternalAgentGateway,
+    submit_external_action_file,
+    submit_external_action_v1_1_file,
+)
 from binliquid.control_plane.install_rehearsal import run_install_rehearsal
 from binliquid.control_plane.operations_runner import dry_run_operation
 from binliquid.control_plane.pilot_pack import generate_design_partner_pilot_pack
@@ -1612,6 +1616,51 @@ def control_plane_gateway_submit_action(
     payload = response.model_dump(mode="json", by_alias=True)
     _emit_payload(payload, json_output=json_output)
     if response.status in {"denied", "invalid_request", "unknown_agent"}:
+        raise typer.Exit(code=3)
+
+
+@control_plane_gateway_app.command("submit-v1-1")
+def control_plane_gateway_submit_v1_1(
+    input_path: str = typer.Option(..., "--input", help="ExternalAgentRequest v1.1 JSON path"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    response = submit_external_action_v1_1_file(
+        path=input_path,
+        config=RuntimeConfig.from_profile(profile),
+        registry=_control_plane_registry(root_dir),
+        root_dir=root_dir,
+    )
+    payload = response.model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if response.status in {"denied", "invalid_request", "unknown_agent"}:
+        raise typer.Exit(code=3)
+
+
+@control_plane_gateway_app.command("replay-v1-1")
+def control_plane_gateway_replay_v1_1(
+    request_id: str = typer.Option(..., "--request-id", help="ExternalAgentRequest v1.1 id"),
+    expected_request_hash: str | None = typer.Option(
+        None,
+        "--expected-request-hash",
+        help="Expected canonical ExternalAgentRequest v1.1 hash.",
+    ),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    gateway = ExternalAgentGateway(
+        config=RuntimeConfig.from_profile(profile),
+        registry=_control_plane_registry(root_dir),
+        root_dir=root_dir,
+    )
+    payload = gateway.replay_v1_1(
+        request_id=request_id,
+        expected_request_hash=expected_request_hash,
+    )
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] in {"missing", "mismatch"}:
         raise typer.Exit(code=3)
 
 

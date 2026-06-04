@@ -13,6 +13,8 @@ from binliquid.control_plane.external_agent_client import ExternalAgentPilotMani
 from binliquid.control_plane.external_contracts import (  # noqa: E402
     ExternalActionRequest,
     ExternalActionResponse,
+    ExternalAgentRequestV11,
+    ExternalAgentV11Result,
 )
 from binliquid.control_plane.install_rehearsal import InstallRehearsalReport  # noqa: E402
 from binliquid.control_plane.models import (  # noqa: E402
@@ -68,6 +70,8 @@ SCHEMAS = {
     "external_agent_client_manifest": ExternalAgentPilotManifest,
     "external_agent_request": ExternalActionRequest,
     "external_agent_response": ExternalActionResponse,
+    "external_agent_request_v1_1": ExternalAgentRequestV11,
+    "external_agent_result_v1_1": ExternalAgentV11Result,
 }
 
 OPERATOR_PANEL_SCHEMAS = {

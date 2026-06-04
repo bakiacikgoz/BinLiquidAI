@@ -1,0 +1,126 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "title": "Agentid",
+      "type": "string"
+    },
+    "approvalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approvalid"
+    },
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "generatedAt": {
+      "format": "date-time",
+      "title": "Generatedat",
+      "type": "string"
+    },
+    "idempotencyStatus": {
+      "enum": [
+        "created",
+        "replayed",
+        "conflict"
+      ],
+      "title": "Idempotencystatus",
+      "type": "string"
+    },
+    "policyDecision": {
+      "enum": [
+        "allow",
+        "deny",
+        "require_approval",
+        "unknown"
+      ],
+      "title": "Policydecision",
+      "type": "string"
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "replayStatus": {
+      "enum": [
+        "recorded",
+        "replayed",
+        "verified",
+        "mismatch",
+        "missing"
+      ],
+      "title": "Replaystatus",
+      "type": "string"
+    },
+    "requestHash": {
+      "title": "Requesthash",
+      "type": "string"
+    },
+    "requestId": {
+      "title": "Requestid",
+      "type": "string"
+    },
+    "runId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runid"
+    },
+    "status": {
+      "enum": [
+        "accepted",
+        "blocked_pending_approval",
+        "denied",
+        "invalid_request",
+        "unknown_agent"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.external-agent-result/v1.1",
+      "default": "control-plane.external-agent-result/v1.1",
+      "title": "Version",
+      "type": "string"
+    },
+    "workflowId": {
+      "title": "Workflowid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requestId",
+    "agentId",
+    "workflowId",
+    "status",
+    "reasonCode",
+    "policyDecision",
+    "replayStatus",
+    "idempotencyStatus",
+    "requestHash"
+  ],
+  "title": "ExternalAgentV11Result",
+  "type": "object"
+}

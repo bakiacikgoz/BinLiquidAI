@@ -1,0 +1,129 @@
+{
+  "$defs": {
+    "ExternalAgentActionV11": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "effect": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Effect",
+          "type": "string"
+        },
+        "kind": {
+          "default": "unknown",
+          "enum": [
+            "read",
+            "mutate",
+            "external_write",
+            "destructive",
+            "credential_sensitive",
+            "unknown"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "targetRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targetref"
+        }
+      },
+      "required": [
+        "actionId"
+      ],
+      "title": "ExternalAgentActionV11",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "actions": {
+      "items": {
+        "$ref": "#/$defs/ExternalAgentActionV11"
+      },
+      "title": "Actions",
+      "type": "array"
+    },
+    "agentId": {
+      "title": "Agentid",
+      "type": "string"
+    },
+    "dryRun": {
+      "default": false,
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "idempotencyKey": {
+      "title": "Idempotencykey",
+      "type": "string"
+    },
+    "intent": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Intent",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "requestId": {
+      "title": "Requestid",
+      "type": "string"
+    },
+    "requestedAt": {
+      "format": "date-time",
+      "title": "Requestedat",
+      "type": "string"
+    },
+    "requestedBy": {
+      "title": "Requestedby",
+      "type": "string"
+    },
+    "riskHint": {
+      "default": "unknown",
+      "enum": [
+        "read_only",
+        "mutation",
+        "destructive",
+        "external_write",
+        "credential_sensitive",
+        "unknown"
+      ],
+      "title": "Riskhint",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.external-agent-request/v1.1",
+      "default": "control-plane.external-agent-request/v1.1",
+      "title": "Version",
+      "type": "string"
+    },
+    "workflowId": {
+      "title": "Workflowid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requestId",
+    "agentId",
+    "workflowId",
+    "intent",
+    "idempotencyKey",
+    "requestedBy"
+  ],
+  "title": "ExternalAgentRequestV11",
+  "type": "object"
+}
