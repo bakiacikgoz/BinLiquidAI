@@ -1,0 +1,189 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/bridge.ts",
+    "src/operator.ts",
+    "src/capabilities.ts",
+    "src/routeRegistry.ts",
+    "src/previewFixtures.ts",
+    "src/test/setup.ts",
+    "scripts/*.ts",
+    "e2e/*.ts"
+  ],
+  "ignorePatterns": [
+    "dist/**",
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**",
+    "src-tauri/target/**"
+  ],
+  "ignoreDependencies": [
+    "eslint-plugin-jsx-a11y"
+  ],
+  "duplicates": {
+    "enabled": true,
+    "mode": "mild",
+    "minTokens": 50,
+    "minLines": 5,
+    "minOccurrences": 2,
+    "ignore": [
+      "src/test/**",
+      "e2e/**"
+    ],
+    "ignoreDefaults": true
+  },
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+    "maxCrap": 30,
+    "crapRefactorBand": 5,
+    "ignore": []
+  },
+  "rules": {
+    "unused-files": "warn",
+    "unused-exports": "warn",
+    "unused-types": "warn",
+    "private-type-leaks": "off",
+    "unused-dependencies": "warn",
+    "unused-dev-dependencies": "warn",
+    "unused-optional-dependencies": "warn",
+    "unused-enum-members": "warn",
+    "unused-class-members": "warn",
+    "unresolved-imports": "error",
+    "unlisted-dependencies": "error",
+    "duplicate-exports": "error",
+    "type-only-dependencies": "warn",
+    "test-only-dependencies": "warn",
+    "circular-dependencies": "warn",
+    "re-export-cycle": "warn",
+    "boundary-violation": "error",
+    "coverage-gaps": "off",
+    "feature-flags": "off",
+    "stale-suppressions": "warn",
+    "unused-catalog-entries": "warn",
+    "empty-catalog-groups": "warn",
+    "unresolved-catalog-references": "error",
+    "unused-dependency-overrides": "warn",
+    "misconfigured-dependency-overrides": "error"
+  },
+  "boundaries": {
+    "zones": [
+      {
+        "name": "fixtures",
+        "patterns": [
+          "src/previewFixtures.ts",
+          "src/test/**",
+          "src/**/*.test.ts",
+          "src/**/*.test.tsx",
+          "e2e/**",
+          "scripts/**",
+          "playwright.config.ts",
+          "vite.config.ts",
+          "eslint.config.js"
+        ]
+      },
+      {
+        "name": "app",
+        "patterns": [
+          "src/App.tsx",
+          "src/main.tsx"
+        ]
+      },
+      {
+        "name": "shell",
+        "patterns": [
+          "src/components/shell/**"
+        ]
+      },
+      {
+        "name": "features",
+        "patterns": [
+          "src/components/assistant/**",
+          "src/components/control-plane/**",
+          "src/components/mission/**",
+          "src/components/notifications/**",
+          "src/components/product-pages/**",
+          "src/components/pilot/**"
+        ]
+      },
+      {
+        "name": "primitives",
+        "patterns": [
+          "src/components/primitives/**"
+        ]
+      },
+      {
+        "name": "view-models",
+        "patterns": [
+          "src/*Mappers.ts",
+          "src/control-plane/**",
+          "src/pilotOperations.ts",
+          "src/workspace.ts",
+          "src/settings.ts",
+          "src/i18n.ts",
+          "src/routeRegistry.ts",
+          "src/redactJson.ts"
+        ]
+      },
+      {
+        "name": "bridge",
+        "patterns": [
+          "src/bridge.ts",
+          "src/operator.ts",
+          "src/capabilities.ts"
+        ]
+      },
+      {
+        "name": "styles",
+        "patterns": [
+          "src/index.css",
+          "src/styles/**"
+        ]
+      }
+    ],
+    "rules": [
+      {
+        "from": "app",
+        "allow": ["shell", "features", "primitives", "view-models", "bridge", "fixtures", "styles"]
+      },
+      {
+        "from": "shell",
+        "allow": ["shell", "features", "primitives", "view-models", "bridge", "styles"]
+      },
+      {
+        "from": "features",
+        "allow": ["features", "shell", "primitives", "view-models", "bridge", "fixtures", "styles"]
+      },
+      {
+        "from": "primitives",
+        "allow": ["primitives", "styles"]
+      },
+      {
+        "from": "view-models",
+        "allow": ["view-models", "bridge", "fixtures"],
+        "allowTypeOnly": ["features", "shell", "primitives"]
+      },
+      {
+        "from": "bridge",
+        "allow": ["bridge", "view-models", "fixtures"]
+      },
+      {
+        "from": "fixtures",
+        "allow": ["app", "shell", "features", "primitives", "view-models", "bridge", "fixtures", "styles"]
+      },
+      {
+        "from": "styles",
+        "allow": ["styles"]
+      }
+    ]
+  },
+  "audit": {
+    "gate": "new-only",
+    "deadCodeBaseline": "../../fallow-baselines/dead-code.json",
+    "healthBaseline": "../../fallow-baselines/health.json",
+    "dupesBaseline": "../../fallow-baselines/dupes.json",
+    "cacheMaxAgeDays": 7
+  }
+}

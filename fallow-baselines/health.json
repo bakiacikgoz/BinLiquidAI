@@ -1,0 +1,156 @@
+{
+  "finding_counts": {
+    "scripts/assert-fallow-policy.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "scripts/assert-no-primary-raw-json.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "scripts/assert-pilot-readiness.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/audit-ui-controls.ts": {
+      "complexity_critical": {
+        "count": 4
+      },
+      "crap_critical": {
+        "count": 6
+      },
+      "crap_high": {
+        "count": 10
+      },
+      "crap_moderate": {
+        "count": 7
+      }
+    },
+    "scripts/collect-route-timings.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/run-fallow-analysis.ts": {
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "scripts/tauri-launched-smoke.ts": {
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "scripts/write-frontend-qa-summary.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "src/App.tsx": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 3
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "src/assistant/assistantMappers.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/components/assistant/AssistantRightRail.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "src/components/control-plane/EvidencePackView.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "src/components/mission/ApprovalGateCard.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "src/components/mission/ComputerUseOperationsCard.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "src/components/mission/RuntimeSummaryCard.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/missionMappers.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/workspace.ts": {
+      "complexity_critical": {
+        "count": 4
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 4
+      },
+      "crap_high": {
+        "count": 3
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": [
+    "src/test/assertions.ts:dead code",
+    "src/test/userFlows.ts:dead code",
+    "src/test/bridgeMock.ts:dead code",
+    "src/missionMappers.ts:complexity",
+    "src/controlPlaneMappers.ts:high impact",
+    "src/components/primitives/StatusDot.tsx:high impact",
+    "src/App.tsx:complexity",
+    "src/workspace.ts:complexity",
+    "scripts/write-frontend-qa-summary.ts:complexity",
+    "scripts/audit-ui-controls.ts:complexity"
+  ]
+}
