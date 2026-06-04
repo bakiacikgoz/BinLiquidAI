@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-
 KNOWN_NODE20_ACTIONS: dict[str, set[str]] = {
     "actions/checkout": {"v4"},
     "actions/setup-node": {"v4"},
@@ -158,7 +157,10 @@ def _markdown(payload: dict[str, object]) -> str:
             if not isinstance(item, dict):
                 continue
             rows.append(
-                "| {workflow_file} | {job_id} | {step_name} | {action} | {ref} | {node_runtime} | {recommended_action} | {is_blocker} |".format(
+                (
+                    "| {workflow_file} | {job_id} | {step_name} | {action} | "
+                    "{ref} | {node_runtime} | {recommended_action} | {is_blocker} |"
+                ).format(
                     workflow_file=item.get("workflow_file", ""),
                     job_id=item.get("job_id", ""),
                     step_name=item.get("step_name") or "",
@@ -172,7 +174,11 @@ def _markdown(payload: dict[str, object]) -> str:
     rows.extend(
         [
             "",
-            "Policy: Node 20 deprecation warnings are not release blockers while checks pass. Actual runtime failure or an unmaintained action with a security risk is a blocker.",
+            (
+                "Policy: Node 20 deprecation warnings are not release blockers while "
+                "checks pass. Actual runtime failure or an unmaintained action with a "
+                "security risk is a blocker."
+            ),
         ]
     )
     return "\n".join(rows) + "\n"

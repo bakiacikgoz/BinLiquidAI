@@ -288,6 +288,171 @@
       "preview-source"
     ]
   },
+  "codeIntelligence": {
+    "artifactRoot": "artifacts/code-intelligence/fallow",
+    "blockers": [],
+    "boundaryViolations": 0,
+    "buckets": [
+      {
+        "bucketId": "dead-code",
+        "count": 1,
+        "detail": "preview fixture",
+        "errors": 0,
+        "label": "Dead code",
+        "path": "artifacts/code-intelligence/fallow/dead-code.json",
+        "status": "warn",
+        "warnings": 1
+      },
+      {
+        "bucketId": "boundaries",
+        "count": 0,
+        "detail": "no violations",
+        "errors": 0,
+        "label": "Architecture boundaries",
+        "path": "artifacts/code-intelligence/fallow/boundaries.json",
+        "status": "ready",
+        "warnings": 0
+      }
+    ],
+    "generatedAtUtc": "2026-06-01T12:00:00Z",
+    "schemaVersion": "control-plane.code-intelligence-summary/v1",
+    "secretScanStatus": "pass",
+    "status": "conditional",
+    "telemetryDisabled": true,
+    "tool": "fallow",
+    "toolVersion": "2.88.3",
+    "verdict": "warn",
+    "warnings": [
+      "dead_code:1"
+    ]
+  },
+  "pilotOperations": {
+    "acceptanceMetrics": {
+      "externalAgentV11Cases": 6,
+      "externalAgentV11Passed": 6,
+      "fallowBoundaryViolations": 0,
+      "fallowVerdict": "warn",
+      "privacy": "aggregate_only_no_pii"
+    },
+    "artifactRoot": "artifacts/pilot-ops",
+    "blockers": [],
+    "checklist": [
+      {
+        "blocking": false,
+        "detail": "status=conditional",
+        "itemId": "pilot-launch-pack",
+        "label": "Pilot launch pack",
+        "path": "artifacts/design-partner-pilot/manifest.json",
+        "status": "conditional"
+      },
+      {
+        "blocking": false,
+        "detail": "verdict=warn; boundaries=0",
+        "itemId": "code-intelligence",
+        "label": "Fallow code intelligence",
+        "path": "artifacts/code-intelligence/fallow/summary.json",
+        "status": "conditional"
+      },
+      {
+        "blocking": false,
+        "detail": "redacted local feedback export",
+        "itemId": "feedback-bundle",
+        "label": "Pilot feedback bundle",
+        "path": "artifacts/pilot-ops/pilot_feedback_bundle.json",
+        "status": "ready"
+      }
+    ],
+    "feedbackBundlePath": "artifacts/pilot-ops/pilot_feedback_bundle.json",
+    "generatedAtUtc": "2026-06-01T12:00:00Z",
+    "headline": "Pilot operations are conditional.",
+    "nextActions": [
+      {
+        "label": "code-intelligence",
+        "severity": "warning",
+        "target": "Pilot Ops"
+      }
+    ],
+    "schemaVersion": "control-plane.pilot-operations/v1",
+    "status": "conditional",
+    "timeline": [
+      {
+        "artifactRef": "artifacts/design-partner-pilot/manifest.json",
+        "detail": "status=conditional",
+        "eventId": "pilot-launch-pack",
+        "label": "Pilot launch pack",
+        "occurredAtUtc": "2026-06-01T12:00:00Z",
+        "status": "warning"
+      }
+    ],
+    "warnings": [
+      "code-intelligence"
+    ]
+  },
+  "designPartnerBeta": {
+    "artifactRoot": "artifacts/design-partner-beta",
+    "blockers": [],
+    "checks": [
+      {
+        "blocking": false,
+        "detail": "Fallow verdict warn",
+        "itemId": "code-intelligence",
+        "label": "Code intelligence",
+        "path": "artifacts/code-intelligence/fallow/summary.json",
+        "status": "conditional"
+      },
+      {
+        "blocking": false,
+        "detail": "Pilot operations are conditional.",
+        "itemId": "pilot-operations",
+        "label": "Pilot operations loop",
+        "path": "artifacts/pilot-ops/pilot_feedback_bundle.json",
+        "status": "conditional"
+      }
+    ],
+    "codeIntelligence": {
+      "artifactRoot": "artifacts/code-intelligence/fallow",
+      "blockers": [],
+      "boundaryViolations": 0,
+      "buckets": [],
+      "generatedAtUtc": "2026-06-01T12:00:00Z",
+      "schemaVersion": "control-plane.code-intelligence-summary/v1",
+      "secretScanStatus": "pass",
+      "status": "conditional",
+      "telemetryDisabled": true,
+      "tool": "fallow",
+      "toolVersion": "2.88.3",
+      "verdict": "warn",
+      "warnings": [
+        "dead_code:1"
+      ]
+    },
+    "generatedAtUtc": "2026-06-01T12:00:00Z",
+    "headline": "Design Partner Beta Operations Candidate is conditional.",
+    "pilotOperations": {
+      "acceptanceMetrics": {
+        "privacy": "aggregate_only_no_pii"
+      },
+      "artifactRoot": "artifacts/pilot-ops",
+      "blockers": [],
+      "checklist": [],
+      "feedbackBundlePath": "artifacts/pilot-ops/pilot_feedback_bundle.json",
+      "generatedAtUtc": "2026-06-01T12:00:00Z",
+      "headline": "Pilot operations are conditional.",
+      "nextActions": [],
+      "schemaVersion": "control-plane.pilot-operations/v1",
+      "status": "conditional",
+      "timeline": [],
+      "warnings": [
+        "code-intelligence"
+      ]
+    },
+    "schemaVersion": "control-plane.design-partner-beta/v1",
+    "status": "conditional",
+    "warnings": [
+      "code-intelligence",
+      "pilot-operations"
+    ]
+  },
   "evidencePacks": [
     {
       "artifactCount": 9,

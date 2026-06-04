@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +34,8 @@ def main() -> None:
     args = parser.parse_args()
 
     root_dir = REPO_ROOT / args.root_dir
+    if root_dir.exists():
+        shutil.rmtree(root_dir)
     config = RuntimeConfig.from_profile(args.profile)
     config.governance.approval_store_path = str(root_dir / "approvals.sqlite3")
     registry = AgentRegistry(root_dir=root_dir)
