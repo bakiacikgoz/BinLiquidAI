@@ -1110,6 +1110,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const operationDescriptors = controlPlaneSnapshot?.operations ?? [];
   const evidencePacks = controlPlaneSnapshot?.evidencePacks ?? [];
   const pilotLaunch = controlPlaneSnapshot?.pilotLaunch ?? null;
+  const codeIntelligence = controlPlaneSnapshot?.codeIntelligence ?? null;
+  const pilotOperations = controlPlaneSnapshot?.pilotOperations ?? null;
+  const designPartnerBeta = controlPlaneSnapshot?.designPartnerBeta ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -1450,6 +1453,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             claims={controlPlaneClaims}
             pendingApprovals={pendingApprovals.length}
             pilotLaunch={pilotLaunch}
+            codeIntelligence={codeIntelligence}
+            pilotOperations={pilotOperations}
+            designPartnerBeta={designPartnerBeta}
           />
         ) : null}
 
@@ -2194,6 +2200,27 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                   <div className="metric-row">
                     <dt>{t.securityReview}</dt>
                     <dd>{pilotLaunch?.securityReview.status ?? t.statusUnknown}</dd>
+                  </div>
+                </dl>
+              </article>
+              <article className="page-card">
+                <h3>Beta Operations</h3>
+                <dl className="metric-list">
+                  <div className="metric-row">
+                    <dt>{t.status}</dt>
+                    <dd>{designPartnerBeta?.status ?? t.statusUnknown}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>Code intelligence</dt>
+                    <dd>{codeIntelligence?.verdict ?? t.statusUnknown}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>Pilot operations</dt>
+                    <dd>{pilotOperations?.status ?? t.statusUnknown}</dd>
+                  </div>
+                  <div className="metric-row">
+                    <dt>Feedback bundle</dt>
+                    <dd>{pilotOperations?.feedbackBundlePath ?? t.statusUnknown}</dd>
                   </div>
                 </dl>
               </article>

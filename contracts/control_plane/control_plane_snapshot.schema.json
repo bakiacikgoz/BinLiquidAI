@@ -333,6 +333,160 @@
       "title": "ApprovalSnapshotSummary",
       "type": "object"
     },
+    "CodeIntelligenceFindingBucket": {
+      "additionalProperties": false,
+      "properties": {
+        "bucketId": {
+          "title": "Bucketid",
+          "type": "string"
+        },
+        "count": {
+          "default": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "detail": {
+          "default": "",
+          "title": "Detail",
+          "type": "string"
+        },
+        "errors": {
+          "default": 0,
+          "title": "Errors",
+          "type": "integer"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "warn",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "default": 0,
+          "title": "Warnings",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bucketId",
+        "label",
+        "status"
+      ],
+      "title": "CodeIntelligenceFindingBucket",
+      "type": "object"
+    },
+    "CodeIntelligenceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactRoot": {
+          "default": "artifacts/code-intelligence/fallow",
+          "title": "Artifactroot",
+          "type": "string"
+        },
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "boundaryViolations": {
+          "default": 0,
+          "title": "Boundaryviolations",
+          "type": "integer"
+        },
+        "buckets": {
+          "items": {
+            "$ref": "#/$defs/CodeIntelligenceFindingBucket"
+          },
+          "title": "Buckets",
+          "type": "array"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "control-plane.code-intelligence-summary/v1",
+          "default": "control-plane.code-intelligence-summary/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "secretScanStatus": {
+          "default": "unknown",
+          "title": "Secretscanstatus",
+          "type": "string"
+        },
+        "status": {
+          "default": "missing",
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "telemetryDisabled": {
+          "default": true,
+          "title": "Telemetrydisabled",
+          "type": "boolean"
+        },
+        "tool": {
+          "default": "fallow",
+          "title": "Tool",
+          "type": "string"
+        },
+        "toolVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Toolversion"
+        },
+        "verdict": {
+          "default": "missing",
+          "title": "Verdict",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "CodeIntelligenceSummary",
+      "type": "object"
+    },
     "DashboardSummary": {
       "additionalProperties": false,
       "properties": {
@@ -458,6 +612,71 @@
         "contractVersion"
       ],
       "title": "DataSourceState",
+      "type": "object"
+    },
+    "DesignPartnerBetaStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactRoot": {
+          "default": "artifacts/design-partner-beta",
+          "title": "Artifactroot",
+          "type": "string"
+        },
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/PilotOperationsChecklistItem"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "codeIntelligence": {
+          "$ref": "#/$defs/CodeIntelligenceSummary"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "headline": {
+          "default": "Design Partner Beta Operations Candidate is conditional.",
+          "title": "Headline",
+          "type": "string"
+        },
+        "pilotOperations": {
+          "$ref": "#/$defs/PilotOperationsStatus"
+        },
+        "schemaVersion": {
+          "const": "control-plane.design-partner-beta/v1",
+          "default": "control-plane.design-partner-beta/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "default": "conditional",
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "DesignPartnerBetaStatus",
       "type": "object"
     },
     "DesignPartnerRcCheck": {
@@ -1168,6 +1387,208 @@
       "title": "PilotLaunchStatusTile",
       "type": "object"
     },
+    "PilotOperationsChecklistItem": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking": {
+          "default": false,
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "itemId": {
+          "title": "Itemid",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId",
+        "label",
+        "status",
+        "detail"
+      ],
+      "title": "PilotOperationsChecklistItem",
+      "type": "object"
+    },
+    "PilotOperationsStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptanceMetrics": {
+          "additionalProperties": true,
+          "title": "Acceptancemetrics",
+          "type": "object"
+        },
+        "artifactRoot": {
+          "default": "artifacts/pilot-ops",
+          "title": "Artifactroot",
+          "type": "string"
+        },
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "checklist": {
+          "items": {
+            "$ref": "#/$defs/PilotOperationsChecklistItem"
+          },
+          "title": "Checklist",
+          "type": "array"
+        },
+        "feedbackBundlePath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Feedbackbundlepath"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "headline": {
+          "default": "Pilot operations are conditional.",
+          "title": "Headline",
+          "type": "string"
+        },
+        "nextActions": {
+          "items": {
+            "$ref": "#/$defs/PilotLaunchNextAction"
+          },
+          "title": "Nextactions",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": "control-plane.pilot-operations/v1",
+          "default": "control-plane.pilot-operations/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "default": "conditional",
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "timeline": {
+          "items": {
+            "$ref": "#/$defs/PilotOperationsTimelineEvent"
+          },
+          "title": "Timeline",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "PilotOperationsStatus",
+      "type": "object"
+    },
+    "PilotOperationsTimelineEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifactref"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "eventId": {
+          "title": "Eventid",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "occurredAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occurredatutc"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "pending",
+            "blocked",
+            "warning"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "eventId",
+        "label",
+        "status",
+        "detail"
+      ],
+      "title": "PilotOperationsTimelineEvent",
+      "type": "object"
+    },
     "PolicyPackSummary": {
       "additionalProperties": false,
       "properties": {
@@ -1718,6 +2139,9 @@
       "title": "Approvals",
       "type": "array"
     },
+    "codeIntelligence": {
+      "$ref": "#/$defs/CodeIntelligenceSummary"
+    },
     "contractVersion": {
       "const": "control-plane.snapshot/v1",
       "default": "control-plane.snapshot/v1",
@@ -1729,6 +2153,9 @@
     },
     "dataSource": {
       "$ref": "#/$defs/DataSourceState"
+    },
+    "designPartnerBeta": {
+      "$ref": "#/$defs/DesignPartnerBetaStatus"
     },
     "designPartnerRc": {
       "$ref": "#/$defs/DesignPartnerRcStatus"
@@ -1775,6 +2202,9 @@
     },
     "pilotLaunch": {
       "$ref": "#/$defs/PilotLaunchReadinessStatus"
+    },
+    "pilotOperations": {
+      "$ref": "#/$defs/PilotOperationsStatus"
     },
     "policyPacks": {
       "items": {

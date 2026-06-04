@@ -907,6 +907,103 @@ class PilotLaunchReadinessStatus(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class CodeIntelligenceFindingBucket(StrictModel):
+    bucket_id: str = Field(alias="bucketId")
+    label: str
+    status: Literal["ready", "warn", "blocked", "missing"]
+    count: int = 0
+    errors: int = 0
+    warnings: int = 0
+    path: str | None = None
+    detail: str = ""
+
+
+class CodeIntelligenceSummary(StrictModel):
+    schema_version: Literal["control-plane.code-intelligence-summary/v1"] = Field(
+        default="control-plane.code-intelligence-summary/v1",
+        alias="schemaVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["ready", "conditional", "blocked", "missing"] = "missing"
+    verdict: str = "missing"
+    tool: str = "fallow"
+    tool_version: str | None = Field(default=None, alias="toolVersion")
+    artifact_root: str = Field(default="artifacts/code-intelligence/fallow", alias="artifactRoot")
+    telemetry_disabled: bool = Field(default=True, alias="telemetryDisabled")
+    boundary_violations: int = Field(default=0, alias="boundaryViolations")
+    secret_scan_status: str = Field(default="unknown", alias="secretScanStatus")
+    buckets: list[CodeIntelligenceFindingBucket] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PilotOperationsChecklistItem(StrictModel):
+    item_id: str = Field(alias="itemId")
+    label: str
+    status: Literal["ready", "conditional", "blocked", "missing"]
+    detail: str
+    path: str | None = None
+    blocking: bool = False
+
+
+class PilotOperationsTimelineEvent(StrictModel):
+    event_id: str = Field(alias="eventId")
+    label: str
+    status: Literal["completed", "pending", "blocked", "warning"]
+    detail: str
+    artifact_ref: str | None = Field(default=None, alias="artifactRef")
+    occurred_at_utc: datetime | None = Field(default=None, alias="occurredAtUtc")
+
+
+class PilotOperationsStatus(StrictModel):
+    schema_version: Literal["control-plane.pilot-operations/v1"] = Field(
+        default="control-plane.pilot-operations/v1",
+        alias="schemaVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["ready", "conditional", "blocked"] = "conditional"
+    headline: str = "Pilot operations are conditional."
+    artifact_root: str = Field(default="artifacts/pilot-ops", alias="artifactRoot")
+    checklist: list[PilotOperationsChecklistItem] = Field(default_factory=list)
+    timeline: list[PilotOperationsTimelineEvent] = Field(default_factory=list)
+    acceptance_metrics: dict[str, Any] = Field(default_factory=dict, alias="acceptanceMetrics")
+    feedback_bundle_path: str | None = Field(default=None, alias="feedbackBundlePath")
+    next_actions: list[PilotLaunchNextAction] = Field(default_factory=list, alias="nextActions")
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class DesignPartnerBetaStatus(StrictModel):
+    schema_version: Literal["control-plane.design-partner-beta/v1"] = Field(
+        default="control-plane.design-partner-beta/v1",
+        alias="schemaVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["ready", "conditional", "blocked"] = "conditional"
+    headline: str = "Design Partner Beta Operations Candidate is conditional."
+    artifact_root: str = Field(default="artifacts/design-partner-beta", alias="artifactRoot")
+    code_intelligence: CodeIntelligenceSummary = Field(
+        default_factory=CodeIntelligenceSummary,
+        alias="codeIntelligence",
+    )
+    pilot_operations: PilotOperationsStatus = Field(
+        default_factory=PilotOperationsStatus,
+        alias="pilotOperations",
+    )
+    checks: list[PilotOperationsChecklistItem] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
@@ -935,5 +1032,17 @@ class ControlPlaneSnapshot(StrictModel):
         alias="designPartnerRc",
     )
     pilot_launch: PilotLaunchReadinessStatus = Field(alias="pilotLaunch")
+    code_intelligence: CodeIntelligenceSummary = Field(
+        default_factory=CodeIntelligenceSummary,
+        alias="codeIntelligence",
+    )
+    pilot_operations: PilotOperationsStatus = Field(
+        default_factory=PilotOperationsStatus,
+        alias="pilotOperations",
+    )
+    design_partner_beta: DesignPartnerBetaStatus = Field(
+        default_factory=DesignPartnerBetaStatus,
+        alias="designPartnerBeta",
+    )
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

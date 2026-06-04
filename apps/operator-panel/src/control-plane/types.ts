@@ -277,6 +277,79 @@ export interface PilotLaunchReadinessStatus {
   warnings: string[];
 }
 
+export interface CodeIntelligenceFindingBucket {
+  bucketId: string;
+  label: string;
+  status: 'ready' | 'warn' | 'blocked' | 'missing';
+  count: number;
+  errors: number;
+  warnings: number;
+  path?: string | null;
+  detail: string;
+}
+
+export interface CodeIntelligenceSummary {
+  schemaVersion: 'control-plane.code-intelligence-summary/v1';
+  generatedAtUtc: string;
+  status: 'ready' | 'conditional' | 'blocked' | 'missing';
+  verdict: string;
+  tool: string;
+  toolVersion?: string | null;
+  artifactRoot: string;
+  telemetryDisabled: boolean;
+  boundaryViolations: number;
+  secretScanStatus: string;
+  buckets: CodeIntelligenceFindingBucket[];
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface PilotOperationsChecklistItem {
+  itemId: string;
+  label: string;
+  status: 'ready' | 'conditional' | 'blocked' | 'missing';
+  detail: string;
+  path?: string | null;
+  blocking: boolean;
+}
+
+export interface PilotOperationsTimelineEvent {
+  eventId: string;
+  label: string;
+  status: 'completed' | 'pending' | 'blocked' | 'warning';
+  detail: string;
+  artifactRef?: string | null;
+  occurredAtUtc?: string | null;
+}
+
+export interface PilotOperationsStatus {
+  schemaVersion: 'control-plane.pilot-operations/v1';
+  generatedAtUtc: string;
+  status: 'ready' | 'conditional' | 'blocked';
+  headline: string;
+  artifactRoot: string;
+  checklist: PilotOperationsChecklistItem[];
+  timeline: PilotOperationsTimelineEvent[];
+  acceptanceMetrics: Record<string, unknown>;
+  feedbackBundlePath?: string | null;
+  nextActions: PilotLaunchNextAction[];
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface DesignPartnerBetaStatus {
+  schemaVersion: 'control-plane.design-partner-beta/v1';
+  generatedAtUtc: string;
+  status: 'ready' | 'conditional' | 'blocked';
+  headline: string;
+  artifactRoot: string;
+  codeIntelligence: CodeIntelligenceSummary;
+  pilotOperations: PilotOperationsStatus;
+  checks: PilotOperationsChecklistItem[];
+  blockers: string[];
+  warnings: string[];
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -296,6 +369,9 @@ export interface ControlPlaneSnapshot {
   admin: AdminSummary;
   designPartnerRc: DesignPartnerRcStatus;
   pilotLaunch: PilotLaunchReadinessStatus;
+  codeIntelligence: CodeIntelligenceSummary;
+  pilotOperations: PilotOperationsStatus;
+  designPartnerBeta: DesignPartnerBetaStatus;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

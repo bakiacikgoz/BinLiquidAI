@@ -59,6 +59,7 @@ from binliquid.control_plane.external_gateway import (
 )
 from binliquid.control_plane.install_rehearsal import run_install_rehearsal
 from binliquid.control_plane.operations_runner import dry_run_operation
+from binliquid.control_plane.pilot_operations import generate_pilot_operations_artifacts
 from binliquid.control_plane.pilot_pack import generate_design_partner_pilot_pack
 from binliquid.control_plane.policy_pack_store import (
     plan_policy_pack_rollback,
@@ -177,6 +178,7 @@ control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
 control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
 control_plane_reports_app = typer.Typer(help="Control Plane reports and alerts commands")
 control_plane_operations_app = typer.Typer(help="Control Plane operation workflow commands")
+pilot_app = typer.Typer(help="Design partner pilot operations commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -217,6 +219,7 @@ control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
 control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
 control_plane_app.add_typer(control_plane_reports_app, name="reports")
 control_plane_app.add_typer(control_plane_operations_app, name="operations")
+app.add_typer(pilot_app, name="pilot")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -1498,6 +1501,54 @@ def control_plane_pilot_pack(
     )
     _emit_payload(manifest, json_output=json_output)
     if manifest["status"] == "blocked":
+        raise typer.Exit(code=1)
+
+
+@pilot_app.command("first-run")
+@control_plane_pilot_app.command("first-run")
+def pilot_first_run(
+    output_root: str = typer.Option(
+        "artifacts/pilot-ops",
+        "--output-root",
+        help="Pilot operations output root.",
+    ),
+    evidence_root: str = typer.Option(
+        "artifacts",
+        "--evidence-root",
+        help="Artifact root used for pilot operations evidence.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = generate_pilot_operations_artifacts(
+        output_root=output_root,
+        evidence_root=evidence_root,
+    )
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] == "blocked":
+        raise typer.Exit(code=1)
+
+
+@pilot_app.command("feedback-export")
+@control_plane_pilot_app.command("feedback-export")
+def pilot_feedback_export(
+    output_root: str = typer.Option(
+        "artifacts/pilot-ops",
+        "--output-root",
+        help="Pilot feedback output root.",
+    ),
+    evidence_root: str = typer.Option(
+        "artifacts",
+        "--evidence-root",
+        help="Artifact root used for feedback evidence.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    payload = generate_pilot_operations_artifacts(
+        output_root=output_root,
+        evidence_root=evidence_root,
+    )
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] == "blocked":
         raise typer.Exit(code=1)
 
 

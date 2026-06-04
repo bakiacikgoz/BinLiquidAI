@@ -1,5 +1,11 @@
 import { asControlPlaneAgentList, asControlPlaneClaimMatrix } from '../../controlPlaneMappers';
-import type { PilotLaunchReadinessStatus, PilotLaunchStatusTile } from '../../control-plane/types';
+import type {
+  CodeIntelligenceSummary,
+  DesignPartnerBetaStatus,
+  PilotLaunchReadinessStatus,
+  PilotLaunchStatusTile,
+  PilotOperationsStatus,
+} from '../../control-plane/types';
 
 export function ControlPlaneDashboard({
   doctor,
@@ -7,12 +13,18 @@ export function ControlPlaneDashboard({
   claims,
   pendingApprovals,
   pilotLaunch,
+  codeIntelligence,
+  pilotOperations,
+  designPartnerBeta,
 }: {
   doctor: unknown;
   agents: unknown;
   claims: unknown;
   pendingApprovals: number;
   pilotLaunch?: PilotLaunchReadinessStatus | null;
+  codeIntelligence?: CodeIntelligenceSummary | null;
+  pilotOperations?: PilotOperationsStatus | null;
+  designPartnerBeta?: DesignPartnerBetaStatus | null;
 }) {
   const doctorRecord = asRecord(doctor);
   const agentList = asControlPlaneAgentList(agents);
@@ -56,6 +68,16 @@ export function ControlPlaneDashboard({
           <p className="metric">{pilotLaunch?.status ?? 'unknown'}</p>
           <small>{pilotLaunch?.generatedAtUtc ?? 'no snapshot'}</small>
         </article>
+        <article className="metric-card">
+          <h3>Beta Ops</h3>
+          <p className="metric">{designPartnerBeta?.status ?? 'unknown'}</p>
+          <small>{designPartnerBeta?.headline ?? 'no snapshot'}</small>
+        </article>
+        <article className="metric-card">
+          <h3>Code Intelligence</h3>
+          <p className="metric">{codeIntelligence?.verdict ?? 'missing'}</p>
+          <small>{codeIntelligence?.boundaryViolations ?? 0} boundary violations</small>
+        </article>
       </div>
       <div className="section-grid two-up">
         <article className="page-card">
@@ -98,6 +120,27 @@ export function ControlPlaneDashboard({
                 <small>{action.severity}</small>
               </article>
             ))}
+          </div>
+        </article>
+        <article className="page-card">
+          <h3>Beta Operations</h3>
+          <div className="metric-list">
+            <div className="metric-row">
+              <span>Pilot operations</span>
+              <strong>{pilotOperations?.status ?? 'unknown'}</strong>
+            </div>
+            <div className="metric-row">
+              <span>Feedback bundle</span>
+              <strong>{pilotOperations?.feedbackBundlePath ? 'ready' : 'missing'}</strong>
+            </div>
+            <div className="metric-row">
+              <span>Fallow telemetry</span>
+              <strong>{codeIntelligence?.telemetryDisabled ? 'off' : 'unknown'}</strong>
+            </div>
+            <div className="metric-row">
+              <span>Secret scan</span>
+              <strong>{codeIntelligence?.secretScanStatus ?? 'unknown'}</strong>
+            </div>
           </div>
         </article>
       </div>

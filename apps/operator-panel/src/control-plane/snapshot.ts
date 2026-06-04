@@ -169,6 +169,9 @@ function emptySnapshot(): ControlPlaneSnapshot {
       blockers: ['SNAPSHOT_UNAVAILABLE'],
       warnings: [],
     },
+    codeIntelligence: missingCodeIntelligence(),
+    pilotOperations: missingPilotOperations(),
+    designPartnerBeta: missingDesignPartnerBeta(),
     quickActions: [],
     partialReasons: [],
   };
@@ -182,5 +185,73 @@ function missingPilotTile(tileId: string, label: string) {
     detail: 'snapshot unavailable',
     path: null,
     blockingReasons: ['SNAPSHOT_UNAVAILABLE'],
+  };
+}
+
+function missingCodeIntelligence() {
+  return {
+    schemaVersion: 'control-plane.code-intelligence-summary/v1' as const,
+    generatedAtUtc: new Date(0).toISOString(),
+    status: 'missing' as const,
+    verdict: 'missing',
+    tool: 'fallow',
+    toolVersion: null,
+    artifactRoot: 'artifacts/code-intelligence/fallow',
+    telemetryDisabled: true,
+    boundaryViolations: 0,
+    secretScanStatus: 'unknown',
+    buckets: [],
+    blockers: ['SNAPSHOT_UNAVAILABLE'],
+    warnings: [],
+  };
+}
+
+function missingPilotOperations() {
+  return {
+    schemaVersion: 'control-plane.pilot-operations/v1' as const,
+    generatedAtUtc: new Date(0).toISOString(),
+    status: 'blocked' as const,
+    headline: 'Pilot operations are blocked.',
+    artifactRoot: 'artifacts/pilot-ops',
+    checklist: [
+      {
+        itemId: 'snapshot-load',
+        label: 'Snapshot load',
+        status: 'blocked' as const,
+        detail: 'snapshot unavailable',
+        path: null,
+        blocking: true,
+      },
+    ],
+    timeline: [],
+    acceptanceMetrics: {},
+    feedbackBundlePath: null,
+    nextActions: [{ label: 'SNAPSHOT_UNAVAILABLE', severity: 'blocking' as const, target: 'System' }],
+    blockers: ['SNAPSHOT_UNAVAILABLE'],
+    warnings: [],
+  };
+}
+
+function missingDesignPartnerBeta() {
+  return {
+    schemaVersion: 'control-plane.design-partner-beta/v1' as const,
+    generatedAtUtc: new Date(0).toISOString(),
+    status: 'blocked' as const,
+    headline: 'Design Partner Beta Operations Candidate is blocked.',
+    artifactRoot: 'artifacts/design-partner-beta',
+    codeIntelligence: missingCodeIntelligence(),
+    pilotOperations: missingPilotOperations(),
+    checks: [
+      {
+        itemId: 'snapshot-load',
+        label: 'Snapshot load',
+        status: 'blocked' as const,
+        detail: 'snapshot unavailable',
+        path: null,
+        blocking: true,
+      },
+    ],
+    blockers: ['SNAPSHOT_UNAVAILABLE'],
+    warnings: [],
   };
 }

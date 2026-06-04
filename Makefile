@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -164,6 +164,12 @@ external-agent-v1-1-gate:
 	test -f contracts/control_plane/external_agent_request_v1_1.schema.json
 	test -f contracts/control_plane/external_agent_result_v1_1.schema.json
 	uv run python scripts/run_external_agent_v1_1_pilot.py --json
+
+pilot-operations-gate:
+	uv run pytest -q tests/test_pilot_operations.py tests/test_control_plane_snapshot.py
+	uv run binliquid pilot first-run --json
+	uv run binliquid control-plane snapshot --profile enterprise --json
+	corepack pnpm --dir apps/operator-panel test -- controlPlaneSnapshot
 
 governance-admin-gate:
 	uv run pytest -q tests/test_control_plane_admin_store.py tests/test_control_plane_policy_pack_lifecycle.py tests/test_rbac_admin.py tests/test_policy_packs.py

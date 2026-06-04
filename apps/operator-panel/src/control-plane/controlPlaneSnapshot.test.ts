@@ -204,6 +204,9 @@ function makeSnapshot(overrides: Partial<ControlPlaneSnapshot> = {}): ControlPla
       blockers: [],
       warnings: ['enterprise-hat-a'],
     },
+    codeIntelligence: codeIntelligence(generatedAtUtc),
+    pilotOperations: pilotOperations(generatedAtUtc),
+    designPartnerBeta: designPartnerBeta(generatedAtUtc),
     quickActions: [],
     partialReasons: ['metrics_snapshot'],
     ...overrides,
@@ -218,5 +221,93 @@ function pilotTile(tileId: string, label: string, status: 'ready' | 'conditional
     detail: label,
     path: `artifacts/${tileId}.json`,
     blockingReasons: status === 'ready' ? [] : [tileId.toUpperCase().replaceAll('-', '_')],
+  };
+}
+
+function codeIntelligence(generatedAtUtc: string) {
+  return {
+    schemaVersion: 'control-plane.code-intelligence-summary/v1' as const,
+    generatedAtUtc,
+    status: 'conditional' as const,
+    verdict: 'warn',
+    tool: 'fallow',
+    toolVersion: '2.88.3',
+    artifactRoot: 'artifacts/code-intelligence/fallow',
+    telemetryDisabled: true,
+    boundaryViolations: 0,
+    secretScanStatus: 'pass',
+    buckets: [
+      {
+        bucketId: 'boundaries',
+        label: 'Architecture boundaries',
+        status: 'ready' as const,
+        count: 0,
+        errors: 0,
+        warnings: 0,
+        path: 'artifacts/code-intelligence/fallow/boundaries.json',
+        detail: 'no violations',
+      },
+    ],
+    blockers: [],
+    warnings: ['dead_code:1'],
+  };
+}
+
+function pilotOperations(generatedAtUtc: string) {
+  return {
+    schemaVersion: 'control-plane.pilot-operations/v1' as const,
+    generatedAtUtc,
+    status: 'conditional' as const,
+    headline: 'Pilot operations are conditional.',
+    artifactRoot: 'artifacts/pilot-ops',
+    checklist: [
+      {
+        itemId: 'pilot-launch-pack',
+        label: 'Pilot launch pack',
+        status: 'ready' as const,
+        detail: 'status=ready',
+        path: 'artifacts/design-partner-pilot/manifest.json',
+        blocking: false,
+      },
+    ],
+    timeline: [
+      {
+        eventId: 'pilot-launch-pack',
+        label: 'Pilot launch pack',
+        status: 'completed' as const,
+        detail: 'status=ready',
+        artifactRef: 'artifacts/design-partner-pilot/manifest.json',
+        occurredAtUtc: generatedAtUtc,
+      },
+    ],
+    acceptanceMetrics: { privacy: 'aggregate_only_no_pii' },
+    feedbackBundlePath: 'artifacts/pilot-ops/pilot_feedback_bundle.json',
+    nextActions: [{ label: 'feedback-bundle', severity: 'warning' as const, target: 'Pilot Ops' }],
+    blockers: [],
+    warnings: ['feedback-bundle'],
+  };
+}
+
+function designPartnerBeta(generatedAtUtc: string) {
+  return {
+    schemaVersion: 'control-plane.design-partner-beta/v1' as const,
+    generatedAtUtc,
+    status: 'conditional' as const,
+    headline: 'Design Partner Beta Operations Candidate is conditional.',
+    artifactRoot: 'artifacts/design-partner-beta',
+    codeIntelligence: codeIntelligence(generatedAtUtc),
+    pilotOperations: pilotOperations(generatedAtUtc),
+    checks: [
+      {
+        itemId: 'code-intelligence',
+        label: 'Code intelligence',
+        status: 'conditional' as const,
+        detail: 'Fallow verdict warn',
+        path: 'artifacts/code-intelligence/fallow/summary.json',
+        blocking: false,
+      },
+    ],
+    blockers: [],
+    warnings: ['code-intelligence'],
   };
 }

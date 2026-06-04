@@ -32,6 +32,11 @@ from binliquid.control_plane.models import (
     SystemSummary,
 )
 from binliquid.control_plane.pilot_launch_readiness import build_pilot_launch_readiness_status
+from binliquid.control_plane.pilot_operations import (
+    build_code_intelligence_summary,
+    build_design_partner_beta_status,
+    build_pilot_operations_status,
+)
 from binliquid.control_plane.rbac_admin import build_admin_summary
 from binliquid.control_plane.registry import AgentRegistry
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
@@ -160,6 +165,18 @@ def build_control_plane_snapshot(
         alerts=alerts,
         generated_at=generated_at,
     )
+    code_intelligence = build_code_intelligence_summary(
+        evidence_root=evidence_root,
+        generated_at=generated_at,
+    )
+    pilot_operations = build_pilot_operations_status(
+        evidence_root=evidence_root,
+        generated_at=generated_at,
+    )
+    design_partner_beta = build_design_partner_beta_status(
+        evidence_root=evidence_root,
+        generated_at=generated_at,
+    )
     logs = _logs(generated_at=generated_at, runs=runs, approvals=approvals, alerts=alerts)
     operations = _operation_descriptors(config=config, generated_at=generated_at)
     admin = _admin_summary(config)
@@ -204,6 +221,9 @@ def build_control_plane_snapshot(
         admin=admin,
         design_partner_rc=design_partner_rc,
         pilot_launch=pilot_launch,
+        code_intelligence=code_intelligence,
+        pilot_operations=pilot_operations,
+        design_partner_beta=design_partner_beta,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )
