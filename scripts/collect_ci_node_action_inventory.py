@@ -67,7 +67,7 @@ def _collect_workflow_actions(workflow: Path, workflow_root: Path) -> list[Actio
         runtime_known, node_runtime, recommended_action, is_blocker = _classify_action(action, ref)
         usages.append(
             ActionUsage(
-                workflow_file=str(workflow.relative_to(workflow_root.parent)),
+                workflow_file=workflow.relative_to(workflow_root.parent).as_posix(),
                 job_id=job_id,
                 step_name=step_name,
                 action=action,
