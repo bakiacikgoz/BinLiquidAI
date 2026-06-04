@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -199,6 +199,26 @@ operator-panel-fallow-gate: operator-panel-fallow-report
 ci-node24-inventory:
 	uv run pytest -q tests/test_ci_node_action_inventory.py
 	uv run python scripts/collect_ci_node_action_inventory.py --workflow-root .github/workflows --output-root artifacts/ci --json
+
+design-partner-beta-pack:
+	uv run pytest -q tests/test_design_partner_beta_pack.py
+	uv run python scripts/generate_design_partner_beta_pack.py --json
+
+design-partner-beta-gate:
+	$(MAKE) design-partner-pilot-gate
+	$(MAKE) operator-panel-fallow-gate
+	$(MAKE) ci-node24-inventory
+	$(MAKE) external-agent-v1-1-gate
+	$(MAKE) pilot-operations-gate
+	$(MAKE) design-partner-beta-pack
+	uv run ruff check .
+	uv run pytest -q
+	corepack pnpm --dir apps/operator-panel test
+	corepack pnpm --dir apps/operator-panel lint
+	corepack pnpm --dir apps/operator-panel build
+	corepack pnpm --dir apps/operator-panel test:e2e
+	cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml
+	git diff --check
 
 design-partner-pilot-gate:
 	uv run ruff check .

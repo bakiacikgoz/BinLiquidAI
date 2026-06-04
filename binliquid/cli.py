@@ -43,6 +43,7 @@ from binliquid.control_plane.admin_store import (
     propose_admin_change,
 )
 from binliquid.control_plane.agent_registry_v2 import build_agent_registry_v2
+from binliquid.control_plane.beta_pack import generate_design_partner_beta_pack
 from binliquid.control_plane.claim_guard import ClaimGuard
 from binliquid.control_plane.errors import ControlPlaneError
 from binliquid.control_plane.evidence_corpus import (
@@ -1549,6 +1550,32 @@ def pilot_feedback_export(
     )
     _emit_payload(payload, json_output=json_output)
     if payload["status"] == "blocked":
+        raise typer.Exit(code=1)
+
+
+@pilot_app.command("beta-pack")
+@control_plane_pilot_app.command("beta-pack")
+def pilot_beta_pack(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    evidence_root: str = typer.Option(
+        "artifacts",
+        "--evidence-root",
+        help="Artifact root used for beta pack evidence.",
+    ),
+    output_root: str = typer.Option(
+        "artifacts/design-partner-beta",
+        "--output-root",
+        help="Beta operations pack output root.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    manifest = generate_design_partner_beta_pack(
+        output_root=Path(output_root),
+        evidence_root=Path(evidence_root),
+        config=RuntimeConfig.from_profile(profile),
+    )
+    _emit_payload(manifest, json_output=json_output)
+    if manifest["status"] == "blocked":
         raise typer.Exit(code=1)
 
 
