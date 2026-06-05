@@ -14,6 +14,25 @@ from binliquid.control_plane.models import (
     ReportSummary,
 )
 
+EXPECTED_BLOCKED_BOUNDARY_ALERT_IDS = {
+    "claim-public-desktop-installer",
+    "claim-live-macos-computer-use",
+    "claim-live-windows-computer-use",
+    "claim-live-linux-computer-use",
+}
+
+EXPECTED_BLOCKED_BOUNDARY_REASONS = {
+    "CLEAN_MACHINE_SMOKE_MISSING",
+    "COMPUTER_USE_NOT_QUALIFIED",
+    "HAT_B_EVIDENCE_MISSING",
+    "LINUX_COMPUTER_USE_NOT_QUALIFIED",
+    "MACOS_LIVE_DISABLED",
+    "MACOS_NOTARIZATION_EVIDENCE_MISSING",
+    "SIGNED_PLATFORM_QUALIFICATION_MISSING",
+    "WINDOWS_COMPUTER_USE_NOT_QUALIFIED",
+    "WINDOWS_SIGNED_RC_EVIDENCE_MISSING",
+}
+
 
 def build_design_partner_rc_status(
     *,
@@ -29,6 +48,7 @@ def build_design_partner_rc_status(
 ) -> DesignPartnerRcStatus:
     """Aggregate Design Partner RC readiness without opening blocked claims."""
 
+    actionable_alerts = _active_error_alerts(alerts)
     checks = [
         _check(
             "runtime-truth",
@@ -80,11 +100,8 @@ def build_design_partner_rc_status(
         _conditional_check(
             "active-alerts",
             "Active alert review",
-            not any(
-                alert.status == "active" and alert.severity in {"error", "critical"}
-                for alert in alerts
-            ),
-            f"{sum(1 for alert in alerts if alert.status == 'active')} active alert(s)",
+            not actionable_alerts,
+            f"{len(actionable_alerts)} active error/critical alert(s)",
         ),
     ]
     blockers = [check.check_id for check in checks if check.status == "failed" and check.blocking]
@@ -173,3 +190,20 @@ def _surface_status(surfaces: list[ExecutionSurfaceSummary], surface_id: str) ->
         if surface.surface_id == surface_id:
             return surface.status
     return "missing"
+
+
+def _active_error_alerts(alerts: list[AlertSummary]) -> list[AlertSummary]:
+    return [
+        alert
+        for alert in alerts
+        if alert.status == "active"
+        and alert.severity in {"error", "critical"}
+        and not is_expected_blocked_claim_boundary_alert(alert)
+    ]
+
+
+def is_expected_blocked_claim_boundary_alert(alert: AlertSummary) -> bool:
+    return (
+        alert.alert_id in EXPECTED_BLOCKED_BOUNDARY_ALERT_IDS
+        and alert.reason_code in EXPECTED_BLOCKED_BOUNDARY_REASONS
+    )

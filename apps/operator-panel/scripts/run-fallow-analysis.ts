@@ -51,15 +51,7 @@ function runCommand(spec: CommandSpec, outputRoot: string): CommandRun {
   const stdoutPath = path.join(outputRoot, `${spec.name}.stdout.json`);
   const stderrPath = path.join(outputRoot, `${spec.name}.stderr.txt`);
   const parsedJsonPath = path.join(outputRoot, `${spec.name}.json`);
-  const result = spawnSync('fallow', spec.args, {
-    cwd: APP_ROOT,
-    env: {
-      ...process.env,
-      FALLOW_TELEMETRY_DISABLED: '1',
-      DO_NOT_TRACK: '1',
-    },
-    encoding: 'utf8',
-  });
+  const result = runFallow(spec);
   fs.mkdirSync(outputRoot, { recursive: true });
   fs.writeFileSync(stdoutPath, result.stdout ?? '', 'utf8');
   fs.writeFileSync(stderrPath, result.stderr ?? '', 'utf8');
@@ -87,6 +79,30 @@ function runCommand(spec: CommandSpec, outputRoot: string): CommandRun {
     },
     parsed,
     parse_error: parseError,
+  };
+}
+
+function runFallow(spec: CommandSpec): ReturnType<typeof spawnSync> {
+  const result = spawnSync('fallow', spec.args, fallowSpawnOptions());
+  if (spec.name !== 'audit' || (result.status ?? 1) === 0) {
+    return result;
+  }
+  const retry = spawnSync('corepack', ['pnpm', 'exec', 'fallow', ...spec.args], {
+    ...fallowSpawnOptions(),
+    cwd: APP_ROOT,
+  });
+  return (retry.status ?? 1) === 0 ? retry : result;
+}
+
+function fallowSpawnOptions(): Parameters<typeof spawnSync>[2] {
+  return {
+    cwd: APP_ROOT,
+    env: {
+      ...process.env,
+      FALLOW_TELEMETRY_DISABLED: '1',
+      DO_NOT_TRACK: '1',
+    },
+    encoding: 'utf8',
   };
 }
 

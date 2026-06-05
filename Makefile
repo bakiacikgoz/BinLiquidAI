@@ -273,6 +273,7 @@ design-partner-rc-gate:
 	uv run ruff check .
 	uv run pytest -q \
 		tests/test_design_partner_rc.py \
+		tests/test_design_partner_rc_pack.py \
 		tests/test_external_agent_gateway.py \
 		tests/test_agent_registry_v2.py \
 		tests/test_policy_packs.py \
@@ -283,11 +284,12 @@ design-partner-rc-gate:
 		tests/test_control_plane_snapshot.py
 	uv run python scripts/generate_control_plane_contract_schemas.py
 	corepack pnpm --dir apps/operator-panel test -- controlPlaneMappers controlPlaneSnapshot
+	$(MAKE) enterprise-hat-a-evidence-gate
 	uv run python scripts/run_external_agent_gateway_smoke.py
 	uv run python scripts/evaluate_policy_pack_promotion.py
-	uv run python scripts/evaluate_evidence_index.py
-	uv run python scripts/evaluate_reports_alerts.py
-	uv run python scripts/generate_design_partner_rc_pack.py --json
+	uv run python scripts/evaluate_evidence_index.py --profile enterprise --evidence-root artifacts/control-plane/evidence --select-latest-valid --staged-evidence-root artifacts/design-partner-rc/evidence-sample --root-dir artifacts/design-partner-rc/evidence-index/state --output artifacts/design-partner-rc/evidence_index.json
+	uv run python scripts/evaluate_reports_alerts.py --profile enterprise --root-dir .binliquid/control-plane --evidence-root artifacts --output-dir artifacts/design-partner-rc/reports-alerts-logs
+	uv run python scripts/generate_design_partner_rc_pack.py --profile enterprise --state-root .binliquid/control-plane --evidence-root artifacts --output artifacts/design-partner-rc --fail-on-conditional --json
 	git diff --check
 
 ui-e2e-gate:

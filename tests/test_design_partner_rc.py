@@ -113,6 +113,47 @@ def test_design_partner_rc_ready_when_required_evidence_is_present() -> None:
     assert status.warnings == []
 
 
+def test_design_partner_rc_ignores_expected_blocked_boundary_alerts() -> None:
+    status = build_design_partner_rc_status(
+        data_source=_data_source(),
+        claims=_claims("allowed"),
+        evidence_packs=_ready_evidence_packs(),
+        reports=_ready_reports(),
+        alerts=[
+            _active_alert(
+                "claim-public-desktop-installer",
+                "CLEAN_MACHINE_SMOKE_MISSING",
+            ),
+            _active_alert(
+                "claim-live-macos-computer-use",
+                "MACOS_LIVE_DISABLED",
+            ),
+        ],
+        execution_surfaces=_blocked_surfaces(),
+        design_partner_beta=_beta_status("ready"),
+        generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+    )
+
+    assert status.status == "ready"
+    assert "active-alerts" not in status.warnings
+
+
+def test_design_partner_rc_keeps_real_active_error_alert_conditional() -> None:
+    status = build_design_partner_rc_status(
+        data_source=_data_source(),
+        claims=_claims("allowed"),
+        evidence_packs=_ready_evidence_packs(),
+        reports=_ready_reports(),
+        alerts=[_active_alert("evidence-tamper", "EVIDENCE_HASH_MISMATCH")],
+        execution_surfaces=_blocked_surfaces(),
+        design_partner_beta=_beta_status("ready"),
+        generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+    )
+
+    assert status.status == "conditional"
+    assert "active-alerts" in status.warnings
+
+
 def _data_source(
     *,
     mode: str = "cli_live",
@@ -210,3 +251,14 @@ def _resolved_alerts() -> list[AlertSummary]:
             recommended_action="Continue monitoring.",
         )
     ]
+
+
+def _active_alert(alert_id: str, reason_code: str) -> AlertSummary:
+    return AlertSummary(
+        alert_id=alert_id,
+        severity="error",
+        status="active",
+        title="Active alert",
+        reason_code=reason_code,
+        recommended_action="Review evidence.",
+    )

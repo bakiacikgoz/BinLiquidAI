@@ -14,7 +14,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from binliquid.control_plane.claim_guard import ClaimGuard
-from binliquid.control_plane.design_partner_rc import build_design_partner_rc_status
+from binliquid.control_plane.design_partner_rc import (
+    build_design_partner_rc_status,
+    is_expected_blocked_claim_boundary_alert,
+)
 from binliquid.control_plane.pilot_operations import build_design_partner_beta_status
 from binliquid.control_plane.snapshot import build_control_plane_snapshot
 from binliquid.runtime.config import RuntimeConfig
@@ -25,23 +28,33 @@ REQUIRED_OPTIONAL_ARTIFACTS = [
     "policy_pack_promotion.json",
     "evidence_index.json",
     "reports-alerts-logs/manifest.json",
+    "control-plane-snapshot.json",
+    "claim-guard-matrix.json",
+    "design-partner-rc-status.json",
+    "DESIGN_PARTNER_RC_REPORT.md",
 ]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build Design Partner RC release pack.")
-    parser.add_argument("--profile", default="lite")
+    parser.add_argument("--profile", default="enterprise")
     parser.add_argument("--output", default="artifacts/design-partner-rc")
-    parser.add_argument("--beta-evidence-root", default="artifacts")
+    parser.add_argument("--state-root", default=".binliquid/control-plane")
+    parser.add_argument("--evidence-root", default="artifacts")
+    parser.add_argument("--beta-evidence-root")
+    parser.add_argument("--fail-on-conditional", action="store_true")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
     output = REPO_ROOT / args.output
     output.mkdir(parents=True, exist_ok=True)
+    generated_at = datetime.now(UTC)
     config = RuntimeConfig.from_profile(args.profile)
-    state_root = output / "state" / "control-plane"
-    evidence_root = output / "evidence-sample"
-    beta_evidence_root = _resolve_path(args.beta_evidence_root)
+    state_root = _resolve_path(args.state_root)
+    evidence_root = _resolve_path(args.evidence_root)
+    beta_evidence_root = (
+        _resolve_path(args.beta_evidence_root) if args.beta_evidence_root else evidence_root
+    )
 
     snapshot = build_control_plane_snapshot(
         root_dir=state_root,
@@ -80,29 +93,61 @@ def main() -> None:
     _write_text(output / "head_commit.txt", _git(["rev-parse", "HEAD"]))
     _write_text(output / "git_status.txt", _git(["status", "--short"]))
 
+    initial_manifest = {
+        "version": "control-plane.design-partner-rc-pack/v1",
+        "generatedAtUtc": generated_at.isoformat(),
+        "status": "pending",
+        "output": _display_path(output),
+        "profile": args.profile,
+        "stateRoot": _display_path(state_root),
+        "evidenceRoot": _display_path(evidence_root),
+        "designPartnerRcStatus": snapshot.design_partner_rc.status,
+        "blockers": list(snapshot.design_partner_rc.blockers),
+        "warnings": list(snapshot.design_partner_rc.warnings),
+        "artifacts": [],
+        "claimBoundaries": _claim_boundaries(snapshot),
+        "evidencePackCount": len(snapshot.evidence_packs),
+        "readyReportCount": sum(1 for report in snapshot.reports if report.status == "ready"),
+        "activeErrorAlertCount": _active_error_alert_count(snapshot),
+    }
+    _write_report(output / "DESIGN_PARTNER_RC_REPORT.md", initial_manifest)
+
     artifacts = _artifact_status(output)
-    blockers = list(snapshot.design_partner_rc.blockers)
+    artifact_blockers = [
+        f"artifact:{item['path']}"
+        for item in artifacts
+        if item.get("status") in {"blocked", "fail", "failed"}
+    ]
+    artifact_warnings = [
+        f"artifact:{item['path']}"
+        for item in artifacts
+        if item.get("status") in {"conditional", "missing"}
+    ]
+    blockers = [*snapshot.design_partner_rc.blockers, *artifact_blockers]
+    warnings = [*snapshot.design_partner_rc.warnings, *artifact_warnings]
     status = (
         "blocked"
         if blockers
         else "conditional"
-        if snapshot.design_partner_rc.warnings
+        if warnings
         else "pass"
     )
     manifest = {
         "version": "control-plane.design-partner-rc-pack/v1",
-        "generatedAtUtc": datetime.now(UTC).isoformat(),
+        "generatedAtUtc": generated_at.isoformat(),
         "status": status,
         "output": _display_path(output),
         "profile": args.profile,
+        "stateRoot": _display_path(state_root),
+        "evidenceRoot": _display_path(evidence_root),
         "designPartnerRcStatus": snapshot.design_partner_rc.status,
         "blockers": blockers,
-        "warnings": snapshot.design_partner_rc.warnings,
+        "warnings": warnings,
         "artifacts": artifacts,
-        "claimBoundaries": {
-            "computerUseLive": "blocked",
-            "publicDesktopInstaller": "blocked",
-        },
+        "claimBoundaries": _claim_boundaries(snapshot),
+        "evidencePackCount": len(snapshot.evidence_packs),
+        "readyReportCount": sum(1 for report in snapshot.reports if report.status == "ready"),
+        "activeErrorAlertCount": _active_error_alert_count(snapshot),
     }
     _write_json(output / "manifest.json", manifest)
     _write_report(output / "DESIGN_PARTNER_RC_REPORT.md", manifest)
@@ -110,7 +155,7 @@ def main() -> None:
         print(json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True))
     else:
         print(f"built {output}")
-    if status == "blocked":
+    if status == "blocked" or (args.fail_on_conditional and status == "conditional"):
         raise SystemExit(1)
 
 
@@ -118,14 +163,36 @@ def _artifact_status(output: Path) -> list[dict[str, object]]:
     items = []
     for relative in REQUIRED_OPTIONAL_ARTIFACTS:
         path = output / relative
+        present = path.exists()
+        size = path.stat().st_size if present else 0
         items.append(
             {
                 "path": relative,
-                "present": path.exists(),
-                "bytes": path.stat().st_size if path.exists() else 0,
+                "present": present,
+                "bytes": size,
+                "sourcePath": _display_path(path) if present else None,
+                "status": _artifact_payload_status(path) if present and size > 0 else "missing",
             }
         )
     return items
+
+
+def _artifact_payload_status(path: Path) -> str:
+    if path.suffix.lower() != ".json":
+        return "present"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return "blocked"
+    if not isinstance(payload, dict):
+        return "present"
+    status = payload.get("status")
+    if isinstance(status, str):
+        return status
+    design_partner_rc = payload.get("designPartnerRc")
+    if isinstance(design_partner_rc, dict) and isinstance(design_partner_rc.get("status"), str):
+        return str(design_partner_rc["status"])
+    return "present"
 
 
 def _write_report(path: Path, manifest: dict[str, object]) -> None:
@@ -134,6 +201,9 @@ def _write_report(path: Path, manifest: dict[str, object]) -> None:
         "",
         f"Status: {manifest['status']}",
         f"Generated: {manifest['generatedAtUtc']}",
+        f"Profile: {manifest.get('profile')}",
+        f"Evidence root: {manifest.get('evidenceRoot')}",
+        f"State root: {manifest.get('stateRoot')}",
         "",
         "## Boundary",
         "",
@@ -146,7 +216,10 @@ def _write_report(path: Path, manifest: dict[str, object]) -> None:
     ]
     for item in manifest["artifacts"]:
         if isinstance(item, dict):
-            lines.append(f"- {item['path']}: {'present' if item['present'] else 'missing'}")
+            lines.append(
+                f"- {item['path']}: {item.get('status')} "
+                f"({'present' if item['present'] else 'missing'}, {item.get('bytes')} bytes)"
+            )
     lines.extend(["", "## Warnings", ""])
     warnings = manifest.get("warnings") if isinstance(manifest, dict) else []
     if isinstance(warnings, list) and warnings:
@@ -179,6 +252,36 @@ def _display_path(path: Path) -> str:
 def _resolve_path(value: str) -> Path:
     path = Path(value)
     return path if path.is_absolute() else REPO_ROOT / path
+
+
+def _claim_boundaries(snapshot: object) -> dict[str, str]:
+    surfaces = getattr(snapshot, "execution_surfaces", [])
+    return {
+        "computerUseLive": _surface_status(surfaces, "computer-use"),
+        "publicDesktopInstaller": _surface_status(surfaces, "public-desktop-installer"),
+    }
+
+
+def _surface_status(surfaces: object, surface_id: str) -> str:
+    if not isinstance(surfaces, list):
+        return "missing"
+    for surface in surfaces:
+        if getattr(surface, "surface_id", None) == surface_id:
+            return str(getattr(surface, "status", "missing"))
+    return "missing"
+
+
+def _active_error_alert_count(snapshot: object) -> int:
+    alerts = getattr(snapshot, "alerts", [])
+    if not isinstance(alerts, list):
+        return 0
+    return sum(
+        1
+        for alert in alerts
+        if getattr(alert, "status", None) == "active"
+        and getattr(alert, "severity", None) in {"error", "critical"}
+        and not is_expected_blocked_claim_boundary_alert(alert)
+    )
 
 
 if __name__ == "__main__":
