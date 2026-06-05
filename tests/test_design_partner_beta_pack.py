@@ -45,6 +45,27 @@ def test_design_partner_beta_pack_blocks_false_ready_safety_claim(tmp_path: Path
     assert "safety-claims" in manifest["blockers"]
 
 
+def test_design_partner_beta_pack_is_ready_on_first_run_without_existing_manifest(
+    tmp_path: Path,
+) -> None:
+    evidence_root = _beta_artifacts(tmp_path, fallow_verdict="pass")
+    assert not (evidence_root / "design-partner-beta" / "manifest.json").exists()
+
+    manifest = generate_design_partner_beta_pack(
+        output_root=evidence_root / "design-partner-beta",
+        evidence_root=evidence_root,
+        config=RuntimeConfig.from_profile("enterprise"),
+    )
+
+    assert manifest["status"] == "ready"
+    assert manifest["warnings"] == []
+    assert manifest["blockers"] == []
+    assert manifest["codeIntelligence"]["status"] == "ready"
+    assert manifest["pilotOperations"]["status"] == "ready"
+    assert manifest["designPartnerBeta"]["status"] == "ready"
+    assert manifest["designPartnerBeta"]["warnings"] == []
+
+
 def test_design_partner_beta_pack_cli(tmp_path: Path) -> None:
     evidence_root = _beta_artifacts(tmp_path)
 
@@ -65,7 +86,12 @@ def test_design_partner_beta_pack_cli(tmp_path: Path) -> None:
     assert json.loads(result.stdout)["status"] == "conditional"
 
 
-def _beta_artifacts(tmp_path: Path, *, public_desktop_status: str = "blocked") -> Path:
+def _beta_artifacts(
+    tmp_path: Path,
+    *,
+    public_desktop_status: str = "blocked",
+    fallow_verdict: str = "warn",
+) -> Path:
     root = tmp_path / "artifacts"
     _write_json(
         root / "design-partner-pilot" / "manifest.json",
@@ -114,14 +140,19 @@ def _beta_artifacts(tmp_path: Path, *, public_desktop_status: str = "blocked") -
             "tool": "fallow",
             "tool_version": "2.88.3",
             "telemetry_disabled": True,
-            "dead_code": {"total": 1, "errors": 0, "warnings": 1, "notes": ["unused=1"]},
+            "dead_code": {
+                "total": 0 if fallow_verdict == "pass" else 1,
+                "errors": 0,
+                "warnings": 0 if fallow_verdict == "pass" else 1,
+                "notes": [] if fallow_verdict == "pass" else ["unused=1"],
+            },
             "duplication": {"total": 0, "errors": 0, "warnings": 0, "notes": []},
             "health": {"total": 0, "errors": 0, "warnings": 0, "notes": []},
             "boundaries": {"total": 0, "errors": 0, "warnings": 0, "notes": []},
             "secret_scan": {"status": "pass", "findings": []},
-            "verdict": "warn",
+            "verdict": fallow_verdict,
             "blocking_reasons": [],
-            "warnings": ["dead_code:1"],
+            "warnings": [] if fallow_verdict == "pass" else ["dead_code:1"],
         },
     )
     _write_json(

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from binliquid.control_plane.design_partner_rc import build_design_partner_rc_status
 from binliquid.control_plane.models import (
     AlertSummary,
     DataSourceState,
+    DesignPartnerBetaStatus,
     EvidencePackSummary,
     ExecutionSurfaceSummary,
     ReportSummary,
@@ -20,6 +22,7 @@ def test_design_partner_rc_blocks_silent_fallback() -> None:
         reports=[],
         alerts=[],
         execution_surfaces=_blocked_surfaces(),
+        design_partner_beta=_beta_status("ready"),
         generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
     )
 
@@ -53,6 +56,7 @@ def test_design_partner_rc_requires_blocked_desktop_boundaries() -> None:
         reports=[],
         alerts=[],
         execution_surfaces=surfaces,
+        design_partner_beta=_beta_status("ready"),
         generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
     )
 
@@ -60,47 +64,47 @@ def test_design_partner_rc_requires_blocked_desktop_boundaries() -> None:
     assert "public-desktop-boundary" in status.blockers
 
 
+def test_design_partner_rc_requires_beta_ready_before_rc_ready() -> None:
+    status = build_design_partner_rc_status(
+        data_source=_data_source(),
+        claims=_claims("allowed"),
+        evidence_packs=_ready_evidence_packs(),
+        reports=_ready_reports(),
+        alerts=_resolved_alerts(),
+        execution_surfaces=_blocked_surfaces(),
+        design_partner_beta=_beta_status("conditional"),
+        generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+    )
+
+    assert status.status == "conditional"
+    assert "design-partner-beta" in status.warnings
+
+
+def test_design_partner_rc_blocks_when_beta_is_blocked() -> None:
+    status = build_design_partner_rc_status(
+        data_source=_data_source(),
+        claims=_claims("allowed"),
+        evidence_packs=_ready_evidence_packs(),
+        reports=_ready_reports(),
+        alerts=_resolved_alerts(),
+        execution_surfaces=_blocked_surfaces(),
+        design_partner_beta=_beta_status("blocked"),
+        generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+    )
+
+    assert status.status == "blocked"
+    assert "design-partner-beta" in status.blockers
+
+
 def test_design_partner_rc_ready_when_required_evidence_is_present() -> None:
     status = build_design_partner_rc_status(
         data_source=_data_source(),
         claims=_claims("allowed"),
-        evidence_packs=[
-            EvidencePackSummary(
-                pack_id="pack-1",
-                run_id="run-1",
-                created_at_utc=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
-                signature_status="valid",
-                hash_chain_status="valid",
-                replay_status="passed",
-                claim_guard_status="ready",
-                redaction_status="passed",
-                artifact_count=3,
-                export_path="artifacts/evidence-pack/pack-1",
-                blocking_reasons=[],
-            )
-        ],
-        reports=[
-            ReportSummary(
-                report_id="readiness",
-                kind="readiness",
-                title="Readiness",
-                status="ready",
-                path="artifacts/readiness/report.json",
-                generated_at_utc=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
-                blocking_reasons=[],
-            )
-        ],
-        alerts=[
-            AlertSummary(
-                alert_id="clear",
-                severity="info",
-                status="resolved",
-                title="No active control-plane alerts",
-                reason_code="NO_ACTIVE_ALERTS",
-                recommended_action="Continue monitoring.",
-            )
-        ],
+        evidence_packs=_ready_evidence_packs(),
+        reports=_ready_reports(),
+        alerts=_resolved_alerts(),
         execution_surfaces=_blocked_surfaces(),
+        design_partner_beta=_beta_status("ready"),
         generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
     )
 
@@ -156,4 +160,53 @@ def _blocked_surfaces() -> list[ExecutionSurfaceSummary]:
             reason_codes=["CLAIM_NOT_SUPPORTED"],
             human_summary="Blocked until signed installer evidence exists.",
         ),
+    ]
+
+
+def _beta_status(status: Literal["ready", "conditional", "blocked"]) -> DesignPartnerBetaStatus:
+    return DesignPartnerBetaStatus(status=status)
+
+
+def _ready_evidence_packs() -> list[EvidencePackSummary]:
+    return [
+        EvidencePackSummary(
+            pack_id="pack-1",
+            run_id="run-1",
+            created_at_utc=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+            signature_status="valid",
+            hash_chain_status="valid",
+            replay_status="passed",
+            claim_guard_status="ready",
+            redaction_status="passed",
+            artifact_count=3,
+            export_path="artifacts/evidence-pack/pack-1",
+            blocking_reasons=[],
+        )
+    ]
+
+
+def _ready_reports() -> list[ReportSummary]:
+    return [
+        ReportSummary(
+            report_id="readiness",
+            kind="readiness",
+            title="Readiness",
+            status="ready",
+            path="artifacts/readiness/report.json",
+            generated_at_utc=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+            blocking_reasons=[],
+        )
+    ]
+
+
+def _resolved_alerts() -> list[AlertSummary]:
+    return [
+        AlertSummary(
+            alert_id="clear",
+            severity="info",
+            status="resolved",
+            title="No active control-plane alerts",
+            reason_code="NO_ACTIVE_ALERTS",
+            recommended_action="Continue monitoring.",
+        )
     ]

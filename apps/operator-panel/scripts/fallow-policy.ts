@@ -40,12 +40,34 @@ export interface CodeIntelligenceSummary {
   baseline_used: boolean;
   commands: FallowCommandArtifact[];
   artifacts: string[];
+  rollout_gate?: FallowRolloutGate;
+  baseline_warnings?: string[];
   secret_scan: {
     status: 'pass' | 'fail';
     findings: string[];
   };
   blocking_reasons: string[];
   warnings: string[];
+}
+
+export interface FallowRolloutGate {
+  gate: 'new-only';
+  status: 'pass' | 'warn' | 'fail';
+  base_ref: string;
+  head_sha: string;
+  changed_files_count: number;
+  introduced: {
+    dead_code: number;
+    duplication: number;
+    health: number;
+  };
+  inherited: {
+    dead_code: number;
+    duplication: number;
+    health: number;
+  };
+  warnings: string[];
+  blocking_reasons: string[];
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -173,32 +195,49 @@ export function boundaryBucket(payload: unknown): FindingBucket {
   };
 }
 
-export function computeVerdict(summary: Pick<CodeIntelligenceSummary, 'dead_code' | 'duplication' | 'health' | 'boundaries' | 'secret_scan'>): {
+export function computeVerdict(summary: Pick<CodeIntelligenceSummary, 'dead_code' | 'duplication' | 'health' | 'boundaries' | 'secret_scan' | 'rollout_gate'>): {
   verdict: FallowVerdict;
   blockingReasons: string[];
   warnings: string[];
 } {
-  const blockingReasons: string[] = [];
-  const warnings: string[] = [];
-  if (summary.dead_code.errors > 0) {
-    blockingReasons.push('FALLOW_AUDIT_FAILED');
+  const blockingReasons = baseBlockingReasons(summary);
+  if (summary.rollout_gate) {
+    return verdictFrom(
+      [...blockingReasons, ...summary.rollout_gate.blocking_reasons],
+      summary.rollout_gate.warnings,
+    );
   }
-  if (summary.boundaries.errors > 0) {
-    blockingReasons.push('FALLOW_BOUNDARY_VIOLATION');
-  }
-  if (summary.secret_scan.status !== 'pass') {
-    blockingReasons.push('FALLOW_ARTIFACT_SECRET_SCAN_FAILED');
-  }
-  for (const [label, bucket] of Object.entries({
+  return verdictFrom(blockingReasons, bucketWarnings(summary));
+}
+
+function baseBlockingReasons(
+  summary: Pick<CodeIntelligenceSummary, 'dead_code' | 'boundaries' | 'secret_scan'>,
+): string[] {
+  return [
+    summary.dead_code.errors > 0 ? 'FALLOW_AUDIT_FAILED' : null,
+    summary.boundaries.errors > 0 ? 'FALLOW_BOUNDARY_VIOLATION' : null,
+    summary.secret_scan.status !== 'pass' ? 'FALLOW_ARTIFACT_SECRET_SCAN_FAILED' : null,
+  ].filter((item): item is string => item !== null);
+}
+
+function bucketWarnings(
+  summary: Pick<CodeIntelligenceSummary, 'dead_code' | 'duplication' | 'health' | 'boundaries'>,
+): string[] {
+  return Object.entries({
     dead_code: summary.dead_code,
     duplication: summary.duplication,
     health: summary.health,
     boundaries: summary.boundaries,
-  })) {
-    if (bucket.total > 0 && bucket.errors === 0) {
-      warnings.push(`${label}:${bucket.total}`);
-    }
-  }
+  })
+    .filter(([, bucket]) => bucket.total > 0 && bucket.errors === 0)
+    .map(([label, bucket]) => `${label}:${bucket.total}`);
+}
+
+function verdictFrom(blockingReasons: string[], warnings: string[]): {
+  verdict: FallowVerdict;
+  blockingReasons: string[];
+  warnings: string[];
+} {
   return {
     verdict: blockingReasons.length > 0 ? 'fail' : warnings.length > 0 ? 'warn' : 'pass',
     blockingReasons,

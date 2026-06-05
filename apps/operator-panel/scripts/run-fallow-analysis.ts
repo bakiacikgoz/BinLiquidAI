@@ -14,6 +14,9 @@ import {
   writeJson,
   type CodeIntelligenceSummary,
   type FallowCommandArtifact,
+  type FallowRolloutGate,
+  asNumber,
+  asRecord,
 } from './fallow-policy.ts';
 
 type FallowCommandName = 'dead-code' | 'dupes' | 'health' | 'audit' | 'boundary-violations' | 'fix-dry-run';
@@ -156,12 +159,56 @@ function writeMarkdown(summary: CodeIntelligenceSummary, outputRoot: string): st
       ? `Blocking reasons: ${summary.blocking_reasons.join(', ')}`
       : 'No blocking Fallow policy reasons.',
     summary.warnings.length ? `Warnings: ${summary.warnings.join(', ')}` : 'No warning buckets.',
+    summary.baseline_warnings?.length
+      ? `Baseline debt retained for visibility: ${summary.baseline_warnings.join(', ')}`
+      : 'No baseline debt buckets.',
+    summary.rollout_gate
+      ? `Rollout gate: ${summary.rollout_gate.status} (${summary.rollout_gate.gate}, changed files: ${summary.rollout_gate.changed_files_count})`
+      : 'Rollout gate: unavailable.',
     '',
     'Auto-fix policy: only `fallow fix --dry-run` is captured; no rewrite or delete action is executed.',
   ];
   const markdownPath = path.join(outputRoot, 'SUMMARY.md');
   fs.writeFileSync(markdownPath, `${lines.join('\n')}\n`, 'utf8');
   return markdownPath;
+}
+
+function rolloutGateFromAudit(payload: unknown): FallowRolloutGate {
+  const record = asRecord(payload);
+  const attribution = asRecord(record.attribution);
+  const introduced = {
+    dead_code: asNumber(attribution.dead_code_introduced),
+    duplication: asNumber(attribution.duplication_introduced),
+    health: asNumber(attribution.complexity_introduced),
+  };
+  const inherited = {
+    dead_code: asNumber(attribution.dead_code_inherited),
+    duplication: asNumber(attribution.duplication_inherited),
+    health: asNumber(attribution.complexity_inherited),
+  };
+  const warnings = Object.entries(introduced)
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => `${label}_new:${count}`);
+  const blockingReasons: string[] = [];
+  if (!record.command || record.command !== 'audit') {
+    blockingReasons.push('FALLOW_AUDIT_MISSING');
+  }
+  const deadCode = asRecord(record.dead_code);
+  const deadSummary = asRecord(deadCode.summary);
+  if (asNumber(deadSummary.unresolved_imports) > 0 || asNumber(deadSummary.unlisted_dependencies) > 0) {
+    blockingReasons.push('FALLOW_AUDIT_FAILED');
+  }
+  return {
+    gate: 'new-only',
+    status: blockingReasons.length > 0 ? 'fail' : warnings.length > 0 ? 'warn' : 'pass',
+    base_ref: typeof record.base_ref === 'string' ? record.base_ref : 'unknown',
+    head_sha: typeof record.head_sha === 'string' ? record.head_sha : 'unknown',
+    changed_files_count: asNumber(record.changed_files_count),
+    introduced,
+    inherited,
+    warnings,
+    blocking_reasons: blockingReasons,
+  };
 }
 
 function main(): void {
@@ -198,7 +245,9 @@ function main(): void {
       findings: secretFindings,
     },
   };
-  const verdict = computeVerdict(partialSummary);
+  const baselineVerdict = computeVerdict(partialSummary);
+  const rolloutGate = rolloutGateFromAudit(byName.get('audit')?.parsed);
+  const verdict = computeVerdict({ ...partialSummary, rollout_gate: rolloutGate });
   const summary: CodeIntelligenceSummary = {
     version: 'control-plane.code-intelligence/v1',
     generated_at: new Date().toISOString(),
@@ -211,6 +260,8 @@ function main(): void {
     ...partialSummary,
     verdict: verdict.verdict,
     baseline_used: fs.existsSync(path.join(REPO_ROOT, 'fallow-baselines', 'dead-code.json')),
+    rollout_gate: rolloutGate,
+    baseline_warnings: baselineVerdict.warnings,
     commands: runs.map((run) => run.artifact),
     artifacts: runs
       .flatMap((run) => [run.artifact.stdout_path, run.artifact.stderr_path, run.artifact.parsed_json_path])

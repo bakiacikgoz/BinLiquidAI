@@ -6,6 +6,7 @@ from typing import Any
 from binliquid.control_plane.models import (
     AlertSummary,
     DataSourceState,
+    DesignPartnerBetaStatus,
     DesignPartnerRcCheck,
     DesignPartnerRcStatus,
     EvidencePackSummary,
@@ -22,6 +23,7 @@ def build_design_partner_rc_status(
     reports: list[ReportSummary],
     alerts: list[AlertSummary],
     execution_surfaces: list[ExecutionSurfaceSummary],
+    design_partner_beta: DesignPartnerBetaStatus | None = None,
     generated_at: datetime | None = None,
     artifact_root: str = "artifacts/design-partner-rc",
 ) -> DesignPartnerRcStatus:
@@ -41,6 +43,7 @@ def build_design_partner_rc_status(
             data_source.mode != "preview_fixture",
             f"mode={data_source.mode}",
         ),
+        _beta_precondition_check(design_partner_beta),
         _conditional_check(
             "evidence-index",
             "Evidence coverage",
@@ -126,6 +129,34 @@ def _conditional_check(
         label=label,
         status="passed" if passed else "conditional",
         detail=detail,
+        blocking=False,
+    )
+
+
+def _beta_precondition_check(
+    design_partner_beta: DesignPartnerBetaStatus | None,
+) -> DesignPartnerRcCheck:
+    if design_partner_beta is None:
+        return DesignPartnerRcCheck(
+            check_id="design-partner-beta",
+            label="Design Partner Beta readiness",
+            status="conditional",
+            detail="status=missing",
+            blocking=False,
+        )
+    if design_partner_beta.status == "blocked":
+        return DesignPartnerRcCheck(
+            check_id="design-partner-beta",
+            label="Design Partner Beta readiness",
+            status="failed",
+            detail="status=blocked",
+            blocking=True,
+        )
+    return DesignPartnerRcCheck(
+        check_id="design-partner-beta",
+        label="Design Partner Beta readiness",
+        status="passed" if design_partner_beta.status == "ready" else "conditional",
+        detail=f"status={design_partner_beta.status}",
         blocking=False,
     )
 

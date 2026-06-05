@@ -14,6 +14,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from binliquid.control_plane.claim_guard import ClaimGuard
+from binliquid.control_plane.design_partner_rc import build_design_partner_rc_status
+from binliquid.control_plane.pilot_operations import build_design_partner_beta_status
 from binliquid.control_plane.snapshot import build_control_plane_snapshot
 from binliquid.runtime.config import RuntimeConfig
 
@@ -30,6 +32,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build Design Partner RC release pack.")
     parser.add_argument("--profile", default="lite")
     parser.add_argument("--output", default="artifacts/design-partner-rc")
+    parser.add_argument("--beta-evidence-root", default="artifacts")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -38,6 +41,7 @@ def main() -> None:
     config = RuntimeConfig.from_profile(args.profile)
     state_root = output / "state" / "control-plane"
     evidence_root = output / "evidence-sample"
+    beta_evidence_root = _resolve_path(args.beta_evidence_root)
 
     snapshot = build_control_plane_snapshot(
         root_dir=state_root,
@@ -48,6 +52,21 @@ def main() -> None:
         used_fixture=False,
     )
     claim_matrix = ClaimGuard(config=config).evaluate(evidence_root=evidence_root)
+    beta_status = build_design_partner_beta_status(
+        evidence_root=beta_evidence_root,
+        generated_at=snapshot.generated_at_utc,
+    )
+    snapshot.design_partner_beta = beta_status
+    snapshot.design_partner_rc = build_design_partner_rc_status(
+        data_source=snapshot.data_source,
+        claims=claim_matrix.model_dump(mode="json"),
+        evidence_packs=snapshot.evidence_packs,
+        reports=snapshot.reports,
+        alerts=snapshot.alerts,
+        execution_surfaces=snapshot.execution_surfaces,
+        design_partner_beta=beta_status,
+        generated_at=snapshot.generated_at_utc,
+    )
 
     _write_json(
         output / "control-plane-snapshot.json",
@@ -155,6 +174,11 @@ def _display_path(path: Path) -> str:
         return str(path.relative_to(REPO_ROOT))
     except ValueError:
         return str(path)
+
+
+def _resolve_path(value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else REPO_ROOT / path
 
 
 if __name__ == "__main__":
