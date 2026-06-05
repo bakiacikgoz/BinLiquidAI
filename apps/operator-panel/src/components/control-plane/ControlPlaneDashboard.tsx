@@ -6,6 +6,7 @@ import type {
   PilotLaunchStatusTile,
   PilotOperationsStatus,
 } from '../../control-plane/types';
+import { DesignPartnerBetaReadinessCard } from './DesignPartnerBetaReadinessCard';
 
 export function ControlPlaneDashboard({
   doctor,
@@ -29,9 +30,7 @@ export function ControlPlaneDashboard({
   const doctorRecord = asRecord(doctor);
   const agentList = asControlPlaneAgentList(agents);
   const claimMatrix = asControlPlaneClaimMatrix(claims);
-  const blockedClaims = claimMatrix.claims.filter((claim) => claim.status === 'blocked').length;
-  const conditionalClaims = claimMatrix.claims.filter((claim) => claim.status === 'conditional').length;
-  const allowedClaims = claimMatrix.claims.filter((claim) => claim.status === 'allowed').length;
+  const claimCounts = countClaims(claimMatrix.claims);
 
   return (
     <section className="workspace" data-testid="page-primary-region">
@@ -42,109 +41,188 @@ export function ControlPlaneDashboard({
           <p className="workspace-lead">Policy, approvals, evidence and execution boundaries.</p>
         </div>
       </div>
-      <div className="metric-grid">
-        <article className="metric-card">
-          <h3>System Safety</h3>
-          <p className="metric">{String(doctorRecord.status ?? 'unknown')}</p>
-          <small>{String(doctorRecord.profile ?? '-')}</small>
-        </article>
-        <article className="metric-card">
-          <h3>Agents</h3>
-          <p className="metric">{agentList.agents.length}</p>
-          <small>registered</small>
-        </article>
-        <article className="metric-card">
-          <h3>Pending Approvals</h3>
-          <p className="metric">{pendingApprovals}</p>
-          <small>operator queue</small>
-        </article>
-        <article className="metric-card">
-          <h3>Claim Guard</h3>
-          <p className="metric">{blockedClaims}</p>
-          <small>blocked claims</small>
-        </article>
-        <article className="metric-card">
-          <h3>Pilot Launch</h3>
-          <p className="metric">{pilotLaunch?.status ?? 'unknown'}</p>
-          <small>{pilotLaunch?.generatedAtUtc ?? 'no snapshot'}</small>
-        </article>
-        <article className="metric-card">
-          <h3>Beta Ops</h3>
-          <p className="metric">{designPartnerBeta?.status ?? 'unknown'}</p>
-          <small>{designPartnerBeta?.headline ?? 'no snapshot'}</small>
-        </article>
-        <article className="metric-card">
-          <h3>Code Intelligence</h3>
-          <p className="metric">{codeIntelligence?.verdict ?? 'missing'}</p>
-          <small>{codeIntelligence?.boundaryViolations ?? 0} boundary violations</small>
-        </article>
-      </div>
+      <DashboardMetricGrid
+        doctorRecord={doctorRecord}
+        agentCount={agentList.agents.length}
+        pendingApprovals={pendingApprovals}
+        blockedClaims={claimCounts.blocked}
+        pilotLaunch={pilotLaunch}
+        designPartnerBeta={designPartnerBeta}
+        codeIntelligence={codeIntelligence}
+      />
       <div className="section-grid two-up">
-        <article className="page-card">
-          <h3>Safety posture</h3>
-          <div className="metric-list">
-            <div className="metric-row">
-              <span>Readiness</span>
-              <strong>{String(doctorRecord.status ?? 'unknown')}</strong>
-            </div>
-            <div className="metric-row">
-              <span>Allowed claims</span>
-              <strong>{allowedClaims}</strong>
-            </div>
-            <div className="metric-row">
-              <span>Conditional claims</span>
-              <strong>{conditionalClaims}</strong>
-            </div>
-            <div className="metric-row">
-              <span>Fail-closed execution</span>
-              <strong>enabled</strong>
-            </div>
-          </div>
-        </article>
-        <article className="page-card">
-          <h3>Pilot Launch Candidate</h3>
-          <div className="metric-list">
-            <PilotTileRow tile={pilotLaunch?.enterpriseHatA} fallback="Enterprise Hat A" />
-            <PilotTileRow tile={pilotLaunch?.installRehearsal} fallback="Install rehearsal" />
-            <PilotTileRow tile={pilotLaunch?.securityReview} fallback="Security review" />
-            <PilotTileRow tile={pilotLaunch?.claimGuard} fallback="Claim guard" />
-          </div>
-        </article>
-        <article className="page-card">
-          <h3>Next actions</h3>
-          <div className="run-list">
-            {(pilotLaunch?.nextActions.length ? pilotLaunch.nextActions : defaultNextActions).map((action) => (
-              <article className="run-list-item" key={`${action.target}-${action.label}`}>
-                <strong>{action.label}</strong>
-                <span>{action.target}</span>
-                <small>{action.severity}</small>
-              </article>
-            ))}
-          </div>
-        </article>
-        <article className="page-card">
-          <h3>Beta Operations</h3>
-          <div className="metric-list">
-            <div className="metric-row">
-              <span>Pilot operations</span>
-              <strong>{pilotOperations?.status ?? 'unknown'}</strong>
-            </div>
-            <div className="metric-row">
-              <span>Feedback bundle</span>
-              <strong>{pilotOperations?.feedbackBundlePath ? 'ready' : 'missing'}</strong>
-            </div>
-            <div className="metric-row">
-              <span>Fallow telemetry</span>
-              <strong>{codeIntelligence?.telemetryDisabled ? 'off' : 'unknown'}</strong>
-            </div>
-            <div className="metric-row">
-              <span>Secret scan</span>
-              <strong>{codeIntelligence?.secretScanStatus ?? 'unknown'}</strong>
-            </div>
-          </div>
-        </article>
+        <SafetyPostureCard doctorRecord={doctorRecord} claimCounts={claimCounts} />
+        <PilotLaunchCandidateCard pilotLaunch={pilotLaunch} />
+        <NextActionsCard pilotLaunch={pilotLaunch} />
+        <DesignPartnerBetaReadinessCard
+          codeIntelligence={codeIntelligence}
+          pilotOperations={pilotOperations}
+          designPartnerBeta={designPartnerBeta}
+        />
       </div>
     </section>
+  );
+}
+
+function DashboardMetricGrid({
+  doctorRecord,
+  agentCount,
+  pendingApprovals,
+  blockedClaims,
+  pilotLaunch,
+  designPartnerBeta,
+  codeIntelligence,
+}: {
+  doctorRecord: Record<string, unknown>;
+  agentCount: number;
+  pendingApprovals: number;
+  blockedClaims: number;
+  pilotLaunch?: PilotLaunchReadinessStatus | null;
+  designPartnerBeta?: DesignPartnerBetaStatus | null;
+  codeIntelligence?: CodeIntelligenceSummary | null;
+}) {
+  const metrics = dashboardMetrics({
+    doctorRecord,
+    agentCount,
+    pendingApprovals,
+    blockedClaims,
+    pilotLaunch,
+    designPartnerBeta,
+    codeIntelligence,
+  });
+  return (
+    <div className="metric-grid">
+      {metrics.map((metric) => (
+        <MetricCard
+          key={metric.title}
+          title={metric.title}
+          value={metric.value}
+          detail={metric.detail}
+        />
+      ))}
+    </div>
+  );
+}
+
+function dashboardMetrics({
+  doctorRecord,
+  agentCount,
+  pendingApprovals,
+  blockedClaims,
+  pilotLaunch,
+  designPartnerBeta,
+  codeIntelligence,
+}: {
+  doctorRecord: Record<string, unknown>;
+  agentCount: number;
+  pendingApprovals: number;
+  blockedClaims: number;
+  pilotLaunch?: PilotLaunchReadinessStatus | null;
+  designPartnerBeta?: DesignPartnerBetaStatus | null;
+  codeIntelligence?: CodeIntelligenceSummary | null;
+}) {
+  return [
+    {
+      title: 'System Safety',
+      value: String(doctorRecord.status ?? 'unknown'),
+      detail: String(doctorRecord.profile ?? '-'),
+    },
+    { title: 'Agents', value: String(agentCount), detail: 'registered' },
+    { title: 'Pending Approvals', value: String(pendingApprovals), detail: 'operator queue' },
+    { title: 'Claim Guard', value: String(blockedClaims), detail: 'blocked claims' },
+    pilotLaunchMetric(pilotLaunch),
+    betaOpsMetric(designPartnerBeta),
+    codeIntelligenceMetric(codeIntelligence),
+  ];
+}
+
+function pilotLaunchMetric(pilotLaunch: PilotLaunchReadinessStatus | null | undefined) {
+  return {
+    title: 'Pilot Launch',
+    value: pilotLaunch?.status ?? 'unknown',
+    detail: pilotLaunch?.generatedAtUtc ?? 'no snapshot',
+  };
+}
+
+function betaOpsMetric(designPartnerBeta: DesignPartnerBetaStatus | null | undefined) {
+  return {
+    title: 'Beta Ops',
+    value: designPartnerBeta?.status ?? 'unknown',
+    detail: designPartnerBeta?.headline ?? 'no snapshot',
+  };
+}
+
+function codeIntelligenceMetric(codeIntelligence: CodeIntelligenceSummary | null | undefined) {
+  return {
+    title: 'Code Intelligence',
+    value: codeIntelligence?.verdict ?? 'missing',
+    detail: `${codeIntelligence?.boundaryViolations ?? 0} boundary violations`,
+  };
+}
+
+function MetricCard({ title, value, detail }: { title: string; value: string; detail: string }) {
+  return (
+    <article className="metric-card">
+      <h3>{title}</h3>
+      <p className="metric">{value}</p>
+      <small>{detail}</small>
+    </article>
+  );
+}
+
+function SafetyPostureCard({
+  doctorRecord,
+  claimCounts,
+}: {
+  doctorRecord: Record<string, unknown>;
+  claimCounts: ReturnType<typeof countClaims>;
+}) {
+  return (
+    <article className="page-card">
+      <h3>Safety posture</h3>
+      <div className="metric-list">
+        <MetricRow label="Readiness" value={String(doctorRecord.status ?? 'unknown')} />
+        <MetricRow label="Allowed claims" value={String(claimCounts.allowed)} />
+        <MetricRow label="Conditional claims" value={String(claimCounts.conditional)} />
+        <MetricRow label="Fail-closed execution" value="enabled" />
+      </div>
+    </article>
+  );
+}
+
+function PilotLaunchCandidateCard({
+  pilotLaunch,
+}: {
+  pilotLaunch?: PilotLaunchReadinessStatus | null;
+}) {
+  return (
+    <article className="page-card">
+      <h3>Pilot Launch Candidate</h3>
+      <div className="metric-list">
+        <PilotTileRow tile={pilotLaunch?.enterpriseHatA} fallback="Enterprise Hat A" />
+        <PilotTileRow tile={pilotLaunch?.installRehearsal} fallback="Install rehearsal" />
+        <PilotTileRow tile={pilotLaunch?.securityReview} fallback="Security review" />
+        <PilotTileRow tile={pilotLaunch?.claimGuard} fallback="Claim guard" />
+      </div>
+    </article>
+  );
+}
+
+function NextActionsCard({ pilotLaunch }: { pilotLaunch?: PilotLaunchReadinessStatus | null }) {
+  const actions = pilotLaunch?.nextActions.length ? pilotLaunch.nextActions : defaultNextActions;
+  return (
+    <article className="page-card">
+      <h3>Next actions</h3>
+      <div className="run-list">
+        {actions.map((action) => (
+          <article className="run-list-item" key={`${action.target}-${action.label}`}>
+            <strong>{action.label}</strong>
+            <span>{action.target}</span>
+            <small>{action.severity}</small>
+          </article>
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -161,6 +239,23 @@ function PilotTileRow({ tile, fallback }: { tile?: PilotLaunchStatusTile | null;
       <strong>{tile?.status ?? 'unknown'}</strong>
     </div>
   );
+}
+
+function MetricRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function countClaims(claims: Array<{ status: string }>) {
+  return {
+    allowed: claims.filter((claim) => claim.status === 'allowed').length,
+    blocked: claims.filter((claim) => claim.status === 'blocked').length,
+    conditional: claims.filter((claim) => claim.status === 'conditional').length,
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

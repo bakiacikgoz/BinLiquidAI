@@ -49,20 +49,25 @@ def build_code_intelligence_summary(
         ),
     ]
     secret_status = str(payload.get("secret_scan", {}).get("status", "unknown"))
+    telemetry_disabled = payload.get("telemetry_disabled") is True
     boundary_violations = int(payload.get("boundaries", {}).get("total") or 0)
     blocking_reasons = [str(item) for item in payload.get("blocking_reasons", [])]
-    if secret_status not in {"pass", "unknown"}:
+    if secret_status != "pass":
         blocking_reasons.append("FALLOW_SECRET_SCAN_FAILED")
+    if not telemetry_disabled:
+        blocking_reasons.append("FALLOW_TELEMETRY_NOT_DISABLED")
     if boundary_violations:
         blocking_reasons.append("FALLOW_BOUNDARY_VIOLATIONS")
 
     warnings = [str(item) for item in payload.get("warnings", [])]
     verdict = str(payload.get("verdict", "warn"))
+    if verdict == "fail":
+        blocking_reasons.append("FALLOW_VERDICT_FAILED")
     status = (
         "blocked"
         if blocking_reasons
         else "conditional"
-        if warnings or verdict == "warn"
+        if warnings or verdict != "pass"
         else "ready"
     )
     return CodeIntelligenceSummary(
@@ -74,7 +79,7 @@ def build_code_intelligence_summary(
         tool=str(payload.get("tool", "fallow")),
         toolVersion=payload.get("tool_version"),
         artifactRoot=str(artifact_root),
-        telemetryDisabled=bool(payload.get("telemetry_disabled", True)),
+        telemetryDisabled=telemetry_disabled,
         boundaryViolations=boundary_violations,
         secretScanStatus=secret_status,
         buckets=buckets,
@@ -187,7 +192,8 @@ def build_design_partner_beta_status(
         generated_at=generated,
     )
     external_v1_1 = _read_json(base / "external-agent-v1-1" / "results.json")
-    beta_manifest = _read_json(base / "design-partner-beta" / "manifest.json")
+    ci_inventory = _read_json(base / "ci" / "node-action-inventory.json")
+    pilot_manifest = _read_json(base / "design-partner-pilot" / "manifest.json")
     checks = [
         PilotOperationsChecklistItem(
             itemId="code-intelligence",
@@ -213,12 +219,13 @@ def build_design_partner_beta_status(
             pass_values={"pass"},
         ),
         _artifact_item(
-            item_id="beta-pack",
-            label="Design partner beta pack",
-            path=base / "design-partner-beta" / "manifest.json",
-            payload=beta_manifest,
-            pass_values={"ready", "conditional"},
+            item_id="ci-node24-inventory",
+            label="CI Node action inventory",
+            path=base / "ci" / "node-action-inventory.json",
+            payload=ci_inventory,
+            pass_values={"pass"},
         ),
+        _safety_claim_item(pilot_manifest),
     ]
     blockers = [item.item_id for item in checks if item.blocking or item.status == "blocked"]
     warnings = [item.item_id for item in checks if item.status in {"conditional", "missing"}]
@@ -396,6 +403,15 @@ def _feedback_item(path: Path) -> PilotOperationsChecklistItem:
 
 
 def _safety_claim_item(pilot_manifest: dict[str, Any] | None) -> PilotOperationsChecklistItem:
+    if pilot_manifest is None:
+        return PilotOperationsChecklistItem(
+            itemId="safety-claims",
+            label="Safety claims remain blocked",
+            status="missing",
+            detail="pilot claim guard artifact missing",
+            path=None,
+            blocking=False,
+        )
     claims = pilot_manifest.get("claimGuard", {}).get("claims", []) if pilot_manifest else []
     by_id = {
         str(item.get("claim_id")): item
@@ -517,6 +533,9 @@ def _feedback_markdown(payload: dict[str, Any]) -> str:
         f"- Status: `{payload['status']}`",
         f"- Redaction: `{payload['redaction']}`",
         f"- Generated: `{payload['generatedAtUtc']}`",
+        "- Scope: local-only operator review bundle",
+        "- Privacy: no PII, no raw screenshots, no secrets, no private keys",
+        "- Operator notes: review and redact before sharing outside the local environment",
         "",
         "## Acceptance Metrics",
         "",

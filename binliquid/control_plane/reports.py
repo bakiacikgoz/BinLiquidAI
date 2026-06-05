@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from binliquid.control_plane.design_partner_rc import is_expected_blocked_claim_boundary_alert
 from binliquid.control_plane.models import (
     AlertEvaluation,
     AlertSummary,
@@ -83,7 +84,8 @@ def build_reports_alerts_logs_manifest(
         ),
     ]
     alert_evaluations = [
-        _alert_evaluation(alert, generated_at=generated_at) for alert in snapshot.alerts
+        _alert_evaluation(alert, snapshot=snapshot, generated_at=generated_at)
+        for alert in snapshot.alerts
     ]
     logs_ref = _write_logs(root=root, snapshot=snapshot, generated_at=generated_at)
     blocking_reasons = [
@@ -144,7 +146,26 @@ def _write_report(
     )
 
 
-def _alert_evaluation(alert: AlertSummary, *, generated_at: datetime) -> AlertEvaluation:
+def _alert_evaluation(
+    alert: AlertSummary,
+    *,
+    snapshot: ControlPlaneSnapshot,
+    generated_at: datetime,
+) -> AlertEvaluation:
+    if is_expected_blocked_claim_boundary_alert(alert) or _has_ready_alternate_report(
+        alert,
+        snapshot=snapshot,
+    ):
+        return AlertEvaluation(
+            alert_id=alert.alert_id,
+            severity="info",
+            state="resolved",
+            source="snapshot",
+            reason_code=alert.reason_code,
+            suggested_action="Expected RC boundary or superseded report gap; keep monitoring.",
+            first_seen_at=generated_at,
+            last_seen_at=generated_at,
+        )
     severity = (
         "critical"
         if alert.severity == "critical"
@@ -162,6 +183,22 @@ def _alert_evaluation(alert: AlertSummary, *, generated_at: datetime) -> AlertEv
         first_seen_at=generated_at,
         last_seen_at=generated_at,
     )
+
+
+def _has_ready_alternate_report(alert: AlertSummary, *, snapshot: ControlPlaneSnapshot) -> bool:
+    if alert.alert_id == "missing-qualification":
+        return any(
+            report.kind == "qualification"
+            and report.status == "ready"
+            and report.report_id != "qualification"
+            for report in snapshot.reports
+        )
+    if alert.alert_id == "missing-metrics":
+        return any(
+            report.kind == "metrics" and report.status == "ready" and report.report_id != "metrics"
+            for report in snapshot.reports
+        )
+    return False
 
 
 def _write_logs(*, root: Path, snapshot: ControlPlaneSnapshot, generated_at: datetime) -> str:

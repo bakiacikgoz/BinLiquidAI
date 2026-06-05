@@ -92,6 +92,7 @@ import { AssistantRightRail, type AssistantRuntimeSummary } from './components/a
 import { AgentRegistryView } from './components/control-plane/AgentRegistryView';
 import { ClaimBoundaryBanner } from './components/control-plane/ClaimBoundaryBanner';
 import { ControlPlaneDashboard } from './components/control-plane/ControlPlaneDashboard';
+import { DesignPartnerBetaReadinessCard } from './components/control-plane/DesignPartnerBetaReadinessCard';
 import { EvidencePackView } from './components/control-plane/EvidencePackView';
 import { ExecutionSurfacesView } from './components/control-plane/ExecutionSurfacesView';
 import { PolicySimulationView } from './components/control-plane/PolicySimulationView';
@@ -2203,27 +2204,30 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                   </div>
                 </dl>
               </article>
-              <article className="page-card">
-                <h3>Beta Operations</h3>
-                <dl className="metric-list">
-                  <div className="metric-row">
-                    <dt>{t.status}</dt>
-                    <dd>{designPartnerBeta?.status ?? t.statusUnknown}</dd>
-                  </div>
-                  <div className="metric-row">
-                    <dt>Code intelligence</dt>
-                    <dd>{codeIntelligence?.verdict ?? t.statusUnknown}</dd>
-                  </div>
-                  <div className="metric-row">
-                    <dt>Pilot operations</dt>
-                    <dd>{pilotOperations?.status ?? t.statusUnknown}</dd>
-                  </div>
-                  <div className="metric-row">
-                    <dt>Feedback bundle</dt>
-                    <dd>{pilotOperations?.feedbackBundlePath ?? t.statusUnknown}</dd>
-                  </div>
-                </dl>
-              </article>
+              <DesignPartnerBetaReadinessCard
+                codeIntelligence={codeIntelligence}
+                pilotOperations={pilotOperations}
+                designPartnerBeta={designPartnerBeta}
+                labels={{
+                  title: t.betaOperations,
+                  status: t.status,
+                  codeIntelligence: t.codeIntelligence,
+                  pilotOperations: t.pilotOperations,
+                  feedbackBundle: t.feedbackBundle,
+                  fallowTelemetry: t.fallowTelemetry,
+                  secretScan: t.secretScan,
+                  externalAgentGateway: t.externalAgentGateway,
+                  ciInventory: t.ciInventory,
+                  claimBoundary: t.claimBoundary,
+                  nextActions: t.betaNextActions,
+                  blockers: t.betaBlockers,
+                  warnings: t.betaWarnings,
+                  baselineDebt: t.baselineDebt,
+                  ready: t.ready,
+                  missing: t.missing,
+                  none: t.none,
+                }}
+              />
               <article className="page-card">
                 <h3>{t.capabilityContract}</h3>
                 <PayloadSummary value={{ profiles: supportedProfiles, features }} title="Contract summary" maxItems={12} />

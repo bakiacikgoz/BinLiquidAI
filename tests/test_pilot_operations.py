@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 
 from binliquid.cli import app
 from binliquid.control_plane.pilot_operations import (
+    build_code_intelligence_summary,
     build_design_partner_beta_status,
     generate_pilot_operations_artifacts,
 )
@@ -47,8 +48,40 @@ def test_design_partner_beta_status_summarizes_pilot_ops_without_false_ready(
     assert status.status == "conditional"
     assert status.code_intelligence.status == "conditional"
     assert status.pilot_operations.status == "conditional"
-    assert "beta-pack" in status.warnings
+    assert "code-intelligence" in status.warnings
+    assert "pilot-operations" in status.warnings
+    assert "beta-pack" not in status.warnings
     assert status.blockers == []
+
+
+def test_code_intelligence_ready_requires_pass_secret_scan_and_disabled_telemetry(
+    tmp_path: Path,
+) -> None:
+    evidence_root = _pilot_artifacts(tmp_path, fallow_verdict="pass")
+
+    status = build_code_intelligence_summary(evidence_root=evidence_root)
+
+    assert status.status == "ready"
+    assert status.verdict == "pass"
+    assert status.boundary_violations == 0
+    assert status.secret_scan_status == "pass"
+    assert status.telemetry_disabled is True
+    assert status.warnings == []
+
+
+def test_code_intelligence_blocks_missing_secret_scan_or_telemetry(tmp_path: Path) -> None:
+    evidence_root = _pilot_artifacts(tmp_path, fallow_verdict="pass")
+    summary_path = evidence_root / "code-intelligence" / "fallow" / "summary.json"
+    payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    payload.pop("secret_scan")
+    payload["telemetry_disabled"] = False
+    _write_json(summary_path, payload)
+
+    status = build_code_intelligence_summary(evidence_root=evidence_root)
+
+    assert status.status == "blocked"
+    assert "FALLOW_SECRET_SCAN_FAILED" in status.blockers
+    assert "FALLOW_TELEMETRY_NOT_DISABLED" in status.blockers
 
 
 def test_pilot_first_run_cli_writes_feedback_bundle(tmp_path: Path) -> None:
@@ -74,7 +107,7 @@ def test_pilot_first_run_cli_writes_feedback_bundle(tmp_path: Path) -> None:
     assert (output_root / "pilot_feedback_bundle.json").exists()
 
 
-def _pilot_artifacts(tmp_path: Path) -> Path:
+def _pilot_artifacts(tmp_path: Path, *, fallow_verdict: str = "warn") -> Path:
     root = tmp_path / "artifacts"
     _write_json(
         root / "design-partner-pilot" / "manifest.json",
@@ -109,20 +142,29 @@ def _pilot_artifacts(tmp_path: Path) -> Path:
         },
     )
     _write_json(
+        root / "ci" / "node-action-inventory.json",
+        {"status": "pass", "node20WarningPresent": True, "actions": []},
+    )
+    _write_json(
         root / "code-intelligence" / "fallow" / "summary.json",
         {
             "generated_at": "2026-06-04T12:00:00Z",
             "tool": "fallow",
             "tool_version": "2.88.3",
             "telemetry_disabled": True,
-            "dead_code": {"total": 1, "errors": 0, "warnings": 1, "notes": ["unused=1"]},
+            "dead_code": {
+                "total": 0 if fallow_verdict == "pass" else 1,
+                "errors": 0,
+                "warnings": 0 if fallow_verdict == "pass" else 1,
+                "notes": [] if fallow_verdict == "pass" else ["unused=1"],
+            },
             "duplication": {"total": 0, "errors": 0, "warnings": 0, "notes": []},
             "health": {"total": 0, "errors": 0, "warnings": 0, "notes": []},
             "boundaries": {"total": 0, "errors": 0, "warnings": 0, "notes": []},
             "secret_scan": {"status": "pass", "findings": []},
-            "verdict": "warn",
+            "verdict": fallow_verdict,
             "blocking_reasons": [],
-            "warnings": ["dead_code:1"],
+            "warnings": [] if fallow_verdict == "pass" else ["dead_code:1"],
         },
     )
     return root

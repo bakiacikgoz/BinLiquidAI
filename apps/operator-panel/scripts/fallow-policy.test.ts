@@ -60,6 +60,63 @@ describe('fallow policy helpers', () => {
     expect(verdict.warnings.join(',')).toContain('health');
   });
 
+  it('treats baseline findings as ready when the new-only rollout gate is clean', () => {
+    const verdict = computeVerdict({
+      dead_code: deadCodeBucket({
+        total_issues: 22,
+        summary: { total_issues: 22, unused_files: 9, unused_exports: 11, unused_types: 2 },
+      }),
+      duplication: duplicationBucket({
+        stats: { clone_groups: 34 },
+        clone_groups: [{ instances: [{ file: 'src/App.tsx' }] }],
+      }),
+      health: healthBucket({ findings: [{ path: 'src/App.tsx', severity: 'critical' }] }),
+      boundaries: boundaryBucket({ summary: { boundary_violations: 0 } }),
+      secret_scan: { status: 'pass', findings: [] },
+      rollout_gate: {
+        gate: 'new-only',
+        status: 'pass',
+        base_ref: 'origin/main',
+        head_sha: 'abc123',
+        changed_files_count: 0,
+        introduced: { dead_code: 0, duplication: 0, health: 0 },
+        inherited: { dead_code: 22, duplication: 34, health: 62 },
+        warnings: [],
+        blocking_reasons: [],
+      },
+    });
+
+    expect(verdict).toEqual({
+      verdict: 'pass',
+      blockingReasons: [],
+      warnings: [],
+    });
+  });
+
+  it('keeps new rollout debt as enforceable warnings', () => {
+    const verdict = computeVerdict({
+      dead_code: deadCodeBucket({ total_issues: 0, summary: { total_issues: 0 } }),
+      duplication: duplicationBucket({ stats: { clone_groups: 0 }, clone_groups: [] }),
+      health: healthBucket({ findings: [] }),
+      boundaries: boundaryBucket({ summary: { boundary_violations: 0 } }),
+      secret_scan: { status: 'pass', findings: [] },
+      rollout_gate: {
+        gate: 'new-only',
+        status: 'warn',
+        base_ref: 'origin/main',
+        head_sha: 'abc123',
+        changed_files_count: 1,
+        introduced: { dead_code: 0, duplication: 1, health: 1 },
+        inherited: { dead_code: 0, duplication: 0, health: 0 },
+        warnings: ['duplication_new:1', 'health_new:1'],
+        blocking_reasons: [],
+      },
+    });
+
+    expect(verdict.verdict).toBe('warn');
+    expect(verdict.warnings).toEqual(['duplication_new:1', 'health_new:1']);
+  });
+
   it('detects high-confidence secret tokens without flagging ordinary words', () => {
     expect(highConfidenceSecretFindings('secret redaction policy')).toEqual([]);
     expect(highConfidenceSecretFindings('token ghp_123456789012345678901234567890')).toContain(

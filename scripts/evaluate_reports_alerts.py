@@ -17,9 +17,9 @@ from binliquid.control_plane.snapshot import build_control_plane_snapshot
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate reports, alerts, and logs manifest.")
-    parser.add_argument("--profile", default="lite")
-    parser.add_argument("--root-dir", default="artifacts/design-partner-rc/reports/state")
-    parser.add_argument("--evidence-root", default="artifacts/design-partner-rc/evidence-sample")
+    parser.add_argument("--profile", default="enterprise")
+    parser.add_argument("--root-dir", default=".binliquid/control-plane")
+    parser.add_argument("--evidence-root", default="artifacts")
     parser.add_argument("--output-dir", default="artifacts/design-partner-rc/reports-alerts-logs")
     args = parser.parse_args()
 

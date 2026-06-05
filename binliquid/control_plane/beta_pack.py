@@ -26,6 +26,7 @@ def generate_design_partner_beta_pack(
     config: RuntimeConfig,
     evidence_root: Path = Path("artifacts"),
 ) -> dict[str, Any]:
+    generated = datetime.now(UTC)
     output_root.mkdir(parents=True, exist_ok=True)
     generate_pilot_operations_artifacts(
         output_root=evidence_root / "pilot-ops",
@@ -55,8 +56,8 @@ def generate_design_partner_beta_pack(
     status = "blocked" if blockers else "conditional" if warnings else "ready"
     manifest = {
         "version": BETA_PACK_VERSION,
-        "generatedAtUtc": datetime.now(UTC).isoformat(),
-        "packId": f"design-partner-beta-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
+        "generatedAtUtc": generated.isoformat(),
+        "packId": f"design-partner-beta-{generated.strftime('%Y%m%d%H%M%S')}",
         "status": status,
         "commitSha": _git_commit(),
         "outputRoot": str(output_root),
@@ -68,9 +69,6 @@ def generate_design_partner_beta_pack(
         "blockers": blockers,
         "warnings": warnings,
     }
-    _write_json(output_root / "manifest.json", manifest)
-    beta_status = build_design_partner_beta_status(evidence_root=evidence_root)
-    manifest["designPartnerBeta"] = beta_status.model_dump(mode="json", by_alias=True)
     _write_json(output_root / "manifest.json", manifest)
     snapshot = build_control_plane_snapshot(
         root_dir=output_root / "state" / "control-plane",

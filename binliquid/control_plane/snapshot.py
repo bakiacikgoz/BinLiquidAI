@@ -150,21 +150,6 @@ def build_control_plane_snapshot(
         reports=reports,
         data_source=data_source,
     )
-    design_partner_rc = build_design_partner_rc_status(
-        data_source=data_source,
-        claims=claims.model_dump(mode="json"),
-        evidence_packs=evidence_packs,
-        reports=reports,
-        alerts=alerts,
-        execution_surfaces=execution_surfaces,
-        generated_at=generated_at,
-    )
-    pilot_launch = build_pilot_launch_readiness_status(
-        artifact_root=Path(evidence_root),
-        claims=claims.model_dump(mode="json"),
-        alerts=alerts,
-        generated_at=generated_at,
-    )
     code_intelligence = build_code_intelligence_summary(
         evidence_root=evidence_root,
         generated_at=generated_at,
@@ -175,6 +160,22 @@ def build_control_plane_snapshot(
     )
     design_partner_beta = build_design_partner_beta_status(
         evidence_root=evidence_root,
+        generated_at=generated_at,
+    )
+    design_partner_rc = build_design_partner_rc_status(
+        data_source=data_source,
+        claims=claims.model_dump(mode="json"),
+        evidence_packs=evidence_packs,
+        reports=reports,
+        alerts=alerts,
+        execution_surfaces=execution_surfaces,
+        design_partner_beta=design_partner_beta,
+        generated_at=generated_at,
+    )
+    pilot_launch = build_pilot_launch_readiness_status(
+        artifact_root=Path(evidence_root),
+        claims=claims.model_dump(mode="json"),
+        alerts=alerts,
         generated_at=generated_at,
     )
     logs = _logs(generated_at=generated_at, runs=runs, approvals=approvals, alerts=alerts)
