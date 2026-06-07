@@ -44,6 +44,7 @@ const requiredActionProps = {
   onApprove: () => undefined,
   onReject: () => undefined,
   onExecute: () => undefined,
+  onRegenerate: () => undefined,
 };
 
 describe('AssistantView', () => {

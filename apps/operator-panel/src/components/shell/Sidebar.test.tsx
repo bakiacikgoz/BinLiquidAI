@@ -16,6 +16,7 @@ describe('Sidebar', () => {
         onClose={() => undefined}
         onToggleCollapse={() => undefined}
         onNavigate={() => undefined}
+        onThemeChange={() => undefined}
       />,
     );
 

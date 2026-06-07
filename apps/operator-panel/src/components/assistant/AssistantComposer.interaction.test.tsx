@@ -6,13 +6,21 @@ import {
   DEFAULT_ASSISTANT_RUNTIME_SETTINGS,
   type AssistantRuntimeSettings,
 } from '../../settings';
+import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
+import type { AssistantComposerControls } from '../../assistant/assistantTypes';
 import { renderOperatorPanel } from '../../test/render';
 import { AssistantComposer } from './AssistantComposer';
 
 function ComposerHarness({
   onSend,
+  modelDiscovery = null,
 }: {
-  onSend: (message: string, runtimeSettings: AssistantRuntimeSettings) => void;
+  onSend: (
+    message: string,
+    runtimeSettings: AssistantRuntimeSettings,
+    controls: AssistantComposerControls,
+  ) => void;
+  modelDiscovery?: AssistantModelDiscoveryState | null;
 }) {
   const [runtimeSettings, setRuntimeSettings] = useState<AssistantRuntimeSettings>({
     ...DEFAULT_ASSISTANT_RUNTIME_SETTINGS,
@@ -25,19 +33,41 @@ function ComposerHarness({
       sendLabel="Send"
       disabled={false}
       runtimeSettings={runtimeSettings}
+      modelDiscovery={modelDiscovery}
       onRuntimeSettingsChange={(next) => setRuntimeSettings((prev) => ({ ...prev, ...next }))}
       onSend={onSend}
     />
   );
 }
 
+const discoveredModels: AssistantModelDiscoveryState = {
+  status: 'success',
+  response: null,
+  providers: [],
+  models: [
+    {
+      provider: 'ollama',
+      id: 'qwen3.5:4b',
+      displayName: 'qwen3.5:4b',
+      installed: true,
+      configured: true,
+      source: 'ollama',
+      warnings: [],
+    },
+  ],
+  error: null,
+  refresh: vi.fn(),
+};
+
 describe('AssistantComposer runtime controls', () => {
   it('selects provider/model metadata and sends it with the message', async () => {
     const onSend = vi.fn();
-    const { user } = renderOperatorPanel(<ComposerHarness onSend={onSend} />);
+    const { user } = renderOperatorPanel(
+      <ComposerHarness onSend={onSend} modelDiscovery={discoveredModels} />,
+    );
 
     await user.selectOptions(screen.getByLabelText('Assistant provider'), 'ollama');
-    await user.type(screen.getByLabelText('Assistant model'), 'qwen3.5:4b');
+    await user.selectOptions(screen.getByLabelText('Assistant model'), 'qwen3.5:4b');
     await user.selectOptions(screen.getByLabelText('Assistant fallback provider'), 'transformers');
     await user.type(screen.getByLabelText('Message'), 'Summarize the active run.');
 
@@ -53,6 +83,10 @@ describe('AssistantComposer runtime controls', () => {
         assistantModel: 'qwen3.5:4b',
         assistantHfModelId: '',
       }),
+      expect.objectContaining({
+        contextAttachmentKinds: expect.arrayContaining(['active_run', 'event_tail']),
+        toolIntents: expect.arrayContaining(['inspect_run']),
+      }),
     );
   });
 
@@ -60,14 +94,58 @@ describe('AssistantComposer runtime controls', () => {
     const onSend = vi.fn();
     const { user } = renderOperatorPanel(<ComposerHarness onSend={onSend} />);
 
-    await user.selectOptions(screen.getByLabelText('Assistant provider'), 'transformers');
-    await user.type(screen.getByLabelText('Assistant model'), 'qwen3.5:4b');
+    await user.selectOptions(screen.getByLabelText('Assistant provider'), 'ollama');
+    await user.type(screen.getByLabelText('Assistant model'), 'bad model');
     await user.type(screen.getByLabelText('Message'), 'Run with invalid metadata.');
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Use HF model id');
+    expect(screen.getByRole('alert')).toHaveTextContent('Model may only include');
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Send' }));
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('sends with Enter and keeps Shift+Enter for multiline drafts', async () => {
+    const onSend = vi.fn();
+    const { user } = renderOperatorPanel(<ComposerHarness onSend={onSend} />);
+    const messageBox = screen.getByLabelText('Message');
+
+    await user.click(messageBox);
+    await user.keyboard('First line');
+    await user.keyboard('{Shift>}{Enter}{/Shift}');
+    await user.keyboard('Second line');
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(messageBox).toHaveValue('First line\nSecond line');
+
+    await user.keyboard('{Enter}');
+
+    expect(onSend).toHaveBeenCalledWith(
+      'First line\nSecond line',
+      expect.any(Object),
+      expect.any(Object),
+    );
+    expect(messageBox).toHaveValue('');
+  });
+
+  it('allows selecting safe tools and context attachments', async () => {
+    const onSend = vi.fn();
+    const { user } = renderOperatorPanel(<ComposerHarness onSend={onSend} />);
+
+    await user.click(screen.getByLabelText('Attach context'));
+    await user.click(screen.getByLabelText('Artifacts'));
+    await user.click(screen.getByText('Tools'));
+    await user.click(screen.getByLabelText('Draft plan'));
+    await user.type(screen.getByLabelText('Message'), 'Prepare next steps.');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(onSend).toHaveBeenCalledWith(
+      'Prepare next steps.',
+      expect.any(Object),
+      expect.objectContaining({
+        contextAttachmentKinds: expect.not.arrayContaining(['artifact_summary']),
+        toolIntents: expect.arrayContaining(['inspect_run', 'draft_remediation_plan']),
+      }),
+    );
   });
 });

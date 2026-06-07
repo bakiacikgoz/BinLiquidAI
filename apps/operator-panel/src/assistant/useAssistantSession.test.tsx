@@ -7,11 +7,13 @@ import { useAssistantSession, type AssistantContextSnapshot } from './useAssista
 const bridgeMocks = vi.hoisted(() => ({
   startAssistantTurn: vi.fn(),
   listenAssistantEvents: vi.fn(),
+  isBridgePreviewMode: vi.fn(),
 }));
 
 vi.mock('../bridge', () => ({
   startAssistantTurn: bridgeMocks.startAssistantTurn,
   listenAssistantEvents: bridgeMocks.listenAssistantEvents,
+  isBridgePreviewMode: bridgeMocks.isBridgePreviewMode,
 }));
 
 const emptyContext: AssistantContextSnapshot = {
@@ -33,6 +35,7 @@ describe('useAssistantSession runtime metadata', () => {
       status: 'started',
     });
     bridgeMocks.listenAssistantEvents.mockResolvedValue(() => undefined);
+    bridgeMocks.isBridgePreviewMode.mockReturnValue(false);
     vi.clearAllMocks();
   });
 
@@ -81,5 +84,18 @@ describe('useAssistantSession runtime metadata', () => {
         hfModelId: undefined,
       }),
     );
+  });
+
+  it('applies preview assistant events through the reducer and reaches a final state', async () => {
+    bridgeMocks.isBridgePreviewMode.mockReturnValue(true);
+    const { result } = renderHook(() => useAssistantSession({ ...DEFAULT_SETTINGS }, () => emptyContext));
+
+    await act(async () => {
+      await result.current.actions.send('Preview assistant response.');
+    });
+
+    await waitFor(() => expect(result.current.state.status).toBe('completed'));
+    expect(result.current.state.turns[0]?.assistantMessage.text).toContain('approval gate');
+    expect(result.current.state.turns[0]?.completedAtUtc).toBeTruthy();
   });
 });

@@ -7,7 +7,7 @@ import { StageProgress, type MissionStageKey } from './StageProgress';
 import { LiveAgentActivity, type ActivityItem } from './LiveAgentActivity';
 import { ApprovalGateCard } from './ApprovalGateCard';
 import { RuntimeSummaryCard, type RuntimeSummaryItem } from './RuntimeSummaryCard';
-import { SessionEventsCard, type SessionEventItem } from './SessionEventsCard';
+import { SessionEventsCard, type SessionEventFilter, type SessionEventItem } from './SessionEventsCard';
 import type { ComputerUseCapabilityResolution } from '../../capabilities';
 
 export type RunOption = {
@@ -32,6 +32,9 @@ export type MissionControlViewProps = {
   progress: number;
   activityItems: ActivityItem[];
   sessionEvents: SessionEventItem[];
+  sessionEventFilter: SessionEventFilter;
+  sessionEventsHasMore: boolean;
+  sessionEventsLoadingMore: boolean;
   runtimeSummary: RuntimeSummaryItem[];
   rawSummary: unknown;
   computerUseCapabilityResolution?: ComputerUseCapabilityResolution | null;
@@ -42,9 +45,12 @@ export type MissionControlViewProps = {
   approvalDisabledReason: string;
   onSelectRun: (runId: string) => void;
   onRawJsonRequested: () => boolean;
+  onSessionEventFilterChange: (filter: SessionEventFilter) => void;
+  onLoadMoreSessionEvents: () => void;
   onApprove: () => void;
   onEditApproval: () => void;
   onReject: () => void;
+  onResolveApprovalDisabled?: () => void;
 };
 
 export function MissionControlView({
@@ -64,6 +70,9 @@ export function MissionControlView({
   progress,
   activityItems,
   sessionEvents,
+  sessionEventFilter,
+  sessionEventsHasMore,
+  sessionEventsLoadingMore,
   runtimeSummary,
   rawSummary,
   computerUseCapabilityResolution,
@@ -74,9 +83,12 @@ export function MissionControlView({
   approvalDisabledReason,
   onSelectRun,
   onRawJsonRequested,
+  onSessionEventFilterChange,
+  onLoadMoreSessionEvents,
   onApprove,
   onEditApproval,
   onReject,
+  onResolveApprovalDisabled,
 }: MissionControlViewProps) {
   return (
     <section className="mission-control-view" data-testid="page-primary-region">
@@ -142,11 +154,19 @@ export function MissionControlView({
           onApprove={onApprove}
           onEdit={onEditApproval}
           onReject={onReject}
+          onResolveDisabled={onResolveApprovalDisabled}
         />
       </div>
 
       <div className="mission-bottom-grid">
-        <SessionEventsCard items={sessionEvents} />
+        <SessionEventsCard
+          items={sessionEvents}
+          filter={sessionEventFilter}
+          hasMore={sessionEventsHasMore}
+          loadingMore={sessionEventsLoadingMore}
+          onFilterChange={onSessionEventFilterChange}
+          onLoadMore={onLoadMoreSessionEvents}
+        />
         <RuntimeSummaryCard
           debugRawEnabled={debugRawEnabled}
           items={runtimeSummary}

@@ -224,16 +224,20 @@ describe('App integration flows', () => {
     expect(await screen.findByRole('button', { name: 'Hide raw' })).toBeInTheDocument();
   });
 
-  it('exports selected run artifacts with the prompt target passed to the bridge', async () => {
+  it('exports selected run artifacts with the modal target passed to the bridge', async () => {
     const { user } = renderApp({ operatorId: 'qa-operator' });
 
     await openView(user, 'Çalıştırmalar');
     const exportButton = await screen.findByRole('button', { name: 'Export' });
     await waitFor(() => expect(exportButton).not.toBeDisabled());
     await user.click(exportButton);
+    const pathInput = await screen.findByLabelText('Export path');
+    await user.clear(pathInput);
+    await user.type(pathInput, './exports/run-preview');
+    const exportButtons = screen.getAllByRole('button', { name: 'Export' });
+    await user.click(exportButtons[exportButtons.length - 1]);
 
     await waitFor(() => {
-      expect(window.prompt).toHaveBeenCalledWith('Export directory', './exports/run_20260308_0910');
       expect(bridge.exportRunArtifacts).toHaveBeenCalledWith(
         expect.any(Object),
         'run_20260308_0910',

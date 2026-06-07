@@ -4,6 +4,7 @@ import type {
   AssistantStartTurnResponse,
   AssistantStreamEvent,
 } from './assistantTypes';
+import type { AssistantProviderModelsResponse } from './modelDiscovery';
 import { createAssistantSession, createAssistantTurn } from './assistantMappers';
 
 const CONTRACT_VERSION = '2.0';
@@ -59,7 +60,65 @@ export function previewAssistantEvents(
         risk: 'medium',
       },
     },
+    {
+      contractVersion: CONTRACT_VERSION,
+      assistantTurnId,
+      sessionId,
+      event: 'final',
+      sequence: 4,
+      timestampUtc: '2026-03-08T09:20:03Z',
+      data: {
+        final_text:
+          'The selected run is blocked by an approval gate. Review the pending approval before continuing.',
+        trace_id: 'trace-preview-assistant',
+        used_path: 'preview_fixture',
+        fallback_events: [],
+      },
+    },
   ];
+}
+
+export function previewAssistantProviderModels(profile = 'balanced'): AssistantProviderModelsResponse {
+  return {
+    contractVersion: 'operator-panel.assistant-provider-models/v1',
+    profile,
+    provider: 'all',
+    generatedAtUtc: '2026-03-08T09:20:00Z',
+    providers: [
+      {
+        provider: 'ollama',
+        available: true,
+        selectedByConfig: true,
+        models: [
+          {
+            provider: 'ollama',
+            id: 'qwen3.5:4b',
+            displayName: 'qwen3.5:4b',
+            installed: true,
+            configured: true,
+            source: 'preview_fixture',
+            warnings: [],
+          },
+        ],
+      },
+      {
+        provider: 'transformers',
+        available: true,
+        selectedByConfig: false,
+        models: [
+          {
+            provider: 'transformers',
+            id: 'Qwen/Qwen3.5-4B-Instruct',
+            displayName: 'Qwen/Qwen3.5-4B-Instruct',
+            installed: false,
+            configured: true,
+            source: 'preview_fixture',
+            warnings: ['Preview fixture only; local cache was not inspected.'],
+          },
+        ],
+      },
+    ],
+  };
 }
 
 function baseState(): AssistantSessionState {

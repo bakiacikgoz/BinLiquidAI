@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  isBridgePreviewMode,
   listenAssistantEvents,
   startAssistantTurn,
 } from '../bridge';
@@ -10,6 +11,7 @@ import {
   type PanelSettings,
 } from '../settings';
 import { buildAssistantPrompt } from './assistantPromptBuilder';
+import { previewAssistantEvents } from './assistantFixtures';
 import {
   createAssistantSession,
   createAssistantTurn,
@@ -17,7 +19,14 @@ import {
   normalizeAssistantError,
   startAssistantTurnLocally,
 } from './assistantMappers';
-import type { AssistantSessionState, AssistantStartTurnOptions, AssistantStreamEvent } from './assistantTypes';
+import type {
+  AssistantComposerControls,
+  AssistantSessionState,
+  AssistantStartTurnOptions,
+  AssistantStreamEvent,
+} from './assistantTypes';
+
+const ASSISTANT_TURN_TIMEOUT_MS = 120_000;
 
 export type AssistantContextSnapshot = {
   selectedRunId: string;
@@ -29,8 +38,13 @@ export type AssistantContextSnapshot = {
 };
 
 export type AssistantSessionActions = {
-  send: (message: string, runtimeSettings?: AssistantRuntimeSettings) => Promise<void>;
+  send: (
+    message: string,
+    runtimeSettings?: AssistantRuntimeSettings,
+    controls?: AssistantComposerControls,
+  ) => Promise<void>;
   newChat: () => void;
+  regenerate: (turnId: string, runtimeSettings?: AssistantRuntimeSettings) => Promise<void>;
   applyEvent: (event: AssistantStreamEvent) => void;
   markApprovalDetailLoaded: (approvalId: string, detail: unknown) => void;
   appendSystemMessage: (message: string) => void;
@@ -44,6 +58,7 @@ export function useAssistantSession(
   const stateRef = useRef(state);
   const eventQueueRef = useRef<AssistantStreamEvent[]>([]);
   const flushTimerRef = useRef<number | null>(null);
+  const timeoutTimersRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     stateRef.current = state;
@@ -69,6 +84,42 @@ export function useAssistantSession(
     [flushEvents],
   );
 
+  const clearTurnTimeout = useCallback((turnId: string) => {
+    const timer = timeoutTimersRef.current.get(turnId);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      timeoutTimersRef.current.delete(turnId);
+    }
+  }, []);
+
+  const armTurnTimeout = useCallback(
+    (turnId: string, sessionId: string) => {
+      clearTurnTimeout(turnId);
+      const timer = window.setTimeout(() => {
+        const current = stateRef.current;
+        const turn = current.turns.find((item) => item.id === turnId);
+        if (!turn || !['starting', 'streaming'].includes(turn.status)) {
+          return;
+        }
+        applyEvent({
+          contractVersion: '2.0',
+          assistantTurnId: turnId,
+          sessionId,
+          event: 'error',
+          sequence: turn.eventSequence + 1,
+          timestampUtc: new Date().toISOString(),
+          data: {
+            code: 'ASSISTANT_TIMEOUT',
+            message: 'Assistant turn timed out before a final event.',
+            retryable: true,
+          },
+        });
+      }, ASSISTANT_TURN_TIMEOUT_MS);
+      timeoutTimersRef.current.set(turnId, timer);
+    },
+    [applyEvent, clearTurnTimeout],
+  );
+
   useEffect(() => {
     let cancelled = false;
     let cleanup: (() => void) | undefined;
@@ -84,12 +135,26 @@ export function useAssistantSession(
       if (flushTimerRef.current !== null) {
         window.clearTimeout(flushTimerRef.current);
       }
+      timeoutTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      timeoutTimersRef.current.clear();
       cleanup?.();
     };
   }, [applyEvent]);
 
+  useEffect(() => {
+    state.turns.forEach((turn) => {
+      if (!['starting', 'streaming'].includes(turn.status)) {
+        clearTurnTimeout(turn.id);
+      }
+    });
+  }, [clearTurnTimeout, state.turns]);
+
   const send = useCallback(
-    async (message: string, runtimeSettings?: AssistantRuntimeSettings) => {
+    async (
+      message: string,
+      runtimeSettings?: AssistantRuntimeSettings,
+      controls?: AssistantComposerControls,
+    ) => {
       const userMessage = message.trim();
       if (!userMessage || ['starting', 'streaming'].includes(stateRef.current.status)) {
         return;
@@ -99,6 +164,7 @@ export function useAssistantSession(
       const turn = createAssistantTurn({
         sessionId: stateRef.current.sessionId,
         userMessage,
+        controls,
       });
       const nextState = startAssistantTurnLocally(stateRef.current, turn);
       const nextStateWithContext = {
@@ -118,6 +184,7 @@ export function useAssistantSession(
         selectedArtifacts: context.selectedArtifacts,
         pendingApproval: context.pendingApproval,
         systemHealth: context.systemHealth,
+        controls,
       });
 
       const options: AssistantStartTurnOptions = {
@@ -131,8 +198,14 @@ export function useAssistantSession(
 
       try {
         await startAssistantTurn(settings, options);
+        if (isBridgePreviewMode()) {
+          previewAssistantEvents(turn.id, stateRef.current.sessionId).forEach(applyEvent);
+        } else {
+          armTurnTimeout(turn.id, stateRef.current.sessionId);
+        }
       } catch (error) {
         const normalized = normalizeAssistantError(error);
+        clearTurnTimeout(turn.id);
         setState((previous) =>
           mapCliAssistantEvent(
             {
@@ -149,12 +222,23 @@ export function useAssistantSession(
         );
       }
     },
-    [getContext, settings],
+    [applyEvent, armTurnTimeout, clearTurnTimeout, getContext, settings],
   );
 
   const newChat = useCallback(() => {
     setState(createAssistantSession());
   }, []);
+
+  const regenerate = useCallback(
+    async (turnId: string, runtimeSettings?: AssistantRuntimeSettings) => {
+      const turn = stateRef.current.turns.find((item) => item.id === turnId);
+      if (!turn) {
+        return;
+      }
+      await send(turn.userMessage.text, runtimeSettings, turn.composerControls ?? undefined);
+    },
+    [send],
+  );
 
   const markApprovalDetailLoaded = useCallback((approvalId: string, detail: unknown) => {
     setState((previous) => ({
@@ -215,6 +299,7 @@ export function useAssistantSession(
     actions: {
       send,
       newChat,
+      regenerate,
       applyEvent,
       markApprovalDetailLoaded,
       appendSystemMessage,

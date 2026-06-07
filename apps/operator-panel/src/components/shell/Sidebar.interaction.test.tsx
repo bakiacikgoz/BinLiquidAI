@@ -19,6 +19,7 @@ describe('Sidebar interactions', () => {
         onClose={onClose}
         onToggleCollapse={vi.fn()}
         onNavigate={onNavigate}
+        onThemeChange={vi.fn()}
       />,
     );
 

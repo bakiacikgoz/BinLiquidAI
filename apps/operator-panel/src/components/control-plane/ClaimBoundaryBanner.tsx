@@ -1,14 +1,39 @@
 import { asControlPlaneClaimMatrix } from '../../controlPlaneMappers';
+import type { UiLocale } from '../../i18n';
 import { ReasonChip, StatusBadge } from '../primitives/Token';
 
-export function ClaimBoundaryBanner({ claims }: { claims: unknown }) {
+const copy = {
+  en: {
+    claimGuard: 'Claim Guard',
+    unsupportedBlocked: (count: number) => `${count} unsupported claim blocked`,
+    noBlockedClaims: 'No blocked claims',
+    noBlockingReason: 'No blocking reason',
+    blocked: 'blocked',
+  },
+  tr: {
+    claimGuard: 'Claim koruması',
+    unsupportedBlocked: (count: number) => `${count} desteklenmeyen claim blokelendi`,
+    noBlockedClaims: 'Blokelenen claim yok',
+    noBlockingReason: 'Bloklama nedeni yok',
+    blocked: 'bloke',
+  },
+} satisfies Record<UiLocale, {
+  claimGuard: string;
+  unsupportedBlocked: (count: number) => string;
+  noBlockedClaims: string;
+  noBlockingReason: string;
+  blocked: string;
+}>;
+
+export function ClaimBoundaryBanner({ claims, locale = 'en' }: { claims: unknown; locale?: UiLocale }) {
+  const text = copy[locale];
   const matrix = asControlPlaneClaimMatrix(claims);
   const blocked = matrix.claims.filter((claim) => claim.status === 'blocked');
   return (
     <article className="page-card">
-      <h3>Claim Guard</h3>
+      <h3>{text.claimGuard}</h3>
       <p className="workspace-lead">
-        {blocked.length > 0 ? `${blocked.length} unsupported claim blocked` : 'No blocked claims'}
+        {blocked.length > 0 ? text.unsupportedBlocked(blocked.length) : text.noBlockedClaims}
       </p>
       <div className="run-list">
         {matrix.claims.map((claim) => (
@@ -19,11 +44,13 @@ export function ClaimBoundaryBanner({ claims }: { claims: unknown }) {
                 {claim.blocking_reasons.length > 0 ? (
                   claim.blocking_reasons.map((reason) => <ReasonChip key={reason}>{reason}</ReasonChip>)
                 ) : (
-                  <span>No blocking reason</span>
+                  <span>{text.noBlockingReason}</span>
                 )}
               </div>
             </div>
-            <StatusBadge tone={claim.status === 'blocked' ? 'error' : 'success'}>{claim.status}</StatusBadge>
+            <StatusBadge tone={claim.status === 'blocked' ? 'error' : 'success'}>
+              {claim.status === 'blocked' ? text.blocked : claim.status}
+            </StatusBadge>
           </article>
         ))}
       </div>

@@ -675,7 +675,9 @@ pub async fn bridge_team_submit(
     fallback_provider: Option<String>,
     model: Option<String>,
     hf_model_id: Option<String>,
+    safety_options: Option<Value>,
 ) -> BridgeResult<SpawnedRunPayload> {
+    let _ = safety_options;
     let spec = match normalize_required_path(&spec_path, "spec_path", "team run") {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
@@ -735,7 +737,9 @@ pub async fn bridge_team_resume_submit(
     fallback_provider: Option<String>,
     model: Option<String>,
     hf_model_id: Option<String>,
+    safety_options: Option<Value>,
 ) -> BridgeResult<SpawnedRunPayload> {
+    let _ = safety_options;
     let spec = match normalize_required_path(&spec_path, "spec_path", "team resume") {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
@@ -1106,6 +1110,40 @@ pub async fn bridge_config_resolve(
     );
     push_optional_arg(&mut args, "--model", model.as_deref());
     push_optional_arg(&mut args, "--hf-model-id", hf_model_id.as_deref());
+
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_assistant_provider_models(
+    config: BridgeConfig,
+    profile: Option<String>,
+    provider: Option<String>,
+    refresh: Option<bool>,
+) -> BridgeResult<Value> {
+    let profile = match normalize_optional_cli_token(profile.as_deref(), "profile", "provider models") {
+        Ok(value) => value.unwrap_or_else(|| config.profile()),
+        Err(error) => return BridgeResult::err(error),
+    };
+    let provider = match normalize_optional_cli_token(provider.as_deref(), "provider", "provider models") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+
+    let mut args = vec![
+        "provider".to_string(),
+        "models".to_string(),
+        "--profile".to_string(),
+        profile,
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--provider", provider.as_deref());
+    if refresh.unwrap_or(false) {
+        args.push("--refresh".to_string());
+    }
 
     match run_cli_json_owned(&config, args).await {
         Ok(value) => BridgeResult::ok(value),

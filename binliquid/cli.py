@@ -154,6 +154,7 @@ benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
 research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
+provider_app = typer.Typer(help="Provider discovery commands")
 approval_app = typer.Typer(help="Governance approval commands")
 operator_app = typer.Typer(help="Operator panel commands")
 computer_use_app = typer.Typer(help="Computer use execution commands")
@@ -195,6 +196,7 @@ app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
+app.add_typer(provider_app, name="provider")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
 app.add_typer(computer_use_app, name="computer-use")
@@ -493,6 +495,150 @@ def _validate_model_override_combo(
             "hf model override (--hf-model-id) cannot be used with provider=ollama.",
         )
     return None
+
+
+def _model_candidate(
+    *,
+    provider: str,
+    model_id: str,
+    installed: bool,
+    configured: bool,
+    source: str,
+    warnings: list[str] | None = None,
+) -> dict[str, object]:
+    return {
+        "provider": provider,
+        "id": model_id,
+        "displayName": model_id,
+        "installed": installed,
+        "configured": configured,
+        "source": source,
+        "sizeBytes": None,
+        "modifiedAtUtc": None,
+        "warnings": warnings or [],
+    }
+
+
+def _list_ollama_model_ids(timeout_seconds: int = 5) -> tuple[bool, list[str], str | None, str | None]:
+    try:
+        result = subprocess.run(
+            ["ollama", "list"],
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except FileNotFoundError:
+        return False, [], "OLLAMA_NOT_INSTALLED", "Ollama executable was not found."
+    except subprocess.TimeoutExpired:
+        return False, [], "OLLAMA_LIST_TIMEOUT", "ollama list timed out."
+
+    if result.returncode != 0:
+        message = (result.stderr or result.stdout or "ollama list failed.").strip()
+        return False, [], "OLLAMA_LIST_FAILED", message[:500]
+
+    models: list[str] = []
+    for line in result.stdout.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.lower().startswith("name "):
+            continue
+        model_id = stripped.split(maxsplit=1)[0].strip()
+        if model_id:
+            models.append(model_id)
+    return True, models[:200], None, None
+
+
+def _provider_models_payload(profile: str, requested_provider: str) -> dict[str, object]:
+    resolved, _source_map = resolve_runtime_config(profile=profile)
+    normalized_provider = _normalize_provider_name(requested_provider) or "all"
+    if normalized_provider == "auto":
+        normalized_provider = "all"
+    if normalized_provider not in {"all", "ollama", "transformers"}:
+        return {
+            "contractVersion": "operator-panel.assistant-provider-models/v1",
+            "profile": profile,
+            "provider": requested_provider,
+            "generatedAtUtc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "providers": [],
+            "status": "invalid_input",
+            "errorCode": "INVALID_PROVIDER",
+            "errorMessage": "provider must be auto, all, ollama, or transformers.",
+        }
+
+    provider_names = (
+        ["ollama", "transformers"]
+        if normalized_provider == "all"
+        else [normalized_provider]
+    )
+    providers: list[dict[str, object]] = []
+
+    if "ollama" in provider_names:
+        available, model_ids, error_code, error_message = _list_ollama_model_ids()
+        models = [
+            _model_candidate(
+                provider="ollama",
+                model_id=model_id,
+                installed=True,
+                configured=model_id == resolved.model_name,
+                source="ollama",
+            )
+            for model_id in model_ids
+        ]
+        if resolved.model_name and not any(item["id"] == resolved.model_name for item in models):
+            models.insert(
+                0,
+                _model_candidate(
+                    provider="ollama",
+                    model_id=resolved.model_name,
+                    installed=False,
+                    configured=True,
+                    source="config",
+                    warnings=["Configured Ollama model is not present in ollama list."],
+                ),
+            )
+        providers.append(
+            {
+                "provider": "ollama",
+                "available": available,
+                "selectedByConfig": _normalize_provider_name(resolved.llm_provider) == "ollama",
+                "errorCode": error_code,
+                "errorMessage": error_message,
+                "models": models,
+            }
+        )
+
+    if "transformers" in provider_names:
+        hf_model_id = resolved.hf_model_id
+        providers.append(
+            {
+                "provider": "transformers",
+                "available": bool(hf_model_id),
+                "selectedByConfig": _normalize_provider_name(resolved.llm_provider) == "transformers"
+                or _normalize_provider_name(resolved.fallback_provider) == "transformers",
+                "errorCode": None if hf_model_id else "HF_MODEL_NOT_CONFIGURED",
+                "errorMessage": None if hf_model_id else "No transformers HF model id is configured.",
+                "models": [
+                    _model_candidate(
+                        provider="transformers",
+                        model_id=hf_model_id,
+                        installed=False,
+                        configured=True,
+                        source="config",
+                        warnings=["Local transformers cache was not inspected by this command."],
+                    )
+                ]
+                if hf_model_id
+                else [],
+            }
+        )
+
+    return {
+        "contractVersion": "operator-panel.assistant-provider-models/v1",
+        "profile": profile,
+        "provider": requested_provider if requested_provider else "all",
+        "generatedAtUtc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "providers": providers,
+    }
 
 
 def _model_selection_context(
@@ -1800,6 +1946,27 @@ def config_resolve(
         typer.echo(f"router_mode={resolved.router_mode}")
         typer.echo(f"shadow_router_enabled={resolved.shadow_router_enabled}")
         typer.echo(f"shadow_router_mode={resolved.shadow_router_mode}")
+
+
+@provider_app.command("models")
+def provider_models(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    provider: str = typer.Option("all", help="Provider: all|auto|ollama|transformers"),
+    refresh: bool = typer.Option(False, "--refresh", help="Refresh provider model list cache when supported"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """List locally discoverable assistant provider models without installing models."""
+    _ = refresh
+    payload = _provider_models_payload(profile=profile, requested_provider=provider)
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+    else:
+        for item in payload.get("providers", []):
+            provider_record = item if isinstance(item, dict) else {}
+            typer.echo(f"{provider_record.get('provider')}: {provider_record.get('available')}")
+
+    if payload.get("status") == "invalid_input":
+        raise typer.Exit(code=1)
 
 
 @app.command()

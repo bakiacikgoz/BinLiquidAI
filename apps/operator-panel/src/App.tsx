@@ -85,10 +85,19 @@ import {
   mapWorkspaceStageToMissionStage,
 } from './missionMappers';
 import { useAssistantSession } from './assistant/useAssistantSession';
+import { useAssistantModels } from './assistant/useAssistantModels';
+import type { AssistantProviderKind } from './assistant/modelDiscovery';
 import { MissionControlView } from './components/mission/MissionControlView';
+import type { SessionEventFilter, SessionEventItem } from './components/mission/SessionEventsCard';
 import { ComputerUseOperationsCard } from './components/mission/ComputerUseOperationsCard';
+import { ComputerUseBlockerChecklist } from './components/mission/ComputerUseBlockerChecklist';
 import { AssistantView, type AssistantViewCopy } from './components/assistant/AssistantView';
-import { AssistantRightRail, type AssistantRuntimeSummary } from './components/assistant/AssistantRightRail';
+import {
+  AssistantRightRail,
+  type AssistantComplianceSummary,
+  type AssistantRailSession,
+  type AssistantRuntimeSummary,
+} from './components/assistant/AssistantRightRail';
 import { AgentRegistryView } from './components/control-plane/AgentRegistryView';
 import { ClaimBoundaryBanner } from './components/control-plane/ClaimBoundaryBanner';
 import { ControlPlaneDashboard } from './components/control-plane/ControlPlaneDashboard';
@@ -98,7 +107,6 @@ import { ExecutionSurfacesView } from './components/control-plane/ExecutionSurfa
 import { PolicySimulationView } from './components/control-plane/PolicySimulationView';
 import { OperationCommandList } from './components/control-plane/OperationCommandCard';
 import { RawInspector } from './components/control-plane/RawInspector';
-import { RuntimeTruthBanner } from './components/control-plane/RuntimeTruthBanner';
 import {
   AlertsPage,
   LogsPage,
@@ -109,9 +117,11 @@ import {
   UsersPage,
 } from './components/product-pages/ProductizedPages';
 import { AppShell } from './components/shell/AppShell';
+import { ExportArtifactsModal } from './components/shell/ExportArtifactsModal';
 import { RightRail } from './components/shell/RightRail';
 import { loadControlPlaneSnapshot } from './control-plane/snapshot';
 import type { ControlPlaneSnapshot, EvidencePackSummary, OperationDescriptor, PageViewModel } from './control-plane/types';
+import { asControlPlaneClaimMatrix } from './controlPlaneMappers';
 import type { ShellViewKey } from './components/shell/Sidebar';
 import type { RouteId } from './routeRegistry';
 
@@ -368,10 +378,17 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [artifactsByName, setArtifactsByName] = useState<Record<string, unknown>>({});
   const [selectedArtifactName, setSelectedArtifactName] = useState<string>('status.json');
   const [showRawArtifact, setShowRawArtifact] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportPath, setExportPath] = useState('');
+  const [exportSubmitting, setExportSubmitting] = useState(false);
 
   const [events, setEvents] = useState<unknown[]>([]);
   const [eventsCursor, setEventsCursor] = useState(0);
   const [eventsWarning, setEventsWarning] = useState('');
+  const [sessionEventFilter, setSessionEventFilter] = useState<SessionEventFilter>('all');
+  const [sessionEventVisibleLimit, setSessionEventVisibleLimit] = useState(20);
+  const [sessionEventsLoadingMore, setSessionEventsLoadingMore] = useState(false);
+  const [sessionEventsHasMore, setSessionEventsHasMore] = useState(false);
   const cursorRef = useRef(0);
 
   const [taskForm, setTaskForm] = useState<TaskFormState>({
@@ -491,6 +508,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const configRecord = asRecord(configData);
   const assistantRuntimeSettings = getAssistantRuntimeSettings(settings);
   const assistantRuntimeValidationMessage = validateAssistantRuntimeSettings(assistantRuntimeSettings);
+  const assistantModelProvider =
+    settings.assistantProvider === 'ollama' || settings.assistantProvider === 'transformers'
+      ? (settings.assistantProvider as AssistantProviderKind)
+      : 'all';
+  const assistantModels = useAssistantModels({
+    settings,
+    profile: settings.profile,
+    provider: assistantModelProvider,
+  });
   const assistantResolvedConfig = asRecord(asRecord(configRecord.resolved));
   const profileDefaultLabel = 'profile default';
   const assistantRuntimeSummary: AssistantRuntimeSummary = {
@@ -716,6 +742,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     setEventsCursor(0);
     cursorRef.current = 0;
     setEventsWarning('');
+    setSessionEventFilter('all');
+    setSessionEventVisibleLimit(20);
+    setSessionEventsHasMore(false);
     setComputerUseState(null);
     void loadRunContext(selectedRunId);
   }, [selectedRunId, settings.profile, settings.rootDir]);
@@ -747,6 +776,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         } else if (stream.events.length > 0) {
           setEvents((prev) => [...prev, ...stream.events]);
         }
+        setSessionEventsHasMore(stream.events.length > 0 || stream.truncated);
 
         cursorRef.current = stream.nextCursor;
         setEventsCursor(stream.nextCursor);
@@ -855,6 +885,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         fallbackProvider: taskForm.fallbackProvider || undefined,
         model: taskForm.model || undefined,
         hfModelId: taskForm.hfModelId || undefined,
+        safetyOptions: {
+          askBeforeExternalAction: askBeforeExternal,
+          askBeforeDelete: askBeforeDeletion,
+          askBeforeSend,
+        },
       });
       const jobId = extractJobId(payload);
       if (jobId) {
@@ -900,6 +935,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         fallbackProvider: taskForm.fallbackProvider || undefined,
         model: taskForm.model || undefined,
         hfModelId: taskForm.hfModelId || undefined,
+        safetyOptions: {
+          askBeforeExternalAction: askBeforeExternal,
+          askBeforeDelete: askBeforeDeletion,
+          askBeforeSend,
+        },
       });
       const jobId = extractJobId(payload);
       if (jobId) {
@@ -1014,24 +1054,65 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
-  async function onExportArtifacts() {
+  function onExportArtifacts() {
     if (!selectedRunId) {
       return;
     }
+    setExportPath((current) => current || `./exports/${selectedRunId}`);
+    setExportModalOpen(true);
+  }
 
-    const target = window.prompt(t.exportPrompt, `./exports/${selectedRunId}`);
-    if (!target) {
+  async function onConfirmExportArtifacts(target: string) {
+    if (!selectedRunId || !target.trim()) {
       return;
     }
 
+    setExportSubmitting(true);
     try {
-      await exportRunArtifacts(settings, selectedRunId, target);
+      await exportRunArtifacts(settings, selectedRunId, target.trim());
+      setExportPath(target.trim());
+      setExportModalOpen(false);
       pushToast('ok', t.exportDone);
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
         pushToast('error', `${parsed.code}: ${parsed.message}`);
       }
+    } finally {
+      setExportSubmitting(false);
+    }
+  }
+
+  async function onLoadMoreSessionEvents() {
+    if (filteredSessionEvents.length > sessionEventVisibleLimit) {
+      setSessionEventVisibleLimit((value) => value + 20);
+      return;
+    }
+    if (!selectedRunId || sessionEventsLoadingMore) {
+      return;
+    }
+
+    setSessionEventsLoadingMore(true);
+    try {
+      const stream = await tailEvents(settings, selectedRunId, cursorRef.current, 96 * 1024, 200);
+      if (stream.reset) {
+        setEvents(stream.events);
+      } else if (stream.events.length > 0) {
+        setEvents((prev) => [...prev, ...stream.events]);
+      }
+      cursorRef.current = stream.nextCursor;
+      setEventsCursor(stream.nextCursor);
+      setSessionEventsHasMore(stream.events.length > 0 || stream.truncated);
+      if (stream.events.length === 0 && !stream.truncated) {
+        pushToast('ok', 'Yeni oturum olayı yok.');
+      }
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      if (parsed) {
+        pushToast('error', `${parsed.code}: ${parsed.message}`);
+      }
+    } finally {
+      setSessionEventsLoadingMore(false);
     }
   }
 
@@ -1172,6 +1253,72 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }).format(parsed);
   }
 
+  function sessionEventCategory(item: SessionEventItem): SessionEventFilter {
+    const haystack = `${item.title} ${item.body} ${item.tag}`.toLowerCase();
+    if (haystack.includes('assistant')) {
+      return 'assistant';
+    }
+    if (haystack.includes('computer') || haystack.includes('vision')) {
+      return 'computer_use';
+    }
+    if (haystack.includes('approval') || haystack.includes('onay')) {
+      return 'approval';
+    }
+    if (haystack.includes('error') || haystack.includes('failed') || haystack.includes('hata')) {
+      return 'error';
+    }
+    if (haystack.includes('warn') || haystack.includes('blocked') || haystack.includes('uyarı')) {
+      return 'warning';
+    }
+    return 'status';
+  }
+
+  function eventRecordToSessionEventItem(value: unknown, index: number): SessionEventItem {
+    const record = asRecord(value);
+    const data = asRecord(record.data);
+    const eventName =
+      readString(record, 'event') ||
+      readString(record, 'type') ||
+      readString(data, 'event') ||
+      `runtime_event_${index + 1}`;
+    const message =
+      readString(record, 'message') ||
+      readString(record, 'summary') ||
+      readString(data, 'message') ||
+      readString(data, 'summary') ||
+      eventName;
+    const timestamp =
+      readString(record, 'timestampUtc') ||
+      readString(record, 'timestamp_utc') ||
+      readString(record, 'timestamp') ||
+      readString(data, 'timestampUtc') ||
+      '';
+    const normalized = `${eventName} ${message}`.toLowerCase();
+    const tone: SessionEventItem['tone'] =
+      normalized.includes('error') || normalized.includes('failed') || normalized.includes('rejected')
+        ? 'warning'
+        : normalized.includes('approved') || normalized.includes('verified') || normalized.includes('completed')
+          ? 'success'
+          : normalized.includes('warning') || normalized.includes('blocked') || normalized.includes('approval')
+            ? 'warning'
+            : 'info';
+
+    return {
+      id: readString(record, 'id') || `${eventName}-${index}-${timestamp || eventsCursor}`,
+      time: timestamp ? formatClock(timestamp, '-') : '-',
+      title: humanizeCode(eventName),
+      body: message,
+      tag: normalized.includes('approval')
+        ? 'APPROVAL'
+        : normalized.includes('assistant')
+          ? 'ASSISTANT'
+          : normalized.includes('computer')
+            ? 'COMPUTER_USE'
+            : 'STATUS',
+      tone,
+    };
+  }
+
   const selectedRunRecord = asRecord(
     runItems.find((item) => readString(asRecord(item), 'job_id') === selectedRunId),
   );
@@ -1240,7 +1387,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     metricsPayload: operationOutputs.metrics,
   });
   const activityItems = buildActivityItems(workspaceSnapshot, formatClock);
-  const sessionEvents = buildSessionEventItems(workspaceSnapshot, formatClock);
+  const sessionEventItems =
+    events.length > 0
+      ? events.slice().reverse().map(eventRecordToSessionEventItem)
+      : buildSessionEventItems(workspaceSnapshot, formatClock);
+  const filteredSessionEvents =
+    sessionEventFilter === 'all'
+      ? sessionEventItems
+      : sessionEventItems.filter((item) => sessionEventCategory(item) === sessionEventFilter);
+  const sessionEvents = filteredSessionEvents.slice(0, sessionEventVisibleLimit);
   const runtimeSummary = buildRuntimeSummaryItems({
     snapshot: workspaceSnapshot,
     selectedRunId,
@@ -1248,13 +1403,71 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     stageLabel: workspaceStageLabel(workspaceSnapshot.stage),
     systemHealth,
   });
-  const notifications = buildNotificationItems({
+  const operatorNotification =
+    !operatorIdValid && !dismissedNotifications.includes('operator-id-required')
+      ? [
+          {
+            id: 'operator-id-required',
+            kind: 'warning' as const,
+            title: locale === 'tr' ? 'Operatör kimliği gerekli' : 'Operator identity required',
+            subtitle: t.setOperatorId,
+            time: '-',
+          },
+        ]
+      : [];
+  const notifications = [
+    ...operatorNotification,
+    ...buildNotificationItems({
     approvalRows,
     timeline: workspaceSnapshot.timeline,
     dismissedIds: dismissedNotifications,
     formatClock,
-  });
+    }),
+  ];
   const pendingApprovalSummaries = buildPendingApprovalSummaries(approvalRows, selectedRunId);
+  const assistantRecentSessions: AssistantRailSession[] = runItems
+    .slice(0, 3)
+    .map((item) => {
+      const row = asRecord(item);
+      const id = readString(row, 'job_id');
+      if (!id) {
+        return null;
+      }
+      const status = readString(row, 'status') || readString(row, 'stage') || 'unknown';
+      const createdAt = readString(row, 'created_at') || readString(row, 'started_at');
+      return {
+        id,
+        title: id,
+        status: humanizeCode(status),
+        timestamp: createdAt ? formatClock(createdAt, '-') : '-',
+      };
+    })
+    .filter((item): item is AssistantRailSession => item !== null);
+  const claimMatrix = asControlPlaneClaimMatrix(controlPlaneClaims);
+  const assistantComplianceSummary: AssistantComplianceSummary =
+    claimMatrix.claims.length === 0
+      ? { label: 'No compliance data available', tone: 'info' }
+      : claimMatrix.claims.some((claim) => claim.status === 'blocked')
+        ? {
+            label: `${claimMatrix.claims.filter((claim) => claim.status === 'blocked').length} blocked`,
+            tone: 'error',
+          }
+        : claimMatrix.claims.some((claim) => claim.status === 'conditional')
+          ? {
+              label: `${claimMatrix.claims.filter((claim) => claim.status === 'conditional').length} conditional`,
+              tone: 'warning',
+            }
+          : { label: 'Clear', tone: 'success' };
+  const assistantRelatedArtifacts = Object.entries(artifactsByName)
+    .slice(0, 3)
+    .map(([name, value]) => ({
+      name,
+      summary:
+        readString(asRecord(value), 'status') ||
+        readString(asRecord(value), 'stage') ||
+        readString(asRecord(value), 'summary') ||
+        selectedRunId,
+    }));
   const computerUseLiveActionBlocked = isComputerUseRun && !computerUseLiveEnabled;
   const canResumeFromQuickAction =
     !computerUseLiveActionBlocked &&
@@ -1317,7 +1530,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     try {
       await decideApproval(settings, approvalId, approve, settings.operatorId, 'assistant approval action');
       pushToast('ok', `${label} OK`);
-      assistantSession.actions.appendSystemMessage(approve ? 'Approved by operator' : 'Rejected by operator');
+      assistantSession.actions.appendSystemMessage(
+        approve
+          ? locale === 'tr'
+            ? 'Operatör tarafından onaylandı'
+            : 'Approved by operator'
+          : locale === 'tr'
+            ? 'Operatör tarafından reddedildi'
+            : 'Rejected by operator',
+      );
       await Promise.all([refreshApprovals(), refreshRuns()]);
       if (selectedRunId) {
         await loadRunContext(selectedRunId, false);
@@ -1345,7 +1566,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     try {
       await executeApproval(settings, approvalId, settings.operatorId);
       pushToast('ok', `${t.execute} OK`);
-      assistantSession.actions.appendSystemMessage('Executed approved action through governance lifecycle');
+      assistantSession.actions.appendSystemMessage(
+        locale === 'tr'
+          ? 'Onaylı aksiyon yönetişim yaşam döngüsü üzerinden yürütüldü'
+          : 'Executed approved action through governance lifecycle',
+      );
       await Promise.all([refreshApprovals(), refreshRuns()]);
       if (selectedRunId) {
         await loadRunContext(selectedRunId, false);
@@ -1365,6 +1590,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       pendingApprovals={pendingApprovalSummaries}
       selectedRunId={selectedRunId}
       runtimeSummary={assistantRuntimeSummary}
+      recentSessions={assistantRecentSessions}
+      complianceSummary={assistantComplianceSummary}
+      relatedArtifacts={assistantRelatedArtifacts}
+      locale={locale}
       onRefreshContext={() => {
         void refreshCore();
         if (selectedRunId) {
@@ -1387,12 +1616,17 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       contractWarning={contractMismatch ? t.contractMismatch : ''}
       pendingApprovalCount={pendingApprovals.length}
       warningCount={driftEvents.length}
+      notificationItems={notifications}
+      themeMode={settings.theme}
+      locale={locale}
       toasts={toasts}
       onNavigate={(view) => setActiveView(view)}
       onToggleNav={() => setMobileNavOpen((value) => !value)}
       onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
       onCloseNav={() => setMobileNavOpen(false)}
       onRefresh={() => void refreshCore()}
+      onDismissNotification={(id) => setDismissedNotifications((prev) => [...prev, id])}
+      onThemeChange={(theme) => updateSettings({ theme })}
       rightRail={
         activeView === 'assistant' ? null : (
           <RightRail
@@ -1445,8 +1679,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <small>{handshakeError.command}</small>
           </div>
         ) : null}
-        {activeView === 'assistant' ? null : <RuntimeTruthBanner viewModel={controlPlaneSnapshotVm} locale={locale} />}
-
         {activeView === 'dashboard' ? (
           <ControlPlaneDashboard
             doctor={controlPlaneDoctor}
@@ -1457,10 +1689,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             codeIntelligence={codeIntelligence}
             pilotOperations={pilotOperations}
             designPartnerBeta={designPartnerBeta}
+            locale={locale}
           />
         ) : null}
 
-        {activeView === 'agents' ? <AgentRegistryView agents={controlPlaneAgents} /> : null}
+        {activeView === 'agents' ? <AgentRegistryView agents={controlPlaneAgents} locale={locale} /> : null}
 
         {activeView === 'policy' ? <PolicySimulationView simulation={controlPlanePolicy} locale={locale} /> : null}
 
@@ -1468,9 +1701,13 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           <section className="workspace" data-testid="page-primary-region">
             <div className="workspace-header">
               <div>
-                <p className="workspace-kicker">Evidence</p>
-                <h2>Signed Evidence</h2>
-                <p className="workspace-lead">Manifest integrity, replay verification and release boundaries.</p>
+                <p className="workspace-kicker">{locale === 'tr' ? 'Kanıt' : 'Evidence'}</p>
+                <h2>{locale === 'tr' ? 'İmzalı Kanıtlar' : 'Signed Evidence'}</h2>
+                <p className="workspace-lead">
+                  {locale === 'tr'
+                    ? 'Manifest bütünlüğü, replay doğrulaması ve yayın sınırları.'
+                    : 'Manifest integrity, replay verification and release boundaries.'}
+                </p>
               </div>
               <div className="workspace-actions">
                 <button
@@ -1478,7 +1715,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                   type="button"
                   onClick={() => void refreshControlPlane()}
                 >
-                  Refresh claims
+                  {locale === 'tr' ? 'Claim kayıtlarını yenile' : 'Refresh claims'}
                 </button>
               </div>
             </div>
@@ -1486,12 +1723,18 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <EvidencePackView
                 evidencePacks={evidencePacks}
                 verifyResult={controlPlaneEvidenceVerifyResult}
-                verifyDisabledReason={selectedEvidenceManifestPath ? '' : 'No evidence manifest is available to verify.'}
+                verifyDisabledReason={
+                  selectedEvidenceManifestPath
+                    ? ''
+                    : locale === 'tr'
+                      ? 'Doğrulanacak evidence manifest yok.'
+                      : 'No evidence manifest is available to verify.'
+                }
                 pilotLaunch={pilotLaunch}
                 locale={locale}
                 onVerify={() => void onVerifyEvidencePack()}
               />
-              <ClaimBoundaryBanner claims={controlPlaneClaims} />
+              <ClaimBoundaryBanner claims={controlPlaneClaims} locale={locale} />
             </div>
           </section>
         ) : null}
@@ -1521,6 +1764,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             progress={workspaceProgress}
             activityItems={activityItems}
             sessionEvents={sessionEvents}
+            sessionEventFilter={sessionEventFilter}
+            sessionEventsHasMore={
+              filteredSessionEvents.length > sessionEventVisibleLimit || sessionEventsHasMore
+            }
+            sessionEventsLoadingMore={sessionEventsLoadingMore}
             runtimeSummary={runtimeSummary}
             rawSummary={{ runStatus, computerUseState, configData, handshakeData }}
             computerUseCapabilityResolution={computerUseVisionCapability.capabilityResolution}
@@ -1531,9 +1779,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             approvalDisabledReason={approvalDisabledReason}
             onSelectRun={setSelectedRunId}
             onRawJsonRequested={() => confirmRawDisclosure('Runtime özeti ham JSON')}
+            onSessionEventFilterChange={(filter) => {
+              setSessionEventFilter(filter);
+              setSessionEventVisibleLimit(20);
+            }}
+            onLoadMoreSessionEvents={() => void onLoadMoreSessionEvents()}
             onApprove={() => void onApproveAndContinue()}
             onEditApproval={() => setActiveView('approvals')}
             onReject={() => void onDecideApproval(false)}
+            onResolveApprovalDisabled={() => setActiveView('settings')}
           />
         ) : null}
         {activeView === 'assistant' ? (
@@ -1545,13 +1799,18 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             debugRawEnabled={settings.debugRaw}
             rightRail={assistantRightRail}
             runtimeSettings={assistantRuntimeSettings}
+            modelDiscovery={assistantModels}
+            locale={locale}
             onRuntimeSettingsChange={updateSettings}
-            onSend={(message, runtimeSettings) => void assistantSession.actions.send(message, runtimeSettings)}
+            onSend={(message, runtimeSettings, controls) =>
+              void assistantSession.actions.send(message, runtimeSettings, controls)
+            }
             onNewChat={assistantSession.actions.newChat}
             onReviewApproval={onReviewAssistantApproval}
             onApprove={(approvalId) => void onDecideAssistantApproval(approvalId, true)}
             onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}
             onExecute={(approvalId) => void onExecuteAssistantApproval(approvalId)}
+            onRegenerate={(turnId) => void assistantSession.actions.regenerate(turnId, assistantRuntimeSettings)}
           />
         ) : null}
 
@@ -1633,6 +1892,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     />
                   </label>
                 </div>
+                <ComputerUseBlockerChecklist
+                  blocked={!computerUseLiveEnabled}
+                  reason={computerUseDisabledReason}
+                  blockers={computerUseVisionBlockers}
+                  onOpenSettings={() => setActiveView('settings')}
+                />
                 <div className="form-grid">
                   <label className="field">
                     <span>{t.profile}</span>
@@ -2779,6 +3044,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         {activeView === 'policy-packs' ? (
           <PolicyPacksPage claims={controlPlaneClaims} snapshot={controlPlaneSnapshot} locale={locale} />
         ) : null}
+        <ExportArtifactsModal
+          open={exportModalOpen}
+          runId={selectedRunId}
+          initialPath={exportPath || `./exports/${selectedRunId || 'run'}`}
+          submitting={exportSubmitting}
+          locale={locale}
+          onClose={() => setExportModalOpen(false)}
+          onSubmit={(path) => void onConfirmExportArtifacts(path)}
+        />
     </AppShell>
   );
 }

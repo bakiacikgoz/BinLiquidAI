@@ -32,6 +32,7 @@ pub fn run() {
             bridge::bridge_team_status,
             bridge::bridge_team_export,
             bridge::bridge_config_resolve,
+            bridge::bridge_assistant_provider_models,
             bridge::bridge_auth_whoami,
             bridge::bridge_auth_check,
             bridge::bridge_security_baseline,

@@ -59,7 +59,7 @@ test('viewport matrix keeps the workspace usable without horizontal overflow', a
     }
 
     if (viewport.name === 'mobile') {
-      await page.getByRole('button', { name: 'Menü', exact: true }).click();
+      await page.getByRole('button', { name: 'Navigasyonu aç', exact: true }).click();
       await expect(page.getByRole('navigation', { name: 'Ana navigasyon' })).toBeVisible();
       await page.getByRole('navigation', { name: 'Ana navigasyon' }).getByRole('button', { name: 'Görevler', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();

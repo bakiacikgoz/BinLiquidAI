@@ -23,6 +23,10 @@ export type IconName =
   | 'layers'
   | 'list'
   | 'logs'
+  | 'menu'
+  | 'monitor'
+  | 'moon'
+  | 'more'
   | 'paperclip'
   | 'play'
   | 'policy'
@@ -30,9 +34,11 @@ export type IconName =
   | 'reject'
   | 'report'
   | 'settings'
+  | 'share'
   | 'shield'
   | 'send'
   | 'sparkle'
+  | 'sun'
   | 'target'
   | 'terminal'
   | 'user'
@@ -63,6 +69,10 @@ const paths: Record<IconName, string> = {
   layers: 'M12 4l8 4-8 4-8-4 8-4z M4 12l8 4 8-4 M4 16l8 4 8-4',
   list: 'M8 6h12 M8 12h12 M8 18h12 M4 6h.01 M4 12h.01 M4 18h.01',
   logs: 'M7 4h10l3 3v13H7z M17 4v4h4 M10 12h7 M10 16h7',
+  menu: 'M4 6h16 M4 12h16 M4 18h16',
+  monitor: 'M4 5h16v11H4z M8 20h8 M12 16v4',
+  moon: 'M20 14.5A7.5 7.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z',
+  more: 'M5 12h.01 M12 12h.01 M19 12h.01',
   paperclip: 'M21 11l-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-2.8-2.8L15 7.4',
   play: 'M8 5l11 7-11 7z',
   policy: 'M12 3l7 3v6c0 4-2.8 7.2-7 9-4.2-1.8-7-5-7-9V6z M9 12l2 2 4-5',
@@ -70,9 +80,11 @@ const paths: Record<IconName, string> = {
   reject: 'M6 6l12 12M18 6L6 18 M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
   report: 'M6 4h12v16H6z M9 8h6 M9 12h6 M9 16h4',
   settings: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M12 2v3 M12 19v3 M4.9 4.9l2.1 2.1 M17 17l2.1 2.1 M2 12h3 M19 12h3 M4.9 19.1L7 17 M17 7l2.1-2.1',
+  share: 'M12 16V4 M7 9l5-5 5 5 M5 16v4h14v-4',
   shield: 'M12 3l8 4v5c0 5-3.4 8-8 9-4.6-1-8-4-8-9V7z M12 8v5 M12 16h.01',
   send: 'M4 4l17 8-17 8 4-8-4-8z M8 12h13',
   sparkle: 'M12 3l1.5 5.2L19 10l-5.5 1.8L12 17l-1.5-5.2L5 10l5.5-1.8L12 3z M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z',
+  sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M12 2v3 M12 19v3 M4.2 4.2l2.1 2.1 M17.7 17.7l2.1 2.1 M2 12h3 M19 12h3 M4.2 19.8l2.1-2.1 M17.7 6.3l2.1-2.1',
   target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M16 4l-4 4',
   terminal: 'M4 5h16v14H4z M8 9l3 3-3 3 M12 15h4',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M4 21a8 8 0 0 1 16 0',

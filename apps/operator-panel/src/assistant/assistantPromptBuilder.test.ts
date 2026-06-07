@@ -52,4 +52,28 @@ describe('assistant prompt builder', () => {
     expect(result.truncated).toBe(true);
     expect(result.omittedSections).toContain('compiledPromptTail');
   });
+
+  it('only includes selected safe context attachments and tool intents', () => {
+    const result = buildAssistantPrompt({
+      userMessage: 'explain blocker',
+      session: createAssistantSession('session-test'),
+      selectedRunStatus: { run_id: 'run-test' },
+      selectedRunEvents: [{ event: 'approval_required' }],
+      selectedArtifacts: { 'status.json': { status: 'blocked' } },
+      pendingApproval: { approval_id: 'apr-test' },
+      systemHealth: { health: 'Healthy' },
+      controls: {
+        contextAttachmentKinds: ['active_run', 'approval_summary'],
+        toolIntents: ['explain_policy_blocker'],
+      },
+    });
+
+    expect(result.compiledPrompt).toContain('## Allowed tool intents');
+    expect(result.compiledPrompt).toContain('explain_policy_blocker');
+    expect(result.compiledPrompt).toContain('## Selected run status');
+    expect(result.compiledPrompt).toContain('## Pending approval');
+    expect(result.compiledPrompt).not.toContain('## Recent normalized events');
+    expect(result.compiledPrompt).not.toContain('## Artifact summary');
+    expect(result.compiledPrompt).not.toContain('## System health');
+  });
 });

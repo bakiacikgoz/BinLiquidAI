@@ -1,5 +1,6 @@
 import type {
   AssistantApprovalSummary,
+  AssistantComposerControls,
   AssistantSessionState,
   AssistantStreamEvent,
   AssistantStreamEventType,
@@ -57,6 +58,7 @@ export function createAssistantTurn(input: {
   sessionId: string;
   userMessage: string;
   createdAtUtc?: string;
+  controls?: AssistantComposerControls;
 }): AssistantTurn {
   const createdAtUtc = input.createdAtUtc ?? nowUtc();
   const id = input.id ?? nextId('assistant-turn');
@@ -64,6 +66,7 @@ export function createAssistantTurn(input: {
     id,
     startedAtUtc: createdAtUtc,
     completedAtUtc: null,
+    composerControls: input.controls ?? null,
     status: 'starting',
     eventSequence: 0,
     userMessage: {

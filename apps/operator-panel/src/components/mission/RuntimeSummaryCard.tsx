@@ -85,6 +85,12 @@ export function RuntimeSummaryCard({
       {computerUseCapabilityResolution ? (
         <ComputerUseCapabilityPanel resolution={computerUseCapabilityResolution} />
       ) : null}
+      {!debugRawEnabled ? (
+        <p className="runtime-disabled-helper">
+          Ham JSON görünümü kapalı. Ayarlar ekranından Debug raw payload seçeneğini açarak redacted runtime
+          payloadlarını görüntüleyebilirsiniz.
+        </p>
+      ) : null}
       {showRaw ? (
         <RawInspector
           value={redactJson(rawJson ?? {})}

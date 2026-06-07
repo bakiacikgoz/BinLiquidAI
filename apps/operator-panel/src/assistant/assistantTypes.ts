@@ -32,6 +32,25 @@ export interface AssistantStartTurnOptions {
   hfModelId?: string;
 }
 
+export type AssistantContextAttachmentKind =
+  | 'active_run'
+  | 'event_tail'
+  | 'approval_summary'
+  | 'artifact_summary'
+  | 'system_health';
+
+export type AssistantSafeToolIntent =
+  | 'inspect_run'
+  | 'summarize_events'
+  | 'explain_policy_blocker'
+  | 'draft_remediation_plan'
+  | 'prepare_approval_review';
+
+export interface AssistantComposerControls {
+  contextAttachmentKinds: AssistantContextAttachmentKind[];
+  toolIntents: AssistantSafeToolIntent[];
+}
+
 export interface AssistantStartTurnResponse {
   contractVersion: string;
   assistantTurnId: string;
@@ -132,6 +151,7 @@ export interface AssistantTurn {
   id: string;
   userMessage: AssistantUserMessage;
   assistantMessage: AssistantAssistantMessage;
+  composerControls: AssistantComposerControls | null;
   startedAtUtc: string;
   completedAtUtc: string | null;
   status: AssistantTurnStatus;

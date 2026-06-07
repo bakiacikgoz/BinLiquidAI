@@ -1,48 +1,73 @@
 import type { AssistantTimelineItem, AssistantTurnStatus } from '../../assistant/assistantTypes';
-import { Badge } from '../primitives/Badge';
+import { translateAssistantText, type UiLocale } from '../../i18n';
 import { StatusDot } from '../primitives/StatusDot';
 
-function statusTone(status: AssistantTurnStatus): 'success' | 'warning' | 'error' | 'info' | 'neutral' {
-  if (status === 'completed') {
-    return 'success';
-  }
-  if (status === 'awaiting_approval') {
-    return 'warning';
-  }
-  if (status === 'failed' || status === 'cancelled') {
-    return 'error';
-  }
-  if (status === 'idle') {
-    return 'neutral';
-  }
-  return 'info';
+function normalizeStatusLabel(value: string): string {
+  return value.replace(/_/g, ' ').trim().toLowerCase();
 }
 
-function dotTone(tone: ReturnType<typeof statusTone>): 'success' | 'warning' | 'error' | 'info' | 'muted' {
-  return tone === 'neutral' ? 'muted' : tone;
+function isBoilerplateTimelineItem(item: AssistantTimelineItem): boolean {
+  const title = normalizeStatusLabel(item.title);
+  const subtitle = normalizeStatusLabel(item.subtitle);
+  return title === 'starting' && subtitle === 'starting assistant turn';
+}
+
+function secondsBetween(startedAtUtc: string, completedAtUtc: string | null): number | null {
+  const startedAt = new Date(startedAtUtc).getTime();
+  const completedAt = completedAtUtc ? new Date(completedAtUtc).getTime() : Date.now();
+
+  if (Number.isNaN(startedAt) || Number.isNaN(completedAt)) {
+    return null;
+  }
+
+  return Math.max(1, Math.round((completedAt - startedAt) / 1000));
+}
+
+function thinkingLabel(status: AssistantTurnStatus, startedAtUtc: string, completedAtUtc: string | null): string {
+  if (status === 'starting' || status === 'streaming') {
+    return 'Düşünüyor';
+  }
+
+  if (status === 'completed') {
+    const seconds = secondsBetween(startedAtUtc, completedAtUtc);
+    return seconds ? `${seconds} saniye düşündü` : 'Düşündü';
+  }
+
+  if (status === 'awaiting_approval') return 'Onay bekliyor';
+  if (status === 'failed') return 'Yanıt tamamlanamadı';
+  if (status === 'cancelled') return 'Yanıt iptal edildi';
+  return 'Hazır';
 }
 
 export function AssistantRunningState({
   status,
   timeline,
+  startedAtUtc,
+  completedAtUtc,
+  locale = 'en',
 }: {
   status: AssistantTurnStatus;
   timeline: AssistantTimelineItem[];
+  startedAtUtc: string;
+  completedAtUtc: string | null;
+  locale?: UiLocale;
 }) {
-  const tone = statusTone(status);
+  const statusLabel = normalizeStatusLabel(status);
+  const visibleTimeline = timeline
+    .filter((item) => normalizeStatusLabel(item.title) !== statusLabel && !isBoilerplateTimelineItem(item))
+    .slice(-5);
+  const isThinking = status === 'starting' || status === 'streaming';
   return (
-    <div className="assistant-running-state">
-      <Badge tone={tone}>
-        <StatusDot tone={dotTone(tone)} pulse={status === 'starting' || status === 'streaming'} /> {status}
-      </Badge>
-      {timeline.length > 0 ? (
+    <div className={isThinking ? 'assistant-running-state assistant-running-state-active' : 'assistant-running-state'}>
+      <span className="assistant-thinking-label">{thinkingLabel(status, startedAtUtc, completedAtUtc)}</span>
+      {visibleTimeline.length > 0 ? (
         <div className="assistant-activity-list">
-          {timeline.slice(-5).map((item) => (
+          {visibleTimeline.map((item) => (
             <div className="assistant-activity-row" key={item.id}>
               <StatusDot tone={item.tone} />
               <span>
-                <strong>{item.title}</strong>
-                <em>{item.subtitle}</em>
+                <strong>{translateAssistantText(item.title, locale)}</strong>
+                <em>{translateAssistantText(item.subtitle, locale)}</em>
               </span>
             </div>
           ))}

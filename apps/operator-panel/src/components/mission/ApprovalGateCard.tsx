@@ -9,6 +9,7 @@ export function ApprovalGateCard({
   onApprove,
   onEdit,
   onReject,
+  onResolveDisabled,
 }: {
   hasApproval: boolean;
   disabled: boolean;
@@ -17,6 +18,7 @@ export function ApprovalGateCard({
   onApprove: () => void;
   onEdit: () => void;
   onReject: () => void;
+  onResolveDisabled?: () => void;
 }) {
   const unavailableReason = hasApproval ? disabledReason : 'Bu çalıştırma için bekleyen operatör onayı bulunmuyor.';
   const mutationDisabledReason = disabled ? disabledReason : unavailableReason;
@@ -40,7 +42,16 @@ export function ApprovalGateCard({
         <span>İSTENEN EYLEM</span>
         <p>{approvalLabel || 'Plan gözden geçir ve çalıştırmaya izin ver.'}</p>
       </div>
-      {disabled && hasApproval ? <p className="approval-disabled-reason">{disabledReason}</p> : null}
+      {disabled && hasApproval ? (
+        <div className="approval-disabled-helper">
+          <p className="approval-disabled-reason">{disabledReason}</p>
+          {onResolveDisabled ? (
+            <button type="button" onClick={onResolveDisabled}>
+              Operator ID ayarla
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="approval-actions">
         <Button
           icon={<Icon name="check" />}

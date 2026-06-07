@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
+import type { AssistantComposerControls } from '../../assistant/assistantTypes';
+import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
 import type { AssistantRuntimeSettings } from '../../settings';
-import { Button } from '../primitives/Button';
+import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import { Card } from '../primitives/Card';
 import { Icon } from '../primitives/Icon';
 import { AssistantComposer } from './AssistantComposer';
@@ -42,6 +44,8 @@ export function AssistantView({
   approvalDisabledReason = '',
   debugRawEnabled = false,
   runtimeSettings,
+  modelDiscovery,
+  locale = 'en',
   onRuntimeSettingsChange,
   onSend,
   onNewChat,
@@ -49,6 +53,7 @@ export function AssistantView({
   onApprove,
   onReject,
   onExecute,
+  onRegenerate,
 }: {
   copy: AssistantViewCopy;
   state: AssistantSessionState;
@@ -57,14 +62,23 @@ export function AssistantView({
   approvalDisabledReason?: string;
   debugRawEnabled?: boolean;
   runtimeSettings: AssistantRuntimeSettings;
+  modelDiscovery?: AssistantModelDiscoveryState | null;
+  locale?: UiLocale;
   onRuntimeSettingsChange: (next: Partial<AssistantRuntimeSettings>) => void;
-  onSend: (message: string, runtimeSettings: AssistantRuntimeSettings) => void;
+  onSend: (
+    message: string,
+    runtimeSettings: AssistantRuntimeSettings,
+    controls: AssistantComposerControls,
+  ) => void;
   onNewChat: () => void;
   onReviewApproval: (approvalId: string) => void;
   onApprove: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
+  onRegenerate: (turnId: string) => void;
 }) {
+  const [contextRailOpen, setContextRailOpen] = useState(false);
+  const text = assistantUiText[locale];
   const currentTurnRunning = state.status === 'starting' || state.status === 'streaming';
   const surfaceState =
     state.status === 'awaiting_approval' ? 'approval' : state.turns.length > 0 ? 'transcript' : 'welcome';
@@ -78,47 +92,64 @@ export function AssistantView({
       <header className="assistant-top-chrome">
         <div className="assistant-context-switcher" aria-label="Assistant workspace context">
           <div className="assistant-top-select assistant-top-select-wide">
-            <span>Workspace</span>
+            <span>{text.workspace}</span>
             <strong>
               Production Control Plane <Icon name="chevron" />
             </strong>
           </div>
           <div className="assistant-top-select">
-            <span>Policy Mode</span>
+            <span>{text.policyMode}</span>
             <strong className="assistant-warning-value">
-              <Icon name="shield" /> Guarded <Icon name="chevron" />
+              <Icon name="shield" /> {text.guarded} <Icon name="chevron" />
             </strong>
           </div>
           <div className="assistant-top-select">
-            <span>Runtime Status</span>
-            <strong className="assistant-success-value">Healthy</strong>
+            <span>{text.runtimeStatus}</span>
+            <strong className="assistant-success-value">{text.healthy}</strong>
           </div>
         </div>
         <div className="assistant-top-actions">
           <label className="assistant-search">
             <Icon name="logs" />
             <input
-              aria-label="Search assistant context"
-              placeholder="Search"
+            aria-label={text.search}
+              placeholder={text.search}
               disabled
-              title="Assistant context search is not available yet"
-              data-disabled-reason="Assistant context search is not available yet"
+              title={translateAssistantText('Assistant context search is not available yet', locale)}
+              data-disabled-reason={translateAssistantText('Assistant context search is not available yet', locale)}
             />
             <kbd>⌘K</kbd>
           </label>
-          <button type="button" aria-label="Open terminal" disabled title="Terminal access is not available in assistant preview">
+          <button
+            type="button"
+            aria-label={text.terminal}
+            disabled
+            title={translateAssistantText('Terminal access is not available in assistant preview', locale)}
+          >
             <Icon name="terminal" />
           </button>
           <button
             type="button"
-            aria-label="Notifications"
+            aria-label={text.notifications}
             className="assistant-notification-button"
             disabled
-            title="Assistant notifications are not available in this context"
+            title={translateAssistantText('Assistant notifications are not available in this context', locale)}
           >
             <Icon name="bell" />
             <span aria-hidden="true" />
           </button>
+          {rightRail ? (
+            <button
+              type="button"
+              aria-label={contextRailOpen ? text.closeAssistantContext : text.openAssistantContext}
+              aria-expanded={contextRailOpen}
+              className="assistant-context-toggle"
+              title={text.assistantContext}
+              onClick={() => setContextRailOpen((value) => !value)}
+            >
+              <Icon name="menu" />
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -126,24 +157,19 @@ export function AssistantView({
         <div className="assistant-main-stage">
           {state.turns.length > 0 ? (
             <header className="assistant-session-header">
-              <div className="assistant-title-block">
-                <div className="assistant-mark" aria-hidden="true">
-                  <Icon name="sparkle" />
-                </div>
-                <div>
-                  <h1 id="assistant-title">{copy.title}</h1>
-                  <span>Pro</span>
-                </div>
-              </div>
+              <span id="assistant-title" className="sr-only">
+                {copy.title}
+              </span>
               <div className="assistant-session-actions">
-                <Button icon={<Icon name="edit" />} variant="ghost" onClick={onNewChat}>
-                  {copy.newChat}
-                </Button>
+                <button type="button" className="assistant-session-icon-button" aria-label={copy.newChat} title={copy.newChat} onClick={onNewChat}>
+                  <Icon name="edit" />
+                </button>
                 <button
                   type="button"
-                  aria-label="More assistant actions"
+                  className="assistant-session-icon-button"
+                  aria-label={text.moreActions}
                   disabled
-                  title="More assistant actions are not available yet"
+                  title={text.moreActionsUnavailable}
                 >
                   ···
                 </button>
@@ -169,15 +195,17 @@ export function AssistantView({
               approvalDisabledReason={approvalDisabledReason}
               emptyRunLabel={copy.noReferencedRunTitle}
               debugRawEnabled={debugRawEnabled}
+              locale={locale}
               onReviewApproval={onReviewApproval}
               onApprove={onApprove}
               onReject={onReject}
               onExecute={onExecute}
+              onRegenerate={onRegenerate}
             />
           )}
 
           {state.turns.length === 0 ? (
-            <div className="assistant-context-grid" aria-label="Assistant context">
+            <div className="assistant-context-grid" aria-label={text.assistantContext}>
               <Card className="assistant-context-card">
                 <span className="assistant-card-label">{copy.systemHealth}</span>
                 <strong>{copy.awaitingContextTitle}</strong>
@@ -202,12 +230,38 @@ export function AssistantView({
             sendLabel={copy.sendLabel}
             disabled={currentTurnRunning}
             runtimeSettings={runtimeSettings}
+            modelDiscovery={modelDiscovery}
+            locale={locale}
             onRuntimeSettingsChange={onRuntimeSettingsChange}
             onSend={onSend}
           />
         </div>
 
-        {rightRail}
+        {rightRail ? (
+          <>
+            <div
+              className={contextRailOpen ? 'assistant-context-drawer assistant-context-drawer-open' : 'assistant-context-drawer'}
+              aria-hidden={!contextRailOpen}
+            >
+              <button
+                type="button"
+                className="assistant-context-backdrop"
+                aria-label={text.closeAssistantContext}
+                onClick={() => setContextRailOpen(false)}
+              />
+              <div className="assistant-context-panel" role="complementary" aria-label={text.assistantContextPanel}>
+                <div className="assistant-context-panel-head">
+                  <span>{text.assistantContext}</span>
+                  <button type="button" aria-label={text.closeAssistantContext} onClick={() => setContextRailOpen(false)}>
+                    <Icon name="close" />
+                  </button>
+                </div>
+                {rightRail}
+              </div>
+            </div>
+            <div className="assistant-context-rail-desktop">{rightRail}</div>
+          </>
+        ) : null}
       </div>
     </section>
   );

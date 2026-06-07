@@ -37,12 +37,12 @@ describe('EvidencePackView', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Evidence packs' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Kanıt paketleri' })).toBeInTheDocument();
     expect(screen.getByText('evp-preview-run')).toBeInTheDocument();
     expect(screen.getByText(/EVIDENCE_HASH_MISMATCH/)).toHaveTextContent('hash zinciri');
-    expect(screen.getByText('failed')).toBeInTheDocument();
+    expect(screen.getByText('başarısız')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Verify latest' }));
+    await user.click(screen.getByRole('button', { name: 'Sonuncuyu doğrula' }));
 
     expect(onVerify).toHaveBeenCalledTimes(1);
   });

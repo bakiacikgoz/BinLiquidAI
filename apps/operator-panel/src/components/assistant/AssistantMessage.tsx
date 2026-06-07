@@ -1,5 +1,7 @@
 import type { AssistantTurn } from '../../assistant/assistantTypes';
+import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import { Card } from '../primitives/Card';
+import { Icon } from '../primitives/Icon';
 import { AssistantActionPreview } from './AssistantActionPreview';
 import { AssistantApprovalCard } from './AssistantApprovalCard';
 import { AssistantRunReferences } from './AssistantRunReferences';
@@ -19,90 +21,115 @@ export function AssistantMessage({
   approvalDisabledReason,
   emptyRunLabel,
   debugRawEnabled,
+  locale = 'en',
   onReviewApproval,
   onApprove,
   onReject,
   onExecute,
+  onRegenerate,
 }: {
   turn: AssistantTurn;
   approvalDisabled: boolean;
   approvalDisabledReason: string;
   emptyRunLabel: string;
   debugRawEnabled: boolean;
+  locale?: UiLocale;
   onReviewApproval: (approvalId: string) => void;
   onApprove: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
+  onRegenerate: (turnId: string) => void;
 }) {
+  const text = assistantUiText[locale];
   const message = turn.assistantMessage;
   const primaryRun = message.referencedRuns[0];
   const hasDetailedFinding = Boolean(primaryRun) && !message.proposedAction;
+  const hasAssistantOutput = Boolean(
+    message.text ||
+      message.warning ||
+      message.error ||
+      message.proposedAction ||
+      message.approval ||
+      message.referencedRuns.length > 0 ||
+      message.referencedArtifacts.length > 0,
+  );
+  const copyAssistantText = () => {
+    if (message.text && typeof navigator !== 'undefined' && navigator.clipboard) {
+      void navigator.clipboard.writeText(message.text);
+    }
+  };
 
   return (
     <div className="assistant-turn">
       <Card className="assistant-user-message">
-        <span className="assistant-avatar">OP</span>
         <div>
           <time className="assistant-user-time">{formatClock(turn.userMessage.createdAtUtc)}</time>
           <p>{turn.userMessage.text}</p>
         </div>
       </Card>
       <Card className="assistant-assistant-message">
-        <span className="assistant-avatar assistant-avatar-bot">
-          <IconMark />
-        </span>
         <div className="assistant-message-body">
           <span className="assistant-message-meta">
-            <strong>AegisOS Assistant</strong>
             <time>{formatClock(turn.startedAtUtc)}</time>
           </span>
-        <AssistantRunningState status={turn.status} timeline={message.timeline} />
-        {message.text ? <p className="assistant-answer">{message.text}</p> : null}
-        {message.warning ? <p className="assistant-warning-text">{message.warning}</p> : null}
+        <AssistantRunningState
+          status={turn.status}
+          timeline={message.timeline}
+          startedAtUtc={turn.startedAtUtc}
+          completedAtUtc={turn.completedAtUtc}
+          locale={locale}
+        />
+        {message.text ? <p className="assistant-answer">{translateAssistantText(message.text, locale)}</p> : null}
+        {message.warning ? <p className="assistant-warning-text">{translateAssistantText(message.warning, locale)}</p> : null}
         {message.error ? (
           <div className="assistant-error-card">
             <strong>{message.error.code}</strong>
-            <p>{message.error.message}</p>
+            <p>{translateAssistantText(message.error.message, locale)}</p>
             {debugRawEnabled && message.error.stderrPreview ? <code>{message.error.stderrPreview}</code> : null}
           </div>
         ) : null}
         {hasDetailedFinding ? (
           <div className="assistant-findings-panel">
-            <h3>What I found</h3>
+            <h3>{text.whatIFound}</h3>
             <dl>
               <div>
-                <dt>Run ID</dt>
+                <dt>{text.runId}</dt>
                 <dd>{primaryRun?.id}</dd>
               </div>
               <div>
-                <dt>Status</dt>
-                <dd>{primaryRun?.status ?? turn.status}</dd>
+                <dt>{text.status}</dt>
+                <dd>{translateAssistantText(primaryRun?.status ?? turn.status, locale)}</dd>
               </div>
               <div>
-                <dt>Failed step</dt>
-                <dd>Inspect operator queue health</dd>
+                <dt>{text.failedStep}</dt>
+                <dd>{locale === 'tr' ? 'Operatör kuyruğu sağlığını incele' : 'Inspect operator queue health'}</dd>
               </div>
               <div>
-                <dt>Root cause</dt>
-                <dd>{primaryRun?.summary ?? 'No root cause summary is available yet.'}</dd>
+                <dt>{text.rootCause}</dt>
+                <dd>{primaryRun?.summary ? translateAssistantText(primaryRun.summary, locale) : text.noRootCause}</dd>
               </div>
               <div>
-                <dt>Impact</dt>
-                <dd>No changes applied. System state unchanged.</dd>
+                <dt>{text.impact}</dt>
+                <dd>{text.noChanges}</dd>
               </div>
               <div>
-                <dt>Duration</dt>
+                <dt>{text.duration}</dt>
                 <dd>00:03:18</dd>
               </div>
             </dl>
           </div>
         ) : null}
-        {message.proposedAction ? <AssistantActionPreview action={message.proposedAction} /> : null}
+        {message.proposedAction ? <AssistantActionPreview action={message.proposedAction} locale={locale} /> : null}
         {message.approval ? (
           <AssistantApprovalCard
             approval={message.approval}
             disabled={approvalDisabled || !message.approval.detailLoaded}
-            disabledReason={!message.approval.detailLoaded ? 'Approval detail must load before decision.' : approvalDisabledReason}
+            disabledReason={
+              !message.approval.detailLoaded
+                ? translateAssistantText('Approval detail must load before decision.', locale)
+                : translateAssistantText(approvalDisabledReason, locale)
+            }
+            locale={locale}
             onReview={onReviewApproval}
             onApprove={onApprove}
             onReject={onReject}
@@ -113,17 +140,20 @@ export function AssistantMessage({
           runs={message.referencedRuns}
           artifacts={message.referencedArtifacts}
           emptyRunLabel={emptyRunLabel}
+          locale={locale}
         />
+        {hasAssistantOutput ? (
+          <div className="assistant-message-actions" aria-label="Assistant message actions">
+            <button type="button" aria-label={text.copyAnswer} title={text.copyAnswer} onClick={copyAssistantText}>
+              <Icon name="copy" />
+            </button>
+            <button type="button" aria-label={text.regenerateAnswer} title={text.regenerateAnswer} onClick={() => onRegenerate(turn.id)}>
+              <Icon name="refresh" />
+            </button>
+          </div>
+        ) : null}
         </div>
       </Card>
     </div>
-  );
-}
-
-function IconMark() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3l1.5 5.2L19 10l-5.5 1.8L12 17l-1.5-5.2L5 10l5.5-1.8L12 3z" />
-    </svg>
   );
 }

@@ -108,6 +108,34 @@ describe('bridge tauri contract', () => {
     );
   });
 
+  it('passes assistant model discovery requests to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      contractVersion: 'operator-panel.assistant-provider-models/v1',
+      profile: 'balanced',
+      provider: 'ollama',
+      generatedAtUtc: '2026-06-07T00:00:00Z',
+      providers: [],
+    });
+
+    await bridge.listAssistantModels(
+      { ...DEFAULT_SETTINGS, profile: 'balanced' },
+      { profile: 'balanced', provider: 'ollama', refresh: true },
+    );
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_assistant_provider_models',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          profile: 'balanced',
+          timeoutMs: 15000,
+        }),
+        profile: 'balanced',
+        provider: 'ollama',
+        refresh: true,
+      }),
+    );
+  });
+
   it('passes config resolve provider and model overrides to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({ contract_version: '2.0', status: 'ok' });
 

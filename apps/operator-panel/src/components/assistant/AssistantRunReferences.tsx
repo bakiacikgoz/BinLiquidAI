@@ -1,4 +1,5 @@
 import type { AssistantArtifactRef, AssistantRunRef } from '../../assistant/assistantTypes';
+import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import { Badge } from '../primitives/Badge';
 import { Card } from '../primitives/Card';
 import { StatusDot } from '../primitives/StatusDot';
@@ -7,11 +8,14 @@ export function AssistantRunReferences({
   runs,
   artifacts,
   emptyRunLabel,
+  locale = 'en',
 }: {
   runs: AssistantRunRef[];
   artifacts: AssistantArtifactRef[];
   emptyRunLabel: string;
+  locale?: UiLocale;
 }) {
+  const text = assistantUiText[locale];
   if (runs.length === 0 && artifacts.length === 0) {
     return <span className="sr-only">{emptyRunLabel}</span>;
   }
@@ -19,7 +23,7 @@ export function AssistantRunReferences({
   return (
     <Card className="assistant-reference-card">
       <div className="assistant-card-head">
-        <span className="assistant-card-label">References</span>
+        <span className="assistant-card-label">{text.referencedRuns}</span>
         <Badge tone={runs.length > 0 || artifacts.length > 0 ? 'info' : 'neutral'}>
           {runs.length + artifacts.length}
         </Badge>
@@ -30,7 +34,7 @@ export function AssistantRunReferences({
             <StatusDot tone={run.status === 'blocked' ? 'warning' : 'info'} />
             <span>
               <strong>{run.id}</strong>
-              <em>{run.summary || run.status || 'Referenced run'}</em>
+              <em>{translateAssistantText(run.summary || run.status || 'Referenced run', locale)}</em>
             </span>
           </div>
         ))}
@@ -39,7 +43,7 @@ export function AssistantRunReferences({
             <StatusDot tone="success" />
             <span>
               <strong>{artifact.name}</strong>
-              <em>{artifact.summary || artifact.path || 'Referenced artifact'}</em>
+              <em>{translateAssistantText(artifact.summary || artifact.path || 'Referenced artifact', locale)}</em>
             </span>
           </div>
         ))}

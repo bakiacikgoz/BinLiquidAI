@@ -14,11 +14,12 @@ describe('TopControls interactions', () => {
         operatorWarning=""
         contractWarning=""
         onToggleNav={onToggleNav}
+        onCycleTheme={vi.fn()}
         onRefresh={onRefresh}
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: /Menü/i }));
+    await user.click(screen.getByRole('button', { name: /Navigasyonu aç/i }));
     await user.click(screen.getByRole('button', { name: /Yenile/i }));
 
     expect(onToggleNav).toHaveBeenCalledTimes(1);

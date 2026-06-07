@@ -1,12 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
-import { previewAssistantStartTurn } from './assistant/assistantFixtures';
+import { previewAssistantProviderModels, previewAssistantStartTurn } from './assistant/assistantFixtures';
 import type {
   AssistantStartTurnOptions,
   AssistantStartTurnResponse,
   AssistantStreamEvent,
 } from './assistant/assistantTypes';
+import type {
+  AssistantProviderModelsRequest,
+  AssistantProviderModelsResponse,
+} from './assistant/modelDiscovery';
 import {
   previewApprovalDetail,
   previewApprovalPending,
@@ -105,6 +109,7 @@ export interface SubmitTeamRunOptions {
   fallbackProvider?: string;
   model?: string;
   hfModelId?: string;
+  safetyOptions?: TaskSafetyOptions;
 }
 
 export interface SubmitComputerUseRunOptions {
@@ -117,6 +122,13 @@ export interface SubmitComputerUseRunOptions {
   fallbackProvider?: string;
   model?: string;
   hfModelId?: string;
+  safetyOptions?: TaskSafetyOptions;
+}
+
+export interface TaskSafetyOptions {
+  askBeforeExternalAction: boolean;
+  askBeforeDelete: boolean;
+  askBeforeSend: boolean;
 }
 
 export interface ResumeTeamRunOptions {
@@ -492,6 +504,7 @@ export async function submitTeamRun(settings: PanelSettings, options: SubmitTeam
     fallbackProvider: options.fallbackProvider,
     model: options.model,
     hfModelId: options.hfModelId,
+    safetyOptions: options.safetyOptions,
   });
 }
 
@@ -513,6 +526,7 @@ export async function submitComputerUseRun(
     fallbackProvider: options.fallbackProvider,
     model: options.model,
     hfModelId: options.hfModelId,
+    safetyOptions: options.safetyOptions,
   });
 }
 
@@ -945,6 +959,29 @@ export async function startAssistantTurn(
     fallbackProvider: options.fallbackProvider,
     model: options.model,
     hfModelId: options.hfModelId,
+  });
+}
+
+export async function listAssistantModels(
+  settings: PanelSettings,
+  request: AssistantProviderModelsRequest,
+): Promise<AssistantProviderModelsResponse> {
+  if (isBridgePreviewMode()) {
+    const payload = previewAssistantProviderModels(request.profile || settings.profile);
+    if (request.provider && request.provider !== 'all') {
+      return {
+        ...payload,
+        provider: request.provider,
+        providers: payload.providers.filter((item) => item.provider === request.provider),
+      };
+    }
+    return payload;
+  }
+  return callBridge('bridge_assistant_provider_models', {
+    config: toBridgeConfig(settings, 15000),
+    profile: request.profile,
+    provider: request.provider,
+    refresh: request.refresh,
   });
 }
 

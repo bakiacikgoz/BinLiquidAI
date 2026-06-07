@@ -9,6 +9,7 @@ import {
   handshake,
   isBridgePreviewMode,
   isPreviewAllowedForEnv,
+  listAssistantModels,
   listRuns,
   pauseComputerUseSession,
   readArtifact,
@@ -87,6 +88,19 @@ describe('bridge preview fallback', () => {
     expect(payload.assistantTurnId).toBe('turn-preview');
     expect(payload.sessionId).toBe('session-preview');
     expect(payload.processId).toBeNull();
+  });
+
+  it('returns filtered preview assistant provider models', async () => {
+    const payload = await listAssistantModels(
+      { ...DEFAULT_SETTINGS, profile: 'balanced' },
+      { profile: 'balanced', provider: 'ollama' },
+    );
+
+    expect(payload.contractVersion).toBe('operator-panel.assistant-provider-models/v1');
+    expect(payload.provider).toBe('ollama');
+    expect(payload.providers).toHaveLength(1);
+    expect(payload.providers[0]?.provider).toBe('ollama');
+    expect(payload.providers[0]?.models[0]?.id).toBe('qwen3.5:4b');
   });
 
   it('applies preview config resolve provider and model overrides', async () => {

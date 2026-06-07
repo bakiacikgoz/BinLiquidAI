@@ -4,12 +4,21 @@ import {
   validateAssistantRuntimeSettings,
   type AssistantRuntimeSettings,
 } from '../../settings';
+import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
+import type {
+  AssistantComposerControls,
+  AssistantContextAttachmentKind,
+  AssistantSafeToolIntent,
+} from '../../assistant/assistantTypes';
+import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import { Button } from '../primitives/Button';
 import { Icon } from '../primitives/Icon';
+import { AssistantModelPicker } from './AssistantModelPicker';
 
-function runtimeDisplayLabel(settings: AssistantRuntimeSettings): string {
-  const provider = settings.assistantProvider.trim() || 'profile default';
-  const model = settings.assistantModel.trim() || settings.assistantHfModelId.trim() || 'profile default';
+function runtimeDisplayLabel(settings: AssistantRuntimeSettings, locale: UiLocale): string {
+  const defaultLabel = locale === 'tr' ? 'profil varsayılanı' : 'profile default';
+  const provider = settings.assistantProvider.trim() || defaultLabel;
+  const model = settings.assistantModel.trim() || settings.assistantHfModelId.trim() || defaultLabel;
   return `${provider} / ${model}`;
 }
 
@@ -21,6 +30,8 @@ export function AssistantComposer({
   initialValue = '',
   statusLabel = '',
   runtimeSettings,
+  modelDiscovery,
+  locale = 'en',
   onRuntimeSettingsChange,
   onSend,
 }: {
@@ -31,10 +42,35 @@ export function AssistantComposer({
   initialValue?: string;
   statusLabel?: string;
   runtimeSettings: AssistantRuntimeSettings;
+  modelDiscovery?: AssistantModelDiscoveryState | null;
+  locale?: UiLocale;
   onRuntimeSettingsChange: (next: Partial<AssistantRuntimeSettings>) => void;
-  onSend: (message: string, runtimeSettings: AssistantRuntimeSettings) => void;
+  onSend: (
+    message: string,
+    runtimeSettings: AssistantRuntimeSettings,
+    controls: AssistantComposerControls,
+  ) => void;
 }) {
+  const text = assistantUiText[locale];
+  const contextOptions: Array<{ kind: AssistantContextAttachmentKind; label: string }> = [
+    { kind: 'active_run', label: text.activeRun },
+    { kind: 'event_tail', label: text.recentEvents },
+    { kind: 'approval_summary', label: text.approval },
+    { kind: 'artifact_summary', label: text.artifacts },
+    { kind: 'system_health', label: text.systemHealthAttachment },
+  ];
+  const toolOptions: Array<{ intent: AssistantSafeToolIntent; label: string }> = [
+    { intent: 'inspect_run', label: text.inspectRun },
+    { intent: 'summarize_events', label: text.summarizeEvents },
+    { intent: 'explain_policy_blocker', label: text.explainBlocker },
+    { intent: 'draft_remediation_plan', label: text.draftPlan },
+    { intent: 'prepare_approval_review', label: text.prepareApprovalReview },
+  ];
   const [draft, setDraft] = useState(initialValue);
+  const [contextAttachmentKinds, setContextAttachmentKinds] = useState<AssistantContextAttachmentKind[]>(
+    contextOptions.map((option) => option.kind),
+  );
+  const [toolIntents, setToolIntents] = useState<AssistantSafeToolIntent[]>(['inspect_run']);
 
   useEffect(() => {
     setDraft(initialValue);
@@ -43,16 +79,35 @@ export function AssistantComposer({
   const validationMessage = validateAssistantRuntimeSettings(runtimeSettings);
   const canSend = draft.trim().length > 0 && !disabled && !validationMessage;
   const visibleStatusLabel = statusLabel && statusLabel !== 'idle' ? statusLabel : '';
-  const selectedRuntimeLabel = runtimeDisplayLabel(runtimeSettings);
+  const selectedRuntimeLabel = runtimeDisplayLabel(runtimeSettings, locale);
+  const controls: AssistantComposerControls = {
+    contextAttachmentKinds,
+    toolIntents,
+  };
   const sendDisabledReason =
-    validationMessage ||
+    translateAssistantText(validationMessage, locale) ||
     (disabled
-      ? 'Assistant is currently processing a turn.'
+      ? translateAssistantText('Assistant is currently processing a turn.', locale)
       : draft.trim().length === 0
-        ? 'Enter a message to send.'
+        ? translateAssistantText('Enter a message to send.', locale)
         : undefined);
-  const updateRuntimeSetting = (key: keyof AssistantRuntimeSettings, value: string) => {
-    onRuntimeSettingsChange({ [key]: value });
+
+  const toggleContext = (kind: AssistantContextAttachmentKind) => {
+    setContextAttachmentKinds((previous) =>
+      previous.includes(kind) ? previous.filter((item) => item !== kind) : [...previous, kind],
+    );
+  };
+  const toggleTool = (intent: AssistantSafeToolIntent) => {
+    setToolIntents((previous) =>
+      previous.includes(intent) ? previous.filter((item) => item !== intent) : [...previous, intent],
+    );
+  };
+  const submitDraft = () => {
+    if (!canSend) {
+      return;
+    }
+    onSend(draft, runtimeSettings, controls);
+    setDraft('');
   };
 
   return (
@@ -61,11 +116,7 @@ export function AssistantComposer({
       aria-label="Assistant composer"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!canSend) {
-          return;
-        }
-        onSend(draft, runtimeSettings);
-        setDraft('');
+        submitDraft();
       }}
     >
       <label className="assistant-composer-label" htmlFor="assistant-message">
@@ -78,78 +129,68 @@ export function AssistantComposer({
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && canSend) {
-            event.preventDefault();
-            onSend(draft, runtimeSettings);
-            setDraft('');
+          if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+            return;
           }
+          event.preventDefault();
+          submitDraft();
         }}
       />
-      <div className="assistant-runtime-settings" aria-label="Assistant runtime settings">
-        <label>
-          <span>Provider</span>
-          <select
-            aria-label="Assistant provider"
-            value={runtimeSettings.assistantProvider}
-            onChange={(event) => updateRuntimeSetting('assistantProvider', event.target.value)}
-          >
-            <option value="">Use profile default</option>
-            <option value="auto">auto</option>
-            <option value="ollama">ollama</option>
-            <option value="transformers">transformers</option>
-          </select>
-        </label>
-        <label>
-          <span>Model</span>
-          <input
-            aria-label="Assistant model"
-            value={runtimeSettings.assistantModel}
-            onChange={(event) => updateRuntimeSetting('assistantModel', event.target.value)}
-            placeholder="qwen3.5:4b"
-          />
-        </label>
-        <label>
-          <span>HF model id</span>
-          <input
-            aria-label="Assistant HF model id"
-            value={runtimeSettings.assistantHfModelId}
-            onChange={(event) => updateRuntimeSetting('assistantHfModelId', event.target.value)}
-            placeholder="Qwen/Qwen2.5"
-          />
-        </label>
-        <label>
-          <span>Fallback</span>
-          <select
-            aria-label="Assistant fallback provider"
-            value={runtimeSettings.assistantFallbackProvider}
-            onChange={(event) => updateRuntimeSetting('assistantFallbackProvider', event.target.value)}
-          >
-            <option value="">Use profile default</option>
-            <option value="transformers">transformers</option>
-            <option value="ollama">ollama</option>
-          </select>
-        </label>
-      </div>
+      <AssistantModelPicker
+        runtimeSettings={runtimeSettings}
+        modelDiscovery={modelDiscovery}
+        locale={locale}
+        onRuntimeSettingsChange={onRuntimeSettingsChange}
+      />
       {validationMessage ? (
         <p className="assistant-runtime-validation" role="alert">
-          {validationMessage}
+          {translateAssistantText(validationMessage, locale)}
         </p>
       ) : null}
       <div className="assistant-composer-actions">
         <div className="assistant-composer-tools">
-          <button type="button" aria-label="Attach context" disabled title="Context attachment is not available yet">
-            <Icon name="paperclip" />
-          </button>
-          <button type="button" disabled title="Tool selection is not available yet">
-            <Icon name="command" />
-            <span>Tools</span>
-            <Icon name="chevron" />
-          </button>
+          <details className="assistant-composer-menu">
+            <summary aria-label={text.attachContext}>
+              <Icon name="paperclip" />
+              <span className="sr-only">{text.attachContext}</span>
+            </summary>
+            <div className="assistant-composer-menu-panel" role="group" aria-label={text.contextAttachments}>
+              {contextOptions.map((option) => (
+                <label key={option.kind}>
+                  <input
+                    type="checkbox"
+                    checked={contextAttachmentKinds.includes(option.kind)}
+                    onChange={() => toggleContext(option.kind)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </details>
+          <details className="assistant-composer-menu">
+            <summary>
+              <Icon name="command" />
+              <span>{text.tools}</span>
+              <Icon name="chevron" />
+            </summary>
+            <div className="assistant-composer-menu-panel" role="group" aria-label={text.safeToolIntents}>
+              {toolOptions.map((option) => (
+                <label key={option.intent}>
+                  <input
+                    type="checkbox"
+                    checked={toolIntents.includes(option.intent)}
+                    onChange={() => toggleTool(option.intent)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </details>
           {visibleStatusLabel ? <em>{visibleStatusLabel}</em> : null}
         </div>
         <div className="assistant-composer-submit">
-          <span className="assistant-model-summary" aria-label="Selected assistant model">
-            <span>Model</span>
+          <span className="assistant-model-summary" aria-label={text.selectedAssistantModel}>
+            <span>{text.model}</span>
             <strong>{selectedRuntimeLabel}</strong>
           </span>
           <Button

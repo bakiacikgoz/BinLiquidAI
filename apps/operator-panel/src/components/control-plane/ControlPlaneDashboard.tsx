@@ -6,7 +6,69 @@ import type {
   PilotLaunchStatusTile,
   PilotOperationsStatus,
 } from '../../control-plane/types';
+import type { UiLocale } from '../../i18n';
 import { DesignPartnerBetaReadinessCard } from './DesignPartnerBetaReadinessCard';
+
+const copy = {
+  en: {
+    kicker: 'Agent Control Plane',
+    title: 'Dashboard',
+    lead: 'Policy, approvals, evidence and execution boundaries.',
+    systemSafety: 'System Safety',
+    unknown: 'unknown',
+    agents: 'Agents',
+    registered: 'registered',
+    pendingApprovals: 'Pending Approvals',
+    operatorQueue: 'operator queue',
+    claimGuard: 'Claim Guard',
+    blockedClaims: 'blocked claims',
+    pilotLaunch: 'Pilot Launch',
+    noSnapshot: 'no snapshot',
+    betaOps: 'Beta Ops',
+    codeIntelligence: 'Code Intelligence',
+    missing: 'missing',
+    boundaryViolations: 'boundary violations',
+    safetyPosture: 'Safety posture',
+    readiness: 'Readiness',
+    allowedClaims: 'Allowed claims',
+    conditionalClaims: 'Conditional claims',
+    failClosedExecution: 'Fail-closed execution',
+    enabled: 'enabled',
+    pilotLaunchCandidate: 'Pilot Launch Candidate',
+    installRehearsal: 'Install rehearsal',
+    securityReview: 'Security review',
+    nextActions: 'Next actions',
+  },
+  tr: {
+    kicker: 'Agent Control Plane',
+    title: 'Dashboard',
+    lead: 'Policy, onaylar, evidence ve yürütme sınırları.',
+    systemSafety: 'Sistem güvenliği',
+    unknown: 'bilinmiyor',
+    agents: 'Agentlar',
+    registered: 'kayıtlı',
+    pendingApprovals: 'Bekleyen onaylar',
+    operatorQueue: 'operatör kuyruğu',
+    claimGuard: 'Claim koruması',
+    blockedClaims: 'blokeli claimler',
+    pilotLaunch: 'Pilot yayın',
+    noSnapshot: 'snapshot yok',
+    betaOps: 'Beta operasyonları',
+    codeIntelligence: 'Kod zekası',
+    missing: 'eksik',
+    boundaryViolations: 'sınır ihlali',
+    safetyPosture: 'Güvenlik duruşu',
+    readiness: 'Hazırlık',
+    allowedClaims: 'İzinli claimler',
+    conditionalClaims: 'Koşullu claimler',
+    failClosedExecution: 'Fail-closed yürütme',
+    enabled: 'aktif',
+    pilotLaunchCandidate: 'Pilot yayın adayı',
+    installRehearsal: 'Kurulum provası',
+    securityReview: 'Güvenlik incelemesi',
+    nextActions: 'Sonraki aksiyonlar',
+  },
+} satisfies Record<UiLocale, Record<string, string>>;
 
 export function ControlPlaneDashboard({
   doctor,
@@ -17,6 +79,7 @@ export function ControlPlaneDashboard({
   codeIntelligence,
   pilotOperations,
   designPartnerBeta,
+  locale = 'en',
 }: {
   doctor: unknown;
   agents: unknown;
@@ -26,7 +89,9 @@ export function ControlPlaneDashboard({
   codeIntelligence?: CodeIntelligenceSummary | null;
   pilotOperations?: PilotOperationsStatus | null;
   designPartnerBeta?: DesignPartnerBetaStatus | null;
+  locale?: UiLocale;
 }) {
+  const text = copy[locale];
   const doctorRecord = asRecord(doctor);
   const agentList = asControlPlaneAgentList(agents);
   const claimMatrix = asControlPlaneClaimMatrix(claims);
@@ -36,9 +101,9 @@ export function ControlPlaneDashboard({
     <section className="workspace" data-testid="page-primary-region">
       <div className="workspace-header">
         <div>
-          <p className="workspace-kicker">Agent Control Plane</p>
-          <h2>Dashboard</h2>
-          <p className="workspace-lead">Policy, approvals, evidence and execution boundaries.</p>
+          <p className="workspace-kicker">{text.kicker}</p>
+          <h2>{text.title}</h2>
+          <p className="workspace-lead">{text.lead}</p>
         </div>
       </div>
       <DashboardMetricGrid
@@ -49,11 +114,12 @@ export function ControlPlaneDashboard({
         pilotLaunch={pilotLaunch}
         designPartnerBeta={designPartnerBeta}
         codeIntelligence={codeIntelligence}
+        text={text}
       />
       <div className="section-grid two-up">
-        <SafetyPostureCard doctorRecord={doctorRecord} claimCounts={claimCounts} />
-        <PilotLaunchCandidateCard pilotLaunch={pilotLaunch} />
-        <NextActionsCard pilotLaunch={pilotLaunch} />
+        <SafetyPostureCard doctorRecord={doctorRecord} claimCounts={claimCounts} text={text} />
+        <PilotLaunchCandidateCard pilotLaunch={pilotLaunch} text={text} />
+        <NextActionsCard pilotLaunch={pilotLaunch} text={text} />
         <DesignPartnerBetaReadinessCard
           codeIntelligence={codeIntelligence}
           pilotOperations={pilotOperations}
@@ -72,6 +138,7 @@ function DashboardMetricGrid({
   pilotLaunch,
   designPartnerBeta,
   codeIntelligence,
+  text,
 }: {
   doctorRecord: Record<string, unknown>;
   agentCount: number;
@@ -80,6 +147,7 @@ function DashboardMetricGrid({
   pilotLaunch?: PilotLaunchReadinessStatus | null;
   designPartnerBeta?: DesignPartnerBetaStatus | null;
   codeIntelligence?: CodeIntelligenceSummary | null;
+  text: (typeof copy)['en'];
 }) {
   const metrics = dashboardMetrics({
     doctorRecord,
@@ -89,6 +157,7 @@ function DashboardMetricGrid({
     pilotLaunch,
     designPartnerBeta,
     codeIntelligence,
+    text,
   });
   return (
     <div className="metric-grid">
@@ -112,6 +181,7 @@ function dashboardMetrics({
   pilotLaunch,
   designPartnerBeta,
   codeIntelligence,
+  text,
 }: {
   doctorRecord: Record<string, unknown>;
   agentCount: number;
@@ -120,43 +190,44 @@ function dashboardMetrics({
   pilotLaunch?: PilotLaunchReadinessStatus | null;
   designPartnerBeta?: DesignPartnerBetaStatus | null;
   codeIntelligence?: CodeIntelligenceSummary | null;
+  text: (typeof copy)['en'];
 }) {
   return [
     {
-      title: 'System Safety',
-      value: String(doctorRecord.status ?? 'unknown'),
+      title: text.systemSafety,
+      value: String(doctorRecord.status ?? text.unknown),
       detail: String(doctorRecord.profile ?? '-'),
     },
-    { title: 'Agents', value: String(agentCount), detail: 'registered' },
-    { title: 'Pending Approvals', value: String(pendingApprovals), detail: 'operator queue' },
-    { title: 'Claim Guard', value: String(blockedClaims), detail: 'blocked claims' },
-    pilotLaunchMetric(pilotLaunch),
-    betaOpsMetric(designPartnerBeta),
-    codeIntelligenceMetric(codeIntelligence),
+    { title: text.agents, value: String(agentCount), detail: text.registered },
+    { title: text.pendingApprovals, value: String(pendingApprovals), detail: text.operatorQueue },
+    { title: text.claimGuard, value: String(blockedClaims), detail: text.blockedClaims },
+    pilotLaunchMetric(pilotLaunch, text),
+    betaOpsMetric(designPartnerBeta, text),
+    codeIntelligenceMetric(codeIntelligence, text),
   ];
 }
 
-function pilotLaunchMetric(pilotLaunch: PilotLaunchReadinessStatus | null | undefined) {
+function pilotLaunchMetric(pilotLaunch: PilotLaunchReadinessStatus | null | undefined, text: (typeof copy)['en']) {
   return {
-    title: 'Pilot Launch',
-    value: pilotLaunch?.status ?? 'unknown',
-    detail: pilotLaunch?.generatedAtUtc ?? 'no snapshot',
+    title: text.pilotLaunch,
+    value: pilotLaunch?.status ?? text.unknown,
+    detail: pilotLaunch?.generatedAtUtc ?? text.noSnapshot,
   };
 }
 
-function betaOpsMetric(designPartnerBeta: DesignPartnerBetaStatus | null | undefined) {
+function betaOpsMetric(designPartnerBeta: DesignPartnerBetaStatus | null | undefined, text: (typeof copy)['en']) {
   return {
-    title: 'Beta Ops',
-    value: designPartnerBeta?.status ?? 'unknown',
-    detail: designPartnerBeta?.headline ?? 'no snapshot',
+    title: text.betaOps,
+    value: designPartnerBeta?.status ?? text.unknown,
+    detail: designPartnerBeta?.headline ?? text.noSnapshot,
   };
 }
 
-function codeIntelligenceMetric(codeIntelligence: CodeIntelligenceSummary | null | undefined) {
+function codeIntelligenceMetric(codeIntelligence: CodeIntelligenceSummary | null | undefined, text: (typeof copy)['en']) {
   return {
-    title: 'Code Intelligence',
-    value: codeIntelligence?.verdict ?? 'missing',
-    detail: `${codeIntelligence?.boundaryViolations ?? 0} boundary violations`,
+    title: text.codeIntelligence,
+    value: codeIntelligence?.verdict ?? text.missing,
+    detail: `${codeIntelligence?.boundaryViolations ?? 0} ${text.boundaryViolations}`,
   };
 }
 
@@ -173,18 +244,20 @@ function MetricCard({ title, value, detail }: { title: string; value: string; de
 function SafetyPostureCard({
   doctorRecord,
   claimCounts,
+  text,
 }: {
   doctorRecord: Record<string, unknown>;
   claimCounts: ReturnType<typeof countClaims>;
+  text: (typeof copy)['en'];
 }) {
   return (
     <article className="page-card">
-      <h3>Safety posture</h3>
+      <h3>{text.safetyPosture}</h3>
       <div className="metric-list">
-        <MetricRow label="Readiness" value={String(doctorRecord.status ?? 'unknown')} />
-        <MetricRow label="Allowed claims" value={String(claimCounts.allowed)} />
-        <MetricRow label="Conditional claims" value={String(claimCounts.conditional)} />
-        <MetricRow label="Fail-closed execution" value="enabled" />
+        <MetricRow label={text.readiness} value={String(doctorRecord.status ?? text.unknown)} />
+        <MetricRow label={text.allowedClaims} value={String(claimCounts.allowed)} />
+        <MetricRow label={text.conditionalClaims} value={String(claimCounts.conditional)} />
+        <MetricRow label={text.failClosedExecution} value={text.enabled} />
       </div>
     </article>
   );
@@ -192,27 +265,29 @@ function SafetyPostureCard({
 
 function PilotLaunchCandidateCard({
   pilotLaunch,
+  text,
 }: {
   pilotLaunch?: PilotLaunchReadinessStatus | null;
+  text: (typeof copy)['en'];
 }) {
   return (
     <article className="page-card">
-      <h3>Pilot Launch Candidate</h3>
+      <h3>{text.pilotLaunchCandidate}</h3>
       <div className="metric-list">
         <PilotTileRow tile={pilotLaunch?.enterpriseHatA} fallback="Enterprise Hat A" />
-        <PilotTileRow tile={pilotLaunch?.installRehearsal} fallback="Install rehearsal" />
-        <PilotTileRow tile={pilotLaunch?.securityReview} fallback="Security review" />
-        <PilotTileRow tile={pilotLaunch?.claimGuard} fallback="Claim guard" />
+        <PilotTileRow tile={pilotLaunch?.installRehearsal} fallback={text.installRehearsal} />
+        <PilotTileRow tile={pilotLaunch?.securityReview} fallback={text.securityReview} />
+        <PilotTileRow tile={pilotLaunch?.claimGuard} fallback={text.claimGuard} />
       </div>
     </article>
   );
 }
 
-function NextActionsCard({ pilotLaunch }: { pilotLaunch?: PilotLaunchReadinessStatus | null }) {
+function NextActionsCard({ pilotLaunch, text }: { pilotLaunch?: PilotLaunchReadinessStatus | null; text: (typeof copy)['en'] }) {
   const actions = pilotLaunch?.nextActions.length ? pilotLaunch.nextActions : defaultNextActions;
   return (
     <article className="page-card">
-      <h3>Next actions</h3>
+      <h3>{text.nextActions}</h3>
       <div className="run-list">
         {actions.map((action) => (
           <article className="run-list-item" key={`${action.target}-${action.label}`}>
