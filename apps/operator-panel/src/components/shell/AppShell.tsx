@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 import { ToastHost, type ToastItem } from '../notifications/ToastHost';
 import { Sidebar, type ShellViewKey } from './Sidebar';
@@ -41,6 +41,7 @@ export function AppShell({
   onCloseNav: () => void;
   onRefresh: () => void;
 }) {
+  const mainPanelRef = useRef<HTMLElement | null>(null);
   const shellClassName = [
     'shell',
     'premium-shell',
@@ -50,6 +51,19 @@ export function AppShell({
   ]
     .filter(Boolean)
     .join(' ');
+
+  useEffect(() => {
+    const panel = mainPanelRef.current;
+    if (!panel) {
+      return;
+    }
+    if (typeof panel.scrollTo === 'function') {
+      panel.scrollTo({ top: 0, left: 0 });
+      return;
+    }
+    panel.scrollTop = 0;
+    panel.scrollLeft = 0;
+  }, [activeView]);
 
   return (
     <div className={shellClassName}>
@@ -70,7 +84,7 @@ export function AppShell({
         onClose={onCloseNav}
         onToggleCollapse={onToggleSidebar}
       />
-      <main className="main-panel premium-main-panel">
+      <main className="main-panel premium-main-panel" ref={mainPanelRef}>
         <TopControls
           previewMode={previewMode}
           operatorWarning={operatorWarning}

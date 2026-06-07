@@ -13,6 +13,7 @@ import {
 } from '../../control-plane/mappers/governance';
 import type { ControlPlaneSnapshot } from '../../control-plane/types';
 import type { UiLocale } from '../../i18n';
+import { CodeToken, ReasonChip, StatusBadge } from '../primitives/Token';
 
 type ProductPageProps = {
   events?: unknown[];
@@ -27,12 +28,126 @@ type ProductPageProps = {
   locale?: UiLocale;
 };
 
+type ProductPageCopy = {
+  kicker: string;
+  title: string;
+  lead: string;
+  primaryQueue: string;
+  sideCardTitle?: string;
+};
+
+const productPageCopy: Record<UiLocale, Record<string, ProductPageCopy>> = {
+  en: {
+    logs: {
+      kicker: 'Event timeline',
+      title: 'Logs',
+      lead: 'Filter runtime events, drift signals, and run-linked logs without leaving the console.',
+      primaryQueue: 'Primary queue',
+      sideCardTitle: 'Filters',
+    },
+    reports: {
+      kicker: 'Readiness evidence',
+      title: 'Reports',
+      lead: 'Review generated readiness, evidence, support, security, and metrics reports from one place.',
+      primaryQueue: 'Primary queue',
+      sideCardTitle: 'Pilot launch report',
+    },
+    alerts: {
+      kicker: 'Alert inbox',
+      title: 'Alerts',
+      lead: 'Prioritize blocked claims, stale approvals, runtime drift, and unsafe execution attempts.',
+      primaryQueue: 'Primary queue',
+      sideCardTitle: 'Lifecycle',
+    },
+    plans: {
+      kicker: 'Plan templates',
+      title: 'Plans',
+      lead: 'Prepare governed task specs, validate safety posture, and submit through the task workspace.',
+      primaryQueue: 'Primary queue',
+      sideCardTitle: 'Safe next step',
+    },
+    users: {
+      kicker: 'Identity',
+      title: 'Users',
+      lead: 'Inspect operator identity, verified assertions, and last-known permission context.',
+      primaryQueue: 'Primary queue',
+      sideCardTitle: 'Admin proposals',
+    },
+    roles: {
+      kicker: 'RBAC',
+      title: 'Roles',
+      lead: 'Review built-in role responsibilities and the permissions required for guarded operations.',
+      primaryQueue: 'Primary queue',
+      sideCardTitle: 'Admin proposals',
+    },
+    policyPacks: {
+      kicker: 'Admin policy',
+      title: 'Policy Packs',
+      lead: 'Manage policy pack visibility separately from the simulation workspace.',
+      primaryQueue: 'Primary queue',
+      sideCardTitle: 'Lifecycle proposals',
+    },
+  },
+  tr: {
+    logs: {
+      kicker: 'Olay zaman akışı',
+      title: 'Loglar',
+      lead: 'Runtime olaylarını, drift sinyallerini ve çalıştırma loglarını konsoldan ayrılmadan filtreleyin.',
+      primaryQueue: 'Ana kuyruk',
+      sideCardTitle: 'Filtreler',
+    },
+    reports: {
+      kicker: 'Hazırlık kanıtları',
+      title: 'Raporlar',
+      lead: 'Hazırlık, kanıt, destek, güvenlik ve metrik raporlarını tek yerden inceleyin.',
+      primaryQueue: 'Ana kuyruk',
+      sideCardTitle: 'Pilot başlatma raporu',
+    },
+    alerts: {
+      kicker: 'Uyarı gelen kutusu',
+      title: 'Uyarılar',
+      lead: 'Bloke claimleri, bekleyen onayları, runtime driftini ve güvenli olmayan yürütme girişimlerini önceliklendirin.',
+      primaryQueue: 'Ana kuyruk',
+      sideCardTitle: 'Yaşam döngüsü',
+    },
+    plans: {
+      kicker: 'Plan şablonları',
+      title: 'Planlamalar',
+      lead: 'Yönetişimli görev tanımlarını hazırlayın, güvenlik duruşunu doğrulayın ve görev alanından gönderin.',
+      primaryQueue: 'Ana kuyruk',
+      sideCardTitle: 'Güvenli sonraki adım',
+    },
+    users: {
+      kicker: 'Kimlik',
+      title: 'Kullanıcılar',
+      lead: 'Operatör kimliğini, doğrulanmış beyanları ve son bilinen yetki bağlamını inceleyin.',
+      primaryQueue: 'Ana kuyruk',
+      sideCardTitle: 'Yönetici önerileri',
+    },
+    roles: {
+      kicker: 'RBAC',
+      title: 'Roller',
+      lead: 'Yerleşik rol sorumluluklarını ve korumalı operasyonlar için gereken yetkileri inceleyin.',
+      primaryQueue: 'Ana kuyruk',
+      sideCardTitle: 'Yönetici önerileri',
+    },
+    policyPacks: {
+      kicker: 'Yönetim politikası',
+      title: 'Politikalar',
+      lead: 'Policy pack görünürlüğünü simülasyon çalışma alanından ayrı yönetin.',
+      primaryQueue: 'Ana kuyruk',
+      sideCardTitle: 'Yaşam döngüsü önerileri',
+    },
+  },
+};
+
 function ProductPageShell({
   kicker,
   title,
   lead,
   metrics,
   rows,
+  primaryQueueLabel,
   children,
 }: {
   kicker: string;
@@ -40,6 +155,7 @@ function ProductPageShell({
   lead: string;
   metrics: ProductPageMetric[];
   rows: ProductPageRow[];
+  primaryQueueLabel: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -62,14 +178,10 @@ function ProductPageShell({
       </div>
       <div className="section-grid two-up">
         <article className="page-card">
-          <h3>Primary queue</h3>
+          <h3>{primaryQueueLabel}</h3>
           <div className="run-list">
             {rows.map((row) => (
-              <article className="run-list-item" key={row.id}>
-                <strong>{row.title}</strong>
-                <span>{row.meta}</span>
-                <small>{row.status}</small>
-              </article>
+              <ProductQueueRow key={row.id} row={row} />
             ))}
           </div>
         </article>
@@ -79,18 +191,84 @@ function ProductPageShell({
   );
 }
 
-export function LogsPage({ events = [], runItems = [], snapshot }: ProductPageProps) {
+function ProductQueueRow({ row }: { row: ProductPageRow }) {
+  return (
+    <article className="run-list-item product-row">
+      <div className="run-list-main">
+        <strong>{row.title}</strong>
+        <div className="run-list-meta">{splitMeta(row.meta).map((part) => renderMetaPart(part))}</div>
+      </div>
+      <StatusBadge tone={statusTone(row.status)} title={row.status}>
+        {row.status}
+      </StatusBadge>
+    </article>
+  );
+}
+
+function splitMeta(meta: string): string[] {
+  return meta
+    .split(/\s+\/\s+|,\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function renderMetaPart(part: string) {
+  if (isReasonCode(part)) {
+    return (
+      <ReasonChip key={part} title={part}>
+        {part}
+      </ReasonChip>
+    );
+  }
+  if (isTechnicalValue(part)) {
+    return (
+      <CodeToken key={part} title={part}>
+        {part}
+      </CodeToken>
+    );
+  }
+  return <span key={part}>{part}</span>;
+}
+
+function isReasonCode(value: string): boolean {
+  return /^[A-Z][A-Z0-9_]{6,}$/.test(value) || value.startsWith('DATA_SOURCE_') || value.endsWith('_DISABLED');
+}
+
+function isTechnicalValue(value: string): boolean {
+  return /[/.@:_-]/.test(value) || value.length > 28;
+}
+
+function statusTone(status: string): 'neutral' | 'success' | 'warning' | 'error' | 'info' | 'muted' {
+  const normalized = status.toLowerCase();
+  if (/(ready|active|enabled|clear|passed|healthy|validated|available)/.test(normalized)) {
+    return 'success';
+  }
+  if (/(blocked|failed|deny|error|missing|required)/.test(normalized)) {
+    return 'error';
+  }
+  if (/(conditional|warning|pending|approval|draft|stale)/.test(normalized)) {
+    return 'warning';
+  }
+  if (/(empty|unknown|not run)/.test(normalized)) {
+    return 'muted';
+  }
+  return 'info';
+}
+
+export function LogsPage({ events = [], runItems = [], snapshot, locale = 'en' }: ProductPageProps) {
+  const copy = productPageCopy[locale].logs;
   const model = buildLogsPageModel(snapshot, { events, runItems });
   return (
     <ProductPageShell
-      kicker="Event timeline"
-      title="Logs"
-      lead="Filter runtime events, drift signals, and run-linked logs without leaving the console."
+      kicker={copy.kicker}
+      title={copy.title}
+      lead={copy.lead}
       metrics={model.metrics}
       rows={model.rows}
+      primaryQueueLabel={copy.primaryQueue}
     >
       <article className="page-card">
-        <h3>Filters</h3>
+        <h3>{copy.sideCardTitle}</h3>
         <div className="metric-list">
           <div className="metric-row">
             <span>Severity</span>
@@ -111,17 +289,19 @@ export function LogsPage({ events = [], runItems = [], snapshot }: ProductPagePr
 }
 
 export function ReportsPage({ operationOutputs = {}, claims, snapshot, locale = 'en' }: ProductPageProps) {
+  const copy = productPageCopy[locale].reports;
   const model = buildReportsPageModel(snapshot, { operationOutputs, claims }, locale);
   return (
     <ProductPageShell
-      kicker="Readiness evidence"
-      title="Reports"
-      lead="Review generated readiness, evidence, support, security, and metrics reports from one place."
+      kicker={copy.kicker}
+      title={copy.title}
+      lead={copy.lead}
       metrics={model.metrics}
       rows={model.rows}
+      primaryQueueLabel={copy.primaryQueue}
     >
       <article className="page-card">
-        <h3>Pilot launch report</h3>
+        <h3>{copy.sideCardTitle}</h3>
         <div className="metric-list">
           <div className="metric-row">
             <span>Status</span>
@@ -142,17 +322,19 @@ export function ReportsPage({ operationOutputs = {}, claims, snapshot, locale = 
 }
 
 export function AlertsPage({ driftEvents = [], pendingApprovals = [], claims, snapshot, locale = 'en' }: ProductPageProps) {
+  const copy = productPageCopy[locale].alerts;
   const model = buildAlertsPageModel(snapshot, { driftEvents, pendingApprovals, claims }, locale);
   return (
     <ProductPageShell
-      kicker="Alert inbox"
-      title="Alerts"
-      lead="Prioritize blocked claims, stale approvals, runtime drift, and unsafe execution attempts."
+      kicker={copy.kicker}
+      title={copy.title}
+      lead={copy.lead}
       metrics={model.metrics}
       rows={model.rows}
+      primaryQueueLabel={copy.primaryQueue}
     >
       <article className="page-card">
-        <h3>Lifecycle</h3>
+        <h3>{copy.sideCardTitle}</h3>
         <div className="metric-list">
           <div className="metric-row">
             <span>Acknowledge</span>
@@ -169,35 +351,39 @@ export function AlertsPage({ driftEvents = [], pendingApprovals = [], claims, sn
 }
 
 export function PlansPage({ profile = 'balanced', snapshot, locale = 'en' }: ProductPageProps) {
+  const copy = productPageCopy[locale].plans;
   const model = buildPlansPageModel(snapshot, profile, locale);
   return (
     <ProductPageShell
-      kicker="Plan templates"
-      title="Plans"
-      lead="Prepare governed task specs, validate safety posture, and submit through the task workspace."
+      kicker={copy.kicker}
+      title={copy.title}
+      lead={copy.lead}
       metrics={model.metrics}
       rows={model.rows}
+      primaryQueueLabel={copy.primaryQueue}
     >
       <article className="page-card">
-        <h3>Safe next step</h3>
+        <h3>{copy.sideCardTitle}</h3>
         <p className="supporting">Open Görevler, keep approval checks enabled, and submit the selected plan as a governed run.</p>
       </article>
     </ProductPageShell>
   );
 }
 
-export function UsersPage({ operatorId = '', profile = 'balanced', snapshot }: ProductPageProps) {
+export function UsersPage({ operatorId = '', profile = 'balanced', snapshot, locale = 'en' }: ProductPageProps) {
+  const copy = productPageCopy[locale].users;
   const model = buildUsersPageModel(snapshot, operatorId, profile);
   return (
     <ProductPageShell
-      kicker="Identity"
-      title="Users"
-      lead="Inspect operator identity, verified assertions, and last-known permission context."
+      kicker={copy.kicker}
+      title={copy.title}
+      lead={copy.lead}
       metrics={model.metrics}
       rows={model.rows}
+      primaryQueueLabel={copy.primaryQueue}
     >
       <article className="page-card">
-        <h3>Admin proposals</h3>
+        <h3>{copy.sideCardTitle}</h3>
         <div className="metric-list">
           <div className="metric-row">
             <span>Pending</span>
@@ -213,18 +399,20 @@ export function UsersPage({ operatorId = '', profile = 'balanced', snapshot }: P
   );
 }
 
-export function RolesPage({ profile = 'balanced', snapshot }: ProductPageProps) {
+export function RolesPage({ profile = 'balanced', snapshot, locale = 'en' }: ProductPageProps) {
+  const copy = productPageCopy[locale].roles;
   const model = buildRolesPageModel(snapshot, profile);
   return (
     <ProductPageShell
-      kicker="RBAC"
-      title="Roles"
-      lead="Review built-in role responsibilities and the permissions required for guarded operations."
+      kicker={copy.kicker}
+      title={copy.title}
+      lead={copy.lead}
       metrics={model.metrics}
       rows={model.rows}
+      primaryQueueLabel={copy.primaryQueue}
     >
       <article className="page-card">
-        <h3>Admin proposals</h3>
+        <h3>{copy.sideCardTitle}</h3>
         <div className="metric-list">
           <div className="metric-row">
             <span>Role proposals</span>
@@ -241,17 +429,19 @@ export function RolesPage({ profile = 'balanced', snapshot }: ProductPageProps) 
 }
 
 export function PolicyPacksPage({ claims, snapshot, locale = 'en' }: ProductPageProps) {
+  const copy = productPageCopy[locale].policyPacks;
   const model = buildPolicyPacksPageModel(snapshot, claims, locale);
   return (
     <ProductPageShell
-      kicker="Admin policy"
-      title="Policy Packs"
-      lead="Manage policy pack visibility separately from the simulation workspace."
+      kicker={copy.kicker}
+      title={copy.title}
+      lead={copy.lead}
       metrics={model.metrics}
       rows={model.rows}
+      primaryQueueLabel={copy.primaryQueue}
     >
       <article className="page-card">
-        <h3>Lifecycle proposals</h3>
+        <h3>{copy.sideCardTitle}</h3>
         <div className="metric-list">
           <div className="metric-row">
             <span>Policy proposals</span>

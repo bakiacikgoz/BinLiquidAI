@@ -791,28 +791,69 @@ body::before {
 }
 
 .runtime-truth-banner {
-  margin: 0 var(--space-8) var(--space-4);
+  margin: 0 var(--space-5) var(--space-4);
   border: 1px solid var(--line-soft);
   border-left-width: 4px;
   border-radius: var(--radius-md);
   background: var(--surface-card);
-  padding: 0.85rem 1rem;
+  padding: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr);
-  gap: var(--space-4);
+  grid-template-columns: minmax(220px, 0.9fr) minmax(420px, 1.45fr) max-content;
+  align-items: stretch;
+  min-height: 64px;
+  max-height: 74px;
+  overflow: hidden;
 }
 
-.runtime-truth-banner > div,
-.runtime-truth-banner dl {
+.runtime-truth-summary {
+  display: contents;
+}
+
+.runtime-truth-banner-loading {
+  grid-template-columns: 1fr;
+  max-height: none;
+}
+
+.runtime-truth-banner-loading .runtime-truth-summary {
   display: grid;
-  gap: 0.35rem;
+}
+
+.runtime-truth-copy {
+  display: grid;
+  align-content: center;
+  gap: 0.18rem;
+  min-width: 0;
+  padding: 0.68rem 0.95rem;
+  border-right: 1px solid var(--line-soft);
+}
+
+.runtime-truth-banner-loading .runtime-truth-copy {
+  border-right: 0;
+}
+
+.runtime-truth-meta {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.55fr) minmax(112px, 0.55fr) minmax(0, 1.25fr);
+  align-self: stretch;
+  min-width: 0;
+  margin: 0;
+}
+
+.runtime-truth-details dl {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
 }
 
 .runtime-truth-banner strong,
 .runtime-truth-banner span,
 .runtime-truth-banner dt,
 .runtime-truth-banner dd {
-  overflow-wrap: anywhere;
+  min-width: 0;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .runtime-truth-banner span,
@@ -820,9 +861,10 @@ body::before {
   color: var(--fg-muted);
 }
 
-.runtime-truth-banner dl {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin: 0;
+.runtime-truth-banner .runtime-truth-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .runtime-truth-banner dt,
@@ -830,8 +872,93 @@ body::before {
   margin: 0;
 }
 
+.runtime-truth-banner dt {
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .runtime-truth-banner dd {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   font-weight: 650;
+}
+
+.runtime-truth-meta > div {
+  display: grid;
+  align-content: center;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.58rem 0.72rem;
+}
+
+.runtime-truth-meta > div:not(:last-child) {
+  border-right: 1px solid var(--line-soft);
+}
+
+.runtime-truth-details dl > div {
+  display: grid;
+  align-content: start;
+  gap: 0.32rem;
+  min-width: 0;
+}
+
+.runtime-truth-reasons {
+  min-width: 0;
+}
+
+.runtime-truth-reasons dd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  min-width: 0;
+}
+
+.runtime-truth-details {
+  display: grid;
+  align-content: center;
+  align-self: stretch;
+  border-left: 1px solid var(--line-soft);
+  color: var(--fg-secondary);
+  font-size: 0.78rem;
+  margin: 0;
+  min-width: 0;
+  padding: 0.58rem 0.72rem;
+}
+
+.runtime-truth-details summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-control);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.runtime-truth-details[open] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  border-left: 0;
+  border-top: 1px solid var(--line-soft);
+  max-height: none;
+  padding: 0.72rem 0.95rem 0.85rem;
+}
+
+.runtime-truth-banner:has(.runtime-truth-details[open]) {
+  grid-template-rows: minmax(64px, auto) auto;
+  height: max-content;
+  max-height: none;
+  overflow: visible;
+}
+
+.runtime-truth-details[open] dl {
+  margin-top: 0.6rem;
+  padding-top: 0;
 }
 
 .runtime-truth-banner-ok {
@@ -986,12 +1113,33 @@ body::before {
   }
 
   .runtime-truth-banner {
+    grid-template-columns: 1fr;
     margin-inline: 0;
+    max-height: none;
+  }
+
+  .runtime-truth-summary {
+    display: grid;
+  }
+
+  .runtime-truth-copy,
+  .runtime-truth-details {
+    border-right: 0;
+    border-left: 0;
+  }
+
+  .runtime-truth-copy,
+  .runtime-truth-meta > div {
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .runtime-truth-meta,
+  .runtime-truth-details dl {
     grid-template-columns: 1fr;
   }
 
-  .runtime-truth-banner dl {
-    grid-template-columns: 1fr;
+  .runtime-truth-meta > div:not(:last-child) {
+    border-right: 0;
   }
 
   .workspace-stage-grid,

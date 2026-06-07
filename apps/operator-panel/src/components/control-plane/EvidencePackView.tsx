@@ -1,6 +1,7 @@
 import { formatReasonCode, formatReasonCodeList } from '../../control-plane/reasonCodes';
 import type { EvidencePackSummary, PilotLaunchReadinessStatus, PilotLaunchStatusTile } from '../../control-plane/types';
 import type { UiLocale } from '../../i18n';
+import { ReasonChip, StatusBadge } from '../primitives/Token';
 
 type EvidencePackViewProps = {
   evidencePacks: EvidencePackSummary[];
@@ -100,9 +101,15 @@ export function EvidencePackView({
       <div className="run-list">
         {blockingReasons.map((reason) => (
           <article className="run-list-item" key={reason}>
-            <strong>{reason}</strong>
-            <span>{formatReasonCode(reason, locale)}</span>
-            <small>{selectedPack ? 'pack blocker' : 'required before ready claim'}</small>
+            <div className="run-list-main">
+              <strong>{formatReasonCode(reason, locale)}</strong>
+              <div className="run-list-meta">
+                <ReasonChip title={reason}>{reason}</ReasonChip>
+              </div>
+            </div>
+            <StatusBadge tone={selectedPack ? 'warning' : 'error'}>
+              {selectedPack ? 'pack blocker' : 'required before ready claim'}
+            </StatusBadge>
           </article>
         ))}
       </div>

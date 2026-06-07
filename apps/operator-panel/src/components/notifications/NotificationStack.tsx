@@ -24,9 +24,11 @@ export function NotificationStack({
   items: NotificationItem[];
   onDismiss: (id: string) => void;
 }) {
+  const visibleItems = items.slice(0, 2);
+  const hiddenCount = Math.max(0, items.length - visibleItems.length);
   return (
     <div className="notification-stack" aria-label="Bildirimler">
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <div className={`notification-item notification-item-${item.kind}`} key={item.id}>
           <span className="notification-icon">
             <Icon name={iconForKind[item.kind]} />
@@ -41,6 +43,7 @@ export function NotificationStack({
           </button>
         </div>
       ))}
+      {hiddenCount > 0 ? <div className="notification-summary">{hiddenCount} sistem bildirimi daha</div> : null}
     </div>
   );
 }

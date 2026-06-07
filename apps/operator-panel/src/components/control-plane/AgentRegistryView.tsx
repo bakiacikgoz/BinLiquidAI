@@ -1,4 +1,5 @@
 import { asControlPlaneAgentList } from '../../controlPlaneMappers';
+import { CodeToken, StatusBadge } from '../primitives/Token';
 
 export function AgentRegistryView({ agents }: { agents: unknown }) {
   const list = asControlPlaneAgentList(agents);
@@ -17,18 +18,28 @@ export function AgentRegistryView({ agents }: { agents: unknown }) {
           <div className="run-list">
             {list.agents.map((agent) => (
               <article className="run-list-item" key={agent.agent_id}>
-                <strong>{agent.display_name || agent.agent_id}</strong>
-                <span>{`${agent.agent_type} / ${agent.runtime_kind}`}</span>
-                <small>{`${agent.status} / ${agent.readiness}`}</small>
-                <small>{`Policy ${agent.policy_pack_id} / ${agent.risk_profile}`}</small>
-                <small>{`Evidence ${agent.last_evidence_status}`}</small>
+                <div className="run-list-main">
+                  <strong>{agent.display_name || agent.agent_id}</strong>
+                  <div className="run-list-meta">
+                    <CodeToken>{agent.agent_type}</CodeToken>
+                    <CodeToken>{agent.runtime_kind}</CodeToken>
+                    <span>{`Policy ${agent.policy_pack_id}`}</span>
+                    <span>{agent.risk_profile}</span>
+                    <span>{`Evidence ${agent.last_evidence_status}`}</span>
+                  </div>
+                </div>
+                <StatusBadge tone={agent.status === 'active' ? 'success' : 'warning'}>
+                  {`${agent.status} / ${agent.readiness}`}
+                </StatusBadge>
               </article>
             ))}
             {list.agents.length === 0 ? (
               <article className="run-list-item">
-                <strong>No registered agents</strong>
-                <span>Register an agent spec with the control-plane CLI.</span>
-                <small>binliquid control-plane agent register</small>
+                <div className="run-list-main">
+                  <strong>No registered agents</strong>
+                  <span>Register an agent spec with the control-plane CLI.</span>
+                </div>
+                <CodeToken>binliquid control-plane agent register</CodeToken>
               </article>
             ) : null}
           </div>

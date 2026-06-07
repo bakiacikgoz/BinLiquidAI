@@ -1445,7 +1445,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <small>{handshakeError.command}</small>
           </div>
         ) : null}
-        <RuntimeTruthBanner viewModel={controlPlaneSnapshotVm} locale={locale} />
+        {activeView === 'assistant' ? null : <RuntimeTruthBanner viewModel={controlPlaneSnapshotVm} locale={locale} />}
 
         {activeView === 'dashboard' ? (
           <ControlPlaneDashboard
@@ -2747,7 +2747,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           </section>
         ) : null}
 
-        {activeView === 'logs' ? <LogsPage events={events} runItems={runItems} snapshot={controlPlaneSnapshot} /> : null}
+        {activeView === 'logs' ? <LogsPage events={events} runItems={runItems} snapshot={controlPlaneSnapshot} locale={locale} /> : null}
 
         {activeView === 'reports' ? (
           <ReportsPage
@@ -2771,10 +2771,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         {activeView === 'plans' ? <PlansPage profile={settings.profile} snapshot={controlPlaneSnapshot} locale={locale} /> : null}
 
         {activeView === 'users' ? (
-          <UsersPage operatorId={settings.operatorId.trim()} profile={settings.profile} snapshot={controlPlaneSnapshot} />
+          <UsersPage operatorId={settings.operatorId.trim()} profile={settings.profile} snapshot={controlPlaneSnapshot} locale={locale} />
         ) : null}
 
-        {activeView === 'roles' ? <RolesPage profile={settings.profile} snapshot={controlPlaneSnapshot} /> : null}
+        {activeView === 'roles' ? <RolesPage profile={settings.profile} snapshot={controlPlaneSnapshot} locale={locale} /> : null}
 
         {activeView === 'policy-packs' ? (
           <PolicyPacksPage claims={controlPlaneClaims} snapshot={controlPlaneSnapshot} locale={locale} />

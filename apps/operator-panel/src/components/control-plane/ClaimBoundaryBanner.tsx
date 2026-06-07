@@ -1,4 +1,5 @@
 import { asControlPlaneClaimMatrix } from '../../controlPlaneMappers';
+import { ReasonChip, StatusBadge } from '../primitives/Token';
 
 export function ClaimBoundaryBanner({ claims }: { claims: unknown }) {
   const matrix = asControlPlaneClaimMatrix(claims);
@@ -12,9 +13,17 @@ export function ClaimBoundaryBanner({ claims }: { claims: unknown }) {
       <div className="run-list">
         {matrix.claims.map((claim) => (
           <article className="run-list-item" key={claim.claim_id}>
-            <strong>{claim.claim_id}</strong>
-            <span>{claim.status}</span>
-            {claim.blocking_reasons.length > 0 ? <small>{claim.blocking_reasons.join(', ')}</small> : null}
+            <div className="run-list-main">
+              <strong>{claim.claim_id}</strong>
+              <div className="run-list-meta">
+                {claim.blocking_reasons.length > 0 ? (
+                  claim.blocking_reasons.map((reason) => <ReasonChip key={reason}>{reason}</ReasonChip>)
+                ) : (
+                  <span>No blocking reason</span>
+                )}
+              </div>
+            </div>
+            <StatusBadge tone={claim.status === 'blocked' ? 'error' : 'success'}>{claim.status}</StatusBadge>
           </article>
         ))}
       </div>

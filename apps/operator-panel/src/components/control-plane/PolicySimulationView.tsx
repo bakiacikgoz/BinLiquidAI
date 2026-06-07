@@ -1,5 +1,6 @@
 import { formatReasonCode } from '../../control-plane/reasonCodes';
 import type { UiLocale } from '../../i18n';
+import { CodeToken, ReasonChip, StatusBadge } from '../primitives/Token';
 
 export function PolicySimulationView({ simulation, locale = 'en' }: { simulation: unknown; locale?: UiLocale }) {
   const record = asRecord(simulation);
@@ -20,17 +21,26 @@ export function PolicySimulationView({ simulation, locale = 'en' }: { simulation
             const reasonCode = typeof decision.reason_code === 'string' ? decision.reason_code : '';
             return (
               <article className="run-list-item" key={String(decision.action_id)}>
-                <strong>{String(decision.action_id ?? '-')}</strong>
-                <span>{String(decision.decision_action ?? '-')}</span>
-                <small>{reasonCode ? formatReasonCode(reasonCode, locale) : '-'}</small>
+                <div className="run-list-main">
+                  <strong>{String(decision.action_id ?? '-')}</strong>
+                  <div className="run-list-meta">
+                    <CodeToken>{String(decision.decision_action ?? '-')}</CodeToken>
+                    {reasonCode ? <ReasonChip title={formatReasonCode(reasonCode, locale)}>{reasonCode}</ReasonChip> : null}
+                  </div>
+                </div>
+                <StatusBadge tone={String(decision.decision_action).includes('deny') ? 'error' : 'success'}>
+                  {String(decision.decision_action ?? '-')}
+                </StatusBadge>
               </article>
             );
           })
         ) : (
           <article className="run-list-item">
-            <strong>No simulation loaded</strong>
-            <span>Select an agent or refresh the control-plane context to run the default dry-run.</span>
-            <small>dry-run only</small>
+            <div className="run-list-main">
+              <strong>No simulation loaded</strong>
+              <span>Select an agent or refresh the control-plane context to run the default dry-run.</span>
+            </div>
+            <StatusBadge tone="muted">dry-run only</StatusBadge>
           </article>
         )}
       </div>
@@ -56,19 +66,25 @@ export function PolicySimulationView({ simulation, locale = 'en' }: { simulation
           <h3>Reason code glossary</h3>
           <div className="run-list">
             <article className="run-list-item">
-              <strong>POLICY_ALLOW</strong>
-              <span>Read-only or harmless action is allowed.</span>
-              <small>allow</small>
+              <div className="run-list-main">
+                <strong>POLICY_ALLOW</strong>
+                <span>Read-only or harmless action is allowed.</span>
+              </div>
+              <StatusBadge tone="success">allow</StatusBadge>
             </article>
             <article className="run-list-item">
-              <strong>APPROVAL_REQUIRED</strong>
-              <span>Mutation can continue only through approval lifecycle.</span>
-              <small>require approval</small>
+              <div className="run-list-main">
+                <strong>APPROVAL_REQUIRED</strong>
+                <span>Mutation can continue only through approval lifecycle.</span>
+              </div>
+              <StatusBadge tone="warning">require approval</StatusBadge>
             </article>
             <article className="run-list-item">
-              <strong>POLICY_DENY</strong>
-              <span>Credential, destructive, financial, or unknown action is blocked.</span>
-              <small>deny</small>
+              <div className="run-list-main">
+                <strong>POLICY_DENY</strong>
+                <span>Credential, destructive, financial, or unknown action is blocked.</span>
+              </div>
+              <StatusBadge tone="error">deny</StatusBadge>
             </article>
           </div>
         </article>
