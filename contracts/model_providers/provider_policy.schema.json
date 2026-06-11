@@ -1,0 +1,161 @@
+{
+  "$defs": {
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allow_streaming": {
+      "default": true,
+      "title": "Allow Streaming",
+      "type": "boolean"
+    },
+    "allow_tool_calls": {
+      "default": false,
+      "title": "Allow Tool Calls",
+      "type": "boolean"
+    },
+    "allowed_data_classes": {
+      "items": {
+        "$ref": "#/$defs/DataClass"
+      },
+      "title": "Allowed Data Classes",
+      "type": "array"
+    },
+    "allowed_hosts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Hosts",
+      "type": "array"
+    },
+    "blocked_data_classes": {
+      "items": {
+        "$ref": "#/$defs/DataClass"
+      },
+      "title": "Blocked Data Classes",
+      "type": "array"
+    },
+    "canary_call_budget": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Canary Call Budget",
+      "type": "integer"
+    },
+    "daily_call_budget": {
+      "default": 1000,
+      "minimum": 0,
+      "title": "Daily Call Budget",
+      "type": "integer"
+    },
+    "daily_cost_limit_usd": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Daily Cost Limit Usd"
+    },
+    "evidence_required": {
+      "default": true,
+      "title": "Evidence Required",
+      "type": "boolean"
+    },
+    "fallback_allowed_to": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Fallback Allowed To",
+      "type": "array"
+    },
+    "max_input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Input Tokens"
+    },
+    "max_output_tokens": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Output Tokens"
+    },
+    "max_prompt_chars": {
+      "default": 12000,
+      "minimum": 1,
+      "title": "Max Prompt Chars",
+      "type": "integer"
+    },
+    "max_retries": {
+      "default": 0,
+      "maximum": 5,
+      "minimum": 0,
+      "title": "Max Retries",
+      "type": "integer"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "rate_limit_per_minute": {
+      "default": 10,
+      "minimum": 0,
+      "title": "Rate Limit Per Minute",
+      "type": "integer"
+    },
+    "requires_approval_for_tool_calls": {
+      "default": true,
+      "title": "Requires Approval For Tool Calls",
+      "type": "boolean"
+    },
+    "requires_redaction": {
+      "default": true,
+      "title": "Requires Redaction",
+      "type": "boolean"
+    },
+    "timeout_ms": {
+      "default": 15000,
+      "maximum": 300000,
+      "minimum": 1000,
+      "title": "Timeout Ms",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "provider_id"
+  ],
+  "title": "ProviderPolicy",
+  "type": "object"
+}

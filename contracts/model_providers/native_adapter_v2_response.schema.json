@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "call_id": {
+      "title": "Call Id",
+      "type": "string"
+    },
+    "content_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Content Hash"
+    },
+    "generated_at_utc": {
+      "format": "date-time",
+      "title": "Generated At Utc",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "raw_content_persisted": {
+      "default": false,
+      "title": "Raw Content Persisted",
+      "type": "boolean"
+    },
+    "reason_code": {
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "status": {
+      "pattern": "^(skipped|denied|pass|fail)$",
+      "title": "Status",
+      "type": "string"
+    },
+    "tool_calls": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Tool Calls",
+      "type": "array"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Usage"
+    },
+    "version": {
+      "default": "model_provider.native_adapter_response/v2",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "provider_id",
+    "model",
+    "status",
+    "reason_code"
+  ],
+  "title": "NativeAdapterV2Response",
+  "type": "object"
+}

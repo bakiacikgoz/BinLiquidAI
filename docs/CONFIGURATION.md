@@ -27,6 +27,9 @@ uv run binliquid config resolve --profile balanced --provider auto --model qwen3
 - `fast_path_regret_window`: int (turn window)
 - `fast_path_regret_threshold`: float
 - `memory_ttl_days`: int
+- `provider_registry_enabled`: bool
+- `provider_registry_path`: path to `config/providers.toml`
+- `remote_providers_enabled`: bool, defaults to false
 
 Planner tuning:
 
@@ -96,6 +99,9 @@ export BINLIQUID_GOVERNANCE_ENABLED=true
 export BINLIQUID_GOVERNANCE_POLICY_PATH=config/policies/balanced.toml
 export BINLIQUID_GOVERNANCE_POLICY_FAIL_MODE=fail_closed
 export BINLIQUID_GOVERNANCE_APPROVAL_TTL_SECONDS=86400
+export BINLIQUID_PROVIDER_REGISTRY_ENABLED=true
+export BINLIQUID_PROVIDER_REGISTRY_PATH=config/providers.toml
+export BINLIQUID_REMOTE_PROVIDERS_ENABLED=false
 ```
 
 ## Model Override Rules (v0.3.1)
@@ -105,6 +111,14 @@ export BINLIQUID_GOVERNANCE_APPROVAL_TTL_SECONDS=86400
 - `--provider transformers` with `--model` returns deterministic invalid input.
 - `--provider ollama` with `--hf-model-id` returns deterministic invalid input.
 - `--provider auto` accepts both; Ollama target comes from `--model`, fallback transformers target from `--hf-model-id`.
+- `--provider-id` selects a canonical model provider from the v1 registry.
+- `--fallback-provider-id` evaluates canonical fallback downgrade policy when provider governance is active.
+
+## Model Provider Registry (v1)
+
+Provider registry config lives in `config/providers.toml`. If that file is absent, CLI inspection commands can read `config/providers.example.toml` as a non-secret example. Public cloud and aggregator providers must use HTTPS base URLs and `api_key_env`; inline `api_key`, `token`, `secret`, `password`, or `authorization` values are rejected.
+
+Remote providers are disabled unless `remote_providers_enabled=true` is set in config or `BINLIQUID_REMOTE_PROVIDERS_ENABLED=true` is present in the environment.
 
 ## Doctor Status Contract (v0.3.1)
 

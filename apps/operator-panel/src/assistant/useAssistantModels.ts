@@ -4,7 +4,7 @@ import { BridgeError, listAssistantModels } from '../bridge';
 import type { PanelSettings } from '../settings';
 import {
   flattenAssistantModels,
-  type AssistantProviderKind,
+  type AssistantProviderId,
   type AssistantProviderModelCandidate,
   type AssistantProviderModelsProvider,
   type AssistantProviderModelsResponse,
@@ -33,7 +33,7 @@ export function useAssistantModels({
 }: {
   settings: PanelSettings;
   profile: string;
-  provider: AssistantProviderKind | 'all';
+  provider: AssistantProviderId | 'all';
 }): AssistantModelDiscoveryState {
   const [response, setResponse] = useState<AssistantProviderModelsResponse | null>(null);
   const [status, setStatus] = useState<AssistantModelDiscoveryStatus>('idle');

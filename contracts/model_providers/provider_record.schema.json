@@ -1,0 +1,221 @@
+{
+  "$defs": {
+    "AuthMode": {
+      "enum": [
+        "none",
+        "bearer_env",
+        "custom_header_env",
+        "azure_ad",
+        "managed_identity"
+      ],
+      "title": "AuthMode",
+      "type": "string"
+    },
+    "DataBoundary": {
+      "enum": [
+        "local",
+        "internal",
+        "private_cloud",
+        "public_cloud",
+        "aggregator",
+        "unknown"
+      ],
+      "title": "DataBoundary",
+      "type": "string"
+    },
+    "ProviderKind": {
+      "enum": [
+        "local_ollama",
+        "local_transformers",
+        "openai_compatible",
+        "openai_responses",
+        "openai",
+        "azure_openai",
+        "anthropic",
+        "google_gemini",
+        "deepseek",
+        "openrouter",
+        "custom_http",
+        "company_internal_api"
+      ],
+      "title": "ProviderKind",
+      "type": "string"
+    },
+    "RetentionPolicy": {
+      "enum": [
+        "none_claimed",
+        "zero_retention",
+        "provider_default",
+        "customer_controlled",
+        "unknown"
+      ],
+      "title": "RetentionPolicy",
+      "type": "string"
+    },
+    "RiskTier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "blocked"
+      ],
+      "title": "RiskTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "api_key_env": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Api Key Env"
+    },
+    "auth_mode": {
+      "$ref": "#/$defs/AuthMode",
+      "default": "none"
+    },
+    "base_url": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Base Url"
+    },
+    "cost_policy_id": {
+      "anyOf": [
+        {
+          "maxLength": 80,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost Policy Id"
+    },
+    "data_boundary": {
+      "$ref": "#/$defs/DataBoundary",
+      "default": "local"
+    },
+    "data_residency": {
+      "anyOf": [
+        {
+          "maxLength": 80,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Data Residency"
+    },
+    "default_model": {
+      "maxLength": 160,
+      "title": "Default Model",
+      "type": "string"
+    },
+    "display_name": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Display Name"
+    },
+    "enabled": {
+      "default": false,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "fallback_priority": {
+      "default": 100,
+      "maximum": 999,
+      "minimum": 0,
+      "title": "Fallback Priority",
+      "type": "integer"
+    },
+    "kind": {
+      "$ref": "#/$defs/ProviderKind"
+    },
+    "models": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Models",
+      "type": "array"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "retention_policy": {
+      "$ref": "#/$defs/RetentionPolicy",
+      "default": "unknown"
+    },
+    "risk_tier": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RiskTier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "supports_json_mode": {
+      "default": false,
+      "title": "Supports Json Mode",
+      "type": "boolean"
+    },
+    "supports_json_schema": {
+      "default": false,
+      "title": "Supports Json Schema",
+      "type": "boolean"
+    },
+    "supports_streaming": {
+      "default": false,
+      "title": "Supports Streaming",
+      "type": "boolean"
+    },
+    "supports_tool_calling": {
+      "default": false,
+      "title": "Supports Tool Calling",
+      "type": "boolean"
+    },
+    "supports_vision": {
+      "default": false,
+      "title": "Supports Vision",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "provider_id",
+    "kind",
+    "default_model"
+  ],
+  "title": "ModelProviderRecord",
+  "type": "object"
+}

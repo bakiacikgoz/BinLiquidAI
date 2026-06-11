@@ -84,7 +84,9 @@ describe('bridge tauri contract', () => {
         compiledPrompt: 'compiled prompt',
         profile: 'balanced',
         provider: 'auto',
+        providerId: 'company-internal',
         fallbackProvider: 'transformers',
+        fallbackProviderId: 'local-transformers',
         model: 'qwen3.5:4b',
         hfModelId: 'Qwen/Qwen2.5',
       },
@@ -101,7 +103,9 @@ describe('bridge tauri contract', () => {
         sessionId: 'session-tauri',
         compiledPrompt: 'compiled prompt',
         provider: 'auto',
+        providerId: 'company-internal',
         fallbackProvider: 'transformers',
+        fallbackProviderId: 'local-transformers',
         model: 'qwen3.5:4b',
         hfModelId: 'Qwen/Qwen2.5',
       }),
@@ -110,9 +114,9 @@ describe('bridge tauri contract', () => {
 
   it('passes assistant model discovery requests to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
-      contractVersion: 'operator-panel.assistant-provider-models/v1',
+      contractVersion: 'operator-panel.assistant-provider-models/v2',
       profile: 'balanced',
-      provider: 'ollama',
+      provider: 'local-ollama',
       generatedAtUtc: '2026-06-07T00:00:00Z',
       providers: [],
     });

@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "ChatMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "default": "",
+          "maxLength": 200000,
+          "title": "Content",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "role": {
+          "pattern": "^(system|user|assistant|tool)$",
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "ChatMessage",
+      "type": "object"
+    },
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    },
+    "NativeAdapterV2ToolPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_required": {
+          "default": true,
+          "title": "Approval Required",
+          "type": "boolean"
+        },
+        "client_tools_allowed": {
+          "default": false,
+          "title": "Client Tools Allowed",
+          "type": "boolean"
+        },
+        "reason_code": {
+          "default": "NATIVE_ADAPTER_SERVER_TOOLS_DENY_BY_DEFAULT",
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "server_tools_allowed": {
+          "default": false,
+          "title": "Server Tools Allowed",
+          "type": "boolean"
+        }
+      },
+      "title": "NativeAdapterV2ToolPolicy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "call_id": {
+      "title": "Call Id",
+      "type": "string"
+    },
+    "canary_only": {
+      "default": true,
+      "title": "Canary Only",
+      "type": "boolean"
+    },
+    "data_classes": {
+      "items": {
+        "$ref": "#/$defs/DataClass"
+      },
+      "title": "Data Classes",
+      "type": "array"
+    },
+    "json_schema": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Json Schema"
+    },
+    "messages": {
+      "items": {
+        "$ref": "#/$defs/ChatMessage"
+      },
+      "title": "Messages",
+      "type": "array"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "stream": {
+      "default": false,
+      "title": "Stream",
+      "type": "boolean"
+    },
+    "tool_policy": {
+      "$ref": "#/$defs/NativeAdapterV2ToolPolicy"
+    },
+    "version": {
+      "default": "model_provider.native_adapter_request/v2",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "run_id",
+    "provider_id",
+    "model"
+  ],
+  "title": "NativeAdapterV2Request",
+  "type": "object"
+}

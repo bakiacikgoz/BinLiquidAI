@@ -27,9 +27,12 @@ export interface AssistantStartTurnOptions {
   compiledPrompt: string;
   profile?: string;
   provider?: string;
+  providerId?: string;
   fallbackProvider?: string;
+  fallbackProviderId?: string;
   model?: string;
   hfModelId?: string;
+  dataClassHint?: 'public' | 'internal' | 'confidential' | 'regulated';
 }
 
 export type AssistantContextAttachmentKind =

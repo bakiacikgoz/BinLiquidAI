@@ -57,10 +57,29 @@ describe('assistant runtime settings', () => {
   it('leaves empty assistant runtime overrides undefined for CLI defaults', () => {
     expect(assistantRuntimeOptionsFromSettings({ ...DEFAULT_SETTINGS })).toEqual({
       provider: undefined,
+      providerId: undefined,
       fallbackProvider: undefined,
+      fallbackProviderId: undefined,
       model: undefined,
       hfModelId: undefined,
     });
+  });
+
+  it('maps canonical provider ids separately from legacy provider flags', () => {
+    expect(
+      assistantRuntimeOptionsFromSettings({
+        ...DEFAULT_SETTINGS,
+        assistantProvider: 'company-internal',
+        assistantFallbackProvider: 'local-transformers',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        provider: undefined,
+        providerId: 'company-internal',
+        fallbackProvider: undefined,
+        fallbackProviderId: 'local-transformers',
+      }),
+    );
   });
 
   it('validates provider-specific model override combinations', () => {

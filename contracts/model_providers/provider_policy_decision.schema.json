@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    },
+    "ProviderDecisionStatus": {
+      "enum": [
+        "allow",
+        "allow_with_redaction",
+        "require_approval",
+        "deny",
+        "blocked_not_configured"
+      ],
+      "title": "ProviderDecisionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approval_required": {
+      "title": "Approval Required",
+      "type": "boolean"
+    },
+    "effective_data_classes": {
+      "items": {
+        "$ref": "#/$defs/DataClass"
+      },
+      "title": "Effective Data Classes",
+      "type": "array"
+    },
+    "evidence_required": {
+      "title": "Evidence Required",
+      "type": "boolean"
+    },
+    "fallback_allowed": {
+      "title": "Fallback Allowed",
+      "type": "boolean"
+    },
+    "internal_detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Internal Detail"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "reason_code": {
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "redaction_required": {
+      "title": "Redaction Required",
+      "type": "boolean"
+    },
+    "safe_to_call_provider": {
+      "title": "Safe To Call Provider",
+      "type": "boolean"
+    },
+    "status": {
+      "$ref": "#/$defs/ProviderDecisionStatus"
+    },
+    "user_message": {
+      "title": "User Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "reason_code",
+    "provider_id",
+    "effective_data_classes",
+    "redaction_required",
+    "approval_required",
+    "evidence_required",
+    "fallback_allowed",
+    "safe_to_call_provider",
+    "user_message"
+  ],
+  "title": "ProviderPolicyDecision",
+  "type": "object"
+}

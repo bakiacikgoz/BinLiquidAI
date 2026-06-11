@@ -1,0 +1,48 @@
+{
+  "case_id": "openai_responses_tool_proposal_pass",
+  "expected_status": "pass",
+  "expected_reason_code": "OPENAI_RESPONSES_NORMALIZED",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Create a public remediation proposal."
+      }
+    ]
+  },
+  "requested_tools": [
+    {
+      "tool_type": "custom_function",
+      "name": "draft_remediation",
+      "description": "Draft a remediation proposal.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "additionalProperties": false
+      },
+      "mutating": false
+    }
+  ],
+  "provider_response": {
+    "status": "completed",
+    "model": "gpt-5.1",
+    "output": [
+      {
+        "type": "function_call",
+        "name": "draft_remediation",
+        "arguments": "{\"summary\":\"Rotate public demo config\"}"
+      }
+    ],
+    "usage": {
+      "input_tokens": 16,
+      "output_tokens": 9
+    }
+  }
+}

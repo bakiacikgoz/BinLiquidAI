@@ -96,11 +96,24 @@ describe('bridge preview fallback', () => {
       { profile: 'balanced', provider: 'ollama' },
     );
 
-    expect(payload.contractVersion).toBe('operator-panel.assistant-provider-models/v1');
+    expect(payload.contractVersion).toBe('operator-panel.assistant-provider-models/v3');
     expect(payload.provider).toBe('ollama');
     expect(payload.providers).toHaveLength(1);
-    expect(payload.providers[0]?.provider).toBe('ollama');
+    expect(payload.providers[0]?.provider).toBe('local-ollama');
+    expect(payload.providers[0]?.legacyProvider).toBe('ollama');
     expect(payload.providers[0]?.models[0]?.id).toBe('qwen3.5:4b');
+  });
+
+  it('treats preview auto assistant provider as all providers', async () => {
+    const payload = await listAssistantModels(
+      { ...DEFAULT_SETTINGS, profile: 'balanced' },
+      { profile: 'balanced', provider: 'auto' },
+    );
+
+    expect(payload.contractVersion).toBe('operator-panel.assistant-provider-models/v3');
+    expect(payload.provider).toBe('all');
+    expect(payload.providers.map((item) => item.provider)).toContain('openai-public');
+    expect(payload.providers.map((item) => item.provider)).toContain('local-ollama');
   });
 
   it('applies preview config resolve provider and model overrides', async () => {

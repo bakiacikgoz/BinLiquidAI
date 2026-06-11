@@ -123,3 +123,84 @@ jobs:
           uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
           uv run binliquid keys verify --profile enterprise --path artifacts/ga_readiness_report.json --json
           uv run binliquid support bundle export --profile enterprise --json
+
+  provider-governance-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        run: uv sync --python 3.11 --extra dev
+
+      - name: Provider governance tests
+        run: |
+          uv run --extra dev python scripts/generate_model_provider_contract_schemas.py
+          uv run --extra dev python -m pytest -q \
+            tests/test_model_provider_contracts.py \
+            tests/test_model_provider_registry.py \
+            tests/test_model_provider_policy.py \
+            tests/test_model_provider_redaction.py \
+            tests/test_model_provider_envelope.py \
+            tests/test_model_provider_openai_compatible.py \
+            tests/test_model_provider_cli.py \
+            tests/test_model_provider_no_secret_leak.py \
+            tests/test_model_provider_budget.py \
+            tests/test_model_provider_network_guard.py \
+            tests/test_model_provider_canary_evidence.py \
+            tests/test_model_provider_canary.py \
+            tests/test_model_provider_router_shadow.py \
+            tests/test_model_provider_native_contracts.py \
+            tests/test_model_provider_tool_policy.py \
+            tests/test_openai_responses_adapter.py \
+            tests/test_provider_conformance_matrix.py \
+            tests/test_provider_native_adapter_gate.py \
+            tests/test_provider_native_adapter_contract.py \
+            tests/test_provider_governance_gate.py
+
+      - name: Provider governance gate and evidence
+        run: |
+          uv run --extra dev python scripts/run_provider_governance_gate.py --profile enterprise --json
+          uv run --extra dev python scripts/run_provider_canary_fixture.py --profile enterprise --json
+          uv run --extra dev python scripts/generate_provider_canary_evidence.py --profile enterprise --json
+          uv run --extra dev python -m binliquid provider canary verify --evidence-root artifacts/model-provider-governance/canary --json
+          uv run --extra dev python scripts/generate_model_provider_governance_evidence.py --profile enterprise --json
+          uv run --extra dev python scripts/generate_provider_conformance_matrix.py --profile enterprise --mode offline --output-root artifacts/model-provider-governance/conformance --json
+          uv run --extra dev python scripts/verify_provider_release_closure.py --profile enterprise --evidence-root artifacts/model-provider-governance/v1_1 --json
+          uv run --extra dev python scripts/run_provider_native_adapter_gate.py --profile enterprise --output-root artifacts/model-provider-governance/native-v2 --json
+
+  provider-governance-windows-script:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        run: uv sync --python 3.11 --extra dev
+
+      - name: Provider governance script gate
+        shell: pwsh
+        run: |
+          uv run --extra dev python scripts/generate_model_provider_contract_schemas.py
+          uv run --extra dev python scripts/run_provider_governance_gate.py --profile enterprise --json
+          uv run --extra dev python scripts/run_provider_canary_fixture.py --profile enterprise --json
+          uv run --extra dev python -m binliquid provider canary verify --evidence-root artifacts/model-provider-governance/canary --json
+          uv run --extra dev python scripts/generate_provider_conformance_matrix.py --profile enterprise --mode offline --output-root artifacts/model-provider-governance/conformance --json
+          uv run --extra dev python scripts/verify_provider_release_closure.py --profile enterprise --evidence-root artifacts/model-provider-governance/v1_1 --json
+          uv run --extra dev python scripts/run_provider_native_adapter_gate.py --profile enterprise --output-root artifacts/model-provider-governance/native-v2 --json

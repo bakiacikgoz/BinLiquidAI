@@ -1,0 +1,48 @@
+{
+  "$defs": {
+    "ProviderEvidenceMode": {
+      "enum": [
+        "hash_only",
+        "redacted_preview"
+      ],
+      "title": "ProviderEvidenceMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cache_allowed": {
+      "default": false,
+      "title": "Cache Allowed",
+      "type": "boolean"
+    },
+    "evidence_mode": {
+      "$ref": "#/$defs/ProviderEvidenceMode",
+      "default": "hash_only"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "raw_payload_persistence": {
+      "default": false,
+      "title": "Raw Payload Persistence",
+      "type": "boolean"
+    },
+    "remote_store_allowed": {
+      "default": false,
+      "title": "Remote Store Allowed",
+      "type": "boolean"
+    },
+    "request_store_flag": {
+      "default": false,
+      "title": "Request Store Flag",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "provider_id"
+  ],
+  "title": "ProviderStoragePolicy",
+  "type": "object"
+}

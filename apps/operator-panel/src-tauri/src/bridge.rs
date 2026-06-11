@@ -1563,7 +1563,9 @@ pub async fn bridge_assistant_start_turn(
     session_id: String,
     compiled_prompt: String,
     provider: Option<String>,
+    provider_id: Option<String>,
     fallback_provider: Option<String>,
+    fallback_provider_id: Option<String>,
     model: Option<String>,
     hf_model_id: Option<String>,
 ) -> BridgeResult<AssistantStartTurnPayload> {
@@ -1585,9 +1587,25 @@ pub async fn bridge_assistant_start_turn(
             Ok(value) => value,
             Err(error) => return BridgeResult::err(error),
         };
+    let provider_id = match normalize_optional_cli_token(
+        provider_id.as_deref(),
+        "provider_id",
+        "assistant start",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
     let fallback_provider = match normalize_optional_cli_token(
         fallback_provider.as_deref(),
         "fallback_provider",
+        "assistant start",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let fallback_provider_id = match normalize_optional_cli_token(
+        fallback_provider_id.as_deref(),
+        "fallback_provider_id",
         "assistant start",
     ) {
         Ok(value) => value,
@@ -1614,7 +1632,9 @@ pub async fn bridge_assistant_start_turn(
         &compiled_prompt,
         &session_id,
         provider.as_deref(),
+        provider_id.as_deref(),
         fallback_provider.as_deref(),
+        fallback_provider_id.as_deref(),
         model.as_deref(),
         hf_model_id.as_deref(),
     );
@@ -1824,7 +1844,9 @@ fn build_assistant_chat_args(
     compiled_prompt: &str,
     session_id: &str,
     provider: Option<&str>,
+    provider_id: Option<&str>,
     fallback_provider: Option<&str>,
+    fallback_provider_id: Option<&str>,
     model: Option<&str>,
     hf_model_id: Option<&str>,
 ) -> Vec<String> {
@@ -1840,7 +1862,9 @@ fn build_assistant_chat_args(
         session_id.to_string(),
     ];
     push_optional_arg(&mut args, "--provider", provider);
+    push_optional_arg(&mut args, "--provider-id", provider_id);
     push_optional_arg(&mut args, "--fallback-provider", fallback_provider);
+    push_optional_arg(&mut args, "--fallback-provider-id", fallback_provider_id);
     push_optional_arg(&mut args, "--model", model);
     push_optional_arg(&mut args, "--hf-model-id", hf_model_id);
     args
@@ -3026,7 +3050,9 @@ mod tests {
             "compiled prompt",
             "session-1",
             Some("ollama"),
+            Some("local-ollama"),
             Some("transformers"),
+            Some("local-transformers"),
             Some("qwen3.5:4b"),
             Some("Qwen/Qwen2.5"),
         );
@@ -3044,7 +3070,13 @@ mod tests {
             .any(|pair| pair[0] == "--provider" && pair[1] == "ollama"));
         assert!(args
             .windows(2)
+            .any(|pair| pair[0] == "--provider-id" && pair[1] == "local-ollama"));
+        assert!(args
+            .windows(2)
             .any(|pair| pair[0] == "--fallback-provider" && pair[1] == "transformers"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--fallback-provider-id" && pair[1] == "local-transformers"));
         assert!(args
             .windows(2)
             .any(|pair| pair[0] == "--model" && pair[1] == "qwen3.5:4b"));

@@ -115,7 +115,9 @@ describe('App integration flows', () => {
     NAVIGATION_TEST_TIMEOUT_MS,
   );
 
-  it('submits a team run through the preview bridge and returns to workspace', async () => {
+  it(
+    'submits a team run through the preview bridge and returns to workspace',
+    async () => {
     const { user } = renderApp({ operatorId: 'qa-operator' });
 
     await openView(user, 'Görevler');
@@ -134,7 +136,9 @@ describe('App integration flows', () => {
     });
     expect(await screen.findByText('Submit run OK')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Mission Control' })).toBeInTheDocument();
-  });
+    },
+    NAVIGATION_TEST_TIMEOUT_MS,
+  );
 
   it('keeps computer-use start fail-closed when the vision runtime is not qualified', async () => {
     const { user } = renderApp({ operatorId: 'qa-operator' });

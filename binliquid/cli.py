@@ -130,6 +130,35 @@ from binliquid.memory.manager import MemoryManager
 from binliquid.memory.persistent_store import PersistentMemoryStore
 from binliquid.memory.salience_gate import SalienceGate
 from binliquid.memory.session_store import SessionStore
+from binliquid.model_providers.adapters.adapter_factory import ProviderAdapterFactory
+from binliquid.model_providers.canary import run_provider_canary
+from binliquid.model_providers.canary_evidence import (
+    verify_canary_evidence_root,
+    write_router_shadow_evidence,
+)
+from binliquid.model_providers.conformance import build_provider_conformance_matrix
+from binliquid.model_providers.doctor import doctor_provider
+from binliquid.model_providers.envelope import ProviderCallEnvelopeWriter
+from binliquid.model_providers.models import (
+    ChatMessage,
+    DataClass,
+    ProviderCallRequest,
+    ProviderCanaryRequest,
+    ProviderConformanceEntry,
+    ProviderKind,
+    ProviderRouteShadowRequest,
+)
+from binliquid.model_providers.native.conformance import (
+    run_openai_responses_native_conformance,
+    verify_native_conformance_evidence,
+    write_native_conformance_report,
+)
+from binliquid.model_providers.policy import GovernanceContext, evaluate_provider_policy
+from binliquid.model_providers.redaction import redact_provider_input
+from binliquid.model_providers.registry import resolve_model_provider_registry
+from binliquid.model_providers.resolver import resolve_provider_id
+from binliquid.model_providers.router_shadow import recommend_provider_shadow
+from binliquid.model_providers.runtime import ProviderGovernanceLLM
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
@@ -155,7 +184,33 @@ memory_app = typer.Typer(help="Memory commands")
 research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
 provider_app = typer.Typer(help="Provider discovery commands")
+provider_registry_app = typer.Typer(help="Model provider registry commands")
+provider_policy_app = typer.Typer(help="Model provider policy commands")
+provider_call_app = typer.Typer(help="Model provider test call commands")
+provider_canary_app = typer.Typer(help="Model provider canary commands")
+provider_route_app = typer.Typer(help="Model provider routing simulation commands")
+provider_native_app = typer.Typer(help="Model provider native adapter commands")
+provider_native_conformance_app = typer.Typer(
+    help="Model provider native adapter conformance commands"
+)
+DEFAULT_PROVIDER_NATIVE_OUTPUT_ROOT = Path("artifacts/model-provider-governance/native-v2")
+PROVIDER_NATIVE_OUTPUT_ROOT_OPTION = typer.Option(
+    DEFAULT_PROVIDER_NATIVE_OUTPUT_ROOT,
+    "--output-root",
+    help="Evidence output root",
+)
 approval_app = typer.Typer(help="Governance approval commands")
+PROVIDER_POLICY_DATA_CLASS_OPTION = typer.Option(
+    ["public"],
+    "--data-class",
+    help="Data class",
+)
+PROVIDER_CANARY_EVIDENCE_ROOT_OPTION = typer.Option(
+    Path("artifacts/model-provider-governance/canary"),
+    "--evidence-root",
+    help="Canary evidence root",
+)
+PROVIDER_ROUTE_CAPABILITY_OPTION = typer.Option([], "--capability", help="Required capability")
 operator_app = typer.Typer(help="Operator panel commands")
 computer_use_app = typer.Typer(help="Computer use execution commands")
 computer_use_vision_app = typer.Typer(help="Vision-first computer use commands")
@@ -197,6 +252,13 @@ app.add_typer(memory_app, name="memory")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
 app.add_typer(provider_app, name="provider")
+provider_app.add_typer(provider_registry_app, name="registry")
+provider_app.add_typer(provider_policy_app, name="policy")
+provider_app.add_typer(provider_call_app, name="call")
+provider_app.add_typer(provider_canary_app, name="canary")
+provider_app.add_typer(provider_route_app, name="route")
+provider_app.add_typer(provider_native_app, name="native")
+provider_native_app.add_typer(provider_native_conformance_app, name="conformance")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
 app.add_typer(computer_use_app, name="computer-use")
@@ -329,21 +391,43 @@ def _build_orchestrator(
     shadow_router_mode: str | None = None,
     shadow_router_enabled: bool | None = None,
     provider_name: str | None = None,
+    provider_id: str | None = None,
+    fallback_provider_id: str | None = None,
     fallback_provider: str | None = None,
 ) -> Orchestrator:
     workspace_dir = workspace or Path.cwd()
-    answer_llm = _build_llm(
-        config=config,
-        temperature=config.answer_temperature,
-        provider_name=provider_name,
-        fallback_provider=fallback_provider,
-    )
-    planner_llm = _build_llm(
-        config=config,
-        temperature=config.planner_temperature,
-        provider_name=provider_name,
-        fallback_provider=fallback_provider,
-    )
+    if provider_id:
+        registry = resolve_model_provider_registry(
+            config=config,
+            profile=config.profile_name,
+            provider_config_path=Path(config.provider_registry_path)
+            if config.provider_registry_enabled
+            else None,
+        )
+        provider_record = registry.get(provider_id)
+        if provider_record is None:
+            raise ValueError(f"unsupported provider_id: {provider_id}")
+        answer_llm = ProviderGovernanceLLM(
+            registry=registry,
+            provider_id=provider_id,
+            model=provider_record.default_model,
+            envelope_writer=ProviderCallEnvelopeWriter(),
+            fallback_provider_id=fallback_provider_id,
+        )
+        planner_llm = answer_llm
+    else:
+        answer_llm = _build_llm(
+            config=config,
+            temperature=config.answer_temperature,
+            provider_name=provider_name,
+            fallback_provider=fallback_provider,
+        )
+        planner_llm = _build_llm(
+            config=config,
+            temperature=config.planner_temperature,
+            provider_name=provider_name,
+            fallback_provider=fallback_provider,
+        )
 
     planner = Planner(
         planner_llm,
@@ -519,7 +603,9 @@ def _model_candidate(
     }
 
 
-def _list_ollama_model_ids(timeout_seconds: int = 5) -> tuple[bool, list[str], str | None, str | None]:
+def _list_ollama_model_ids(
+    timeout_seconds: int = 5,
+) -> tuple[bool, list[str], str | None, str | None]:
     try:
         result = subprocess.run(
             ["ollama", "list"],
@@ -550,33 +636,57 @@ def _list_ollama_model_ids(timeout_seconds: int = 5) -> tuple[bool, list[str], s
 
 def _provider_models_payload(profile: str, requested_provider: str) -> dict[str, object]:
     resolved, _source_map = resolve_runtime_config(profile=profile)
+    provider_config_path = (
+        Path(resolved.provider_registry_path)
+        if resolved.provider_registry_enabled and Path(resolved.provider_registry_path).exists()
+        else None
+    )
+    registry = resolve_model_provider_registry(
+        config=resolved,
+        profile=profile,
+        provider_config_path=provider_config_path,
+    )
     normalized_provider = _normalize_provider_name(requested_provider) or "all"
     if normalized_provider == "auto":
         normalized_provider = "all"
-    if normalized_provider not in {"all", "ollama", "transformers"}:
+    requested_provider_id = resolve_provider_id(
+        registry=registry,
+        legacy_provider=normalized_provider if normalized_provider != "all" else None,
+    )
+    conformance_matrix = build_provider_conformance_matrix(
+        registry=registry,
+        profile=profile,
+        mode="offline",
+    )
+    conformance_by_provider = {
+        item.provider_id: item for item in conformance_matrix.providers
+    }
+    valid_ids = {item.provider_id for item in registry.providers}
+    valid_legacy = {"all", "ollama", "transformers"}
+    if normalized_provider not in valid_legacy and normalized_provider not in valid_ids:
         return {
-            "contractVersion": "operator-panel.assistant-provider-models/v1",
+            "contractVersion": "operator-panel.assistant-provider-models/v3",
             "profile": profile,
             "provider": requested_provider,
             "generatedAtUtc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "providers": [],
             "status": "invalid_input",
             "errorCode": "INVALID_PROVIDER",
-            "errorMessage": "provider must be auto, all, ollama, or transformers.",
+            "errorMessage": "provider must be all, a legacy provider, or a configured provider_id.",
         }
 
-    provider_names = (
-        ["ollama", "transformers"]
+    selected_records = (
+        registry.providers
         if normalized_provider == "all"
-        else [normalized_provider]
+        else [item for item in registry.providers if item.provider_id == requested_provider_id]
     )
     providers: list[dict[str, object]] = []
 
-    if "ollama" in provider_names:
+    if any(item.provider_id == "local-ollama" for item in selected_records):
         available, model_ids, error_code, error_message = _list_ollama_model_ids()
         models = [
             _model_candidate(
-                provider="ollama",
+                provider="local-ollama",
                 model_id=model_id,
                 installed=True,
                 configured=model_id == resolved.model_name,
@@ -588,7 +698,7 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
             models.insert(
                 0,
                 _model_candidate(
-                    provider="ollama",
+                    provider="local-ollama",
                     model_id=resolved.model_name,
                     installed=False,
                     configured=True,
@@ -598,28 +708,64 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
             )
         providers.append(
             {
-                "provider": "ollama",
+                "provider": "local-ollama",
+                "legacyProvider": "ollama",
+                "kind": "local_ollama",
+                "displayName": "Local Ollama",
+                "dataBoundary": "local",
+                "riskTier": "low",
+                "trustSource": "bridge_state",
+                "lastCanaryStatus": "not_run",
+                "lastCanaryReason": None,
+                "lastCanaryAtUtc": None,
+                "lastVerifiedEvidenceAtUtc": None,
+                "evidencePath": None,
+                "budgetState": "allow",
+                "budgetReason": "PROVIDER_BUDGET_ALLOWED",
+                **_provider_conformance_payload(conformance_by_provider.get("local-ollama")),
+                **_provider_native_payload(None),
                 "available": available,
                 "selectedByConfig": _normalize_provider_name(resolved.llm_provider) == "ollama",
+                "disabledReason": None,
                 "errorCode": error_code,
                 "errorMessage": error_message,
                 "models": models,
             }
         )
 
-    if "transformers" in provider_names:
+    if any(item.provider_id == "local-transformers" for item in selected_records):
         hf_model_id = resolved.hf_model_id
         providers.append(
             {
-                "provider": "transformers",
+                "provider": "local-transformers",
+                "legacyProvider": "transformers",
+                "kind": "local_transformers",
+                "displayName": "Local Transformers",
+                "dataBoundary": "local",
+                "riskTier": "low",
+                "trustSource": "bridge_state",
+                "lastCanaryStatus": "not_run",
+                "lastCanaryReason": None,
+                "lastCanaryAtUtc": None,
+                "lastVerifiedEvidenceAtUtc": None,
+                "evidencePath": None,
+                "budgetState": "allow" if hf_model_id else "unknown",
+                "budgetReason": "PROVIDER_BUDGET_ALLOWED" if hf_model_id else None,
+                **_provider_conformance_payload(conformance_by_provider.get("local-transformers")),
+                **_provider_native_payload(None),
                 "available": bool(hf_model_id),
-                "selectedByConfig": _normalize_provider_name(resolved.llm_provider) == "transformers"
-                or _normalize_provider_name(resolved.fallback_provider) == "transformers",
+                "selectedByConfig": (
+                    _normalize_provider_name(resolved.llm_provider) == "transformers"
+                    or _normalize_provider_name(resolved.fallback_provider) == "transformers"
+                ),
+                "disabledReason": None if hf_model_id else "HF_MODEL_NOT_CONFIGURED",
                 "errorCode": None if hf_model_id else "HF_MODEL_NOT_CONFIGURED",
-                "errorMessage": None if hf_model_id else "No transformers HF model id is configured.",
+                "errorMessage": (
+                    None if hf_model_id else "No transformers HF model id is configured."
+                ),
                 "models": [
                     _model_candidate(
-                        provider="transformers",
+                        provider="local-transformers",
                         model_id=hf_model_id,
                         installed=False,
                         configured=True,
@@ -632,12 +778,101 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
             }
         )
 
+    local_ids = {"local-ollama", "local-transformers"}
+    for provider in selected_records:
+        if provider.provider_id in local_ids:
+            continue
+        policy = registry.policy_for(provider.provider_id)
+        doctor = doctor_provider(
+            provider=provider,
+            policy=policy,
+            remote_providers_enabled=registry.remote_providers_enabled,
+        )
+        providers.append(
+            {
+                "provider": provider.provider_id,
+                "legacyProvider": None,
+                "kind": provider.kind,
+                "displayName": provider.display_name or provider.provider_id,
+                "dataBoundary": provider.data_boundary,
+                "riskTier": provider.risk_tier,
+                "trustSource": "bridge_state",
+                "lastCanaryStatus": "not_run",
+                "lastCanaryReason": None,
+                "lastCanaryAtUtc": None,
+                "lastVerifiedEvidenceAtUtc": None,
+                "evidencePath": None,
+                "budgetState": "guarded" if policy.canary_call_budget <= 0 else "allow",
+                "budgetReason": (
+                    "PROVIDER_CANARY_BUDGET_DISABLED"
+                    if policy.canary_call_budget <= 0
+                    else "PROVIDER_BUDGET_ALLOWED"
+                ),
+                **_provider_conformance_payload(conformance_by_provider.get(provider.provider_id)),
+                **_provider_native_payload(provider.kind),
+                "available": doctor["status"] == "ready",
+                "selectedByConfig": False,
+                "disabledReason": None if doctor["status"] == "ready" else doctor["reasonCode"],
+                "errorCode": None if doctor["status"] == "ready" else doctor["reasonCode"],
+                "errorMessage": None if doctor["status"] == "ready" else doctor["reasonCode"],
+                "models": [
+                    _model_candidate(
+                        provider=provider.provider_id,
+                        model_id=model_id,
+                        installed=False,
+                        configured=model_id == provider.default_model,
+                        source="config",
+                        warnings=["Remote model listing is skipped unless explicitly requested."],
+                    )
+                    for model_id in (provider.models or [provider.default_model])
+                ],
+            }
+        )
+
     return {
-        "contractVersion": "operator-panel.assistant-provider-models/v1",
+        "contractVersion": "operator-panel.assistant-provider-models/v3",
         "profile": profile,
         "provider": requested_provider if requested_provider else "all",
         "generatedAtUtc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "providers": providers,
+    }
+
+
+def _provider_conformance_payload(
+    entry: ProviderConformanceEntry | None,
+) -> dict[str, object | None]:
+    if entry is None:
+        return {
+            "conformanceStatus": "unknown",
+            "conformanceReason": "PROVIDER_CONFORMANCE_NOT_RUN",
+            "conformanceSummary": "0 pass / 0 skip / 0 fail",
+        }
+    return {
+        "conformanceStatus": str(entry.summary_status),
+        "conformanceReason": "PROVIDER_CONFORMANCE_OFFLINE_PASS"
+        if entry.fail_count == 0
+        else "PROVIDER_CONFORMANCE_OFFLINE_FAIL",
+        "conformanceSummary": (
+            f"{entry.pass_count} pass / {entry.skipped_count} skip / {entry.fail_count} fail"
+        ),
+    }
+
+
+def _provider_native_payload(kind: ProviderKind | str | None) -> dict[str, object | None]:
+    if kind != ProviderKind.OPENAI_RESPONSES:
+        return {
+            "nativeAdapterKind": None,
+            "nativeAdapterStatus": "not_applicable",
+            "storagePolicy": None,
+            "serverToolsPolicy": None,
+            "customToolsPolicy": None,
+        }
+    return {
+        "nativeAdapterKind": "openai_responses",
+        "nativeAdapterStatus": "canary_only",
+        "storagePolicy": "hash_only/store=false",
+        "serverToolsPolicy": "denied",
+        "customToolsPolicy": "proposal_only",
     }
 
 
@@ -1948,11 +2183,337 @@ def config_resolve(
         typer.echo(f"shadow_router_mode={resolved.shadow_router_mode}")
 
 
+def _resolve_registry_for_cli(profile: str) -> tuple[RuntimeConfig, Any]:
+    config, _source_map = resolve_runtime_config(profile=profile)
+    registry_path = (
+        Path(config.provider_registry_path) if config.provider_registry_enabled else None
+    )
+    if registry_path is not None and not registry_path.exists():
+        registry_path = None
+    registry = resolve_model_provider_registry(
+        config=config,
+        profile=profile,
+        provider_config_path=registry_path,
+    )
+    return config, registry
+
+
+@provider_registry_app.command("list")
+def provider_registry_list(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    enabled_only: bool = typer.Option(False, "--enabled-only", help="Show only enabled providers"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """List resolved model provider registry records without secret values."""
+    _config, registry = _resolve_registry_for_cli(profile)
+    providers = registry.providers
+    if enabled_only:
+        providers = [item for item in providers if item.enabled]
+    payload = {
+        "contractVersion": "model_provider.registry/v1",
+        "profile": profile,
+        "generatedAtUtc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "remoteProvidersEnabled": registry.remote_providers_enabled,
+        "providers": [item.safe_dump() for item in providers],
+    }
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
+    else:
+        for item in providers:
+            typer.echo(f"{item.provider_id}\t{item.kind}\tenabled={item.enabled}")
+
+
+@provider_app.command("doctor")
+def provider_doctor(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    provider_id: str = typer.Option("local-ollama", "--provider-id", help="Provider id"),
+    network_check: bool = typer.Option(
+        False,
+        "--network-check",
+        help="Run optional network checks",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Report provider readiness, secret refs, capabilities, and policy boundaries."""
+    _config, registry = _resolve_registry_for_cli(profile)
+    provider = registry.get(provider_id)
+    if provider is None:
+        payload = {
+            "contractVersion": "model_provider.doctor/v1",
+            "providerId": provider_id,
+            "status": "blocked",
+            "reasonCode": "PROVIDER_NOT_FOUND",
+            "warnings": [],
+        }
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+        raise typer.Exit(code=1)
+    payload = doctor_provider(
+        provider=provider,
+        policy=registry.policy_for(provider.provider_id),
+        remote_providers_enabled=registry.remote_providers_enabled,
+        network_check=network_check,
+    )
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
+    else:
+        typer.echo(f"status={payload['status']} reason={payload['reasonCode']}")
+
+
+@provider_policy_app.command("simulate")
+def provider_policy_simulate(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    provider_id: str = typer.Option(..., "--provider-id", help="Provider id"),
+    data_class: list[str] = PROVIDER_POLICY_DATA_CLASS_OPTION,
+    tool_calls: bool = typer.Option(
+        False,
+        "--tool-calls/--no-tool-calls",
+        help="Simulate tool specs",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Simulate provider egress policy without making a model call."""
+    _config, registry = _resolve_registry_for_cli(profile)
+    provider = registry.get(provider_id)
+    if provider is None:
+        payload = {
+            "contractVersion": "model_provider.policy_decision/v1",
+            "status": "blocked_not_configured",
+            "reasonCode": "PROVIDER_NOT_FOUND",
+            "safeToCallProvider": False,
+        }
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+        raise typer.Exit(code=1)
+    try:
+        classes = [DataClass(item) for item in data_class]
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    request = ProviderCallRequest(
+        call_id="policy-simulate",
+        run_id="policy-simulate",
+        provider_id=provider.provider_id,
+        model=provider.default_model,
+        messages=[ChatMessage(role="user", content="policy simulation")],
+        data_classes=classes,
+        tools=[{"name": "proposed_action"}] if tool_calls else [],
+    )
+    decision = evaluate_provider_policy(
+        request=request,
+        provider=provider,
+        policy=registry.policy_for(provider.provider_id),
+        governance_context=GovernanceContext(
+            remote_providers_enabled=registry.remote_providers_enabled
+        ),
+    )
+    payload = {
+        "contractVersion": "model_provider.policy_decision/v1",
+        "status": decision.status,
+        "reasonCode": decision.reason_code,
+        "providerId": decision.provider_id,
+        "safeToCallProvider": decision.safe_to_call_provider,
+        "redactionRequired": decision.redaction_required,
+        "approvalRequired": decision.approval_required,
+        "evidenceRequired": decision.evidence_required,
+        "effectiveDataClasses": decision.effective_data_classes,
+        "userMessage": decision.user_message,
+    }
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
+    else:
+        typer.echo(f"status={decision.status} reason={decision.reason_code}")
+
+
+@provider_call_app.command("test")
+def provider_call_test(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    provider_id: str = typer.Option(..., "--provider-id", help="Provider id"),
+    prompt: str = typer.Option("Return JSON", "--prompt", help="Prompt text"),
+    dry_run: bool = typer.Option(True, "--dry-run/--live", help="Do not call remote provider"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Evaluate a governed provider call; dry-run is default and performs no network call."""
+    _config, registry = _resolve_registry_for_cli(profile)
+    provider = registry.get(provider_id)
+    if provider is None:
+        raise typer.BadParameter(f"unknown provider_id: {provider_id}")
+    request = ProviderCallRequest(
+        call_id="provider-call-test",
+        run_id="provider-call-test",
+        provider_id=provider.provider_id,
+        model=provider.default_model,
+        messages=[ChatMessage(role="user", content=prompt)],
+        data_classes=[DataClass.PUBLIC],
+    )
+    decision = evaluate_provider_policy(
+        request=request,
+        provider=provider,
+        policy=registry.policy_for(provider.provider_id),
+        governance_context=GovernanceContext(
+            remote_providers_enabled=registry.remote_providers_enabled
+        ),
+    )
+    redacted = redact_provider_input(request=request, decision=decision)
+    payload: dict[str, Any] = {
+        "contractVersion": "model_provider.call_test/v1",
+        "providerId": provider.provider_id,
+        "dryRun": dry_run,
+        "decision": decision.model_dump(mode="json"),
+        "redactionSummary": redacted.summary.model_dump(mode="json"),
+    }
+    if not dry_run and decision.safe_to_call_provider:
+        response = (
+            ProviderAdapterFactory(registry=registry)
+            .create(provider.provider_id)
+            .generate(request)
+        )
+        payload["response"] = response.model_dump(mode="json")
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+    else:
+        typer.echo(f"status={decision.status} reason={decision.reason_code}")
+
+
+@provider_canary_app.command("run")
+def provider_canary_run(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    provider_id: str = typer.Option(..., "--provider-id", help="Provider id"),
+    data_class: list[str] = PROVIDER_POLICY_DATA_CLASS_OPTION,
+    allow_live: bool = typer.Option(
+        False,
+        "--allow-live",
+        help="Allow live provider call when BINLIQUID_PROVIDER_LIVE_CANARY=1 is also set",
+    ),
+    evidence_root: Path = PROVIDER_CANARY_EVIDENCE_ROOT_OPTION,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Run a governed provider canary. Live network is skipped unless double opt-in is present."""
+    _config, registry = _resolve_registry_for_cli(profile)
+    try:
+        classes = [DataClass(item) for item in data_class]
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    result = run_provider_canary(
+        request=ProviderCanaryRequest(
+            provider_id=provider_id,
+            profile=profile,
+            data_classes=classes,
+            allow_live=allow_live,
+            evidence_root=str(evidence_root),
+        ),
+        registry=registry,
+        evidence_root=evidence_root,
+    )
+    payload = result.model_dump(mode="json")
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
+    else:
+        typer.echo(f"status={result.status} reason={result.reason_code}")
+    if result.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@provider_canary_app.command("verify")
+def provider_canary_verify(
+    evidence_root: Path = PROVIDER_CANARY_EVIDENCE_ROOT_OPTION,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Verify canary evidence for schema validity and raw/secret content absence."""
+    payload = verify_canary_evidence_root(evidence_root)
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
+    else:
+        typer.echo(f"status={payload['status']} reason={payload['reasonCode']}")
+    if payload["status"] != "pass":
+        raise typer.Exit(code=1)
+
+
+@provider_route_app.command("simulate")
+def provider_route_simulate(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    task_type: str = typer.Option("chat", "--task-type", help="Task type"),
+    data_class: list[str] = PROVIDER_POLICY_DATA_CLASS_OPTION,
+    capability: list[str] = PROVIDER_ROUTE_CAPABILITY_OPTION,
+    preferred_provider_id: str | None = typer.Option(
+        None,
+        "--preferred-provider-id",
+        help="Provider requested by caller",
+    ),
+    write_evidence: bool = typer.Option(
+        False,
+        "--write-evidence",
+        help="Write shadow routing evidence",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Produce policy-aware provider routing recommendation in shadow mode only."""
+    _config, registry = _resolve_registry_for_cli(profile)
+    try:
+        classes = [DataClass(item) for item in data_class]
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    decision = recommend_provider_shadow(
+        registry=registry,
+        request=ProviderRouteShadowRequest(
+            task_type=task_type,
+            data_classes=classes,
+            required_capabilities=capability,
+            preferred_provider_id=preferred_provider_id,
+        ),
+    )
+    if write_evidence:
+        path = write_router_shadow_evidence(decision=decision)
+        decision.evidence_path = str(path)
+    payload = decision.model_dump(mode="json")
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
+    else:
+        typer.echo(
+            f"shadow_only={decision.shadow_only} recommended={decision.recommended_provider_id}"
+        )
+
+
+@provider_native_conformance_app.command("run")
+def provider_native_conformance_run(
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    output_root: Path = PROVIDER_NATIVE_OUTPUT_ROOT_OPTION,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Run offline native adapter conformance fixtures without live provider calls."""
+    report = run_openai_responses_native_conformance(profile=profile)
+    paths = write_native_conformance_report(report=report, output_root=output_root)
+    payload = report.model_dump(mode="json")
+    payload["paths"] = paths
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
+    else:
+        typer.echo(f"status={report.status} cases={report.total_cases}")
+    if report.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@provider_native_conformance_app.command("verify")
+def provider_native_conformance_verify(
+    output_root: Path = PROVIDER_NATIVE_OUTPUT_ROOT_OPTION,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Verify native adapter evidence contains no raw payload or secret markers."""
+    payload = verify_native_conformance_evidence(output_root=output_root)
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
+    else:
+        typer.echo(f"status={payload['status']} reason={payload['reasonCode']}")
+    if payload["status"] != "pass":
+        raise typer.Exit(code=1)
+
+
 @provider_app.command("models")
 def provider_models(
     profile: str = typer.Option("balanced", help="Config profile"),
     provider: str = typer.Option("all", help="Provider: all|auto|ollama|transformers"),
-    refresh: bool = typer.Option(False, "--refresh", help="Refresh provider model list cache when supported"),
+    refresh: bool = typer.Option(
+        False,
+        "--refresh",
+        help="Refresh provider model list cache when supported",
+    ),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     """List locally discoverable assistant provider models without installing models."""
@@ -2108,6 +2669,16 @@ def chat(
     privacy_off: bool = typer.Option(False, help="Allow persistent debug traces"),
     router_mode: str | None = typer.Option(None, help="Override router mode: rule|sltc"),
     provider: str | None = typer.Option(None, help="Override provider: auto|ollama|transformers"),
+    provider_id: str | None = typer.Option(
+        None,
+        "--provider-id",
+        help="Canonical model provider id",
+    ),
+    fallback_provider_id: str | None = typer.Option(
+        None,
+        "--fallback-provider-id",
+        help="Canonical fallback model provider id",
+    ),
     fallback_provider: str | None = typer.Option(
         None,
         help="Override fallback provider: transformers|ollama",
@@ -2172,6 +2743,8 @@ def chat(
         config,
         router_mode=router_mode,
         provider_name=config.llm_provider,
+        provider_id=provider_id,
+        fallback_provider_id=fallback_provider_id,
         fallback_provider=config.fallback_provider,
     )
     startup_error = _startup_abort(

@@ -1,0 +1,8 @@
+{
+  "case_id": "openai_responses_store_true_rejected",
+  "expected_status": "blocked",
+  "expected_reason_code": "OPENAI_RESPONSES_STORE_TRUE_REJECTED",
+  "storage_policy": {
+    "request_store_flag": true
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "DataBoundary": {
+      "enum": [
+        "local",
+        "internal",
+        "private_cloud",
+        "public_cloud",
+        "aggregator",
+        "unknown"
+      ],
+      "title": "DataBoundary",
+      "type": "string"
+    },
+    "ProviderConformanceCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "evidence": {
+          "additionalProperties": true,
+          "title": "Evidence",
+          "type": "object"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ProviderConformanceStatus"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "status",
+        "reason_code",
+        "summary"
+      ],
+      "title": "ProviderConformanceCheck",
+      "type": "object"
+    },
+    "ProviderConformanceEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/ProviderConformanceCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "data_boundary": {
+          "$ref": "#/$defs/DataBoundary"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "fail_count": {
+          "title": "Fail Count",
+          "type": "integer"
+        },
+        "pass_count": {
+          "title": "Pass Count",
+          "type": "integer"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "provider_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderKind"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Provider Kind"
+        },
+        "risk_tier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RiskTier"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Risk Tier"
+        },
+        "skipped_count": {
+          "title": "Skipped Count",
+          "type": "integer"
+        },
+        "summary_status": {
+          "$ref": "#/$defs/ProviderConformanceStatus"
+        }
+      },
+      "required": [
+        "provider_id",
+        "provider_kind",
+        "data_boundary",
+        "risk_tier",
+        "enabled",
+        "summary_status",
+        "pass_count",
+        "skipped_count",
+        "fail_count",
+        "checks"
+      ],
+      "title": "ProviderConformanceEntry",
+      "type": "object"
+    },
+    "ProviderConformanceStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "skipped"
+      ],
+      "title": "ProviderConformanceStatus",
+      "type": "string"
+    },
+    "ProviderKind": {
+      "enum": [
+        "local_ollama",
+        "local_transformers",
+        "openai_compatible",
+        "openai_responses",
+        "openai",
+        "azure_openai",
+        "anthropic",
+        "google_gemini",
+        "deepseek",
+        "openrouter",
+        "custom_http",
+        "company_internal_api"
+      ],
+      "title": "ProviderKind",
+      "type": "string"
+    },
+    "RiskTier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "blocked"
+      ],
+      "title": "RiskTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "generated_at_utc": {
+      "format": "date-time",
+      "title": "Generated At Utc",
+      "type": "string"
+    },
+    "mode": {
+      "pattern": "^(offline|live)$",
+      "title": "Mode",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "providers": {
+      "items": {
+        "$ref": "#/$defs/ProviderConformanceEntry"
+      },
+      "title": "Providers",
+      "type": "array"
+    },
+    "remote_providers_enabled": {
+      "default": false,
+      "title": "Remote Providers Enabled",
+      "type": "boolean"
+    },
+    "version": {
+      "default": "model_provider.conformance_matrix/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile",
+    "mode",
+    "providers"
+  ],
+  "title": "ProviderConformanceMatrix",
+  "type": "object"
+}

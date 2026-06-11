@@ -37,6 +37,7 @@ BinLiquid currently provides four control-plane surfaces:
 | Windows x64 tooling | Supported | Core CLI, operator panel, bundled runtime, and release-candidate validation paths. |
 | Team Runtime | Pilot-hardened | Controlled/restricted profiles only; bounded concurrency and replay verification are implemented. |
 | Enterprise profile | Constrained readiness | Self-hosted single-tenant profile with identity/RBAC, signing, baseline checks, metrics, support bundle, and GA readiness reporting. |
+| Model provider governance | Experimental/gated | Registry, policy simulation, redacted envelopes, and OpenAI-compatible adapter are present. Remote/cloud providers are disabled by default. |
 | Vision-first computer-use foundation | Implemented behind gates | Platform model, policy, approval, replay, qualification schema, and fail-closed platform gates exist. |
 | Live macOS vision computer-use | Not qualified | Disabled until local provider, permissions, and qualification evidence are present. |
 | Live Windows computer-use | Not qualified | Disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`. |
@@ -115,6 +116,7 @@ Core Runtime
 | Expert contracts | Working | Typed code/research/plan expert payloads with partial failover. |
 | Memory v2 | Working | Deduplication, TTL, ranked retrieval, and privacy-safe defaults. |
 | Governance | Working | Policy, approvals, audit, fail-closed handling. |
+| Provider governance | Experimental/gated | Fail-closed registry and policy layer for model providers. OpenAI-compatible support is a gated adapter path, not broad cloud enablement. |
 | Team Runtime | Pilot-hardened | Restricted/controlled profiles with bounded concurrency and replay verification. |
 | Enterprise profile | Constrained readiness | Requires signed evidence and deployment drills for broader GA claims. |
 | Operator Panel | Beta | Tauri desktop surface for operator workflows. |
@@ -142,6 +144,17 @@ uv run binliquid control-plane policy simulate --agent-id governed-ops --profile
 uv run binliquid control-plane run submit --agent-id governed-ops --once "Inspect queue and draft remediation" --profile enterprise --json
 uv run binliquid control-plane claims verify --profile enterprise --json
 ```
+
+Provider governance quick commands:
+
+```bash
+uv run python -m binliquid provider registry list --profile enterprise --json
+uv run python -m binliquid provider policy simulate --profile enterprise --provider-id openai-public --data-class confidential --json
+uv run python scripts/run_provider_governance_gate.py --profile enterprise --json
+```
+
+Remote/cloud providers remain disabled by default. Provider configs store
+environment variable names for secrets, never key values.
 
 ---
 

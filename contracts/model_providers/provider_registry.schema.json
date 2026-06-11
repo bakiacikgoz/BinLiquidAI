@@ -1,0 +1,424 @@
+{
+  "$defs": {
+    "AuthMode": {
+      "enum": [
+        "none",
+        "bearer_env",
+        "custom_header_env",
+        "azure_ad",
+        "managed_identity"
+      ],
+      "title": "AuthMode",
+      "type": "string"
+    },
+    "DataBoundary": {
+      "enum": [
+        "local",
+        "internal",
+        "private_cloud",
+        "public_cloud",
+        "aggregator",
+        "unknown"
+      ],
+      "title": "DataBoundary",
+      "type": "string"
+    },
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    },
+    "ModelProviderRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "api_key_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Api Key Env"
+        },
+        "auth_mode": {
+          "$ref": "#/$defs/AuthMode",
+          "default": "none"
+        },
+        "base_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Base Url"
+        },
+        "cost_policy_id": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Policy Id"
+        },
+        "data_boundary": {
+          "$ref": "#/$defs/DataBoundary",
+          "default": "local"
+        },
+        "data_residency": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Residency"
+        },
+        "default_model": {
+          "maxLength": 160,
+          "title": "Default Model",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "fallback_priority": {
+          "default": 100,
+          "maximum": 999,
+          "minimum": 0,
+          "title": "Fallback Priority",
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/ProviderKind"
+        },
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Models",
+          "type": "array"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "retention_policy": {
+          "$ref": "#/$defs/RetentionPolicy",
+          "default": "unknown"
+        },
+        "risk_tier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RiskTier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "supports_json_mode": {
+          "default": false,
+          "title": "Supports Json Mode",
+          "type": "boolean"
+        },
+        "supports_json_schema": {
+          "default": false,
+          "title": "Supports Json Schema",
+          "type": "boolean"
+        },
+        "supports_streaming": {
+          "default": false,
+          "title": "Supports Streaming",
+          "type": "boolean"
+        },
+        "supports_tool_calling": {
+          "default": false,
+          "title": "Supports Tool Calling",
+          "type": "boolean"
+        },
+        "supports_vision": {
+          "default": false,
+          "title": "Supports Vision",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "provider_id",
+        "kind",
+        "default_model"
+      ],
+      "title": "ModelProviderRecord",
+      "type": "object"
+    },
+    "ProviderKind": {
+      "enum": [
+        "local_ollama",
+        "local_transformers",
+        "openai_compatible",
+        "openai_responses",
+        "openai",
+        "azure_openai",
+        "anthropic",
+        "google_gemini",
+        "deepseek",
+        "openrouter",
+        "custom_http",
+        "company_internal_api"
+      ],
+      "title": "ProviderKind",
+      "type": "string"
+    },
+    "ProviderPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_streaming": {
+          "default": true,
+          "title": "Allow Streaming",
+          "type": "boolean"
+        },
+        "allow_tool_calls": {
+          "default": false,
+          "title": "Allow Tool Calls",
+          "type": "boolean"
+        },
+        "allowed_data_classes": {
+          "items": {
+            "$ref": "#/$defs/DataClass"
+          },
+          "title": "Allowed Data Classes",
+          "type": "array"
+        },
+        "allowed_hosts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Hosts",
+          "type": "array"
+        },
+        "blocked_data_classes": {
+          "items": {
+            "$ref": "#/$defs/DataClass"
+          },
+          "title": "Blocked Data Classes",
+          "type": "array"
+        },
+        "canary_call_budget": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Canary Call Budget",
+          "type": "integer"
+        },
+        "daily_call_budget": {
+          "default": 1000,
+          "minimum": 0,
+          "title": "Daily Call Budget",
+          "type": "integer"
+        },
+        "daily_cost_limit_usd": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daily Cost Limit Usd"
+        },
+        "evidence_required": {
+          "default": true,
+          "title": "Evidence Required",
+          "type": "boolean"
+        },
+        "fallback_allowed_to": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fallback Allowed To",
+          "type": "array"
+        },
+        "max_input_tokens": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Input Tokens"
+        },
+        "max_output_tokens": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Output Tokens"
+        },
+        "max_prompt_chars": {
+          "default": 12000,
+          "minimum": 1,
+          "title": "Max Prompt Chars",
+          "type": "integer"
+        },
+        "max_retries": {
+          "default": 0,
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Max Retries",
+          "type": "integer"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "rate_limit_per_minute": {
+          "default": 10,
+          "minimum": 0,
+          "title": "Rate Limit Per Minute",
+          "type": "integer"
+        },
+        "requires_approval_for_tool_calls": {
+          "default": true,
+          "title": "Requires Approval For Tool Calls",
+          "type": "boolean"
+        },
+        "requires_redaction": {
+          "default": true,
+          "title": "Requires Redaction",
+          "type": "boolean"
+        },
+        "timeout_ms": {
+          "default": 15000,
+          "maximum": 300000,
+          "minimum": 1000,
+          "title": "Timeout Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "provider_id"
+      ],
+      "title": "ProviderPolicy",
+      "type": "object"
+    },
+    "RetentionPolicy": {
+      "enum": [
+        "none_claimed",
+        "zero_retention",
+        "provider_default",
+        "customer_controlled",
+        "unknown"
+      ],
+      "title": "RetentionPolicy",
+      "type": "string"
+    },
+    "RiskTier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "blocked"
+      ],
+      "title": "RiskTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "default": "model_provider.registry/v1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "generated_at_utc": {
+      "format": "date-time",
+      "title": "Generated At Utc",
+      "type": "string"
+    },
+    "policies": {
+      "items": {
+        "$ref": "#/$defs/ProviderPolicy"
+      },
+      "title": "Policies",
+      "type": "array"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "providers": {
+      "items": {
+        "$ref": "#/$defs/ModelProviderRecord"
+      },
+      "title": "Providers",
+      "type": "array"
+    },
+    "remote_providers_enabled": {
+      "default": false,
+      "title": "Remote Providers Enabled",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "profile",
+    "providers"
+  ],
+  "title": "ResolvedProviderRegistry",
+  "type": "object"
+}

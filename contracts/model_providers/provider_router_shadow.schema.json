@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "DataBoundary": {
+      "enum": [
+        "local",
+        "internal",
+        "private_cloud",
+        "public_cloud",
+        "aggregator",
+        "unknown"
+      ],
+      "title": "DataBoundary",
+      "type": "string"
+    },
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    },
+    "ProviderKind": {
+      "enum": [
+        "local_ollama",
+        "local_transformers",
+        "openai_compatible",
+        "openai_responses",
+        "openai",
+        "azure_openai",
+        "anthropic",
+        "google_gemini",
+        "deepseek",
+        "openrouter",
+        "custom_http",
+        "company_internal_api"
+      ],
+      "title": "ProviderKind",
+      "type": "string"
+    },
+    "ProviderRouteCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "title": "Allowed",
+          "type": "boolean"
+        },
+        "data_boundary": {
+          "$ref": "#/$defs/DataBoundary"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "provider_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderKind"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Provider Kind"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "risk_tier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RiskTier"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Risk Tier"
+        },
+        "score": {
+          "title": "Score",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "provider_id",
+        "provider_kind",
+        "data_boundary",
+        "risk_tier",
+        "allowed",
+        "reason_code",
+        "score"
+      ],
+      "title": "ProviderRouteCandidate",
+      "type": "object"
+    },
+    "RiskTier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "blocked"
+      ],
+      "title": "RiskTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowed_providers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Providers",
+      "type": "array"
+    },
+    "blocked_providers": {
+      "items": {
+        "$ref": "#/$defs/ProviderRouteCandidate"
+      },
+      "title": "Blocked Providers",
+      "type": "array"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/ProviderRouteCandidate"
+      },
+      "title": "Candidates",
+      "type": "array"
+    },
+    "data_classes": {
+      "items": {
+        "$ref": "#/$defs/DataClass"
+      },
+      "title": "Data Classes",
+      "type": "array"
+    },
+    "evidence_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Path"
+    },
+    "fallback_provider_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fallback Provider Id"
+    },
+    "generated_at_utc": {
+      "format": "date-time",
+      "title": "Generated At Utc",
+      "type": "string"
+    },
+    "reason_code": {
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "recommended_provider_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Recommended Provider Id"
+    },
+    "requested_provider_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Requested Provider Id"
+    },
+    "required_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Capabilities",
+      "type": "array"
+    },
+    "shadow_only": {
+      "default": true,
+      "title": "Shadow Only",
+      "type": "boolean"
+    },
+    "task_type": {
+      "title": "Task Type",
+      "type": "string"
+    },
+    "version": {
+      "default": "model_provider.router_shadow/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_type",
+    "data_classes",
+    "required_capabilities",
+    "reason_code"
+  ],
+  "title": "ProviderRouteShadowDecision",
+  "type": "object"
+}

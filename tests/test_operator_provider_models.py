@@ -21,14 +21,40 @@ def test_provider_models_lists_ollama_models_without_pulling(monkeypatch) -> Non
 
     monkeypatch.setattr("binliquid.cli.subprocess.run", fake_run)
 
-    result = runner.invoke(app, ["provider", "models", "--profile", "balanced", "--provider", "ollama", "--json"])
+    result = runner.invoke(
+        app,
+        ["provider", "models", "--profile", "balanced", "--provider", "ollama", "--json"],
+    )
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["contractVersion"] == "operator-panel.assistant-provider-models/v1"
+    assert payload["contractVersion"] == "operator-panel.assistant-provider-models/v3"
     assert payload["provider"] == "ollama"
-    assert payload["providers"][0]["provider"] == "ollama"
-    assert any(item["id"] == "qwen3.5:4b" and item["installed"] is True for item in payload["providers"][0]["models"])
+    assert payload["providers"][0]["provider"] == "local-ollama"
+    assert payload["providers"][0]["conformanceStatus"] == "pass"
+    assert any(
+        item["id"] == "qwen3.5:4b" and item["installed"] is True
+        for item in payload["providers"][0]["models"]
+    )
+
+
+def test_provider_models_includes_native_openai_responses_metadata() -> None:
+    result = runner.invoke(
+        app,
+        ["provider", "models", "--profile", "balanced", "--provider", "all", "--json"],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    provider = next(
+        item for item in payload["providers"] if item["provider"] == "openai-responses-preview"
+    )
+    assert provider["kind"] == "openai_responses"
+    assert provider["nativeAdapterKind"] == "openai_responses"
+    assert provider["nativeAdapterStatus"] == "canary_only"
+    assert provider["storagePolicy"] == "hash_only/store=false"
+    assert provider["serverToolsPolicy"] == "denied"
+    assert provider["customToolsPolicy"] == "proposal_only"
 
 
 def test_provider_models_reports_unavailable_ollama(monkeypatch) -> None:
@@ -37,7 +63,10 @@ def test_provider_models_reports_unavailable_ollama(monkeypatch) -> None:
 
     monkeypatch.setattr("binliquid.cli.subprocess.run", fake_run)
 
-    result = runner.invoke(app, ["provider", "models", "--profile", "balanced", "--provider", "ollama", "--json"])
+    result = runner.invoke(
+        app,
+        ["provider", "models", "--profile", "balanced", "--provider", "ollama", "--json"],
+    )
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)

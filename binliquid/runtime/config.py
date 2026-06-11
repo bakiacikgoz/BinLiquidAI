@@ -282,6 +282,9 @@ class RuntimeConfig(BaseModel):
     fast_path_regret_threshold: float = Field(default=0.2, ge=0.0, le=1.0)
     env_prefix: str = "BINLIQUID"
     web_enabled: bool = False
+    remote_providers_enabled: bool = False
+    provider_registry_enabled: bool = True
+    provider_registry_path: str = "config/providers.toml"
     workspace_root: str = "."
     trace_dir: str = ".binliquid/traces"
     router_dataset_path: str = ".binliquid/research/router_dataset.jsonl"
@@ -347,6 +350,9 @@ class RuntimeConfig(BaseModel):
             fast_path_regret_threshold=app_data.get("fast_path_regret_threshold", 0.2),
             env_prefix=app_data.get("env_prefix", "BINLIQUID"),
             web_enabled=app_data.get("web_enabled", False),
+            remote_providers_enabled=app_data.get("remote_providers_enabled", False),
+            provider_registry_enabled=app_data.get("provider_registry_enabled", True),
+            provider_registry_path=app_data.get("provider_registry_path", "config/providers.toml"),
             workspace_root=app_data.get("workspace_root", "."),
             trace_dir=app_data.get("trace_dir", ".binliquid/traces"),
             router_dataset_path=app_data.get(
@@ -613,6 +619,9 @@ ENV_PATHS: dict[str, str] = {
     "FAST_PATH_REGRET_WINDOW": "fast_path_regret_window",
     "FAST_PATH_REGRET_THRESHOLD": "fast_path_regret_threshold",
     "WEB_ENABLED": "web_enabled",
+    "REMOTE_PROVIDERS_ENABLED": "remote_providers_enabled",
+    "PROVIDER_REGISTRY_ENABLED": "provider_registry_enabled",
+    "PROVIDER_REGISTRY_PATH": "provider_registry_path",
     "WORKSPACE_ROOT": "workspace_root",
     "TRACE_DIR": "trace_dir",
     "ROUTER_DATASET_PATH": "router_dataset_path",

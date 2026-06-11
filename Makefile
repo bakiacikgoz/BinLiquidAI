@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-governance-gate provider-v1-1-closure-gate provider-native-adapter-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -88,6 +88,65 @@ vision-gate:
 		--evidence-root artifacts/computer_use \
 		--output artifacts/computer_use/macos_supervised_v2_gate.json \
 		--markdown artifacts/computer_use/MACOS_SUPERVISED_V2_GATE.md \
+		--json
+
+provider-governance-gate:
+	uv run --extra dev python scripts/generate_model_provider_contract_schemas.py
+	uv run --extra dev python -m pytest -q \
+		tests/test_model_provider_contracts.py \
+		tests/test_model_provider_registry.py \
+		tests/test_model_provider_policy.py \
+		tests/test_model_provider_redaction.py \
+		tests/test_model_provider_envelope.py \
+		tests/test_model_provider_openai_compatible.py \
+		tests/test_model_provider_cli.py \
+		tests/test_model_provider_no_secret_leak.py \
+		tests/test_model_provider_budget.py \
+		tests/test_model_provider_network_guard.py \
+		tests/test_model_provider_canary_evidence.py \
+		tests/test_model_provider_canary.py \
+		tests/test_model_provider_router_shadow.py \
+		tests/test_model_provider_native_contracts.py \
+		tests/test_model_provider_tool_policy.py \
+		tests/test_openai_responses_adapter.py \
+		tests/test_provider_native_adapter_gate.py \
+		tests/test_provider_governance_gate.py
+	uv run --extra dev python scripts/run_provider_governance_gate.py --profile enterprise --json
+	uv run --extra dev python scripts/run_provider_canary_fixture.py --profile enterprise --json
+	uv run --extra dev python scripts/generate_provider_canary_evidence.py --profile enterprise --json
+	uv run --extra dev python -m binliquid provider canary verify \
+		--evidence-root artifacts/model-provider-governance/canary \
+		--json
+	uv run --extra dev python scripts/generate_model_provider_governance_evidence.py --profile enterprise --json
+
+provider-v1-1-closure-gate: provider-governance-gate
+	uv run --extra dev python scripts/generate_provider_conformance_matrix.py \
+		--profile enterprise \
+		--mode offline \
+		--output-root artifacts/model-provider-governance/conformance \
+		--json
+	uv run --extra dev python scripts/verify_provider_release_closure.py \
+		--profile enterprise \
+		--evidence-root artifacts/model-provider-governance/v1_1 \
+		--json
+	uv run --extra dev python scripts/run_provider_native_adapter_gate.py \
+		--profile enterprise \
+		--output-root artifacts/model-provider-governance/native-v2 \
+		--json
+
+provider-native-adapter-gate:
+	uv run --extra dev python scripts/generate_model_provider_contract_schemas.py
+	uv run --extra dev python -m pytest -q \
+		tests/test_model_provider_native_contracts.py \
+		tests/test_model_provider_tool_policy.py \
+		tests/test_openai_responses_adapter.py \
+		tests/test_provider_native_adapter_gate.py
+	uv run --extra dev python scripts/run_provider_native_adapter_gate.py \
+		--profile enterprise \
+		--output-root artifacts/model-provider-governance/native-v2 \
+		--json
+	uv run --extra dev python -m binliquid provider native conformance verify \
+		--output-root artifacts/model-provider-governance/native-v2 \
 		--json
 
 control-plane-schemas:
@@ -301,6 +360,7 @@ rust-gate:
 mainline-gate:
 	uv run --extra dev ruff check .
 	uv run --extra dev pytest -q
+	$(MAKE) provider-governance-gate
 	$(MAKE) control-plane-gate
 	$(MAKE) vision-gate
 	$(MAKE) ui-gate

@@ -70,6 +70,12 @@ jobs:
         shell: pwsh
         run: uv run pytest -q
 
+      - name: Provider native adapter gate
+        shell: pwsh
+        run: |
+          uv run python scripts/generate_model_provider_contract_schemas.py
+          uv run python scripts/run_provider_native_adapter_gate.py --profile enterprise --output-root artifacts/model-provider-governance/native-v2 --json
+
       - name: Core smoke evidence
         shell: pwsh
         run: |

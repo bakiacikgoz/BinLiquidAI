@@ -1,0 +1,5 @@
+[provider_policy_defaults]
+remote_providers_enabled = false
+public_cloud_allowed_data_classes = ["public"]
+blocked_data_classes = ["secret", "credential", "payment", "raw_pii"]
+requires_redaction_for_remote = true

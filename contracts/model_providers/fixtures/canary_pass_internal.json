@@ -1,0 +1,31 @@
+{
+  "canary_id": "fixture-pass-internal",
+  "data_boundary": "internal",
+  "data_classes": [
+    "public"
+  ],
+  "error_class": null,
+  "evidence_path": "artifacts/model-provider-governance/canary/fixture-pass-internal.json",
+  "generated_at_utc": "2026-06-10T08:00:00Z",
+  "latency_ms": 42,
+  "live_call_attempted": true,
+  "network_decision": null,
+  "policy_decision": null,
+  "provider_id": "company-internal",
+  "provider_kind": "openai_compatible",
+  "raw_content_persisted": false,
+  "reason_code": "PROVIDER_CANARY_PASS",
+  "redaction_summary": null,
+  "request_hash": "sha256:fixture-request",
+  "response_hash": "sha256:fixture-response",
+  "retry_count": 0,
+  "risk_tier": "medium",
+  "status": "pass",
+  "status_code_class": "2xx",
+  "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 8,
+    "total_tokens": 10
+  },
+  "version": "model_provider.canary_result/v1"
+}

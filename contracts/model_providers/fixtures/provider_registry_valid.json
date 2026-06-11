@@ -1,0 +1,29 @@
+{
+  "profile": "balanced",
+  "remote_providers_enabled": false,
+  "providers": [
+    {
+      "provider_id": "company-internal",
+      "display_name": "Company Internal Gateway",
+      "kind": "openai_compatible",
+      "data_boundary": "internal",
+      "retention_policy": "zero_retention",
+      "auth_mode": "bearer_env",
+      "api_key_env": "COMPANY_INTERNAL_MODEL_API_KEY",
+      "base_url": "https://models.internal.example/v1",
+      "default_model": "secure-agent-model",
+      "models": ["secure-agent-model"],
+      "enabled": true
+    }
+  ],
+  "policies": [
+    {
+      "provider_id": "company-internal",
+      "allowed_data_classes": ["public", "internal"],
+      "blocked_data_classes": ["secret", "credential", "payment", "raw_pii"],
+      "requires_redaction": true,
+      "evidence_required": true,
+      "fallback_allowed_to": ["local-transformers"]
+    }
+  ]
+}
