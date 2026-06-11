@@ -161,6 +161,7 @@ jobs:
             tests/test_model_provider_native_contracts.py \
             tests/test_model_provider_tool_policy.py \
             tests/test_openai_responses_adapter.py \
+            tests/test_provider_native_anthropic_messages.py \
             tests/test_provider_conformance_matrix.py \
             tests/test_provider_native_adapter_gate.py \
             tests/test_provider_native_adapter_contract.py \
@@ -176,6 +177,8 @@ jobs:
           uv run --extra dev python scripts/generate_provider_conformance_matrix.py --profile enterprise --mode offline --output-root artifacts/model-provider-governance/conformance --json
           uv run --extra dev python scripts/verify_provider_release_closure.py --profile enterprise --evidence-root artifacts/model-provider-governance/v1_1 --json
           uv run --extra dev python scripts/run_provider_native_adapter_gate.py --profile enterprise --output-root artifacts/model-provider-governance/native-v2 --json
+          uv run --extra dev python -m binliquid provider native conformance run --profile enterprise --provider-kind anthropic_messages --offline --json
+          uv run --extra dev python -m binliquid provider native conformance verify --input artifacts/model-provider-governance/native-v2/anthropic_messages_native_adapter_report.json --json
 
   provider-governance-windows-script:
     runs-on: windows-latest
@@ -204,3 +207,5 @@ jobs:
           uv run --extra dev python scripts/generate_provider_conformance_matrix.py --profile enterprise --mode offline --output-root artifacts/model-provider-governance/conformance --json
           uv run --extra dev python scripts/verify_provider_release_closure.py --profile enterprise --evidence-root artifacts/model-provider-governance/v1_1 --json
           uv run --extra dev python scripts/run_provider_native_adapter_gate.py --profile enterprise --output-root artifacts/model-provider-governance/native-v2 --json
+          uv run --extra dev python -m binliquid provider native conformance run --profile enterprise --provider-kind anthropic_messages --offline --json
+          uv run --extra dev python -m binliquid provider native conformance verify --input artifacts/model-provider-governance/native-v2/anthropic_messages_native_adapter_report.json --json

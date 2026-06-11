@@ -6,6 +6,10 @@
         "builtin_web_search",
         "builtin_file_search",
         "builtin_computer_use",
+        "builtin_code_execution",
+        "builtin_web_fetch",
+        "builtin_bash",
+        "builtin_text_editor",
         "mcp",
         "server_tool",
         "unknown"

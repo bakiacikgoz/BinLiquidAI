@@ -109,6 +109,7 @@ provider-governance-gate:
 		tests/test_model_provider_native_contracts.py \
 		tests/test_model_provider_tool_policy.py \
 		tests/test_openai_responses_adapter.py \
+		tests/test_provider_native_anthropic_messages.py \
 		tests/test_provider_native_adapter_gate.py \
 		tests/test_provider_governance_gate.py
 	uv run --extra dev python scripts/run_provider_governance_gate.py --profile enterprise --json
@@ -140,13 +141,19 @@ provider-native-adapter-gate:
 		tests/test_model_provider_native_contracts.py \
 		tests/test_model_provider_tool_policy.py \
 		tests/test_openai_responses_adapter.py \
+		tests/test_provider_native_anthropic_messages.py \
 		tests/test_provider_native_adapter_gate.py
 	uv run --extra dev python scripts/run_provider_native_adapter_gate.py \
 		--profile enterprise \
 		--output-root artifacts/model-provider-governance/native-v2 \
 		--json
+	uv run --extra dev python -m binliquid provider native conformance run \
+		--profile enterprise \
+		--provider-kind anthropic_messages \
+		--offline \
+		--json
 	uv run --extra dev python -m binliquid provider native conformance verify \
-		--output-root artifacts/model-provider-governance/native-v2 \
+		--input artifacts/model-provider-governance/native-v2/anthropic_messages_native_adapter_report.json \
 		--json
 
 control-plane-schemas:

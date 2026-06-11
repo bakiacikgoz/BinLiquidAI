@@ -285,6 +285,10 @@ export function AssistantModelPicker({
                 {item.storagePolicy ? <small>{`storage: ${item.storagePolicy}`}</small> : null}
                 {item.serverToolsPolicy ? <small>{`server_tools: ${item.serverToolsPolicy}`}</small> : null}
                 {item.customToolsPolicy ? <small>{`custom_tools: ${item.customToolsPolicy}`}</small> : null}
+                {item.clientToolsPolicy ? <small>{`client_tools: ${item.clientToolsPolicy}`}</small> : null}
+                {item.toolResultLoopPolicy ? <small>{`tool_result_loop: ${item.toolResultLoopPolicy}`}</small> : null}
+                {item.stopReasonPolicy ? <small>{`stop_reason: ${item.stopReasonPolicy}`}</small> : null}
+                {item.liveCanaryStatus ? <small>{`live_canary: ${item.liveCanaryStatus}`}</small> : null}
                 <small>{`evidence: ${evidenceAt}`}</small>
               </div>
             );

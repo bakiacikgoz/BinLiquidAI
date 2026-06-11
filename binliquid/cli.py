@@ -149,10 +149,12 @@ from binliquid.model_providers.models import (
     ProviderRouteShadowRequest,
 )
 from binliquid.model_providers.native.conformance import (
-    run_openai_responses_native_conformance,
+    run_all_native_conformance,
+    run_native_conformance,
     verify_native_conformance_evidence,
     write_native_conformance_report,
 )
+from binliquid.model_providers.native.types import ProviderNativeConformanceReport
 from binliquid.model_providers.policy import GovernanceContext, evaluate_provider_policy
 from binliquid.model_providers.redaction import redact_provider_input
 from binliquid.model_providers.registry import resolve_model_provider_registry
@@ -198,6 +200,16 @@ PROVIDER_NATIVE_OUTPUT_ROOT_OPTION = typer.Option(
     DEFAULT_PROVIDER_NATIVE_OUTPUT_ROOT,
     "--output-root",
     help="Evidence output root",
+)
+PROVIDER_NATIVE_KIND_OPTION = typer.Option(
+    "openai_responses",
+    "--provider-kind",
+    help="Native provider kind: openai_responses|anthropic_messages|all",
+)
+PROVIDER_NATIVE_INPUT_OPTION = typer.Option(
+    None,
+    "--input",
+    help="Specific evidence file to verify",
 )
 approval_app = typer.Typer(help="Governance approval commands")
 PROVIDER_POLICY_DATA_CLASS_OPTION = typer.Option(
@@ -665,7 +677,7 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
     valid_legacy = {"all", "ollama", "transformers"}
     if normalized_provider not in valid_legacy and normalized_provider not in valid_ids:
         return {
-            "contractVersion": "operator-panel.assistant-provider-models/v3",
+            "contractVersion": "operator-panel.assistant-provider-models/v4",
             "profile": profile,
             "provider": requested_provider,
             "generatedAtUtc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -830,7 +842,7 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
         )
 
     return {
-        "contractVersion": "operator-panel.assistant-provider-models/v3",
+        "contractVersion": "operator-panel.assistant-provider-models/v4",
         "profile": profile,
         "provider": requested_provider if requested_provider else "all",
         "generatedAtUtc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -859,20 +871,40 @@ def _provider_conformance_payload(
 
 
 def _provider_native_payload(kind: ProviderKind | str | None) -> dict[str, object | None]:
-    if kind != ProviderKind.OPENAI_RESPONSES:
+    if kind == ProviderKind.OPENAI_RESPONSES:
         return {
-            "nativeAdapterKind": None,
-            "nativeAdapterStatus": "not_applicable",
-            "storagePolicy": None,
-            "serverToolsPolicy": None,
-            "customToolsPolicy": None,
+            "nativeAdapterKind": "openai_responses",
+            "nativeAdapterStatus": "canary_only",
+            "storagePolicy": "hash_only/store=false",
+            "serverToolsPolicy": "denied",
+            "customToolsPolicy": "proposal_only",
+            "clientToolsPolicy": "proposal_only",
+            "toolResultLoopPolicy": "not_applicable",
+            "stopReasonPolicy": "fail_closed",
+            "liveCanaryStatus": "false",
+        }
+    if kind == ProviderKind.ANTHROPIC_MESSAGES:
+        return {
+            "nativeAdapterKind": "anthropic_messages",
+            "nativeAdapterStatus": "canary_only",
+            "storagePolicy": "hash_only/raw_disabled",
+            "serverToolsPolicy": "denied",
+            "customToolsPolicy": "proposal_only",
+            "clientToolsPolicy": "proposal_only",
+            "toolResultLoopPolicy": "not_implemented",
+            "stopReasonPolicy": "fail_closed",
+            "liveCanaryStatus": "false",
         }
     return {
-        "nativeAdapterKind": "openai_responses",
-        "nativeAdapterStatus": "canary_only",
-        "storagePolicy": "hash_only/store=false",
-        "serverToolsPolicy": "denied",
-        "customToolsPolicy": "proposal_only",
+        "nativeAdapterKind": None,
+        "nativeAdapterStatus": "not_applicable",
+        "storagePolicy": None,
+        "serverToolsPolicy": None,
+        "customToolsPolicy": None,
+        "clientToolsPolicy": None,
+        "toolResultLoopPolicy": None,
+        "stopReasonPolicy": None,
+        "liveCanaryStatus": None,
     }
 
 
@@ -2475,34 +2507,85 @@ def provider_route_simulate(
 def provider_native_conformance_run(
     profile: str = typer.Option("enterprise", help="Config profile"),
     output_root: Path = PROVIDER_NATIVE_OUTPUT_ROOT_OPTION,
+    provider_kind: str = PROVIDER_NATIVE_KIND_OPTION,
+    offline: bool = typer.Option(True, "--offline/--no-offline", help="Run offline fixtures only"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     """Run offline native adapter conformance fixtures without live provider calls."""
-    report = run_openai_responses_native_conformance(profile=profile)
-    paths = write_native_conformance_report(report=report, output_root=output_root)
-    payload = report.model_dump(mode="json")
-    payload["paths"] = paths
+    if not offline:
+        raise typer.BadParameter("native conformance live mode is not implemented")
+    if provider_kind == "all":
+        reports = run_all_native_conformance(profile=profile)
+        paths = {
+            str(report.provider_kind): write_native_conformance_report(
+                report=report,
+                output_root=output_root,
+                stem=f"{report.provider_kind}_native_adapter_report",
+            )
+            for report in reports
+        }
+        payload = _native_conformance_aggregate_payload(
+            profile=profile,
+            reports=reports,
+            paths=paths,
+        )
+        status = payload["status"]
+    else:
+        report = run_native_conformance(profile=profile, provider_kind=provider_kind)
+        paths = write_native_conformance_report(
+            report=report,
+            output_root=output_root,
+            stem=f"{report.provider_kind}_native_adapter_report",
+        )
+        payload = report.model_dump(mode="json")
+        payload["paths"] = paths
+        status = report.status
     if json_output:
         typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
     else:
-        typer.echo(f"status={report.status} cases={report.total_cases}")
-    if report.status != "pass":
+        typer.echo(f"status={status} provider_kind={provider_kind}")
+    if status != "pass":
         raise typer.Exit(code=1)
 
 
 @provider_native_conformance_app.command("verify")
 def provider_native_conformance_verify(
     output_root: Path = PROVIDER_NATIVE_OUTPUT_ROOT_OPTION,
+    input_path: Path | None = PROVIDER_NATIVE_INPUT_OPTION,
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     """Verify native adapter evidence contains no raw payload or secret markers."""
-    payload = verify_native_conformance_evidence(output_root=output_root)
+    payload = verify_native_conformance_evidence(output_root=output_root, input_path=input_path)
     if json_output:
         typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True, default=str))
     else:
         typer.echo(f"status={payload['status']} reason={payload['reasonCode']}")
     if payload["status"] != "pass":
         raise typer.Exit(code=1)
+
+
+def _native_conformance_aggregate_payload(
+    *,
+    profile: str,
+    reports: list[ProviderNativeConformanceReport],
+    paths: dict[str, object],
+) -> dict[str, object]:
+    pass_count = sum(report.pass_count for report in reports)
+    expected_blocked_count = sum(report.expected_blocked_count for report in reports)
+    unexpected_failure_count = sum(report.unexpected_failure_count for report in reports)
+    total_cases = sum(report.total_cases for report in reports)
+    status = "pass" if all(report.status == "pass" for report in reports) else "fail"
+    return {
+        "version": "model_provider.native_conformance_aggregate/v1",
+        "profile": profile,
+        "status": status,
+        "total_cases": total_cases,
+        "pass_count": pass_count,
+        "expected_blocked_count": expected_blocked_count,
+        "unexpected_failure_count": unexpected_failure_count,
+        "reports": [report.model_dump(mode="json") for report in reports],
+        "paths": paths,
+    }
 
 
 @provider_app.command("models")

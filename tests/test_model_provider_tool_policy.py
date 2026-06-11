@@ -59,3 +59,34 @@ def test_tool_policy_allows_custom_tool_proposal_only() -> None:
     assert decision.reason_code == "CUSTOM_TOOL_PROPOSAL_REQUIRES_APPROVAL"
     assert decision.proposal_allowed is True
     assert decision.execution_allowed is False
+
+
+def test_anthropic_tool_policy_denies_server_tools_with_specific_reason() -> None:
+    decision = evaluate_provider_tool_policy(
+        requested_tool=ProviderRequestedTool(
+            tool_type=ProviderRequestedToolType.BUILTIN_CODE_EXECUTION,
+            name="code_execution",
+        ),
+        provider_policy=_policy(),
+        data_class=DataClass.PUBLIC,
+        execution_surface="anthropic_messages_native",
+    )
+
+    assert decision.reason_code == "ANTHROPIC_SERVER_CODE_EXECUTION_DEFAULT_DENY"
+    assert decision.execution_allowed is False
+
+
+def test_anthropic_tool_policy_keeps_custom_tools_proposal_only() -> None:
+    decision = evaluate_provider_tool_policy(
+        requested_tool=ProviderRequestedTool(
+            tool_type=ProviderRequestedToolType.CUSTOM_FUNCTION,
+            name="lookup_public_status",
+        ),
+        provider_policy=_policy(),
+        data_class=DataClass.PUBLIC,
+        execution_surface="anthropic_messages_native",
+    )
+
+    assert decision.reason_code == "CUSTOM_TOOL_PROPOSAL_REQUIRES_APPROVAL"
+    assert decision.proposal_allowed is True
+    assert decision.execution_allowed is False

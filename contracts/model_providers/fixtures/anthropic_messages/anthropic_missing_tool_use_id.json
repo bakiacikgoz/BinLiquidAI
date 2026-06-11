@@ -1,0 +1,30 @@
+{
+  "case_id": "anthropic_missing_tool_use_id",
+  "expected_status": "blocked",
+  "expected_reason_code": "ANTHROPIC_MESSAGES_TOOL_USE_ID_MISSING",
+  "requested_tools": [
+    {
+      "tool_type": "custom_function",
+      "name": "lookup_public_status",
+      "parameters": {
+        "type": "object"
+      }
+    }
+  ],
+  "provider_response": {
+    "id": "msg_fixture_missing_tool_id",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-6",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "name": "lookup_public_status",
+        "input": {
+          "service": "canary"
+        }
+      }
+    ]
+  }
+}

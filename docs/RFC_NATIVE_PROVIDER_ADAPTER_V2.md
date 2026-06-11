@@ -1,6 +1,6 @@
 # RFC: Native Provider Adapter V2
 
-Status: offline vertical slice implemented for OpenAI Responses preview.
+Status: offline vertical slices implemented for OpenAI Responses preview and Anthropic Messages preview.
 
 ## Goals
 
@@ -22,6 +22,10 @@ Schemas are generated from:
 
 - `OpenAIResponsesRequest`
 - `OpenAIResponsesResult`
+- `AnthropicMessagesRequest`
+- `AnthropicMessagesResult`
+- `ProviderContentBlock`
+- `ProviderStopReason`
 - `ProviderStoragePolicy`
 - `ProviderToolPolicyDecision`
 - `ProviderToolProposal`
@@ -31,6 +35,10 @@ Generated schema files:
 
 - `contracts/model_providers/openai_responses_request.schema.json`
 - `contracts/model_providers/openai_responses_result.schema.json`
+- `contracts/model_providers/anthropic_messages_request.schema.json`
+- `contracts/model_providers/anthropic_messages_result.schema.json`
+- `contracts/model_providers/provider_content_block.schema.json`
+- `contracts/model_providers/provider_stop_reason.schema.json`
 - `contracts/model_providers/provider_storage_policy.schema.json`
 - `contracts/model_providers/provider_tool_policy_decision.schema.json`
 - `contracts/model_providers/provider_tool_proposal.schema.json`
@@ -45,13 +53,16 @@ Generated schema files:
 - OpenAI Responses payloads force `store=false`
 - parallel tool calls are disabled
 - custom function tools are proposal-only
+- Anthropic Messages raw payload persistence is rejected
+- Anthropic server tools and high-risk client tools are denied
+- Anthropic `tool_result` loops fail closed until implemented
 
 ## Adapter Inventory
 
 | Provider family | V2 status |
 | --- | --- |
 | OpenAI Responses | disabled-by-default offline vertical slice |
-| Anthropic native | RFC only |
+| Anthropic native | disabled-by-default offline vertical slice |
 | Gemini native | RFC only |
 | DeepSeek | OpenAI-compatible recipe only |
 

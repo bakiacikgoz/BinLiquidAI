@@ -272,6 +272,18 @@ uv run binliquid doctor --profile balanced --provider auto --model qwen3.5:4b --
 uv run binliquid chat --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "adım adım anlat"
 ```
 
+### Native provider previews
+
+OpenAI Responses and Anthropic Messages native adapters are present as disabled,
+canary-only preview surfaces. They are used for offline conformance, Operator
+Panel trust metadata, and future graduation review; they do not enable production
+cloud routing by default.
+
+```bash
+uv run python scripts/run_provider_native_adapter_gate.py --profile enterprise --json
+uv run python -m binliquid provider native conformance run --profile enterprise --provider-kind all --offline --json
+```
+
 Show model override source:
 
 ```bash

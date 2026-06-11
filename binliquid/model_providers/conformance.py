@@ -133,6 +133,8 @@ def _provider_entry(
     ]
     if provider.kind == ProviderKind.OPENAI_RESPONSES:
         checks.extend(_native_openai_responses_checks())
+    if provider.kind == ProviderKind.ANTHROPIC_MESSAGES:
+        checks.extend(_native_anthropic_messages_checks())
     pass_count = sum(item.status == ProviderConformanceStatus.PASS for item in checks)
     skipped_count = sum(item.status == ProviderConformanceStatus.SKIPPED for item in checks)
     fail_count = sum(item.status == ProviderConformanceStatus.FAIL for item in checks)
@@ -179,6 +181,49 @@ def _native_openai_responses_checks() -> list[ProviderConformanceCheck]:
             reason_code="NATIVE_ADAPTER_CANARY_ONLY",
             summary="Native adapter is conformance/canary-only and not production-routed.",
             evidence={"production_routing_enabled": False},
+        ),
+    ]
+
+
+def _native_anthropic_messages_checks() -> list[ProviderConformanceCheck]:
+    return [
+        ProviderConformanceCheck(
+            check_id="native_storage_policy",
+            status=ProviderConformanceStatus.PASS,
+            reason_code="NATIVE_STORAGE_HASH_ONLY_RAW_DISABLED",
+            summary=(
+                "Anthropic Messages native adapter uses hash-only evidence "
+                "and raw persistence off."
+            ),
+            evidence={"evidence_mode": "hash_only", "raw_payload_persistence": False},
+        ),
+        ProviderConformanceCheck(
+            check_id="native_server_tools_policy",
+            status=ProviderConformanceStatus.PASS,
+            reason_code="NATIVE_SERVER_TOOLS_DEFAULT_DENY",
+            summary="Anthropic server, MCP, browser, code, and computer-use tools are denied.",
+            evidence={
+                "server_tools_allowed": False,
+                "mcp_tools_allowed": False,
+                "tool_result_loop_supported": False,
+            },
+        ),
+        ProviderConformanceCheck(
+            check_id="native_client_tools_policy",
+            status=ProviderConformanceStatus.PASS,
+            reason_code="NATIVE_CLIENT_TOOLS_PROPOSAL_ONLY",
+            summary="Anthropic client/custom tools are normalized into governance proposals only.",
+            evidence={"client_tools_mode": "proposal_only", "execution_allowed": False},
+        ),
+        ProviderConformanceCheck(
+            check_id="native_canary_only",
+            status=ProviderConformanceStatus.PASS,
+            reason_code="NATIVE_ADAPTER_CANARY_ONLY",
+            summary=(
+                "Anthropic native adapter is conformance/canary-only "
+                "and not production-routed."
+            ),
+            evidence={"production_routing_enabled": False, "live_canary_default": False},
         ),
     ]
 

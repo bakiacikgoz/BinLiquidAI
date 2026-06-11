@@ -1,0 +1,42 @@
+{
+  "case_id": "anthropic_client_tool_proposal",
+  "expected_status": "pass",
+  "expected_reason_code": "ANTHROPIC_MESSAGES_NORMALIZED",
+  "requested_tools": [
+    {
+      "tool_type": "custom_function",
+      "name": "lookup_public_status",
+      "description": "Look up a public status fixture.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          }
+        },
+        "required": ["service"]
+      }
+    }
+  ],
+  "provider_response": {
+    "id": "msg_fixture_tool",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-6",
+    "stop_reason": "tool_use",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_fixture_01",
+        "name": "lookup_public_status",
+        "input": {
+          "service": "operator-panel"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 44,
+      "output_tokens": 18
+    }
+  }
+}

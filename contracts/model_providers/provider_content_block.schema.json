@@ -1,0 +1,62 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "arguments_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Arguments Hash"
+    },
+    "block_type": {
+      "title": "Block Type",
+      "type": "string"
+    },
+    "text_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Text Hash"
+    },
+    "tool_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tool Id"
+    },
+    "tool_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tool Name"
+    }
+  },
+  "required": [
+    "block_type"
+  ],
+  "title": "ProviderContentBlock",
+  "type": "object"
+}

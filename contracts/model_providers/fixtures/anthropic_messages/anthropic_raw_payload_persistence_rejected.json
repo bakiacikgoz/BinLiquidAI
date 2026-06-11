@@ -1,0 +1,8 @@
+{
+  "case_id": "anthropic_raw_payload_persistence_rejected",
+  "expected_status": "blocked",
+  "expected_reason_code": "ANTHROPIC_MESSAGES_RAW_PAYLOAD_PERSISTENCE_REJECTED",
+  "storage_policy": {
+    "raw_payload_persistence": true
+  }
+}

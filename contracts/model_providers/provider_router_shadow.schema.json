@@ -33,6 +33,7 @@
         "local_transformers",
         "openai_compatible",
         "openai_responses",
+        "anthropic_messages",
         "openai",
         "azure_openai",
         "anthropic",

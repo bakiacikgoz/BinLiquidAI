@@ -6,6 +6,7 @@ export type AssistantProviderKind =
   | 'local_transformers'
   | 'openai_compatible'
   | 'openai_responses'
+  | 'anthropic_messages'
   | 'company_internal_api'
   | 'openai'
   | 'azure_openai'
@@ -65,6 +66,10 @@ export type AssistantProviderModelsProvider = {
   storagePolicy?: string | null;
   serverToolsPolicy?: string | null;
   customToolsPolicy?: string | null;
+  clientToolsPolicy?: string | null;
+  toolResultLoopPolicy?: string | null;
+  stopReasonPolicy?: string | null;
+  liveCanaryStatus?: string | null;
   available: boolean;
   selectedByConfig: boolean;
   disabledReason?: string | null;
@@ -77,7 +82,8 @@ export type AssistantProviderModelsResponse = {
   contractVersion:
     | 'operator-panel.assistant-provider-models/v1'
     | 'operator-panel.assistant-provider-models/v2'
-    | 'operator-panel.assistant-provider-models/v3';
+    | 'operator-panel.assistant-provider-models/v3'
+    | 'operator-panel.assistant-provider-models/v4';
   profile: string;
   provider: AssistantProviderId | 'all';
   generatedAtUtc: string;

@@ -6,7 +6,7 @@
 - CLI JSON payloads and team artifact files use `contract_version="2.0"` in snake_case.
 - `computer-use summary --json` is an Operator Panel control-plane payload and uses `contractVersion="2.0"` in camelCase.
 - Assistant start-turn and stream-event payloads use `contractVersion="2.0"` in camelCase.
-- Assistant model discovery uses `contractVersion="operator-panel.assistant-provider-models/v3"` for the provider native trust surface. V1 and V2 payloads remain parseable for compatibility.
+- Assistant model discovery uses `contractVersion="operator-panel.assistant-provider-models/v4"` for the provider native trust surface. V1, V2, and V3 payloads remain parseable for compatibility.
 - Stream events remain versioned by `schema_version="3"`.
 - Audit envelopes remain versioned by `contract_version="2.0"` plus `envelope_version="3"`, `event_schema_version="3"`, and `handoff_schema_version="3"`.
 
@@ -22,7 +22,7 @@
 - Computer-use device action approval snapshot
 - Assistant payloads surfaced through `bridge_assistant_start_turn` and `assistant://event`
 - Assistant provider discovery payloads surfaced through `bridge_assistant_provider_models`
-- Assistant provider native trust metadata: `nativeAdapterKind`, `nativeAdapterStatus`, `storagePolicy`, `serverToolsPolicy`, and `customToolsPolicy`
+- Assistant provider native trust metadata: `nativeAdapterKind`, `nativeAdapterStatus`, `storagePolicy`, `serverToolsPolicy`, `customToolsPolicy`, `clientToolsPolicy`, `toolResultLoopPolicy`, `stopReasonPolicy`, and `liveCanaryStatus`
 
 ## Empty State Rules
 

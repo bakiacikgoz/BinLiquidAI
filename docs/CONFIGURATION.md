@@ -120,6 +120,8 @@ Provider registry config lives in `config/providers.toml`. If that file is absen
 
 Remote providers are disabled unless `remote_providers_enabled=true` is set in config or `BINLIQUID_REMOTE_PROVIDERS_ENABLED=true` is present in the environment.
 
+Native preview providers remain disabled by default. The example registry includes disabled `openai_responses` and `anthropic_messages` rows for Operator Panel trust visibility and offline conformance only. Anthropic live canary evidence requires an `ANTHROPIC_API_KEY` environment variable plus all live canary opt-ins; CI and default gates do not make live Anthropic calls.
+
 ## Doctor Status Contract (v0.3.1)
 
 `doctor` emits:

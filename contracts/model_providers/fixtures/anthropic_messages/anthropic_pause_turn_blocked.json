@@ -1,0 +1,18 @@
+{
+  "case_id": "anthropic_pause_turn_blocked",
+  "expected_status": "blocked",
+  "expected_reason_code": "ANTHROPIC_MESSAGES_PAUSE_TURN_BLOCKED",
+  "provider_response": {
+    "id": "msg_fixture_pause",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-6",
+    "stop_reason": "pause_turn",
+    "content": [
+      {
+        "type": "text",
+        "text": "Server-side tool loop paused."
+      }
+    ]
+  }
+}

@@ -129,6 +129,41 @@ function discovery(overrides: Partial<AssistantModelDiscoveryState> = {}): Assis
         storagePolicy: 'hash_only/store=false',
         serverToolsPolicy: 'denied',
         customToolsPolicy: 'proposal_only',
+        clientToolsPolicy: 'proposal_only',
+        toolResultLoopPolicy: 'not_applicable',
+        stopReasonPolicy: 'fail_closed',
+        liveCanaryStatus: 'false',
+        available: false,
+        selectedByConfig: false,
+        disabledReason: 'PROVIDER_REMOTE_DISABLED',
+        errorCode: 'PROVIDER_REMOTE_DISABLED',
+        models: [],
+      },
+      {
+        provider: 'anthropic-messages-preview',
+        legacyProvider: null,
+        kind: 'anthropic_messages',
+        displayName: 'Anthropic Messages Native Preview',
+        dataBoundary: 'public_cloud',
+        riskTier: 'high',
+        trustSource: 'preview_fixture',
+        lastCanaryStatus: 'skipped',
+        lastCanaryReason: 'PROVIDER_LIVE_CANARY_DISABLED',
+        lastVerifiedEvidenceAtUtc: 'preview_fixture',
+        budgetState: 'guarded',
+        budgetReason: 'PROVIDER_CANARY_BUDGET_DISABLED',
+        conformanceStatus: 'pass',
+        conformanceReason: 'PROVIDER_CONFORMANCE_OFFLINE_PASS',
+        conformanceSummary: '4 pass / 13 expected-blocked / 0 fail',
+        nativeAdapterKind: 'anthropic_messages',
+        nativeAdapterStatus: 'canary_only',
+        storagePolicy: 'hash_only/raw_disabled',
+        serverToolsPolicy: 'denied',
+        customToolsPolicy: 'proposal_only',
+        clientToolsPolicy: 'proposal_only',
+        toolResultLoopPolicy: 'not_implemented',
+        stopReasonPolicy: 'fail_closed',
+        liveCanaryStatus: 'false',
         available: false,
         selectedByConfig: false,
         disabledReason: 'PROVIDER_REMOTE_DISABLED',
@@ -199,8 +234,15 @@ describe('AssistantModelPicker provider governance states', () => {
     expect(within(registry).getByText('OpenAI Responses Native Preview')).toBeInTheDocument();
     expect(within(registry).getByText('native: openai_responses: canary_only')).toBeInTheDocument();
     expect(within(registry).getByText('storage: hash_only/store=false')).toBeInTheDocument();
-    expect(within(registry).getByText('server_tools: denied')).toBeInTheDocument();
-    expect(within(registry).getByText('custom_tools: proposal_only')).toBeInTheDocument();
+    expect(within(registry).getAllByText('server_tools: denied').length).toBeGreaterThan(0);
+    expect(within(registry).getAllByText('custom_tools: proposal_only').length).toBeGreaterThan(0);
+    expect(within(registry).getByText('Anthropic Messages Native Preview')).toBeInTheDocument();
+    expect(within(registry).getByText('native: anthropic_messages: canary_only')).toBeInTheDocument();
+    expect(within(registry).getByText('storage: hash_only/raw_disabled')).toBeInTheDocument();
+    expect(within(registry).getAllByText('client_tools: proposal_only').length).toBeGreaterThan(0);
+    expect(within(registry).getByText('tool_result_loop: not_implemented')).toBeInTheDocument();
+    expect(within(registry).getAllByText('stop_reason: fail_closed').length).toBeGreaterThan(0);
+    expect(within(registry).getAllByText('live_canary: false').length).toBeGreaterThan(0);
   });
 
   it('shows loading and empty discovery states without raw JSON', () => {

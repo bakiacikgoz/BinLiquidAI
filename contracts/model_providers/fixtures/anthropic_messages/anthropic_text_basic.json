@@ -1,0 +1,22 @@
+{
+  "case_id": "anthropic_text_basic",
+  "expected_status": "pass",
+  "expected_reason_code": "ANTHROPIC_MESSAGES_NORMALIZED",
+  "provider_response": {
+    "id": "msg_fixture_text",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-6",
+    "stop_reason": "end_turn",
+    "content": [
+      {
+        "type": "text",
+        "text": "Fixture response for a public canary prompt."
+      }
+    ],
+    "usage": {
+      "input_tokens": 12,
+      "output_tokens": 9
+    }
+  }
+}

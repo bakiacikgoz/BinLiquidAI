@@ -53,5 +53,5 @@ def test_provider_models_includes_registry_driven_contract() -> None:
 
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
-    assert payload["contractVersion"] == "operator-panel.assistant-provider-models/v3"
+    assert payload["contractVersion"] == "operator-panel.assistant-provider-models/v4"
     assert any(item["provider"] == "local-ollama" for item in payload["providers"])

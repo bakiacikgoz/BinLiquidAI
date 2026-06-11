@@ -36,6 +36,12 @@
       "$ref": "#/$defs/DataClass",
       "default": "public"
     },
+    "execution_mode": {
+      "default": "proposal_only",
+      "pattern": "^proposal_only$",
+      "title": "Execution Mode",
+      "type": "string"
+    },
     "governance_action": {
       "pattern": "^(record_only|requires_approval|deny)$",
       "title": "Governance Action",
@@ -48,6 +54,18 @@
     "provider_id": {
       "title": "Provider Id",
       "type": "string"
+    },
+    "provider_tool_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Tool Id"
     },
     "redacted_arguments_preview": {
       "additionalProperties": true,

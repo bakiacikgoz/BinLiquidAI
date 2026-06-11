@@ -36,6 +36,10 @@ class ProviderRequestedToolType(StrEnum):
     BUILTIN_WEB_SEARCH = "builtin_web_search"
     BUILTIN_FILE_SEARCH = "builtin_file_search"
     BUILTIN_COMPUTER_USE = "builtin_computer_use"
+    BUILTIN_CODE_EXECUTION = "builtin_code_execution"
+    BUILTIN_WEB_FETCH = "builtin_web_fetch"
+    BUILTIN_BASH = "builtin_bash"
+    BUILTIN_TEXT_EDITOR = "builtin_text_editor"
     MCP = "mcp"
     SERVER_TOOL = "server_tool"
     UNKNOWN = "unknown"
@@ -75,12 +79,35 @@ class ProviderToolProposal(BaseModel):
 
     proposal_id: str
     provider_id: str
+    provider_tool_id: str | None = None
     tool_name: str
+    execution_mode: str = Field(default="proposal_only", pattern=r"^proposal_only$")
     arguments_hash: str
     redacted_arguments_preview: dict[str, Any] = Field(default_factory=dict)
     data_class: DataClass = DataClass.PUBLIC
     risk_tier: RiskTier | str
     governance_action: str = Field(pattern=r"^(record_only|requires_approval|deny)$")
+
+
+class ProviderStopReason(StrEnum):
+    END_TURN = "end_turn"
+    TOOL_USE = "tool_use"
+    MAX_TOKENS = "max_tokens"
+    STOP_SEQUENCE = "stop_sequence"
+    PAUSE_TURN = "pause_turn"
+    REFUSAL = "refusal"
+    MODEL_CONTEXT_WINDOW_EXCEEDED = "model_context_window_exceeded"
+    UNKNOWN = "unknown"
+
+
+class ProviderContentBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    block_type: str
+    text_hash: str | None = None
+    tool_name: str | None = None
+    tool_id: str | None = None
+    arguments_hash: str | None = None
 
 
 class OpenAIResponsesRequest(BaseModel):
@@ -109,6 +136,40 @@ class OpenAIResponsesResult(BaseModel):
     tool_proposals: list[ProviderToolProposal] = Field(default_factory=list)
     usage: dict[str, Any] | None = None
     latency_ms: int | None = None
+    raw_response_persisted: bool = False
+    generated_at_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class AnthropicMessagesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: str = "model_provider.anthropic_messages_request/v1"
+    provider_id: str
+    model: str
+    request_hash: str
+    payload: dict[str, Any]
+    storage_policy: ProviderStoragePolicy
+    tool_policy_decisions: list[ProviderToolPolicyDecision] = Field(default_factory=list)
+    canary_only: bool = True
+    live_canary_attempted: bool = False
+    raw_payload_persisted: bool = False
+
+
+class AnthropicMessagesResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: str = "model_provider.anthropic_messages_result/v1"
+    provider_id: str
+    model: str
+    status: str = Field(pattern=r"^(pass|blocked)$")
+    reason_code: str
+    stop_reason: ProviderStopReason | str
+    output_text_hash: str | None = None
+    content_blocks: list[ProviderContentBlock] = Field(default_factory=list)
+    tool_proposals: list[ProviderToolProposal] = Field(default_factory=list)
+    usage: dict[str, Any] | None = None
+    latency_ms: int | None = None
+    tool_result_loop_supported: bool = False
     raw_response_persisted: bool = False
     generated_at_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

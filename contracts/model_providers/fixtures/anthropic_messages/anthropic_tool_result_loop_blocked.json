@@ -1,0 +1,19 @@
+{
+  "case_id": "anthropic_tool_result_loop_blocked",
+  "expected_status": "blocked",
+  "expected_reason_code": "ANTHROPIC_TOOL_RESULT_LOOP_NOT_IMPLEMENTED",
+  "provider_response": {
+    "id": "msg_fixture_tool_result",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-6",
+    "stop_reason": "end_turn",
+    "content": [
+      {
+        "type": "tool_result",
+        "tool_use_id": "toolu_fixture_01",
+        "content": "Tool result loop fixture."
+      }
+    ]
+  }
+}

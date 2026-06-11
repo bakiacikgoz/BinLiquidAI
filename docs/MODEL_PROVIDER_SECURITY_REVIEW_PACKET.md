@@ -1,6 +1,6 @@
 # Model Provider Security Review Packet
 
-Scope: Model Provider Governance V1.1 canary and policy-aware routing shadow mode, plus the OpenAI Responses native adapter V2 offline vertical slice.
+Scope: Model Provider Governance V1.1 canary and policy-aware routing shadow mode, plus the OpenAI Responses V2 and Anthropic Messages V2.1 native adapter offline vertical slices.
 
 Security claims:
 
@@ -19,6 +19,10 @@ Security claims:
 - Native OpenAI Responses payloads force provider storage off with `store=false`.
 - Provider-hosted tools, built-in tools, MCP tools, web search, file search, and computer-use tools are denied by default.
 - Custom function tools are proposal-only and are not executed by the adapter.
+- Anthropic Messages native adapter remains canary-only and disabled by default.
+- Anthropic server tools and high-risk client tools are denied by default.
+- Anthropic `tool_result` continuation loops are not implemented and fail closed.
+- Native Anthropic evidence stores hashes and normalized summaries, not raw provider payloads.
 
 Primary commands:
 
@@ -29,8 +33,13 @@ uv run python -m binliquid provider canary verify \
   --evidence-root artifacts/model-provider-governance/canary \
   --json
 uv run python scripts/run_provider_native_adapter_gate.py --profile enterprise --json
+uv run python -m binliquid provider native conformance run \
+  --profile enterprise \
+  --provider-kind anthropic_messages \
+  --offline \
+  --json
 uv run python -m binliquid provider native conformance verify \
-  --output-root artifacts/model-provider-governance/native-v2 \
+  --input artifacts/model-provider-governance/native-v2/anthropic_messages_native_adapter_report.json \
   --json
 ```
 
@@ -44,10 +53,12 @@ Blocker conditions:
 - Budget or rate-limit guard fails.
 - Native evidence verification fails.
 - A native payload permits provider storage, server tools, MCP tools, or built-in tools.
+- A native Anthropic result accepts `pause_turn`, unknown stop reasons, incomplete tool blocks, or `tool_result` loops as success.
 
 Known limits:
 
 - OpenAI Responses native support is an offline canary-only vertical slice, not production routing approval.
-- Anthropic, Gemini, and DeepSeek native adapters are not implemented here.
+- Anthropic Messages native support is an offline canary-only vertical slice, not production routing approval.
+- Gemini and DeepSeek native adapters are not implemented here.
 - Operator Panel is read-only for provider trust state; it does not trigger live canaries.
 - Router shadow recommendations are not enforcement decisions.

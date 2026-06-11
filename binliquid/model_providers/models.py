@@ -17,6 +17,7 @@ class ProviderKind(StrEnum):
     LOCAL_TRANSFORMERS = "local_transformers"
     OPENAI_COMPATIBLE = "openai_compatible"
     OPENAI_RESPONSES = "openai_responses"
+    ANTHROPIC_MESSAGES = "anthropic_messages"
     OPENAI = "openai"
     AZURE_OPENAI = "azure_openai"
     ANTHROPIC = "anthropic"
@@ -157,6 +158,7 @@ class ModelProviderRecord(BaseModel):
         remote_kinds = {
             ProviderKind.OPENAI_COMPATIBLE,
             ProviderKind.OPENAI_RESPONSES,
+            ProviderKind.ANTHROPIC_MESSAGES,
             ProviderKind.OPENAI,
             ProviderKind.AZURE_OPENAI,
             ProviderKind.ANTHROPIC,

@@ -73,3 +73,4 @@ Provider output is treated as untrusted observed content. Screen text is not acc
 - Public cloud providers can receive `public` data only under the default policy.
 - `secret`, `credential`, `payment`, and `raw_pii` data classes are blocked before provider dispatch.
 - Provider evidence envelopes include hashes, reason codes, redaction summaries, attempts, and usage metadata; they must not include raw API keys or bearer tokens.
+- Native provider adapters store hash-only evidence. OpenAI Responses forces `store=false`; Anthropic Messages rejects raw payload persistence and records only hashes, normalized block metadata, stop reasons, policy decisions, and usage summaries.
