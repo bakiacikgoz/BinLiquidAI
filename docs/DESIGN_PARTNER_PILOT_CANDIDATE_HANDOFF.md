@@ -4,6 +4,16 @@ The pilot candidate pack assembles RC status, target evidence closure, optional
 operator attestation, provider workflow proof, claim guard output, and handoff
 documents into a single review folder.
 
+Current status as of 2026-06-13:
+
+- The design partner pilot candidate is conditionally frozen, not RC-ready.
+- Local rehearsal, provider governance, workflow proof, operator panel, and
+  control-plane gates pass with no release blockers.
+- Strict RC remains conditional until a real target-environment evidence session
+  and independent operator attestation are collected.
+- Public desktop installer, unrestricted live computer-use, and approval-free
+  irreversible mutation claims remain blocked.
+
 Generate the pack:
 
 ```bash
