@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "OperatorAttestationSignature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "default": "unsigned",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "keyId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keyid"
+        },
+        "signature": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signature"
+        }
+      },
+      "title": "OperatorAttestationSignature",
+      "type": "object"
+    },
+    "OperatorClaimReview": {
+      "additionalProperties": false,
+      "properties": {
+        "boundaryStatus": {
+          "enum": [
+            "blocked",
+            "conditional",
+            "allowed"
+          ],
+          "title": "Boundarystatus",
+          "type": "string"
+        },
+        "claimId": {
+          "title": "Claimid",
+          "type": "string"
+        },
+        "notesHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Noteshash"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "not_reviewed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claimId",
+        "status",
+        "boundaryStatus"
+      ],
+      "title": "OperatorClaimReview",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "acceptedBoundaries": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Acceptedboundaries",
+      "type": "array"
+    },
+    "attestationId": {
+      "title": "Attestationid",
+      "type": "string"
+    },
+    "operatorDisplayNameHash": {
+      "title": "Operatordisplaynamehash",
+      "type": "string"
+    },
+    "reviewedClaims": {
+      "items": {
+        "$ref": "#/$defs/OperatorClaimReview"
+      },
+      "title": "Reviewedclaims",
+      "type": "array"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "signature": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OperatorAttestationSignature"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "signedAtUtc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Signedatutc"
+    },
+    "version": {
+      "const": "control-plane.operator-attestation/v1",
+      "default": "control-plane.operator-attestation/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "attestationId",
+    "sessionId",
+    "operatorDisplayNameHash"
+  ],
+  "title": "OperatorAttestation",
+  "type": "object"
+}

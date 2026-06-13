@@ -1,0 +1,77 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "allowedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowedclaims",
+      "type": "array"
+    },
+    "blockedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockedclaims",
+      "type": "array"
+    },
+    "environmentLabel": {
+      "title": "Environmentlabel",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "rehearsal",
+        "target"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "operatorIdHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Operatoridhash"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rawPersistence": {
+      "const": false,
+      "default": false,
+      "title": "Rawpersistence",
+      "type": "boolean"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "startedAtUtc": {
+      "format": "date-time",
+      "title": "Startedatutc",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.target-evidence-session/v1",
+      "default": "control-plane.target-evidence-session/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "profile",
+    "environmentLabel",
+    "mode",
+    "startedAtUtc"
+  ],
+  "title": "TargetEvidenceSession",
+  "type": "object"
+}

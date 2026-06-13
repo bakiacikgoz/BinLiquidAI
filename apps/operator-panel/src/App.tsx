@@ -1197,6 +1197,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const designPartnerBeta = controlPlaneSnapshot?.designPartnerBeta ?? null;
   const providerGovernance = controlPlaneSnapshot?.providerGovernance ?? null;
   const providerRuntime = controlPlaneSnapshot?.providerRuntime ?? null;
+  const targetEvidenceClosure = controlPlaneSnapshot?.targetEvidenceClosure ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -1693,6 +1694,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             designPartnerBeta={designPartnerBeta}
             providerGovernance={providerGovernance}
             providerRuntime={providerRuntime}
+            targetEvidenceClosure={targetEvidenceClosure}
             locale={locale}
           />
         ) : null}

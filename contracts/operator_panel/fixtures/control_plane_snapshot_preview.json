@@ -805,6 +805,26 @@
       }
     ]
   },
+  "targetEvidenceClosure": {
+    "attestationStatus": "present",
+    "blockedClaims": [
+      "public-desktop-installer",
+      "live-macos-computer-use",
+      "live-windows-computer-use",
+      "live-linux-computer-use"
+    ],
+    "blockingReasons": [],
+    "contractVersion": "control-plane.target-evidence-closure/v1",
+    "evidenceMode": "hash_only",
+    "generatedAtUtc": "2026-06-01T12:00:00Z",
+    "mode": "rehearsal",
+    "rawPersistence": false,
+    "sessionId": "target-evidence-preview",
+    "status": "conditional",
+    "warnings": [
+      "TARGET_ENVIRONMENT_REHEARSAL_ONLY"
+    ]
+  },
   "partialReasons": [
     "DATA_SOURCE_PREVIEW_FIXTURE",
     "metrics_snapshot",

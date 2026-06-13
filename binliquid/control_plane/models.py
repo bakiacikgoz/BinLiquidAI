@@ -1227,6 +1227,155 @@ class ProviderRuntimeSnapshot(StrictModel):
     blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
 
 
+class TargetEvidenceItem(StrictModel):
+    item_id: str = Field(alias="itemId")
+    kind: str
+    path: str
+    sha256: str
+    status: Literal["pass", "conditional", "blocked", "missing"] = "pass"
+    required: bool = True
+
+
+class TargetEvidenceClaimBoundary(StrictModel):
+    public_desktop_installer: Literal["blocked", "conditional", "allowed"] = Field(
+        default="blocked",
+        alias="publicDesktopInstaller",
+    )
+    live_macos_computer_use: Literal["blocked", "conditional", "allowed"] = Field(
+        default="blocked",
+        alias="liveMacosComputerUse",
+    )
+    live_windows_computer_use: Literal["blocked", "conditional", "allowed"] = Field(
+        default="blocked",
+        alias="liveWindowsComputerUse",
+    )
+    live_linux_computer_use: Literal["blocked", "conditional", "allowed"] = Field(
+        default="blocked",
+        alias="liveLinuxComputerUse",
+    )
+    blocked_claims: list[str] = Field(default_factory=list, alias="blockedClaims")
+
+
+class TargetEvidenceSession(StrictModel):
+    version: Literal["control-plane.target-evidence-session/v1"] = (
+        "control-plane.target-evidence-session/v1"
+    )
+    session_id: str = Field(alias="sessionId")
+    profile: str
+    environment_label: str = Field(alias="environmentLabel")
+    mode: Literal["rehearsal", "target"]
+    started_at_utc: datetime = Field(alias="startedAtUtc")
+    operator_id_hash: str | None = Field(default=None, alias="operatorIdHash")
+    allowed_claims: list[str] = Field(default_factory=list, alias="allowedClaims")
+    blocked_claims: list[str] = Field(default_factory=list, alias="blockedClaims")
+    raw_persistence: Literal[False] = Field(default=False, alias="rawPersistence")
+
+
+class TargetEvidenceBundle(StrictModel):
+    version: Literal["control-plane.target-evidence-bundle/v1"] = (
+        "control-plane.target-evidence-bundle/v1"
+    )
+    session_id: str = Field(alias="sessionId")
+    status: Literal["pass", "conditional", "blocked"] = "conditional"
+    items: list[TargetEvidenceItem] = Field(default_factory=list)
+    missing_items: list[str] = Field(default_factory=list, alias="missingItems")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+    claim_boundary: TargetEvidenceClaimBoundary = Field(
+        default_factory=TargetEvidenceClaimBoundary,
+        alias="claimBoundary",
+    )
+    secret_material_written: bool = Field(default=False, alias="secretMaterialWritten")
+    raw_prompt_persisted: bool = Field(default=False, alias="rawPromptPersisted")
+    raw_response_persisted: bool = Field(default=False, alias="rawResponsePersisted")
+    raw_screenshot_persisted: bool = Field(default=False, alias="rawScreenshotPersisted")
+
+
+class TargetEvidenceVerificationResult(StrictModel):
+    version: Literal["control-plane.target-evidence-verification/v1"] = (
+        "control-plane.target-evidence-verification/v1"
+    )
+    status: Literal["pass", "blocked"]
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class OperatorClaimReview(StrictModel):
+    claim_id: str = Field(alias="claimId")
+    status: Literal["accepted", "rejected", "not_reviewed"]
+    boundary_status: Literal["blocked", "conditional", "allowed"] = Field(alias="boundaryStatus")
+    notes_hash: str | None = Field(default=None, alias="notesHash")
+
+
+class OperatorAttestationSignature(StrictModel):
+    algorithm: str = "unsigned"
+    key_id: str | None = Field(default=None, alias="keyId")
+    signature: str | None = None
+
+
+class OperatorAttestation(StrictModel):
+    version: Literal["control-plane.operator-attestation/v1"] = (
+        "control-plane.operator-attestation/v1"
+    )
+    attestation_id: str = Field(alias="attestationId")
+    session_id: str = Field(alias="sessionId")
+    operator_display_name_hash: str = Field(alias="operatorDisplayNameHash")
+    reviewed_claims: list[OperatorClaimReview] = Field(default_factory=list, alias="reviewedClaims")
+    accepted_boundaries: list[str] = Field(default_factory=list, alias="acceptedBoundaries")
+    signed_at_utc: datetime | None = Field(default=None, alias="signedAtUtc")
+    signature: OperatorAttestationSignature | None = None
+
+
+class AttestationVerificationResult(StrictModel):
+    version: Literal["control-plane.operator-attestation-verification/v1"] = (
+        "control-plane.operator-attestation-verification/v1"
+    )
+    status: Literal["pass", "blocked"]
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PilotCandidateManifest(StrictModel):
+    version: Literal["control-plane.pilot-candidate/v1"] = "control-plane.pilot-candidate/v1"
+    status: Literal["pass", "conditional", "blocked"] = "conditional"
+    profile: str = "enterprise"
+    rc_status_path: str = Field(alias="rcStatusPath")
+    target_evidence_path: str = Field(alias="targetEvidencePath")
+    attestation_path: str | None = Field(default=None, alias="attestationPath")
+    provider_runtime_proof_path: str = Field(alias="providerRuntimeProofPath")
+    claim_guard_path: str = Field(alias="claimGuardPath")
+    handoff_docs: list[str] = Field(default_factory=list, alias="handoffDocs")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+
+
+class TargetEvidenceClosureSummary(StrictModel):
+    contract_version: Literal["control-plane.target-evidence-closure/v1"] = Field(
+        default="control-plane.target-evidence-closure/v1",
+        alias="contractVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["pass", "conditional", "blocked", "unknown"] = "unknown"
+    session_id: str | None = Field(default=None, alias="sessionId")
+    mode: Literal["rehearsal", "target"] | None = None
+    evidence_mode: Literal["hash_only"] | None = Field(default=None, alias="evidenceMode")
+    raw_persistence: Literal[False] = Field(default=False, alias="rawPersistence")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+    blocked_claims: list[str] = Field(default_factory=list, alias="blockedClaims")
+    attestation_status: Literal["missing", "present", "signed", "invalid"] = Field(
+        default="missing",
+        alias="attestationStatus",
+    )
+
+
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
@@ -1274,6 +1423,10 @@ class ControlPlaneSnapshot(StrictModel):
     provider_runtime: ProviderRuntimeSnapshot = Field(
         default_factory=ProviderRuntimeSnapshot,
         alias="providerRuntime",
+    )
+    target_evidence_closure: TargetEvidenceClosureSummary = Field(
+        default_factory=TargetEvidenceClosureSummary,
+        alias="targetEvidenceClosure",
     )
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

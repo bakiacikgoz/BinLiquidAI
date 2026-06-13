@@ -1,0 +1,108 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attestationStatus": {
+      "default": "missing",
+      "enum": [
+        "missing",
+        "present",
+        "signed",
+        "invalid"
+      ],
+      "title": "Attestationstatus",
+      "type": "string"
+    },
+    "blockedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockedclaims",
+      "type": "array"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "contractVersion": {
+      "const": "control-plane.target-evidence-closure/v1",
+      "default": "control-plane.target-evidence-closure/v1",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "evidenceMode": {
+      "anyOf": [
+        {
+          "const": "hash_only",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidencemode"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "rehearsal",
+            "target"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mode"
+    },
+    "rawPersistence": {
+      "const": false,
+      "default": false,
+      "title": "Rawpersistence",
+      "type": "boolean"
+    },
+    "sessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sessionid"
+    },
+    "status": {
+      "default": "unknown",
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked",
+        "unknown"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "title": "TargetEvidenceClosureSummary",
+  "type": "object"
+}

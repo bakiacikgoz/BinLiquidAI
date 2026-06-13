@@ -7,8 +7,10 @@ import type {
   PilotOperationsStatus,
   ProviderGovernanceSnapshot,
   ProviderRuntimeSnapshot,
+  TargetEvidenceClosureSummary,
 } from '../../control-plane/types';
 import type { UiLocale } from '../../i18n';
+import { TargetEvidenceClosure } from '../../provider-governance/TargetEvidenceClosure';
 import { DesignPartnerBetaReadinessCard } from './DesignPartnerBetaReadinessCard';
 import { ProviderTrustSurface } from './ProviderTrustSurface';
 
@@ -84,6 +86,7 @@ export function ControlPlaneDashboard({
   designPartnerBeta,
   providerGovernance,
   providerRuntime,
+  targetEvidenceClosure,
   locale = 'en',
 }: {
   doctor: unknown;
@@ -96,6 +99,7 @@ export function ControlPlaneDashboard({
   designPartnerBeta?: DesignPartnerBetaStatus | null;
   providerGovernance?: ProviderGovernanceSnapshot | null;
   providerRuntime?: ProviderRuntimeSnapshot | null;
+  targetEvidenceClosure?: TargetEvidenceClosureSummary | null;
   locale?: UiLocale;
 }) {
   const text = copy[locale];
@@ -128,6 +132,7 @@ export function ControlPlaneDashboard({
         <PilotLaunchCandidateCard pilotLaunch={pilotLaunch} text={text} />
         <NextActionsCard pilotLaunch={pilotLaunch} text={text} />
         <ProviderTrustSurface snapshot={providerGovernance} runtime={providerRuntime} locale={locale} />
+        <TargetEvidenceClosure closure={targetEvidenceClosure} />
         <DesignPartnerBetaReadinessCard
           codeIntelligence={codeIntelligence}
           pilotOperations={pilotOperations}
