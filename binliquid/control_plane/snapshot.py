@@ -51,6 +51,7 @@ from binliquid.enterprise.identity import describe_actor
 from binliquid.enterprise.signing import key_status
 from binliquid.governance.approval_store import ApprovalStore
 from binliquid.governance.policy import load_policy
+from binliquid.memory.snapshot import build_memory_governance_snapshot
 from binliquid.runtime.config import RuntimeConfig
 
 SNAPSHOT_CONTRACT_VERSION = "control-plane.snapshot/v1"
@@ -177,6 +178,7 @@ def build_control_plane_snapshot(
         Path(evidence_root),
         generated_at=generated_at,
     )
+    memory_governance = build_memory_governance_snapshot(config=config, evidence_root=evidence_root)
     design_partner_rc = build_design_partner_rc_status(
         data_source=data_source,
         claims=claims.model_dump(mode="json"),
@@ -244,6 +246,7 @@ def build_control_plane_snapshot(
         provider_governance=provider_governance,
         provider_runtime=provider_runtime,
         target_evidence_closure=target_evidence_closure,
+        memory_governance=memory_governance,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )

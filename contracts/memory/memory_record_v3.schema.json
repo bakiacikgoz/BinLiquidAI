@@ -1,0 +1,263 @@
+{
+  "$defs": {
+    "MemoryOwnerType": {
+      "enum": [
+        "user",
+        "agent",
+        "team",
+        "project",
+        "case",
+        "org"
+      ],
+      "title": "MemoryOwnerType",
+      "type": "string"
+    },
+    "MemoryRecordStatus": {
+      "enum": [
+        "active",
+        "expired",
+        "tombstoned",
+        "denied"
+      ],
+      "title": "MemoryRecordStatus",
+      "type": "string"
+    },
+    "MemoryScope": {
+      "enum": [
+        "personal",
+        "agent",
+        "team",
+        "case",
+        "project",
+        "organization",
+        "global_readonly"
+      ],
+      "title": "MemoryScope",
+      "type": "string"
+    },
+    "MemorySourceType": {
+      "enum": [
+        "run",
+        "operator",
+        "system",
+        "migration",
+        "eval"
+      ],
+      "title": "MemorySourceType",
+      "type": "string"
+    },
+    "MemoryVisibility": {
+      "enum": [
+        "private",
+        "agent",
+        "team",
+        "project",
+        "organization",
+        "public_readonly"
+      ],
+      "title": "MemoryVisibility",
+      "type": "string"
+    },
+    "RetentionClass": {
+      "enum": [
+        "ephemeral",
+        "standard",
+        "regulated"
+      ],
+      "title": "RetentionClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "default": 0.5,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "contentHash": {
+      "title": "Contenthash",
+      "type": "string"
+    },
+    "contentSummary": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Contentsummary",
+      "type": "string"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "title": "Createdat",
+      "type": "string"
+    },
+    "embeddingRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embeddingref"
+    },
+    "expiresAt": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expiresat"
+    },
+    "memoryId": {
+      "title": "Memoryid",
+      "type": "string"
+    },
+    "memoryTarget": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Memorytarget"
+    },
+    "namespace": {
+      "default": "default",
+      "title": "Namespace",
+      "type": "string"
+    },
+    "ownerIdHash": {
+      "title": "Owneridhash",
+      "type": "string"
+    },
+    "ownerType": {
+      "$ref": "#/$defs/MemoryOwnerType"
+    },
+    "policyTags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Policytags",
+      "type": "array"
+    },
+    "provenance": {
+      "additionalProperties": true,
+      "title": "Provenance",
+      "type": "object"
+    },
+    "retentionClass": {
+      "$ref": "#/$defs/RetentionClass",
+      "default": "standard"
+    },
+    "salience": {
+      "default": 0.5,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Salience",
+      "type": "number"
+    },
+    "schemaVersion": {
+      "const": "memory.v3",
+      "default": "memory.v3",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/$defs/MemoryScope"
+    },
+    "sourceAgentId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sourceagentid"
+    },
+    "sourceRunId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sourcerunid"
+    },
+    "sourceType": {
+      "$ref": "#/$defs/MemorySourceType",
+      "default": "run"
+    },
+    "sourceUserHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sourceuserhash"
+    },
+    "stateVersion": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Stateversion",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/MemoryRecordStatus",
+      "default": "active"
+    },
+    "ttlDays": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ttldays"
+    },
+    "updatedAt": {
+      "format": "date-time",
+      "title": "Updatedat",
+      "type": "string"
+    },
+    "visibility": {
+      "$ref": "#/$defs/MemoryVisibility"
+    }
+  },
+  "required": [
+    "memoryId",
+    "scope",
+    "ownerType",
+    "ownerIdHash",
+    "visibility",
+    "contentSummary",
+    "contentHash"
+  ],
+  "title": "MemoryRecordV3",
+  "type": "object"
+}

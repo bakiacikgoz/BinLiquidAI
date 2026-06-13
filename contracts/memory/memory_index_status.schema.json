@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "MemoryIndexBackendStatus": {
+      "enum": [
+        "pass",
+        "degraded",
+        "disabled",
+        "unavailable",
+        "error"
+      ],
+      "title": "MemoryIndexBackendStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "backend": {
+      "title": "Backend",
+      "type": "string"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "degradedReason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Degradedreason"
+    },
+    "experimental": {
+      "default": false,
+      "title": "Experimental",
+      "type": "boolean"
+    },
+    "lastRebuildAt": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lastrebuildat"
+    },
+    "recordCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Recordcount",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/MemoryIndexBackendStatus"
+    }
+  },
+  "required": [
+    "backend",
+    "status"
+  ],
+  "title": "MemoryIndexStatus",
+  "type": "object"
+}

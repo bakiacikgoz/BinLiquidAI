@@ -1,0 +1,174 @@
+{
+  "$defs": {
+    "MemoryOwnerType": {
+      "enum": [
+        "user",
+        "agent",
+        "team",
+        "project",
+        "case",
+        "org"
+      ],
+      "title": "MemoryOwnerType",
+      "type": "string"
+    },
+    "MemoryScope": {
+      "enum": [
+        "personal",
+        "agent",
+        "team",
+        "case",
+        "project",
+        "organization",
+        "global_readonly"
+      ],
+      "title": "MemoryScope",
+      "type": "string"
+    },
+    "MemoryVisibility": {
+      "enum": [
+        "private",
+        "agent",
+        "team",
+        "project",
+        "organization",
+        "public_readonly"
+      ],
+      "title": "MemoryVisibility",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "actorIdHash": {
+      "title": "Actoridhash",
+      "type": "string"
+    },
+    "agentId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Agentid"
+    },
+    "candidateSummary": {
+      "anyOf": [
+        {
+          "maxLength": 4000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidatesummary"
+    },
+    "candidateText": {
+      "maxLength": 8000,
+      "minLength": 1,
+      "title": "Candidatetext",
+      "type": "string"
+    },
+    "expectedStateVersion": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expectedstateversion"
+    },
+    "idempotencyKey": {
+      "maxLength": 160,
+      "minLength": 8,
+      "title": "Idempotencykey",
+      "type": "string"
+    },
+    "memoryTarget": {
+      "anyOf": [
+        {
+          "maxLength": 160,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Memorytarget"
+    },
+    "namespace": {
+      "default": "default",
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Namespace",
+      "type": "string"
+    },
+    "ownerIdHash": {
+      "title": "Owneridhash",
+      "type": "string"
+    },
+    "ownerType": {
+      "$ref": "#/$defs/MemoryOwnerType"
+    },
+    "producerRole": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Producerrole",
+      "type": "string"
+    },
+    "proposalId": {
+      "title": "Proposalid",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/$defs/MemoryScope"
+    },
+    "sourceRunId": {
+      "anyOf": [
+        {
+          "maxLength": 160,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sourcerunid"
+    },
+    "visibility": {
+      "$ref": "#/$defs/MemoryVisibility"
+    }
+  },
+  "required": [
+    "proposalId",
+    "actorIdHash",
+    "producerRole",
+    "scope",
+    "ownerType",
+    "ownerIdHash",
+    "visibility",
+    "candidateText",
+    "reason",
+    "idempotencyKey"
+  ],
+  "title": "MemoryWriteProposal",
+  "type": "object"
+}

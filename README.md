@@ -7,6 +7,7 @@ audit/replay artifacts, export signed evidence packs, and block unsupported
 release claims before agents are trusted in production-like workflows.
 
 Product boundary: [Agent Control Plane Product Boundary](docs/AGENT_CONTROL_PLANE_PRODUCT_BOUNDARY.md).
+Governed Memory v1 is documented in [Governed Memory Layer](docs/GOVERNED_MEMORY_LAYER.md).
 
 BinLiquid currently provides four control-plane surfaces:
 

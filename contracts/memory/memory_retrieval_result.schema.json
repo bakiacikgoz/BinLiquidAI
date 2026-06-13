@@ -1,0 +1,262 @@
+{
+  "$defs": {
+    "MemoryHit": {
+      "additionalProperties": false,
+      "properties": {
+        "contentHash": {
+          "title": "Contenthash",
+          "type": "string"
+        },
+        "contentSummary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contentsummary"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "memoryId": {
+          "title": "Memoryid",
+          "type": "string"
+        },
+        "ownerIdHash": {
+          "title": "Owneridhash",
+          "type": "string"
+        },
+        "policyTags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Policytags",
+          "type": "array"
+        },
+        "scope": {
+          "$ref": "#/$defs/MemoryScope"
+        },
+        "score": {
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "visibility": {
+          "$ref": "#/$defs/MemoryVisibility"
+        }
+      },
+      "required": [
+        "memoryId",
+        "scope",
+        "visibility",
+        "ownerIdHash",
+        "contentHash",
+        "score",
+        "createdAt"
+      ],
+      "title": "MemoryHit",
+      "type": "object"
+    },
+    "MemoryPolicyAction": {
+      "enum": [
+        "allow",
+        "deny",
+        "require_approval",
+        "proposal_only"
+      ],
+      "title": "MemoryPolicyAction",
+      "type": "string"
+    },
+    "MemoryPolicyDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approvalid"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "decision": {
+          "$ref": "#/$defs/MemoryPolicyAction"
+        },
+        "evidenceRequired": {
+          "default": true,
+          "title": "Evidencerequired",
+          "type": "boolean"
+        },
+        "indexWriteAllowed": {
+          "default": true,
+          "title": "Indexwriteallowed",
+          "type": "boolean"
+        },
+        "matchedRulePath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matchedrulepath"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "redactionRequired": {
+          "default": true,
+          "title": "Redactionrequired",
+          "type": "boolean"
+        },
+        "retentionOverride": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RetentionClass"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "decision",
+        "reasonCode"
+      ],
+      "title": "MemoryPolicyDecision",
+      "type": "object"
+    },
+    "MemoryScope": {
+      "enum": [
+        "personal",
+        "agent",
+        "team",
+        "case",
+        "project",
+        "organization",
+        "global_readonly"
+      ],
+      "title": "MemoryScope",
+      "type": "string"
+    },
+    "MemoryVisibility": {
+      "enum": [
+        "private",
+        "agent",
+        "team",
+        "project",
+        "organization",
+        "public_readonly"
+      ],
+      "title": "MemoryVisibility",
+      "type": "string"
+    },
+    "RetentionClass": {
+      "enum": [
+        "ephemeral",
+        "standard",
+        "regulated"
+      ],
+      "title": "RetentionClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "deniedScopes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Deniedscopes",
+      "type": "array"
+    },
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "hits": {
+      "items": {
+        "$ref": "#/$defs/MemoryHit"
+      },
+      "title": "Hits",
+      "type": "array"
+    },
+    "indexBackend": {
+      "title": "Indexbackend",
+      "type": "string"
+    },
+    "policyDecision": {
+      "$ref": "#/$defs/MemoryPolicyDecision"
+    },
+    "queryHash": {
+      "title": "Queryhash",
+      "type": "string"
+    },
+    "rawContentIncluded": {
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "retrievalFingerprint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retrievalfingerprint"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "denied",
+        "empty",
+        "degraded",
+        "error"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "queryHash",
+    "policyDecision",
+    "indexBackend"
+  ],
+  "title": "MemoryRetrievalResult",
+  "type": "object"
+}

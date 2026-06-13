@@ -443,6 +443,56 @@ export interface TargetEvidenceClosureSummary {
   attestationStatus: 'missing' | 'present' | 'signed' | 'invalid';
 }
 
+export interface MemoryAuthorityRecordsSummary {
+  active: number;
+  expired: number;
+  tombstoned: number;
+  deniedWrites: number;
+  pendingProposals: number;
+}
+
+export interface MemoryScopeSummary {
+  scope: string;
+  visibility: string;
+  activeRecords: number;
+  policy: string;
+}
+
+export interface MemoryIndexStatus {
+  backend: string;
+  status: 'pass' | 'degraded' | 'disabled' | 'unavailable' | 'error';
+  recordCount: number;
+  lastRebuildAt?: string | null;
+  degradedReason?: string | null;
+  blockingReasons: string[];
+  experimental: boolean;
+}
+
+export interface MemoryPrivacySummary {
+  rawPromptPersistence: boolean;
+  rawResponsePersistence: boolean;
+  primaryUiRawContent: boolean;
+}
+
+export interface MemoryEvidenceSummary {
+  mode: 'hash_only_redacted';
+  lastArtifactRef?: string | null;
+}
+
+export interface MemoryAuthoritySnapshot {
+  contractVersion: 'memory.authority-snapshot/v1';
+  enabled: boolean;
+  authorityStatus: 'pass' | 'disabled' | 'degraded' | 'blocked';
+  storeSchemaVersion: 'memory.v3';
+  records: MemoryAuthorityRecordsSummary;
+  scopes: MemoryScopeSummary[];
+  index: MemoryIndexStatus;
+  privacy: MemoryPrivacySummary;
+  evidence: MemoryEvidenceSummary;
+  blockingReasons: string[];
+  warnings: string[];
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -468,6 +518,7 @@ export interface ControlPlaneSnapshot {
   providerGovernance: ProviderGovernanceSnapshot;
   providerRuntime: ProviderRuntimeSnapshot;
   targetEvidenceClosure: TargetEvidenceClosureSummary;
+  memoryGovernance?: MemoryAuthoritySnapshot;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

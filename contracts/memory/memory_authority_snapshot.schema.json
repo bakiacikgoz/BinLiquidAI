@@ -1,0 +1,276 @@
+{
+  "$defs": {
+    "MemoryAuthorityRecordsSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "default": 0,
+          "title": "Active",
+          "type": "integer"
+        },
+        "deniedWrites": {
+          "default": 0,
+          "title": "Deniedwrites",
+          "type": "integer"
+        },
+        "expired": {
+          "default": 0,
+          "title": "Expired",
+          "type": "integer"
+        },
+        "pendingProposals": {
+          "default": 0,
+          "title": "Pendingproposals",
+          "type": "integer"
+        },
+        "tombstoned": {
+          "default": 0,
+          "title": "Tombstoned",
+          "type": "integer"
+        }
+      },
+      "title": "MemoryAuthorityRecordsSummary",
+      "type": "object"
+    },
+    "MemoryEvidenceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "lastArtifactRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastartifactref"
+        },
+        "mode": {
+          "const": "hash_only_redacted",
+          "default": "hash_only_redacted",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "MemoryEvidenceSummary",
+      "type": "object"
+    },
+    "MemoryIndexBackendStatus": {
+      "enum": [
+        "pass",
+        "degraded",
+        "disabled",
+        "unavailable",
+        "error"
+      ],
+      "title": "MemoryIndexBackendStatus",
+      "type": "string"
+    },
+    "MemoryIndexStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "title": "Backend",
+          "type": "string"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "degradedReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Degradedreason"
+        },
+        "experimental": {
+          "default": false,
+          "title": "Experimental",
+          "type": "boolean"
+        },
+        "lastRebuildAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastrebuildat"
+        },
+        "recordCount": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Recordcount",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/MemoryIndexBackendStatus"
+        }
+      },
+      "required": [
+        "backend",
+        "status"
+      ],
+      "title": "MemoryIndexStatus",
+      "type": "object"
+    },
+    "MemoryPrivacySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "primaryUiRawContent": {
+          "default": false,
+          "title": "Primaryuirawcontent",
+          "type": "boolean"
+        },
+        "rawPromptPersistence": {
+          "default": false,
+          "title": "Rawpromptpersistence",
+          "type": "boolean"
+        },
+        "rawResponsePersistence": {
+          "default": false,
+          "title": "Rawresponsepersistence",
+          "type": "boolean"
+        }
+      },
+      "title": "MemoryPrivacySummary",
+      "type": "object"
+    },
+    "MemoryScope": {
+      "enum": [
+        "personal",
+        "agent",
+        "team",
+        "case",
+        "project",
+        "organization",
+        "global_readonly"
+      ],
+      "title": "MemoryScope",
+      "type": "string"
+    },
+    "MemoryScopeSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "activeRecords": {
+          "title": "Activerecords",
+          "type": "integer"
+        },
+        "policy": {
+          "title": "Policy",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/MemoryScope"
+        },
+        "visibility": {
+          "$ref": "#/$defs/MemoryVisibility"
+        }
+      },
+      "required": [
+        "scope",
+        "visibility",
+        "activeRecords",
+        "policy"
+      ],
+      "title": "MemoryScopeSummary",
+      "type": "object"
+    },
+    "MemoryVisibility": {
+      "enum": [
+        "private",
+        "agent",
+        "team",
+        "project",
+        "organization",
+        "public_readonly"
+      ],
+      "title": "MemoryVisibility",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "authorityStatus": {
+      "enum": [
+        "pass",
+        "disabled",
+        "degraded",
+        "blocked"
+      ],
+      "title": "Authoritystatus",
+      "type": "string"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "contractVersion": {
+      "const": "memory.authority-snapshot/v1",
+      "default": "memory.authority-snapshot/v1",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "evidence": {
+      "$ref": "#/$defs/MemoryEvidenceSummary"
+    },
+    "index": {
+      "$ref": "#/$defs/MemoryIndexStatus"
+    },
+    "privacy": {
+      "$ref": "#/$defs/MemoryPrivacySummary"
+    },
+    "records": {
+      "$ref": "#/$defs/MemoryAuthorityRecordsSummary"
+    },
+    "scopes": {
+      "items": {
+        "$ref": "#/$defs/MemoryScopeSummary"
+      },
+      "title": "Scopes",
+      "type": "array"
+    },
+    "storeSchemaVersion": {
+      "const": "memory.v3",
+      "default": "memory.v3",
+      "title": "Storeschemaversion",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "enabled",
+    "authorityStatus",
+    "index"
+  ],
+  "title": "MemoryAuthoritySnapshot",
+  "type": "object"
+}

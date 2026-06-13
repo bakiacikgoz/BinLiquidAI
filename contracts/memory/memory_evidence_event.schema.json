@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "MemoryPolicyAction": {
+      "enum": [
+        "allow",
+        "deny",
+        "require_approval",
+        "proposal_only"
+      ],
+      "title": "MemoryPolicyAction",
+      "type": "string"
+    },
+    "MemoryPolicyDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approvalid"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "decision": {
+          "$ref": "#/$defs/MemoryPolicyAction"
+        },
+        "evidenceRequired": {
+          "default": true,
+          "title": "Evidencerequired",
+          "type": "boolean"
+        },
+        "indexWriteAllowed": {
+          "default": true,
+          "title": "Indexwriteallowed",
+          "type": "boolean"
+        },
+        "matchedRulePath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Matchedrulepath"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "redactionRequired": {
+          "default": true,
+          "title": "Redactionrequired",
+          "type": "boolean"
+        },
+        "retentionOverride": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RetentionClass"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "decision",
+        "reasonCode"
+      ],
+      "title": "MemoryPolicyDecision",
+      "type": "object"
+    },
+    "MemoryScope": {
+      "enum": [
+        "personal",
+        "agent",
+        "team",
+        "case",
+        "project",
+        "organization",
+        "global_readonly"
+      ],
+      "title": "MemoryScope",
+      "type": "string"
+    },
+    "MemoryVisibility": {
+      "enum": [
+        "private",
+        "agent",
+        "team",
+        "project",
+        "organization",
+        "public_readonly"
+      ],
+      "title": "MemoryVisibility",
+      "type": "string"
+    },
+    "RetentionClass": {
+      "enum": [
+        "ephemeral",
+        "standard",
+        "regulated"
+      ],
+      "title": "RetentionClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "actorHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Actorhash"
+    },
+    "contentHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Contenthash"
+    },
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "eventHash": {
+      "title": "Eventhash",
+      "type": "string"
+    },
+    "eventId": {
+      "title": "Eventid",
+      "type": "string"
+    },
+    "eventType": {
+      "title": "Eventtype",
+      "type": "string"
+    },
+    "memoryId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Memoryid"
+    },
+    "policyDecision": {
+      "$ref": "#/$defs/MemoryPolicyDecision"
+    },
+    "proposalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposalid"
+    },
+    "rawContentIncluded": {
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "rawPromptIncluded": {
+      "default": false,
+      "title": "Rawpromptincluded",
+      "type": "boolean"
+    },
+    "rawResponseIncluded": {
+      "default": false,
+      "title": "Rawresponseincluded",
+      "type": "boolean"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MemoryScope"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "visibility": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MemoryVisibility"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "eventId",
+    "eventType",
+    "policyDecision",
+    "eventHash"
+  ],
+  "title": "MemoryEvidenceEvent",
+  "type": "object"
+}

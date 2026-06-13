@@ -138,7 +138,10 @@ from binliquid.governance.runtime import (
     build_governance_runtime,
     governance_startup_abort,
 )
+from binliquid.memory.authority import build_memory_authority, proposal_from_cli
+from binliquid.memory.evaluation import run_memory_retrieval_eval
 from binliquid.memory.manager import MemoryManager
+from binliquid.memory.models import MemoryRetrievalRequest, MemoryScopeFilter, hash_identity
 from binliquid.memory.persistent_store import PersistentMemoryStore
 from binliquid.memory.salience_gate import SalienceGate
 from binliquid.memory.session_store import SessionStore
@@ -164,6 +167,7 @@ from research.sltc_experiments.train_router import calibrate_router_params, trai
 app = typer.Typer(help="BinLiquidAI CLI")
 benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
+memory_index_app = typer.Typer(help="Memory index commands")
 research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
 provider_app = typer.Typer(help="Provider discovery commands")
@@ -207,6 +211,7 @@ ga_app = typer.Typer(help="GA readiness commands")
 qualification_app = typer.Typer(help="Qualification evidence commands")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
+memory_app.add_typer(memory_index_app, name="index")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
 app.add_typer(provider_app, name="provider")
@@ -248,6 +253,13 @@ support_app.add_typer(support_bundle_app, name="bundle")
 app.add_typer(metrics_app, name="metrics")
 app.add_typer(ga_app, name="ga")
 app.add_typer(qualification_app, name="qualification")
+
+_MEMORY_VISIBILITY_OPTION = typer.Option(None, "--visibility", help="Allowed visibility")
+_MEMORY_ALLOWED_SCOPE_OPTION = typer.Option(
+    None,
+    "--allowed-scope",
+    help="Policy-allowed retrieval scope",
+)
 
 
 def _version_callback(value: bool) -> None:
@@ -5026,11 +5038,150 @@ def benchmark_energy(
 
 
 @memory_app.command("stats")
-def memory_stats(profile: str = typer.Option("balanced", help="Config profile")) -> None:
+def memory_stats(
+    profile: str = typer.Option("balanced", help="Config profile"),
+    legacy: bool = typer.Option(False, "--legacy", help="Return legacy memory manager stats"),
+) -> None:
     ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
+    if not legacy:
+        authority = build_memory_authority(config)
+        typer.echo(json.dumps(authority.stats(), indent=2, ensure_ascii=False, sort_keys=True))
+        return
     manager = _build_memory_manager(config)
     typer.echo(json.dumps(manager.stats(), indent=2, ensure_ascii=False))
+
+
+@memory_app.command("doctor")
+def memory_doctor(profile: str = typer.Option("balanced", help="Config profile")) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    authority = build_memory_authority(config)
+    payload = authority.snapshot().model_dump(mode="json", by_alias=True)
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+
+
+@memory_app.command("propose")
+def memory_propose(
+    text: str = typer.Option(..., "--text", help="Memory candidate text"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+    actor: str = typer.Option("cli:operator", help="Actor id or sha256 hash"),
+    role: str = typer.Option("operator", help="Producer role"),
+    scope: str = typer.Option("personal", help="Memory scope"),
+    owner_type: str = typer.Option("user", "--owner-type", help="Owner type"),
+    owner: str = typer.Option("cli:operator", help="Owner id or sha256 hash"),
+    visibility: str = typer.Option("private", help="Memory visibility"),
+    reason: str = typer.Option("operator memory proposal", help="Write reason"),
+    memory_target: str | None = typer.Option(None, "--memory-target", help="Optional target key"),
+    expected_state_version: int | None = typer.Option(
+        None,
+        "--expected-state-version",
+        help="Expected target state version for targeted writes",
+    ),
+    agent_id: str | None = typer.Option(None, "--agent-id", help="Source agent id"),
+    source_run_id: str | None = typer.Option(None, "--source-run-id", help="Source run id"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    authority = build_memory_authority(config)
+    result = authority.propose_write(
+        proposal_from_cli(
+            actor=actor,
+            scope=scope,
+            owner_type=owner_type,
+            owner=owner,
+            visibility=visibility,
+            text=text,
+            role=role,
+            reason=reason,
+            memory_target=memory_target,
+            expected_state_version=expected_state_version,
+            agent_id=agent_id,
+            source_run_id=source_run_id,
+        )
+    )
+    typer.echo(
+        json.dumps(
+            result.model_dump(mode="json", by_alias=True),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@memory_app.command("retrieve")
+def memory_retrieve(
+    query: str = typer.Option(..., "--query", help="Retrieval query"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+    actor: str = typer.Option("cli:operator", help="Actor id or sha256 hash"),
+    role: str = typer.Option("operator", help="Requester role"),
+    scope: str = typer.Option("personal", help="Scope filter"),
+    owner_type: str = typer.Option("user", "--owner-type", help="Owner type"),
+    owner: str = typer.Option("cli:operator", help="Owner id or sha256 hash"),
+    namespace: str = typer.Option("default", help="Namespace"),
+    visibility: list[str] | None = _MEMORY_VISIBILITY_OPTION,
+    allowed_scope: list[str] | None = _MEMORY_ALLOWED_SCOPE_OPTION,
+    limit: int = typer.Option(5, min=1, max=50, help="Maximum hits"),
+    include_content: bool = typer.Option(
+        False,
+        "--include-content",
+        help="Return redacted summaries",
+    ),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    authority = build_memory_authority(config)
+    request = MemoryRetrievalRequest(
+        actorIdHash=hash_identity(actor),
+        requesterRole=role,
+        query=query,
+        allowedScopes=allowed_scope or ["personal"],
+        scopeFilters=[
+            MemoryScopeFilter(
+                scope=scope,
+                ownerType=owner_type,
+                ownerIdHash=hash_identity(owner),
+                namespace=namespace,
+            )
+        ],
+        visibilityFilters=visibility or ["private"],
+        purpose="operator_review",
+        limit=limit,
+        includeContent=include_content,
+    )
+    result = authority.retrieve(request)
+    typer.echo(
+        json.dumps(
+            result.model_dump(mode="json", by_alias=True),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@memory_index_app.command("status")
+def memory_index_status(profile: str = typer.Option("balanced", help="Config profile")) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    authority = build_memory_authority(config)
+    payload = authority.snapshot().index.model_dump(mode="json", by_alias=True)
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+
+
+@memory_app.command("eval")
+def memory_eval(
+    suite: str = typer.Option(
+        "benchmarks/tasks/memory/memory_retrieval_eval.jsonl",
+        help="Evaluation JSONL suite",
+    ),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    payload = run_memory_retrieval_eval(config, Path(suite))
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
 
 
 @research_app.command("train-router")

@@ -48,6 +48,17 @@ task_bias_overrides = {}
 
 [memory]
 db_path = ".binliquid/memory.sqlite3"
+v3_enabled = false
+v3_authority_mode = "local"
+raw_prompt_persistence = false
+raw_response_persistence = false
+raw_content_artifacts = false
+primary_ui_raw_content = false
+semantic_index_enabled = true
+semantic_index_backend = "sqlite_text"
+turbovec_experimental_enabled = false
+turbovec_bits_per_coord = 4
+turbovec_dim_guard_max = 4096
 salience_threshold = 0.58
 salience_decay = 0.84
 max_rows = 8000

@@ -122,6 +122,7 @@ import { RightRail } from './components/shell/RightRail';
 import { loadControlPlaneSnapshot } from './control-plane/snapshot';
 import type { ControlPlaneSnapshot, EvidencePackSummary, OperationDescriptor, PageViewModel } from './control-plane/types';
 import { asControlPlaneClaimMatrix } from './controlPlaneMappers';
+import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import type { ShellViewKey } from './components/shell/Sidebar';
 import type { RouteId } from './routeRegistry';
 
@@ -1198,6 +1199,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const providerGovernance = controlPlaneSnapshot?.providerGovernance ?? null;
   const providerRuntime = controlPlaneSnapshot?.providerRuntime ?? null;
   const targetEvidenceClosure = controlPlaneSnapshot?.targetEvidenceClosure ?? null;
+  const memoryGovernance = controlPlaneSnapshot?.memoryGovernance ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2506,6 +2508,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               </article>
             </div>
           </section>
+        ) : null}
+
+        {activeView === 'memory-governance' ? (
+          <MemoryGovernanceView snapshot={memoryGovernance} locale={locale} />
         ) : null}
 
         {activeView === 'operations' ? (

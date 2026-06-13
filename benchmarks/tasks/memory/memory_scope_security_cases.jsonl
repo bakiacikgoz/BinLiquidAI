@@ -1,0 +1,3 @@
+{"caseId":"deny-secret-001","scope":"personal","ownerType":"user","visibility":"private","candidateText":"remember sk-test-secret-token-123456789","expectedStatus":"denied","expectedReason":"MEMORY_SECRET_DETECTED"}
+{"caseId":"approval-org-001","scope":"organization","ownerType":"org","visibility":"organization","candidateText":"organization memory summary","expectedStatus":"approval_required","expectedReason":"MEMORY_APPROVAL_REQUIRED"}
+{"caseId":"deny-cross-scope-001","requestedScopes":["organization"],"allowedScopes":["personal"],"query":"organization roadmap","expectedStatus":"denied","expectedReason":"MEMORY_SCOPE_DENIED"}

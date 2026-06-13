@@ -40,6 +40,19 @@ class MemoryConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     db_path: str = ".binliquid/memory.sqlite3"
+    v3_enabled: bool = False
+    v3_authority_mode: Literal["local"] = "local"
+    raw_prompt_persistence: bool = False
+    raw_response_persistence: bool = False
+    raw_content_artifacts: bool = False
+    primary_ui_raw_content: bool = False
+    semantic_index_enabled: bool = True
+    semantic_index_backend: Literal["sqlite_text", "dense_json", "turbovec_experimental"] = (
+        "sqlite_text"
+    )
+    turbovec_experimental_enabled: bool = False
+    turbovec_bits_per_coord: int = Field(default=4, ge=1, le=8)
+    turbovec_dim_guard_max: int = Field(default=4096, ge=1, le=65536)
     salience_threshold: float = Field(default=0.62, ge=0.0, le=1.0)
     salience_decay: float = Field(default=0.82, ge=0.0, le=1.0)
     max_rows: int = Field(default=5000, ge=100)
@@ -376,6 +389,19 @@ class RuntimeConfig(BaseModel):
             ),
             memory=MemoryConfig(
                 db_path=memory_data.get("db_path", ".binliquid/memory.sqlite3"),
+                v3_enabled=memory_data.get("v3_enabled", False),
+                v3_authority_mode=memory_data.get("v3_authority_mode", "local"),
+                raw_prompt_persistence=memory_data.get("raw_prompt_persistence", False),
+                raw_response_persistence=memory_data.get("raw_response_persistence", False),
+                raw_content_artifacts=memory_data.get("raw_content_artifacts", False),
+                primary_ui_raw_content=memory_data.get("primary_ui_raw_content", False),
+                semantic_index_enabled=memory_data.get("semantic_index_enabled", True),
+                semantic_index_backend=memory_data.get("semantic_index_backend", "sqlite_text"),
+                turbovec_experimental_enabled=memory_data.get(
+                    "turbovec_experimental_enabled", False
+                ),
+                turbovec_bits_per_coord=memory_data.get("turbovec_bits_per_coord", 4),
+                turbovec_dim_guard_max=memory_data.get("turbovec_dim_guard_max", 4096),
                 salience_threshold=memory_data.get("salience_threshold", 0.62),
                 salience_decay=memory_data.get("salience_decay", 0.82),
                 max_rows=memory_data.get("max_rows", 5000),

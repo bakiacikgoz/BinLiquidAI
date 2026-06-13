@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from binliquid.memory.models import MemoryAuthoritySnapshot, disabled_memory_authority_snapshot
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(
@@ -1427,6 +1429,10 @@ class ControlPlaneSnapshot(StrictModel):
     target_evidence_closure: TargetEvidenceClosureSummary = Field(
         default_factory=TargetEvidenceClosureSummary,
         alias="targetEvidenceClosure",
+    )
+    memory_governance: MemoryAuthoritySnapshot = Field(
+        default_factory=disabled_memory_authority_snapshot,
+        alias="memoryGovernance",
     )
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

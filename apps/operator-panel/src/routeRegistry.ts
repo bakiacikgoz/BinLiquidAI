@@ -12,6 +12,7 @@ export type RouteId =
   | 'assistant'
   | 'tasks'
   | 'system'
+  | 'memory-governance'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -71,6 +72,13 @@ export const routeGroups: RouteGroup[] = [
     title: 'SİSTEM',
     routes: [
       { id: 'system-health', routeId: 'system', label: 'Sistem Sağlığı', heading: 'System', icon: 'layers' },
+      {
+        id: 'memory-governance',
+        routeId: 'memory-governance',
+        label: 'Memory Governance',
+        heading: 'Memory Governance',
+        icon: 'archive',
+      },
       { id: 'operations', routeId: 'operations', label: 'Yürütmeler', heading: 'Operations', icon: 'clipboard' },
       { id: 'settings', routeId: 'settings', label: 'Ayarlar', heading: 'Settings', icon: 'settings' },
     ],

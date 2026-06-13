@@ -36,6 +36,7 @@ const routeLabelTr: Partial<Record<RouteId, string>> = {
   assistant: 'AI Asistan',
   tasks: 'Görevler',
   system: 'Sistem sağlığı',
+  'memory-governance': 'Memory yönetişimi',
   operations: 'Yürütmeler',
   settings: 'Ayarlar',
   logs: 'Loglar',

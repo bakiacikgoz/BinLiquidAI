@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "MemoryPolicyAction": {
+      "enum": [
+        "allow",
+        "deny",
+        "require_approval",
+        "proposal_only"
+      ],
+      "title": "MemoryPolicyAction",
+      "type": "string"
+    },
+    "RetentionClass": {
+      "enum": [
+        "ephemeral",
+        "standard",
+        "regulated"
+      ],
+      "title": "RetentionClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approvalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approvalid"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "decision": {
+      "$ref": "#/$defs/MemoryPolicyAction"
+    },
+    "evidenceRequired": {
+      "default": true,
+      "title": "Evidencerequired",
+      "type": "boolean"
+    },
+    "indexWriteAllowed": {
+      "default": true,
+      "title": "Indexwriteallowed",
+      "type": "boolean"
+    },
+    "matchedRulePath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Matchedrulepath"
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "redactionRequired": {
+      "default": true,
+      "title": "Redactionrequired",
+      "type": "boolean"
+    },
+    "retentionOverride": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RetentionClass"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "decision",
+    "reasonCode"
+  ],
+  "title": "MemoryPolicyDecision",
+  "type": "object"
+}
