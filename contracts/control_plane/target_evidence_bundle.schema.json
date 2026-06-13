@@ -1,0 +1,182 @@
+{
+  "$defs": {
+    "TargetEvidenceClaimBoundary": {
+      "additionalProperties": false,
+      "properties": {
+        "blockedClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedclaims",
+          "type": "array"
+        },
+        "liveLinuxComputerUse": {
+          "default": "blocked",
+          "enum": [
+            "blocked",
+            "conditional",
+            "allowed"
+          ],
+          "title": "Livelinuxcomputeruse",
+          "type": "string"
+        },
+        "liveMacosComputerUse": {
+          "default": "blocked",
+          "enum": [
+            "blocked",
+            "conditional",
+            "allowed"
+          ],
+          "title": "Livemacoscomputeruse",
+          "type": "string"
+        },
+        "liveWindowsComputerUse": {
+          "default": "blocked",
+          "enum": [
+            "blocked",
+            "conditional",
+            "allowed"
+          ],
+          "title": "Livewindowscomputeruse",
+          "type": "string"
+        },
+        "publicDesktopInstaller": {
+          "default": "blocked",
+          "enum": [
+            "blocked",
+            "conditional",
+            "allowed"
+          ],
+          "title": "Publicdesktopinstaller",
+          "type": "string"
+        }
+      },
+      "title": "TargetEvidenceClaimBoundary",
+      "type": "object"
+    },
+    "TargetEvidenceItem": {
+      "additionalProperties": false,
+      "properties": {
+        "itemId": {
+          "title": "Itemid",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "status": {
+          "default": "pass",
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId",
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "title": "TargetEvidenceItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "claimBoundary": {
+      "$ref": "#/$defs/TargetEvidenceClaimBoundary"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/TargetEvidenceItem"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "missingItems": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missingitems",
+      "type": "array"
+    },
+    "rawPromptPersisted": {
+      "default": false,
+      "title": "Rawpromptpersisted",
+      "type": "boolean"
+    },
+    "rawResponsePersisted": {
+      "default": false,
+      "title": "Rawresponsepersisted",
+      "type": "boolean"
+    },
+    "rawScreenshotPersisted": {
+      "default": false,
+      "title": "Rawscreenshotpersisted",
+      "type": "boolean"
+    },
+    "secretMaterialWritten": {
+      "default": false,
+      "title": "Secretmaterialwritten",
+      "type": "boolean"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "status": {
+      "default": "conditional",
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.target-evidence-bundle/v1",
+      "default": "control-plane.target-evidence-bundle/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sessionId"
+  ],
+  "title": "TargetEvidenceBundle",
+  "type": "object"
+}

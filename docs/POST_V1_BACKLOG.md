@@ -1,5 +1,18 @@
 # Post-v1 Backlog
 
+## Design Partner Conditional Freeze Follow-Ups
+
+- Run the real target-environment evidence session for the first design
+  partner.
+- Collect independent operator attestation for the target-environment run.
+- Rerun `make design-partner-rc-gate` after target evidence and attestation are
+  available, then promote conditional to ready only if the strict gate passes.
+- Publish the promoted RC evidence bundle without treating rehearsal-only
+  artifacts as target-environment proof.
+- Keep public desktop installer, unrestricted live computer-use, and
+  approval-free irreversible mutation claims blocked until their independent
+  release evidence exists.
+
 ## Release Blockers For Hat B
 
 Detailed operator handoff:

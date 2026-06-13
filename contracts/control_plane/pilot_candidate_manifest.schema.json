@@ -1,0 +1,88 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attestationPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attestationpath"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "claimGuardPath": {
+      "title": "Claimguardpath",
+      "type": "string"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "handoffDocs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Handoffdocs",
+      "type": "array"
+    },
+    "profile": {
+      "default": "enterprise",
+      "title": "Profile",
+      "type": "string"
+    },
+    "providerRuntimeProofPath": {
+      "title": "Providerruntimeproofpath",
+      "type": "string"
+    },
+    "rcStatusPath": {
+      "title": "Rcstatuspath",
+      "type": "string"
+    },
+    "status": {
+      "default": "conditional",
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "targetEvidencePath": {
+      "title": "Targetevidencepath",
+      "type": "string"
+    },
+    "version": {
+      "const": "control-plane.pilot-candidate/v1",
+      "default": "control-plane.pilot-candidate/v1",
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "rcStatusPath",
+    "targetEvidencePath",
+    "providerRuntimeProofPath",
+    "claimGuardPath"
+  ],
+  "title": "PilotCandidateManifest",
+  "type": "object"
+}

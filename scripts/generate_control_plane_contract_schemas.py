@@ -31,6 +31,8 @@ from binliquid.control_plane.models import (  # noqa: E402
     EvidenceVerifyResult,
     OperationWorkflowRequest,
     OperationWorkflowResult,
+    OperatorAttestation,
+    PilotCandidateManifest,
     PolicyPackDiffResult,
     PolicyPackManifest,
     PolicyPackPromotionDryRun,
@@ -44,6 +46,9 @@ from binliquid.control_plane.models import (  # noqa: E402
     RbacPermissionDecision,
     ReadinessReport,
     ReportManifest,
+    TargetEvidenceBundle,
+    TargetEvidenceClosureSummary,
+    TargetEvidenceSession,
 )
 from binliquid.control_plane.policy_pack_store import PolicyPackLifecycleRecord  # noqa: E402
 
@@ -71,6 +76,11 @@ SCHEMAS = {
     "provider_invocation": ProviderInvocationArtifact,
     "provider_workflow_proof": ProviderWorkflowProofArtifact,
     "provider_runtime": ProviderRuntimeSnapshot,
+    "target_evidence_session": TargetEvidenceSession,
+    "target_evidence_bundle": TargetEvidenceBundle,
+    "operator_attestation": OperatorAttestation,
+    "pilot_candidate_manifest": PilotCandidateManifest,
+    "target_evidence_closure": TargetEvidenceClosureSummary,
     "readiness_report": ReadinessReport,
     "claim_matrix": ClaimMatrix,
     "control_plane_snapshot": ControlPlaneSnapshot,

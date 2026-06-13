@@ -10,6 +10,9 @@ Required PR checks:
 - `make provider-native-gate`
 - `make provider-runtime-gate`
 - `make provider-workflow-proof-gate`
+- `make target-evidence-rehearsal-gate`
+- `make operator-attestation-gate`
+- `make design-partner-pilot-candidate-gate`
 - `make design-partner-rc-audit-gate`
 - `make pilot-readiness-gate`
 
@@ -24,3 +27,10 @@ Boundaries that must remain closed:
 - server-side provider tools
 - custom provider tools executing directly instead of proposal-only
 - raw prompt, response, secret, or PII persistence
+
+Post-merge continuation writes
+`artifacts/mainline/provider-governance-v1-baseline/mainline_baseline.json`
+for the Provider Governance V1 baseline and uses the target evidence closure
+flow for Design Partner Pilot Candidate review. The pilot candidate gate is
+blocker-sensitive, but rehearsal-only evidence can remain conditional without
+weakening strict `make design-partner-rc-gate`.

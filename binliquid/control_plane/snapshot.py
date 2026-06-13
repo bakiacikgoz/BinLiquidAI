@@ -33,6 +33,8 @@ from binliquid.control_plane.models import (
     RunSnapshotSummary,
     SystemHealthState,
     SystemSummary,
+    TargetEvidenceBundle,
+    TargetEvidenceClosureSummary,
 )
 from binliquid.control_plane.pilot_launch_readiness import build_pilot_launch_readiness_status
 from binliquid.control_plane.pilot_operations import (
@@ -171,6 +173,10 @@ def build_control_plane_snapshot(
         generated_at=generated_at,
     )
     provider_runtime = _provider_runtime_snapshot(Path(evidence_root), generated_at=generated_at)
+    target_evidence_closure = _target_evidence_closure_snapshot(
+        Path(evidence_root),
+        generated_at=generated_at,
+    )
     design_partner_rc = build_design_partner_rc_status(
         data_source=data_source,
         claims=claims.model_dump(mode="json"),
@@ -237,6 +243,7 @@ def build_control_plane_snapshot(
         design_partner_beta=design_partner_beta,
         provider_governance=provider_governance,
         provider_runtime=provider_runtime,
+        target_evidence_closure=target_evidence_closure,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )
@@ -270,6 +277,69 @@ def _provider_runtime_snapshot(
         latestInvocations=invocations,
         workflowProofs=proofs,
         blockingReasons=[],
+    )
+
+
+def _target_evidence_closure_snapshot(
+    evidence_root: Path,
+    *,
+    generated_at: datetime,
+) -> TargetEvidenceClosureSummary:
+    target_root = evidence_root / "design-partner-target-evidence"
+    bundle_path = target_root / "target_evidence_bundle.json"
+    attestation_path = target_root / "operator_attestation.json"
+    if not bundle_path.exists():
+        return TargetEvidenceClosureSummary(
+            generatedAtUtc=generated_at,
+            status="unknown",
+            blockingReasons=[],
+            warnings=["TARGET_EVIDENCE_NOT_COLLECTED"],
+            blockedClaims=[],
+            attestationStatus="missing",
+        )
+    try:
+        bundle = TargetEvidenceBundle.model_validate_json(bundle_path.read_text(encoding="utf-8"))
+    except ValueError:
+        return TargetEvidenceClosureSummary(
+            generatedAtUtc=generated_at,
+            status="blocked",
+            blockingReasons=["TARGET_EVIDENCE_BUNDLE_INVALID"],
+            warnings=[],
+            blockedClaims=[],
+            attestationStatus="invalid",
+        )
+    mode = None
+    session_path = target_root / "session.json"
+    if session_path.exists():
+        try:
+            session_payload = json.loads(session_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            mode = None
+        else:
+            session_mode = session_payload.get("mode")
+            if session_mode in {"rehearsal", "target"}:
+                mode = session_mode
+    attestation_status = "missing"
+    if attestation_path.exists():
+        attestation_status = "present"
+        try:
+            payload = json.loads(attestation_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            attestation_status = "invalid"
+        else:
+            if payload.get("signedAtUtc"):
+                attestation_status = "signed"
+    return TargetEvidenceClosureSummary(
+        generatedAtUtc=generated_at,
+        status=bundle.status,
+        sessionId=bundle.session_id,
+        mode=mode,
+        evidenceMode="hash_only",
+        rawPersistence=False,
+        blockingReasons=bundle.blocking_reasons,
+        warnings=bundle.warnings,
+        blockedClaims=bundle.claim_boundary.blocked_claims,
+        attestationStatus=attestation_status,
     )
 
 

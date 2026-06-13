@@ -429,6 +429,20 @@ export interface ProviderRuntimeSnapshot {
   blockingReasons: string[];
 }
 
+export interface TargetEvidenceClosureSummary {
+  contractVersion: 'control-plane.target-evidence-closure/v1';
+  generatedAtUtc: string;
+  status: 'pass' | 'conditional' | 'blocked' | 'unknown';
+  sessionId?: string | null;
+  mode?: 'rehearsal' | 'target' | null;
+  evidenceMode?: 'hash_only' | null;
+  rawPersistence: false;
+  blockingReasons: string[];
+  warnings: string[];
+  blockedClaims: string[];
+  attestationStatus: 'missing' | 'present' | 'signed' | 'invalid';
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -453,6 +467,7 @@ export interface ControlPlaneSnapshot {
   designPartnerBeta: DesignPartnerBetaStatus;
   providerGovernance: ProviderGovernanceSnapshot;
   providerRuntime: ProviderRuntimeSnapshot;
+  targetEvidenceClosure: TargetEvidenceClosureSummary;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

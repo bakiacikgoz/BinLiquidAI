@@ -26,6 +26,7 @@ from binliquid.control_plane.provider_runtime_workflows import (
     workflow_proof_hash,
 )
 from binliquid.control_plane.snapshot import build_control_plane_snapshot
+from binliquid.control_plane.target_evidence import verify_target_evidence_bundle
 from binliquid.runtime.config import RuntimeConfig
 
 
@@ -48,6 +49,7 @@ def main() -> None:
     parser.add_argument("--state-root", default=".binliquid/control-plane")
     parser.add_argument("--evidence-root", default="artifacts")
     parser.add_argument("--beta-evidence-root")
+    parser.add_argument("--target-evidence-root")
     parser.add_argument("--fail-on-conditional", action="store_true")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
@@ -60,6 +62,9 @@ def main() -> None:
     evidence_root = _resolve_path(args.evidence_root)
     beta_evidence_root = (
         _resolve_path(args.beta_evidence_root) if args.beta_evidence_root else evidence_root
+    )
+    target_evidence_root = (
+        _resolve_path(args.target_evidence_root) if args.target_evidence_root else None
     )
 
     snapshot = build_control_plane_snapshot(
@@ -131,6 +136,7 @@ def main() -> None:
         "activeErrorAlertCount": _active_error_alert_count(snapshot),
         "providerGovernance": _provider_governance_manifest(snapshot, provider_gate),
         "providerWorkflowProof": _provider_workflow_proof_manifest(workflow_proof),
+        "targetEvidenceClosure": _target_evidence_manifest(target_evidence_root),
     }
     _write_report(output / "DESIGN_PARTNER_RC_REPORT.md", initial_manifest)
 
@@ -147,6 +153,9 @@ def main() -> None:
     ]
     blockers = [*snapshot.design_partner_rc.blockers, *artifact_blockers]
     warnings = [*snapshot.design_partner_rc.warnings, *artifact_warnings]
+    target_evidence = _target_evidence_manifest(target_evidence_root)
+    if target_evidence.get("status") == "blocked":
+        blockers.extend(str(item) for item in target_evidence.get("blockingReasons", []))
     status = (
         "blocked"
         if blockers
@@ -172,6 +181,7 @@ def main() -> None:
         "activeErrorAlertCount": _active_error_alert_count(snapshot),
         "providerGovernance": _provider_governance_manifest(snapshot, provider_gate),
         "providerWorkflowProof": _provider_workflow_proof_manifest(workflow_proof),
+        "targetEvidenceClosure": target_evidence,
     }
     _write_json(output / "manifest.json", manifest)
     _write_report(output / "DESIGN_PARTNER_RC_REPORT.md", manifest)
@@ -232,6 +242,12 @@ def _write_report(path: Path, manifest: dict[str, object]) -> None:
     if isinstance(provider_workflow, dict):
         workflow_status = str(provider_workflow.get("status", "unknown"))
         workflow_mutations = str(provider_workflow.get("executedMutations", "unknown"))
+    target_evidence = manifest.get("targetEvidenceClosure")
+    target_status = "not_requested"
+    target_attestation = "missing"
+    if isinstance(target_evidence, dict):
+        target_status = str(target_evidence.get("status", "not_requested"))
+        target_attestation = str(target_evidence.get("attestationStatus", "missing"))
     lines = [
         "# Design Partner RC Report",
         "",
@@ -257,6 +273,11 @@ def _write_report(path: Path, manifest: dict[str, object]) -> None:
         "",
         f"- Status: {workflow_status}",
         f"- Executed mutations: {workflow_mutations}",
+        "",
+        "## Target Evidence Closure",
+        "",
+        f"- Status: {target_status}",
+        f"- Operator attestation: {target_attestation}",
         "",
         "## Artifacts",
         "",
@@ -350,6 +371,36 @@ def _provider_workflow_proof_manifest(workflow_proof: object) -> dict[str, objec
         "artifactHash": artifact_hash,
         "providerInvocations": list(getattr(workflow_proof, "provider_invocations", [])),
         "evidenceArtifacts": list(getattr(workflow_proof, "evidence_artifacts", [])),
+    }
+
+
+def _target_evidence_manifest(target_evidence_root: Path | None) -> dict[str, object]:
+    if target_evidence_root is None:
+        return {
+            "status": "not_requested",
+            "bundlePath": None,
+            "attestationStatus": "missing",
+            "blockingReasons": [],
+            "warnings": [],
+        }
+    bundle_path = target_evidence_root / "target_evidence_bundle.json"
+    attestation_path = target_evidence_root / "operator_attestation.json"
+    if not bundle_path.exists():
+        return {
+            "status": "conditional",
+            "bundlePath": str(bundle_path),
+            "attestationStatus": "missing",
+            "blockingReasons": [],
+            "warnings": ["TARGET_EVIDENCE_BUNDLE_MISSING"],
+        }
+    verification = verify_target_evidence_bundle(bundle_path)
+    return {
+        "status": "blocked" if verification.status == "blocked" else "pass",
+        "bundlePath": str(bundle_path),
+        "attestationPath": str(attestation_path) if attestation_path.exists() else None,
+        "attestationStatus": "present" if attestation_path.exists() else "missing",
+        "blockingReasons": list(verification.blocking_reasons),
+        "warnings": list(verification.warnings),
     }
 
 
