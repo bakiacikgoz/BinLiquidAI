@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from binliquid.governance.models import GovernanceAction
 from binliquid.governance.runtime import GovernanceRuntime
 from binliquid.memory.manager import MemoryManager
+from binliquid.memory.prompt_injector import MemoryPromptInjector
+from binliquid.memory.runtime_bridge import MemoryRuntimeBridge, RuntimeMemoryRequest
 
 
 @dataclass(slots=True)
@@ -112,7 +114,42 @@ def write_scoped_memory(
     visibility: str,
     memory_target: str | None = None,
     expected_state_version: int | None = None,
+    memory_runtime_bridge: MemoryRuntimeBridge | None = None,
 ) -> dict[str, object]:
+    if memory_runtime_bridge is not None and memory_runtime_bridge.enabled:
+        result = memory_runtime_bridge.propose_post_run_write(
+            run_id=session_id,
+            actor_id=producer_agent_id,
+            role=producer_role,
+            user_input=user_input,
+            assistant_output=assistant_output,
+            scope=scope,
+            owner_type=_owner_type(scope),
+            owner=_owner_for_scope(
+                scope=scope,
+                team_id=team_id,
+                case_id=case_id,
+                job_id=job_id,
+                producer_agent_id=producer_agent_id,
+            ),
+            visibility=visibility,
+            memory_target=memory_target,
+            expected_state_version=expected_state_version,
+            agent_id=producer_agent_id,
+        )
+        return {
+            "written": result.status == "written",
+            "reason": result.status,
+            "record_id": result.memory_id,
+            "salience_score": 0.0,
+            "conflict_detected": result.conflict_detected,
+            "expected_state_version": expected_state_version,
+            "committed_state_version": result.state_version,
+            "memory_target": memory_target,
+            "proposal_id": result.proposal_id,
+            "evidence_ref": result.evidence_ref,
+            "blocking_reasons": result.blocking_reasons,
+        }
     if memory_manager is None:
         return {
             "written": False,
@@ -180,7 +217,43 @@ def read_scoped_memory(
     job_id: str,
     visibility: str,
     limit: int = 4,
+    memory_runtime_bridge: MemoryRuntimeBridge | None = None,
+    producer_agent_id: str | None = None,
 ) -> dict[str, object]:
+    if memory_runtime_bridge is not None and memory_runtime_bridge.enabled:
+        pack = memory_runtime_bridge.retrieve_context(
+            RuntimeMemoryRequest(
+                run_id=job_id,
+                query=query,
+                actor_id=producer_agent_id or team_id or "team-runtime",
+                requester_role="team_runtime",
+                agent_id=producer_agent_id,
+                team_id=team_id,
+                case_id=case_id,
+            )
+        )
+        section = MemoryPromptInjector.build_section(
+            pack,
+            max_chars=memory_runtime_bridge.config.memory.runtime.max_context_chars,
+        )
+        snippets = [section] if section else []
+        return {
+            "snippets": snippets,
+            "count": len(pack.hits),
+            "reason": pack.status,
+            "refs": [hit.memory_id for hit in pack.hits],
+            "fingerprint": pack.retrieval_fingerprint,
+            "records": [
+                {
+                    "memory_id": hit.memory_id,
+                    "content_hash": hit.content_hash,
+                    "scope": hit.scope,
+                    "visibility": hit.visibility,
+                }
+                for hit in pack.hits
+            ],
+            "evidence_ref": pack.evidence_ref,
+        }
     if memory_manager is None:
         return {
             "snippets": [],
@@ -250,3 +323,30 @@ def read_scoped_memory(
         "refs": [],
         "fingerprint": None,
     }
+
+
+def _owner_type(scope: str) -> str:
+    return {
+        "agent": "agent",
+        "team": "team",
+        "case": "case",
+        "project": "project",
+        "organization": "org",
+    }.get(scope, "user")
+
+
+def _owner_for_scope(
+    *,
+    scope: str,
+    team_id: str,
+    case_id: str,
+    job_id: str,
+    producer_agent_id: str,
+) -> str:
+    return {
+        "agent": producer_agent_id,
+        "team": team_id,
+        "case": case_id,
+        "project": job_id,
+        "organization": "organization",
+    }.get(scope, producer_agent_id)

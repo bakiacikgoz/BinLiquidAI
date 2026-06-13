@@ -1229,6 +1229,63 @@
       "title": "MemoryPrivacySummary",
       "type": "object"
     },
+    "MemoryRuntimeSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "contextTopK": {
+          "default": 0,
+          "title": "Contexttopk",
+          "type": "integer"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "lastEvidenceRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastevidenceref"
+        },
+        "maxContextChars": {
+          "default": 0,
+          "title": "Maxcontextchars",
+          "type": "integer"
+        },
+        "postRunWriteEnabled": {
+          "default": false,
+          "title": "Postrunwriteenabled",
+          "type": "boolean"
+        },
+        "status": {
+          "default": "disabled",
+          "enum": [
+            "disabled",
+            "pass",
+            "degraded",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "MemoryRuntimeSnapshot",
+      "type": "object"
+    },
     "MemoryScope": {
       "enum": [
         "personal",
@@ -1267,6 +1324,63 @@
         "policy"
       ],
       "title": "MemoryScopeSummary",
+      "type": "object"
+    },
+    "MemorySyncSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "allowCrossEnvironmentImport": {
+          "default": false,
+          "title": "Allowcrossenvironmentimport",
+          "type": "boolean"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "exportRawContent": {
+          "default": false,
+          "title": "Exportrawcontent",
+          "type": "boolean"
+        },
+        "importApplyRequiresApproval": {
+          "default": true,
+          "title": "Importapplyrequiresapproval",
+          "type": "boolean"
+        },
+        "lastPackRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastpackref"
+        },
+        "status": {
+          "default": "disabled",
+          "enum": [
+            "disabled",
+            "pass",
+            "degraded",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "MemorySyncSnapshot",
       "type": "object"
     },
     "MemoryVisibility": {
@@ -3027,6 +3141,12 @@
     },
     "memoryGovernance": {
       "$ref": "#/$defs/MemoryAuthoritySnapshot"
+    },
+    "memoryRuntime": {
+      "$ref": "#/$defs/MemoryRuntimeSnapshot"
+    },
+    "memorySync": {
+      "$ref": "#/$defs/MemorySyncSnapshot"
     },
     "operations": {
       "items": {

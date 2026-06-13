@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from binliquid.memory.models import MemoryAuthoritySnapshot, disabled_memory_authority_snapshot
+from binliquid.memory.runtime_snapshot import MemoryRuntimeSnapshot, MemorySyncSnapshot
 
 
 class StrictModel(BaseModel):
@@ -1433,6 +1434,14 @@ class ControlPlaneSnapshot(StrictModel):
     memory_governance: MemoryAuthoritySnapshot = Field(
         default_factory=disabled_memory_authority_snapshot,
         alias="memoryGovernance",
+    )
+    memory_runtime: MemoryRuntimeSnapshot = Field(
+        default_factory=MemoryRuntimeSnapshot,
+        alias="memoryRuntime",
+    )
+    memory_sync: MemorySyncSnapshot = Field(
+        default_factory=MemorySyncSnapshot,
+        alias="memorySync",
     )
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

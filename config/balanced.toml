@@ -69,6 +69,20 @@ spike_reduction = 0.5
 rank_salience_weight = 0.72
 rank_recency_weight = 0.28
 
+[memory.runtime]
+enabled = false
+context_top_k = 4
+max_context_chars = 4000
+post_run_write_enabled = false
+post_run_default_scope = "personal"
+strict_fail_closed_profiles = ["enterprise", "restricted"]
+
+[memory.sync]
+enabled = false
+export_raw_content = false
+import_apply_requires_approval = true
+allow_cross_environment_import = false
+
 [memory.keyword_weights]
 remember = 0.18
 "hatırla" = 0.18

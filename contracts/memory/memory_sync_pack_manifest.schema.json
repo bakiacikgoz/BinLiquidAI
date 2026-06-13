@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "createdAtUtc": {
+      "title": "Createdatutc"
+    },
+    "packId": {
+      "title": "Packid",
+      "type": "string"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "recordCount": {
+      "minimum": 0,
+      "title": "Recordcount",
+      "type": "integer"
+    },
+    "recordsHash": {
+      "title": "Recordshash",
+      "type": "string"
+    },
+    "scopeFilterCount": {
+      "default": 0,
+      "title": "Scopefiltercount",
+      "type": "integer"
+    },
+    "sourceEnvironment": {
+      "title": "Sourceenvironment",
+      "type": "string"
+    },
+    "version": {
+      "const": "memory.sync-pack/v1",
+      "default": "memory.sync-pack/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "packId",
+    "sourceEnvironment",
+    "createdAtUtc",
+    "recordCount",
+    "recordsHash"
+  ],
+  "title": "MemorySyncPackManifest",
+  "type": "object"
+}

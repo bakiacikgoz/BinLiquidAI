@@ -1,0 +1,164 @@
+{
+  "$defs": {
+    "MemoryContextHit": {
+      "additionalProperties": false,
+      "properties": {
+        "contentHash": {
+          "title": "Contenthash",
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "memoryId": {
+          "title": "Memoryid",
+          "type": "string"
+        },
+        "policyTags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Policytags",
+          "type": "array"
+        },
+        "redactedSummary": {
+          "title": "Redactedsummary",
+          "type": "string"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "score": {
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "visibility": {
+          "title": "Visibility",
+          "type": "string"
+        }
+      },
+      "required": [
+        "memoryId",
+        "scope",
+        "visibility",
+        "redactedSummary",
+        "contentHash",
+        "score",
+        "createdAt"
+      ],
+      "title": "MemoryContextHit",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "degradedReason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Degradedreason"
+    },
+    "deniedScopes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Deniedscopes",
+      "type": "array"
+    },
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "hits": {
+      "items": {
+        "$ref": "#/$defs/MemoryContextHit"
+      },
+      "title": "Hits",
+      "type": "array"
+    },
+    "packId": {
+      "title": "Packid",
+      "type": "string"
+    },
+    "queryHash": {
+      "title": "Queryhash",
+      "type": "string"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "retrievalFingerprint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retrievalfingerprint"
+    },
+    "runId": {
+      "title": "Runid",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "empty",
+        "denied",
+        "degraded",
+        "disabled",
+        "error"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "version": {
+      "const": "memory.context-pack/v1",
+      "default": "memory.context-pack/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "packId",
+    "runId",
+    "queryHash",
+    "status"
+  ],
+  "title": "MemoryContextPack",
+  "type": "object"
+}

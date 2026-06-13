@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from binliquid.memory.context_pack import MemoryContextPack
 from binliquid.memory.models import (
     MemoryAuthoritySnapshot,
     MemoryEvidenceEvent,
@@ -12,6 +13,10 @@ from binliquid.memory.models import (
     MemoryRetrievalResult,
     MemoryWriteProposal,
 )
+from binliquid.memory.runtime_snapshot import MemoryRuntimeSnapshot
+from binliquid.memory.sync_conflicts import MemorySyncConflict
+from binliquid.memory.sync_importer import MemorySyncImportReport
+from binliquid.memory.sync_pack import MemorySyncPackManifest
 
 SCHEMAS = {
     "memory_record_v3.schema.json": MemoryRecordV3,
@@ -21,6 +26,11 @@ SCHEMAS = {
     "memory_evidence_event.schema.json": MemoryEvidenceEvent,
     "memory_index_status.schema.json": MemoryIndexStatus,
     "memory_authority_snapshot.schema.json": MemoryAuthoritySnapshot,
+    "memory_context_pack.schema.json": MemoryContextPack,
+    "memory_runtime_event.schema.json": MemoryRuntimeSnapshot,
+    "memory_sync_pack_manifest.schema.json": MemorySyncPackManifest,
+    "memory_sync_import_report.schema.json": MemorySyncImportReport,
+    "memory_sync_conflict.schema.json": MemorySyncConflict,
 }
 
 

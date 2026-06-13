@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "conflictId": {
+      "title": "Conflictid",
+      "type": "string"
+    },
+    "conflictType": {
+      "enum": [
+        "target_version",
+        "cross_environment",
+        "policy",
+        "duplicate"
+      ],
+      "title": "Conflicttype",
+      "type": "string"
+    },
+    "localStateVersion": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Localstateversion"
+    },
+    "memoryId": {
+      "title": "Memoryid",
+      "type": "string"
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "remoteStateVersion": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Remotestateversion"
+    },
+    "resolution": {
+      "default": "skip",
+      "enum": [
+        "skip",
+        "manual_review",
+        "reject"
+      ],
+      "title": "Resolution",
+      "type": "string"
+    }
+  },
+  "required": [
+    "conflictId",
+    "memoryId",
+    "conflictType",
+    "reasonCode"
+  ],
+  "title": "MemorySyncConflict",
+  "type": "object"
+}

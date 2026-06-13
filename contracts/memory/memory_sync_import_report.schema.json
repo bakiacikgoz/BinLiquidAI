@@ -1,0 +1,155 @@
+{
+  "$defs": {
+    "MemorySyncConflict": {
+      "additionalProperties": false,
+      "properties": {
+        "conflictId": {
+          "title": "Conflictid",
+          "type": "string"
+        },
+        "conflictType": {
+          "enum": [
+            "target_version",
+            "cross_environment",
+            "policy",
+            "duplicate"
+          ],
+          "title": "Conflicttype",
+          "type": "string"
+        },
+        "localStateVersion": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Localstateversion"
+        },
+        "memoryId": {
+          "title": "Memoryid",
+          "type": "string"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "remoteStateVersion": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remotestateversion"
+        },
+        "resolution": {
+          "default": "skip",
+          "enum": [
+            "skip",
+            "manual_review",
+            "reject"
+          ],
+          "title": "Resolution",
+          "type": "string"
+        }
+      },
+      "required": [
+        "conflictId",
+        "memoryId",
+        "conflictType",
+        "reasonCode"
+      ],
+      "title": "MemorySyncConflict",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approvalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approvalid"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "conflicts": {
+      "items": {
+        "$ref": "#/$defs/MemorySyncConflict"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "dryRun": {
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "packId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Packid"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "recordsApplied": {
+      "default": 0,
+      "title": "Recordsapplied",
+      "type": "integer"
+    },
+    "recordsSeen": {
+      "default": 0,
+      "title": "Recordsseen",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked",
+        "applied"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "const": "memory.sync-import-report/v1",
+      "default": "memory.sync-import-report/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "dryRun"
+  ],
+  "title": "MemorySyncImportReport",
+  "type": "object"
+}

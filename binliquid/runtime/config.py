@@ -36,6 +36,35 @@ class SLTCConfig(BaseModel):
     task_bias_overrides: dict[str, float] = Field(default_factory=dict)
 
 
+class MemoryRuntimeConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = False
+    context_top_k: int = Field(default=4, ge=0, le=50)
+    max_context_chars: int = Field(default=4000, ge=0, le=16000)
+    post_run_write_enabled: bool = False
+    post_run_default_scope: Literal[
+        "personal",
+        "agent",
+        "team",
+        "case",
+        "project",
+        "organization",
+    ] = "personal"
+    strict_fail_closed_profiles: list[str] = Field(
+        default_factory=lambda: ["enterprise", "restricted"]
+    )
+
+
+class MemorySyncConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = False
+    export_raw_content: bool = False
+    import_apply_requires_approval: bool = True
+    allow_cross_environment_import: bool = False
+
+
 class MemoryConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -76,6 +105,8 @@ class MemoryConfig(BaseModel):
     spike_reduction: float = Field(default=0.5, ge=0.0, le=1.0)
     rank_salience_weight: float = Field(default=0.7, ge=0.0, le=1.0)
     rank_recency_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+    runtime: MemoryRuntimeConfig = Field(default_factory=MemoryRuntimeConfig)
+    sync: MemorySyncConfig = Field(default_factory=MemorySyncConfig)
 
 
 class PlannerTuningConfig(BaseModel):
@@ -327,6 +358,8 @@ class RuntimeConfig(BaseModel):
         limits_data = data.get("limits", {})
         sltc_data = data.get("sltc", {})
         memory_data = data.get("memory", {})
+        memory_runtime_data = memory_data.get("runtime", {})
+        memory_sync_data = memory_data.get("sync", {})
         planner_data = data.get("planner", {})
         code_verify_data = data.get("code_verify", {})
         governance_data = data.get("governance", {})
@@ -412,6 +445,31 @@ class RuntimeConfig(BaseModel):
                 spike_reduction=memory_data.get("spike_reduction", 0.5),
                 rank_salience_weight=memory_data.get("rank_salience_weight", 0.7),
                 rank_recency_weight=memory_data.get("rank_recency_weight", 0.3),
+                runtime=MemoryRuntimeConfig(
+                    enabled=memory_runtime_data.get("enabled", False),
+                    context_top_k=memory_runtime_data.get("context_top_k", 4),
+                    max_context_chars=memory_runtime_data.get("max_context_chars", 4000),
+                    post_run_write_enabled=memory_runtime_data.get(
+                        "post_run_write_enabled", False
+                    ),
+                    post_run_default_scope=memory_runtime_data.get(
+                        "post_run_default_scope", "personal"
+                    ),
+                    strict_fail_closed_profiles=memory_runtime_data.get(
+                        "strict_fail_closed_profiles",
+                        ["enterprise", "restricted"],
+                    ),
+                ),
+                sync=MemorySyncConfig(
+                    enabled=memory_sync_data.get("enabled", False),
+                    export_raw_content=memory_sync_data.get("export_raw_content", False),
+                    import_apply_requires_approval=memory_sync_data.get(
+                        "import_apply_requires_approval", True
+                    ),
+                    allow_cross_environment_import=memory_sync_data.get(
+                        "allow_cross_environment_import", False
+                    ),
+                ),
             ),
             planner_tuning=PlannerTuningConfig(
                 repair_enabled=planner_data.get("repair_enabled", True),

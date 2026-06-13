@@ -15,7 +15,10 @@ from binliquid.core.planner import Planner
 from binliquid.experts.base import ExpertBase
 from binliquid.governance.models import GovernanceAction, GovernanceDecision
 from binliquid.governance.runtime import GovernanceRuntime
+from binliquid.memory.context_pack import MemoryContextPack, empty_context_pack
 from binliquid.memory.manager import MemoryManager
+from binliquid.memory.prompt_injector import MemoryPromptInjector
+from binliquid.memory.runtime_bridge import MemoryRuntimeBridge, RuntimeMemoryRequest
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.schemas.expert_payloads import (
     CodeExpertPayload,
@@ -78,6 +81,7 @@ class Orchestrator:
         tracer: Tracer,
         config: RuntimeConfig,
         memory_manager: MemoryManager | None = None,
+        memory_runtime_bridge: MemoryRuntimeBridge | None = None,
         shadow_router: RouterLike | None = None,
         governance_runtime: GovernanceRuntime | None = None,
     ):
@@ -89,6 +93,7 @@ class Orchestrator:
         self._tracer = tracer
         self._config = config
         self._memory_manager = memory_manager
+        self._memory_runtime_bridge = memory_runtime_bridge
         self._governance_runtime = governance_runtime
         self._fast_path_sessions: dict[str, dict[str, int]] = {}
         self._expert_payload_models = {
@@ -242,6 +247,16 @@ class Orchestrator:
                 },
             )
 
+        memory_context_pack = self._retrieve_memory_context(
+            request_id=request_id,
+            user_input=user_input,
+            session_context=session_context,
+            requester_role="orchestrator",
+        )
+        memory_prompt_section = MemoryPromptInjector.build_section(
+            memory_context_pack,
+            max_chars=self._config.memory.runtime.max_context_chars,
+        )
         selected_result: ExpertResult | None = None
         secondary_result: ExpertResult | None = None
         used_path = "llm_only"
@@ -394,7 +409,11 @@ class Orchestrator:
                 )
                 fallback_events.append("expert_adjudication")
             else:
-                synthesis_prompt = self._build_synthesis_prompt(user_input, selected_result)
+                synthesis_prompt = self._build_synthesis_prompt(
+                    user_input,
+                    selected_result,
+                    memory_section=memory_prompt_section,
+                )
                 try:
                     final_text = self._generate_with_timeout(
                         prompt=synthesis_prompt,
@@ -406,12 +425,18 @@ class Orchestrator:
         else:
             try:
                 language_instruction = self._language_instruction(user_input)
+                prompt_pieces = []
+                if memory_prompt_section:
+                    prompt_pieces.append(memory_prompt_section)
+                prompt_pieces.extend(
+                    [
+                        f"User request: {user_input}",
+                        "Respond concisely and clearly.",
+                        language_instruction,
+                    ]
+                )
                 final_text = self._generate_with_timeout(
-                    prompt=(
-                        f"User request: {user_input}\n"
-                        "Respond concisely and clearly.\n"
-                        f"{language_instruction}"
-                    ),
+                    prompt="\n\n".join(prompt_pieces),
                     system="You are BinLiquid assistant in product mode.",
                 )
             except Exception as exc:  # noqa: BLE001
@@ -454,6 +479,8 @@ class Orchestrator:
             "route_selected_expert": route.selected_expert.value,
             "memory_written": memory_write["written"],
             "memory_salience_score": memory_write["salience_score"],
+            **self._memory_context_metrics(memory_context_pack),
+            "memory_write_decision": memory_write["reason"],
             "llm_error": llm_error,
             "tool_calls_used": tool_budget_state["used"],
             "fast_path_taken": False,
@@ -625,7 +652,21 @@ class Orchestrator:
                     requested_model_metadata=requested_model_metadata,
                 )
 
-        prompt = self._build_direct_prompt(user_input=user_input, session_context=session_context)
+        memory_context_pack = self._retrieve_memory_context(
+            request_id=request_id,
+            user_input=user_input,
+            session_context=session_context,
+            requester_role="orchestrator_fast",
+        )
+        memory_prompt_section = MemoryPromptInjector.build_section(
+            memory_context_pack,
+            max_chars=self._config.memory.runtime.max_context_chars,
+        )
+        prompt = self._build_direct_prompt(
+            user_input=user_input,
+            session_context=session_context,
+            memory_section=memory_prompt_section,
+        )
         llm_started = time.perf_counter()
         llm_error: str | None = None
         used_path = "llm_only_fast"
@@ -690,6 +731,8 @@ class Orchestrator:
             "route_selected_expert": ExpertName.LLM_ONLY.value,
             "memory_written": memory_write["written"],
             "memory_salience_score": memory_write["salience_score"],
+            **self._memory_context_metrics(memory_context_pack),
+            "memory_write_decision": memory_write["reason"],
             "llm_error": llm_error,
             "tool_calls_used": 0,
             "fast_path": True,
@@ -810,6 +853,30 @@ class Orchestrator:
             "reason": "memory_manager_missing",
             "record_id": None,
         }
+        if (
+            self._memory_runtime_bridge is not None
+            and self._memory_runtime_bridge.enabled
+            and self._config.memory.runtime.post_run_write_enabled
+        ):
+            result = self._memory_runtime_bridge.propose_post_run_write(
+                run_id=request_id,
+                actor_id=session_id,
+                role="orchestrator",
+                user_input=user_input,
+                assistant_output=assistant_output,
+            )
+            memory_write = {
+                "written": result.status == "written",
+                "salience_score": 0.0,
+                "reason": result.status,
+                "record_id": result.memory_id,
+                "proposal_id": result.proposal_id,
+                "evidence_ref": result.evidence_ref,
+                "conflict_detected": result.conflict_detected,
+                "blocking_reasons": result.blocking_reasons,
+            }
+            self._tracer.emit(request_id, "memory_write_proposed", memory_write)
+            return memory_write
         if self._memory_manager is None:
             return memory_write
 
@@ -981,15 +1048,24 @@ class Orchestrator:
         }
 
     @staticmethod
-    def _build_synthesis_prompt(user_input: str, expert_result: ExpertResult) -> str:
+    def _build_synthesis_prompt(
+        user_input: str,
+        expert_result: ExpertResult,
+        *,
+        memory_section: str = "",
+    ) -> str:
         evidence = json.dumps(expert_result.payload, ensure_ascii=False)
-        return (
+        pieces = []
+        if memory_section:
+            pieces.append(memory_section)
+        pieces.append(
             "You are BinLiquid response synthesizer. "
             "Use the expert evidence to answer clearly and cite uncertainty when needed.\n"
             f"User input: {user_input}\n"
             f"Expert name: {expert_result.expert_name.value}\n"
             f"Expert payload JSON: {evidence}"
         )
+        return "\n\n".join(pieces)
 
     @staticmethod
     def _build_adjudication_prompt(
@@ -1009,7 +1085,12 @@ class Orchestrator:
         )
 
     @staticmethod
-    def _build_direct_prompt(user_input: str, session_context: dict[str, str]) -> str:
+    def _build_direct_prompt(
+        user_input: str,
+        session_context: dict[str, str],
+        *,
+        memory_section: str = "",
+    ) -> str:
         summary = session_context.get("session_summary", "").strip()
         memory_hints = session_context.get("memory_hints", "").strip()
         pieces = []
@@ -1017,10 +1098,62 @@ class Orchestrator:
             pieces.append(f"Session summary:\n{summary}")
         if memory_hints:
             pieces.append(f"Memory hints:\n{memory_hints}")
+        if memory_section:
+            pieces.append(memory_section)
         pieces.append(f"User request: {user_input}")
         pieces.append("Respond concisely and clearly.")
         pieces.append(Orchestrator._language_instruction(user_input))
         return "\n\n".join(pieces)
+
+    def _retrieve_memory_context(
+        self,
+        *,
+        request_id: str,
+        user_input: str,
+        session_context: dict[str, str],
+        requester_role: str,
+    ) -> MemoryContextPack:
+        if self._memory_runtime_bridge is None:
+            return empty_context_pack(
+                run_id=request_id,
+                query=user_input,
+                status="disabled",
+                degraded_reason="MEMORY_RUNTIME_BRIDGE_MISSING",
+            )
+        pack = self._memory_runtime_bridge.retrieve_context(
+            RuntimeMemoryRequest(
+                run_id=request_id,
+                query=user_input,
+                actor_id=str(
+                    session_context.get("actor_id")
+                    or session_context.get("session_id")
+                    or "local-user"
+                ),
+                requester_role=requester_role,
+                agent_id=session_context.get("agent_id"),
+                team_id=session_context.get("team_id"),
+                case_id=session_context.get("case_id"),
+                project_id=session_context.get("project_id"),
+            )
+        )
+        self._tracer.emit(
+            request_id,
+            "memory_context_pack",
+            pack.model_dump(mode="json", by_alias=True),
+        )
+        return pack
+
+    @staticmethod
+    def _memory_context_metrics(pack: MemoryContextPack) -> dict[str, object]:
+        return {
+            "memory_runtime_enabled": pack.status not in {"disabled"},
+            "memory_context_pack_id": pack.pack_id,
+            "memory_context_hit_count": len(pack.hits),
+            "memory_context_truncated": pack.truncated,
+            "memory_context_status": pack.status,
+            "memory_context_degraded_reason": pack.degraded_reason,
+            "memory_context_evidence_ref": pack.evidence_ref,
+        }
 
     @staticmethod
     def _language_instruction(user_input: str) -> str:

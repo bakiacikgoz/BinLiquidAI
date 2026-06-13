@@ -143,8 +143,15 @@ from binliquid.memory.evaluation import run_memory_retrieval_eval
 from binliquid.memory.manager import MemoryManager
 from binliquid.memory.models import MemoryRetrievalRequest, MemoryScopeFilter, hash_identity
 from binliquid.memory.persistent_store import PersistentMemoryStore
+from binliquid.memory.runtime_bridge import RuntimeMemoryRequest, build_memory_runtime_bridge
 from binliquid.memory.salience_gate import SalienceGate
 from binliquid.memory.session_store import SessionStore
+from binliquid.memory.sync_importer import import_memory_sync_pack
+from binliquid.memory.sync_pack import (
+    export_memory_sync_pack,
+    owner_filter,
+    verify_memory_sync_pack,
+)
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
@@ -168,6 +175,8 @@ app = typer.Typer(help="BinLiquidAI CLI")
 benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
 memory_index_app = typer.Typer(help="Memory index commands")
+memory_runtime_app = typer.Typer(help="Memory runtime commands")
+memory_sync_app = typer.Typer(help="Memory sync pack commands")
 research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
 provider_app = typer.Typer(help="Provider discovery commands")
@@ -212,6 +221,8 @@ qualification_app = typer.Typer(help="Qualification evidence commands")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
 memory_app.add_typer(memory_index_app, name="index")
+memory_app.add_typer(memory_runtime_app, name="runtime")
+memory_app.add_typer(memory_sync_app, name="sync")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
 app.add_typer(provider_app, name="provider")
@@ -410,6 +421,7 @@ def _build_orchestrator(
         ExpertName.PLAN.value: MemoryPlanExpert(),
     }
     memory_manager = _build_memory_manager(config)
+    memory_runtime_bridge = build_memory_runtime_bridge(config)
     tracer = Tracer(
         debug_mode=config.debug_mode,
         privacy_mode=config.privacy_mode,
@@ -429,6 +441,7 @@ def _build_orchestrator(
         tracer=tracer,
         config=config,
         memory_manager=memory_manager,
+        memory_runtime_bridge=memory_runtime_bridge,
         shadow_router=shadow_router,
         governance_runtime=governance_runtime,
     )
@@ -5182,6 +5195,133 @@ def memory_eval(
     config = RuntimeConfig.from_profile(profile)
     payload = run_memory_retrieval_eval(config, Path(suite))
     typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+
+
+@memory_runtime_app.command("doctor")
+def memory_runtime_doctor(profile: str = typer.Option("balanced", help="Config profile")) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    from binliquid.memory.runtime_snapshot import build_memory_runtime_snapshot
+
+    payload = build_memory_runtime_snapshot(config=config).model_dump(
+        mode="json",
+        by_alias=True,
+    )
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
+
+
+@memory_runtime_app.command("context")
+def memory_runtime_context(
+    query: str = typer.Option(..., "--query", help="Runtime query"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+    actor: str = typer.Option("cli:operator", help="Actor id or sha256 hash"),
+    role: str = typer.Option("operator", help="Requester role"),
+    run_id: str = typer.Option("cli-runtime-context", help="Run id"),
+    agent_id: str | None = typer.Option(None, "--agent-id", help="Optional agent id"),
+    team_id: str | None = typer.Option(None, "--team-id", help="Optional team id"),
+    case_id: str | None = typer.Option(None, "--case-id", help="Optional case id"),
+    project_id: str | None = typer.Option(None, "--project-id", help="Optional project id"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    bridge = build_memory_runtime_bridge(config)
+    pack = bridge.retrieve_context(
+        RuntimeMemoryRequest(
+            run_id=run_id,
+            query=query,
+            actor_id=actor,
+            requester_role=role,
+            agent_id=agent_id,
+            team_id=team_id,
+            case_id=case_id,
+            project_id=project_id,
+        )
+    )
+    typer.echo(
+        json.dumps(
+            pack.model_dump(mode="json", by_alias=True),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@memory_sync_app.command("export")
+def memory_sync_export(
+    output: str = typer.Option(..., "--output", help="Output sync pack JSON"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+    source_environment: str = typer.Option("local", "--source-environment"),
+    scope: str | None = typer.Option(None, "--scope", help="Optional scope filter"),
+    owner_type: str = typer.Option("user", "--owner-type", help="Owner type"),
+    owner: str | None = typer.Option(None, "--owner", help="Owner id or hash"),
+    namespace: str = typer.Option("default", help="Namespace"),
+    limit: int = typer.Option(500, min=1, max=5000, help="Maximum records"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    scope_filters = None
+    if scope and owner:
+        scope_filters = [owner_filter(scope, owner_type, owner, namespace)]
+    pack = export_memory_sync_pack(
+        config=config,
+        output_path=output,
+        source_environment=source_environment,
+        scope_filters=scope_filters,
+        limit=limit,
+    )
+    typer.echo(
+        json.dumps(
+            pack.manifest.model_dump(mode="json", by_alias=True),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
+@memory_sync_app.command("verify")
+def memory_sync_verify(
+    input_path: str = typer.Option(..., "--input", help="Sync pack JSON"),
+) -> None:
+    result = verify_memory_sync_pack(input_path)
+    typer.echo(
+        json.dumps(
+            result.model_dump(mode="json", by_alias=True),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+    if result.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@memory_sync_app.command("import")
+def memory_sync_import(
+    input_path: str = typer.Option(..., "--input", help="Sync pack JSON"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+    apply: bool = typer.Option(False, "--apply", help="Apply records instead of dry-run"),
+    approval_id: str | None = typer.Option(None, "--approval-id", help="Required for apply"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    report = import_memory_sync_pack(
+        config=config,
+        input_path=input_path,
+        dry_run=not apply,
+        approval_id=approval_id,
+    )
+    typer.echo(
+        json.dumps(
+            report.model_dump(mode="json", by_alias=True),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+    if report.status == "blocked" and apply:
+        raise typer.Exit(code=1)
 
 
 @research_app.command("train-router")

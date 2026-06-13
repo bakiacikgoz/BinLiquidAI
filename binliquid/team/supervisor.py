@@ -9,6 +9,12 @@ from typing import Any
 from uuid import uuid4
 
 from binliquid.core.orchestrator import Orchestrator
+from binliquid.memory.models import (
+    MemoryOwnerType,
+    MemoryScope,
+    MemoryVisibility,
+    hash_identity,
+)
 from binliquid.runtime.config import RuntimeConfig
 from binliquid.team.artifacts import (
     ensure_team_artifact_paths,
@@ -59,6 +65,7 @@ class TeamSupervisor:
         self._config = config
         self._governance_runtime = getattr(orchestrator, "governance_runtime", None)
         self._memory_manager = getattr(orchestrator, "_memory_manager", None)
+        self._memory_runtime_bridge = getattr(orchestrator, "_memory_runtime_bridge", None)
 
     def run(
         self,
@@ -887,6 +894,8 @@ class TeamSupervisor:
                             case_id=resolved_case_id,
                             job_id=resolved_job_id,
                             visibility=requested_visibility,
+                            memory_runtime_bridge=self._memory_runtime_bridge,
+                            producer_agent_id=agent.agent_id,
                         )
                         snippets = [
                             str(item)
@@ -1616,6 +1625,25 @@ class TeamSupervisor:
                             memory_target=task_def.memory_target,
                         )
                     )
+                elif (
+                    self._memory_runtime_bridge is not None
+                    and self._memory_runtime_bridge.enabled
+                ):
+                    owner = spec.team.team_id if requested_scope == "team" else resolved_case_id
+                    expected_state_version = int(
+                        self._memory_runtime_bridge.authority.store.target_version(
+                            scope=MemoryScope(requested_scope),
+                            owner_type=(
+                                MemoryOwnerType.TEAM
+                                if requested_scope == "team"
+                                else MemoryOwnerType.CASE
+                            ),
+                            owner_id_hash=hash_identity(owner),
+                            visibility=MemoryVisibility(requested_visibility or "team"),
+                            namespace="default",
+                            memory_target=task_def.memory_target,
+                        )
+                    )
 
             if status == TaskStatus.COMPLETED and (
                 requested_scope is None or requested_visibility is None
@@ -1882,6 +1910,7 @@ class TeamSupervisor:
                             visibility=requested_visibility,
                             memory_target=task_def.memory_target,
                             expected_state_version=expected_state_version,
+                            memory_runtime_bridge=self._memory_runtime_bridge,
                         )
                         if memory_write.get("conflict_detected"):
                             detected = emit(

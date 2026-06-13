@@ -51,6 +51,10 @@ from binliquid.enterprise.identity import describe_actor
 from binliquid.enterprise.signing import key_status
 from binliquid.governance.approval_store import ApprovalStore
 from binliquid.governance.policy import load_policy
+from binliquid.memory.runtime_snapshot import (
+    build_memory_runtime_snapshot,
+    build_memory_sync_snapshot,
+)
 from binliquid.memory.snapshot import build_memory_governance_snapshot
 from binliquid.runtime.config import RuntimeConfig
 
@@ -179,6 +183,16 @@ def build_control_plane_snapshot(
         generated_at=generated_at,
     )
     memory_governance = build_memory_governance_snapshot(config=config, evidence_root=evidence_root)
+    memory_runtime = build_memory_runtime_snapshot(
+        config=config,
+        evidence_root=evidence_root,
+        generated_at=generated_at,
+    )
+    memory_sync = build_memory_sync_snapshot(
+        config=config,
+        evidence_root=evidence_root,
+        generated_at=generated_at,
+    )
     design_partner_rc = build_design_partner_rc_status(
         data_source=data_source,
         claims=claims.model_dump(mode="json"),
@@ -247,6 +261,8 @@ def build_control_plane_snapshot(
         provider_runtime=provider_runtime,
         target_evidence_closure=target_evidence_closure,
         memory_governance=memory_governance,
+        memory_runtime=memory_runtime,
+        memory_sync=memory_sync,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )

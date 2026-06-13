@@ -37,6 +37,7 @@ const routeLabelTr: Partial<Record<RouteId, string>> = {
   tasks: 'Görevler',
   system: 'Sistem sağlığı',
   'memory-governance': 'Memory yönetişimi',
+  'memory-runtime': 'Memory runtime',
   operations: 'Yürütmeler',
   settings: 'Ayarlar',
   logs: 'Loglar',

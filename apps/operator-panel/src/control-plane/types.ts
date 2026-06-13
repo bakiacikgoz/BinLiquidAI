@@ -493,6 +493,26 @@ export interface MemoryAuthoritySnapshot {
   warnings: string[];
 }
 
+export interface MemoryRuntimeSnapshot {
+  enabled: boolean;
+  status: 'disabled' | 'pass' | 'degraded' | 'blocked';
+  contextTopK: number;
+  maxContextChars: number;
+  postRunWriteEnabled: boolean;
+  lastEvidenceRef?: string | null;
+  warnings: string[];
+}
+
+export interface MemorySyncSnapshot {
+  enabled: boolean;
+  status: 'disabled' | 'pass' | 'degraded' | 'blocked';
+  exportRawContent: boolean;
+  importApplyRequiresApproval: boolean;
+  allowCrossEnvironmentImport: boolean;
+  lastPackRef?: string | null;
+  warnings: string[];
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -519,6 +539,8 @@ export interface ControlPlaneSnapshot {
   providerRuntime: ProviderRuntimeSnapshot;
   targetEvidenceClosure: TargetEvidenceClosureSummary;
   memoryGovernance?: MemoryAuthoritySnapshot;
+  memoryRuntime?: MemoryRuntimeSnapshot;
+  memorySync?: MemorySyncSnapshot;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

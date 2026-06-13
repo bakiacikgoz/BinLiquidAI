@@ -336,6 +336,44 @@ class MemoryStoreV3:
             rows = self._conn.execute(sql, params).fetchall()
             return [_row_to_record(row) for row in rows]
 
+    def list_records(
+        self,
+        *,
+        scope_filters: list[MemoryScopeFilter] | None = None,
+        visibility_filters: list[MemoryVisibility] | None = None,
+        include_expired: bool = False,
+        limit: int = 500,
+    ) -> list[MemoryRecordV3]:
+        clauses = ["status = 'active'"]
+        params: list[Any] = []
+        if not include_expired:
+            clauses.append("(expires_at IS NULL OR expires_at > ?)")
+            params.append(_iso_now())
+        if visibility_filters:
+            clauses.append(
+                f"visibility IN ({','.join('?' for _ in visibility_filters)})"
+            )
+            params.extend(str(item) for item in visibility_filters)
+        if scope_filters:
+            scope_clauses: list[str] = []
+            for item in scope_filters:
+                scope_clauses.append(
+                    "(scope = ? AND owner_type = ? AND owner_id_hash = ? AND namespace = ?)"
+                )
+                params.extend(
+                    [str(item.scope), str(item.owner_type), item.owner_id_hash, item.namespace]
+                )
+            clauses.append("(" + " OR ".join(scope_clauses) + ")")
+        sql = (
+            "SELECT * FROM memory_records_v3 WHERE "
+            + " AND ".join(clauses)
+            + " ORDER BY updated_at DESC, created_at DESC LIMIT ?"
+        )
+        params.append(limit)
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+            return [_row_to_record(row) for row in rows]
+
     def tombstone(
         self,
         *,
