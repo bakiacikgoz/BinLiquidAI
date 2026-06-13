@@ -172,6 +172,21 @@ function emptySnapshot(): ControlPlaneSnapshot {
     codeIntelligence: missingCodeIntelligence(),
     pilotOperations: missingPilotOperations(),
     designPartnerBeta: missingDesignPartnerBeta(),
+    providerGovernance: {
+      contractVersion: 'control-plane.provider-governance/v1',
+      generatedAtUtc: new Date(0).toISOString(),
+      providers: [],
+      overallStatus: 'blocked',
+      blockingReasons: ['SNAPSHOT_UNAVAILABLE'],
+    },
+    providerRuntime: {
+      contractVersion: 'control-plane.provider-runtime/v1',
+      generatedAtUtc: new Date(0).toISOString(),
+      enabled: false,
+      latestInvocations: [],
+      workflowProofs: [],
+      blockingReasons: ['SNAPSHOT_UNAVAILABLE'],
+    },
     quickActions: [],
     partialReasons: [],
   };

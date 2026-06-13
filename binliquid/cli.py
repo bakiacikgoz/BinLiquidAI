@@ -75,6 +75,18 @@ from binliquid.control_plane.policy_packs import (
     validate_policy_pack,
 )
 from binliquid.control_plane.policy_simulator import PolicySimulator
+from binliquid.control_plane.provider_conformance import (
+    run_provider_native_conformance,
+    run_provider_native_gate,
+)
+from binliquid.control_plane.provider_invocation import (
+    ProviderInvocationCoordinator,
+    ProviderInvocationRequest,
+)
+from binliquid.control_plane.provider_registry import (
+    build_provider_governance_snapshot,
+    inspect_provider_entry,
+)
 from binliquid.control_plane.qualification_closure import (
     generate_enterprise_hat_a_closure,
     verify_enterprise_hat_a_closure,
@@ -155,6 +167,7 @@ memory_app = typer.Typer(help="Memory commands")
 research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
 provider_app = typer.Typer(help="Provider discovery commands")
+provider_native_app = typer.Typer(help="Native provider conformance commands")
 approval_app = typer.Typer(help="Governance approval commands")
 operator_app = typer.Typer(help="Operator panel commands")
 computer_use_app = typer.Typer(help="Computer use execution commands")
@@ -197,6 +210,7 @@ app.add_typer(memory_app, name="memory")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
 app.add_typer(provider_app, name="provider")
+provider_app.add_typer(provider_native_app, name="native")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
 app.add_typer(computer_use_app, name="computer-use")
@@ -519,7 +533,9 @@ def _model_candidate(
     }
 
 
-def _list_ollama_model_ids(timeout_seconds: int = 5) -> tuple[bool, list[str], str | None, str | None]:
+def _list_ollama_model_ids(
+    timeout_seconds: int = 5,
+) -> tuple[bool, list[str], str | None, str | None]:
     try:
         result = subprocess.run(
             ["ollama", "list"],
@@ -613,10 +629,14 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
             {
                 "provider": "transformers",
                 "available": bool(hf_model_id),
-                "selectedByConfig": _normalize_provider_name(resolved.llm_provider) == "transformers"
-                or _normalize_provider_name(resolved.fallback_provider) == "transformers",
+                "selectedByConfig": (
+                    _normalize_provider_name(resolved.llm_provider) == "transformers"
+                    or _normalize_provider_name(resolved.fallback_provider) == "transformers"
+                ),
                 "errorCode": None if hf_model_id else "HF_MODEL_NOT_CONFIGURED",
-                "errorMessage": None if hf_model_id else "No transformers HF model id is configured.",
+                "errorMessage": (
+                    None if hf_model_id else "No transformers HF model id is configured."
+                ),
                 "models": [
                     _model_candidate(
                         provider="transformers",
@@ -1952,7 +1972,11 @@ def config_resolve(
 def provider_models(
     profile: str = typer.Option("balanced", help="Config profile"),
     provider: str = typer.Option("all", help="Provider: all|auto|ollama|transformers"),
-    refresh: bool = typer.Option(False, "--refresh", help="Refresh provider model list cache when supported"),
+    refresh: bool = typer.Option(
+        False,
+        "--refresh",
+        help="Refresh provider model list cache when supported",
+    ),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     """List locally discoverable assistant provider models without installing models."""
@@ -1966,6 +1990,133 @@ def provider_models(
             typer.echo(f"{provider_record.get('provider')}: {provider_record.get('available')}")
 
     if payload.get("status") == "invalid_input":
+        raise typer.Exit(code=1)
+
+
+@provider_app.command("registry")
+def provider_registry(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Show fail-closed provider governance registry state."""
+    snapshot = build_provider_governance_snapshot(profile=profile)
+    _emit_payload(snapshot.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@provider_app.command("inspect")
+def provider_inspect(
+    provider: str = typer.Option(..., "--provider", help="Provider kind"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Inspect one provider governance entry without exposing secrets."""
+    try:
+        entry = inspect_provider_entry(provider, profile=profile)
+    except KeyError:
+        _emit_payload(
+            {
+                "status": "blocked",
+                "errorCode": "PROVIDER_UNKNOWN",
+                "providerKind": provider,
+                "blockingReasons": ["PROVIDER_UNKNOWN"],
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1) from None
+    _emit_payload(entry.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@provider_app.command("invoke")
+def provider_invoke(
+    provider: str = typer.Option(..., "--provider", help="Provider kind"),
+    model: str = typer.Option("gpt-placeholder", "--model", help="Provider model name"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    mode: str = typer.Option("dry-run", "--mode", help="dry-run|canary-live|disabled"),
+    once: str = typer.Option(..., "--once", help="Single prompt to hash and invoke"),
+    output_dir: str = typer.Option(
+        "artifacts/provider-runtime/invocations",
+        "--output-dir",
+        help="Invocation artifact output directory.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Run a governed provider invocation without raw prompt/response persistence."""
+    runtime_mode = mode.replace("-", "_")
+    if runtime_mode not in {"offline_conformance", "dry_run", "canary_live", "disabled"}:
+        _emit_payload(
+            {
+                "schemaVersion": "provider.invocation.v1",
+                "status": "blocked",
+                "providerKind": provider,
+                "runtimeMode": runtime_mode,
+                "blockingReasons": ["PROVIDER_RUNTIME_MODE_UNSUPPORTED"],
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1)
+    result = ProviderInvocationCoordinator(output_dir=output_dir).invoke(
+        ProviderInvocationRequest(
+            provider_kind=provider,
+            model=model,
+            profile=profile,
+            runtime_mode=runtime_mode,  # type: ignore[arg-type]
+            prompt=once,
+        )
+    )
+    _emit_payload(result.to_payload(), json_output=json_output)
+    if result.status in {"blocked", "error"}:
+        raise typer.Exit(code=1)
+
+
+@provider_native_app.command("conformance")
+def provider_native_conformance(
+    provider: str = typer.Option(..., "--provider", help="Native provider kind"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    offline: bool = typer.Option(True, "--offline/--live-canary", help="Use offline fixtures"),
+    output_dir: str = typer.Option(
+        "artifacts/provider-native",
+        "--output-dir",
+        help="Conformance artifact output directory.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Run offline native provider conformance fixtures."""
+    try:
+        report = run_provider_native_conformance(
+            provider,
+            profile=profile,
+            offline=offline,
+            output_dir=output_dir,
+        )
+    except KeyError:
+        _emit_payload(
+            {
+                "status": "fail",
+                "providerKind": provider,
+                "blockingReasons": ["PROVIDER_UNKNOWN"],
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1) from None
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@provider_native_app.command("gate")
+def provider_native_gate(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    output_dir: str = typer.Option(
+        "artifacts/provider-native",
+        "--output-dir",
+        help="Conformance artifact output directory.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Run all offline native provider conformance checks."""
+    payload = run_provider_native_gate(profile=profile, output_dir=output_dir)
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] != "pass":
         raise typer.Exit(code=1)
 
 

@@ -1,0 +1,35 @@
+version: control-plane.agent/v1
+agent_id: provider-governed-ops
+display_name: Provider Governed Ops Triage
+description: Read-only IT/ops triage agent that drafts remediation proposals through governed provider dry-run evidence.
+runtime_kind: binliquid_core
+profile: enterprise
+owner:
+  team: operations
+  contact: ops@example.invalid
+allowed_surfaces:
+  - core_runtime
+blocked_surfaces:
+  - computer_use_live
+declared_actions:
+  - action_id: inspect-service-alerts
+    phase: task
+    risk_class: read_only
+    target_kind: reports
+    effect: Read service alerts and evidence summaries.
+  - action_id: restart-service
+    phase: tool
+    risk_class: mutation
+    target_kind: service
+    effect: Proposal-only remediation requiring explicit approval.
+qualification:
+  required: true
+  minimum_level: pilot
+  status: missing
+evidence:
+  signed_pack_required: true
+  replay_required: true
+metadata:
+  providerRuntimeMode: dry_run
+  rawPersistence: false
+  evidenceMode: hash_only

@@ -25,6 +25,9 @@ from binliquid.control_plane.models import (
     OperationDescriptor,
     OperationResultSummary,
     PolicyPackSummary,
+    ProviderInvocationArtifact,
+    ProviderRuntimeSnapshot,
+    ProviderWorkflowProofArtifact,
     QuickActionSummary,
     ReportSummary,
     RunSnapshotSummary,
@@ -37,6 +40,7 @@ from binliquid.control_plane.pilot_operations import (
     build_design_partner_beta_status,
     build_pilot_operations_status,
 )
+from binliquid.control_plane.provider_registry import build_provider_governance_snapshot
 from binliquid.control_plane.rbac_admin import build_admin_summary
 from binliquid.control_plane.registry import AgentRegistry
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
@@ -162,6 +166,11 @@ def build_control_plane_snapshot(
         evidence_root=evidence_root,
         generated_at=generated_at,
     )
+    provider_governance = build_provider_governance_snapshot(
+        profile=profile,
+        generated_at=generated_at,
+    )
+    provider_runtime = _provider_runtime_snapshot(Path(evidence_root), generated_at=generated_at)
     design_partner_rc = build_design_partner_rc_status(
         data_source=data_source,
         claims=claims.model_dump(mode="json"),
@@ -170,6 +179,7 @@ def build_control_plane_snapshot(
         alerts=alerts,
         execution_surfaces=execution_surfaces,
         design_partner_beta=design_partner_beta,
+        provider_governance=provider_governance,
         generated_at=generated_at,
     )
     pilot_launch = build_pilot_launch_readiness_status(
@@ -225,8 +235,41 @@ def build_control_plane_snapshot(
         code_intelligence=code_intelligence,
         pilot_operations=pilot_operations,
         design_partner_beta=design_partner_beta,
+        provider_governance=provider_governance,
+        provider_runtime=provider_runtime,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
+    )
+
+
+def _provider_runtime_snapshot(
+    evidence_root: Path,
+    *,
+    generated_at: datetime,
+) -> ProviderRuntimeSnapshot:
+    runtime_root = evidence_root / "provider-runtime"
+    invocations: list[ProviderInvocationArtifact] = []
+    for path in sorted((runtime_root / "invocations").glob("*.json"))[-5:]:
+        try:
+            invocations.append(
+                ProviderInvocationArtifact.model_validate_json(path.read_text(encoding="utf-8"))
+            )
+        except ValueError:
+            continue
+    proofs: list[ProviderWorkflowProofArtifact] = []
+    for path in sorted((runtime_root / "workflow-proof").glob("*.json"))[-5:]:
+        try:
+            proofs.append(
+                ProviderWorkflowProofArtifact.model_validate_json(path.read_text(encoding="utf-8"))
+            )
+        except ValueError:
+            continue
+    return ProviderRuntimeSnapshot(
+        generatedAtUtc=generated_at,
+        enabled=bool(invocations or proofs),
+        latestInvocations=invocations,
+        workflowProofs=proofs,
+        blockingReasons=[],
     )
 
 

@@ -118,6 +118,7 @@ Core Runtime
 | Team Runtime | Pilot-hardened | Restricted/controlled profiles with bounded concurrency and replay verification. |
 | Enterprise profile | Constrained readiness | Requires signed evidence and deployment drills for broader GA claims. |
 | Operator Panel | Beta | Tauri desktop surface for operator workflows. |
+| External Provider Governance | Preview | OpenAI Responses and Anthropic Messages are governed behind offline conformance, dry-run invocation, hash-only evidence, server-tool denial, and proposal-only custom tools. This is not unrestricted external provider execution. |
 | Vision-first computer-use | Gated foundation | Strict policy, replay, qualification gates, deterministic mocks, CLI/Operator Panel summary; no default live OS automation. |
 
 Computer-use operator control surfaces:
@@ -141,6 +142,7 @@ uv run binliquid control-plane agent register --spec examples/control_plane/agen
 uv run binliquid control-plane policy simulate --agent-id governed-ops --profile enterprise --json
 uv run binliquid control-plane run submit --agent-id governed-ops --once "Inspect queue and draft remediation" --profile enterprise --json
 uv run binliquid control-plane claims verify --profile enterprise --json
+uv run binliquid provider invoke --provider openai_responses --profile enterprise --mode dry-run --once "Inspect service alerts and draft read-only triage summary" --json
 ```
 
 ---

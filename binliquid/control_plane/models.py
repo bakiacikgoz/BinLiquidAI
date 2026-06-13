@@ -1004,6 +1004,229 @@ class DesignPartnerBetaStatus(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class ProviderCapabilities(StrictModel):
+    supports_streaming: bool = Field(default=False, alias="supportsStreaming")
+    supports_server_tools: bool = Field(default=False, alias="supportsServerTools")
+    supports_custom_tools: bool = Field(default=True, alias="supportsCustomTools")
+    supports_store_false: bool = Field(default=True, alias="supportsStoreFalse")
+
+
+class ProviderToolPolicy(StrictModel):
+    server_tools_policy: Literal["denied", "approval_required"] = Field(
+        default="denied",
+        alias="serverToolsPolicy",
+    )
+    custom_tools_policy: Literal["proposal_only", "approval_required", "execute"] = Field(
+        default="proposal_only",
+        alias="customToolsPolicy",
+    )
+    requested_server_tools: list[str] = Field(default_factory=list, alias="requestedServerTools")
+
+
+class ProviderRetentionPolicy(StrictModel):
+    store: bool = False
+    evidence_mode: Literal["hash_only"] = Field(default="hash_only", alias="evidenceMode")
+    raw_persistence: bool = Field(default=False, alias="rawPersistence")
+
+
+class NativeRequestEnvelope(StrictModel):
+    provider_kind: Literal[
+        "ollama",
+        "transformers",
+        "openai_responses",
+        "anthropic_messages",
+        "google_gemini",
+        "deepseek_chat",
+    ] = Field(alias="providerKind")
+    model: str
+    profile: str = "enterprise"
+    request_hash: str = Field(alias="requestHash")
+    raw_persistence: bool = Field(default=False, alias="rawPersistence")
+    tool_policy: ProviderToolPolicy = Field(alias="toolPolicy")
+    retention_policy: ProviderRetentionPolicy = Field(alias="retentionPolicy")
+    approval_context: dict[str, Any] | None = Field(default=None, alias="approvalContext")
+    native_payload: dict[str, Any] = Field(default_factory=dict, alias="nativePayload")
+    created_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="createdAtUtc",
+    )
+
+
+class ProviderNativeResult(StrictModel):
+    provider_kind: Literal["openai_responses", "anthropic_messages"] = Field(
+        alias="providerKind"
+    )
+    output_text: str = Field(alias="outputText")
+    raw_response_persisted: bool = Field(default=False, alias="rawResponsePersisted")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderPolicyDecision(StrictModel):
+    decision: Literal["allow", "deny", "proposal_only", "require_approval"]
+    reason_codes: list[str] = Field(default_factory=list, alias="reasonCodes")
+    policy_hash: str = Field(alias="policyHash")
+
+
+class ProviderRegistryEntry(StrictModel):
+    provider_kind: Literal[
+        "ollama",
+        "transformers",
+        "openai_responses",
+        "anthropic_messages",
+        "google_gemini",
+        "deepseek_chat",
+    ] = Field(alias="providerKind")
+    display_name: str = Field(alias="displayName", min_length=1, max_length=80)
+    status: Literal["available", "blocked", "conditional", "canary_only"] = "blocked"
+    credential_state: Literal["missing", "configured", "not_required", "redacted"] = Field(
+        default="missing",
+        alias="credentialState",
+    )
+    canary_only: bool = Field(default=True, alias="canaryOnly")
+    supports_streaming: bool = Field(default=False, alias="supportsStreaming")
+    server_tools_policy: Literal["denied", "approval_required"] = Field(
+        default="denied",
+        alias="serverToolsPolicy",
+    )
+    custom_tools_policy: Literal["proposal_only", "approval_required", "execute"] = Field(
+        default="proposal_only",
+        alias="customToolsPolicy",
+    )
+    retention_policy: Literal["hash_only_store_false"] = Field(
+        default="hash_only_store_false",
+        alias="retentionPolicy",
+    )
+    last_conformance_status: Literal["pass", "fail", "unknown"] | None = Field(
+        default=None,
+        alias="lastConformanceStatus",
+    )
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
+class ProviderGovernanceSnapshot(StrictModel):
+    contract_version: Literal["control-plane.provider-governance/v1"] = Field(
+        default="control-plane.provider-governance/v1",
+        alias="contractVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    providers: list[ProviderRegistryEntry] = Field(default_factory=list)
+    overall_status: Literal["ready", "conditional", "blocked"] = Field(
+        default="conditional",
+        alias="overallStatus",
+    )
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
+class ProviderConformanceCheck(StrictModel):
+    check_id: str = Field(alias="checkId")
+    status: Literal["pass", "fail"]
+    reason_code: str = Field(alias="reasonCode")
+    summary: str
+
+
+class ProviderConformanceReport(StrictModel):
+    schema_version: Literal["control-plane.provider-conformance/v1"] = Field(
+        default="control-plane.provider-conformance/v1",
+        alias="schemaVersion",
+    )
+    status: Literal["pass", "fail", "conditional"] = "fail"
+    provider_kind: Literal["openai_responses", "anthropic_messages"] = Field(
+        alias="providerKind"
+    )
+    offline: bool = True
+    fixtures_run: int = Field(default=0, alias="fixturesRun")
+    policy_checks: list[ProviderConformanceCheck] = Field(
+        default_factory=list,
+        alias="policyChecks",
+    )
+    evidence_path: str | None = Field(default=None, alias="evidencePath")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    raw_persistence: bool = Field(default=False, alias="rawPersistence")
+    request_hashes: list[str] = Field(default_factory=list, alias="requestHashes")
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+
+
+class ProviderInvocationArtifact(StrictModel):
+    schema_version: Literal["provider.invocation.v1"] = Field(
+        default="provider.invocation.v1",
+        alias="schemaVersion",
+    )
+    status: Literal["pass", "blocked", "conditional", "error"]
+    invocation_id: str = Field(alias="invocationId")
+    provider_kind: str = Field(alias="providerKind")
+    model: str
+    runtime_mode: Literal["offline_conformance", "dry_run", "canary_live", "disabled"] = Field(
+        alias="runtimeMode",
+    )
+    policy_decision: dict[str, Any] = Field(alias="policyDecision")
+    request_hash: str = Field(alias="requestHash")
+    response_hash: str | None = Field(default=None, alias="responseHash")
+    raw_persistence: Literal[False] = Field(default=False, alias="rawPersistence")
+    evidence_mode: Literal["hash_only"] = Field(default="hash_only", alias="evidenceMode")
+    tool_policy: ProviderToolPolicy = Field(alias="toolPolicy")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    created_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="createdAtUtc",
+    )
+
+
+class ProviderWorkflowProposal(StrictModel):
+    proposal_id: str = Field(alias="proposalId")
+    action_id: str = Field(alias="actionId")
+    risk_class: Literal["read_only", "mutation", "destructive"] = Field(alias="riskClass")
+    execution_mode: Literal["proposal_only"] = Field(default="proposal_only", alias="executionMode")
+    effect_summary: str = Field(alias="effectSummary")
+
+
+class ProviderWorkflowProofArtifact(StrictModel):
+    schema_version: Literal["provider.workflow-proof.v1"] = Field(
+        default="provider.workflow-proof.v1",
+        alias="schemaVersion",
+    )
+    status: Literal["pass", "conditional", "blocked", "error"]
+    workflow_id: str = Field(alias="workflowId")
+    workflow_kind: Literal["read_only_ops_triage"] = Field(alias="workflowKind")
+    agent_id: str = Field(alias="agentId")
+    provider_invocations: list[str] = Field(default_factory=list, alias="providerInvocations")
+    proposals: list[ProviderWorkflowProposal] = Field(default_factory=list)
+    executed_mutations: int = Field(default=0, alias="executedMutations")
+    approval_tickets_created: int = Field(default=0, alias="approvalTicketsCreated")
+    evidence_artifacts: list[str] = Field(default_factory=list, alias="evidenceArtifacts")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+
+
+class ProviderRuntimeSnapshot(StrictModel):
+    contract_version: Literal["control-plane.provider-runtime/v1"] = Field(
+        default="control-plane.provider-runtime/v1",
+        alias="contractVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    enabled: bool = False
+    latest_invocations: list[ProviderInvocationArtifact] = Field(
+        default_factory=list,
+        alias="latestInvocations",
+    )
+    workflow_proofs: list[ProviderWorkflowProofArtifact] = Field(
+        default_factory=list,
+        alias="workflowProofs",
+    )
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+
+
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
@@ -1043,6 +1266,14 @@ class ControlPlaneSnapshot(StrictModel):
     design_partner_beta: DesignPartnerBetaStatus = Field(
         default_factory=DesignPartnerBetaStatus,
         alias="designPartnerBeta",
+    )
+    provider_governance: ProviderGovernanceSnapshot = Field(
+        default_factory=ProviderGovernanceSnapshot,
+        alias="providerGovernance",
+    )
+    provider_runtime: ProviderRuntimeSnapshot = Field(
+        default_factory=ProviderRuntimeSnapshot,
+        alias="providerRuntime",
     )
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

@@ -1,0 +1,307 @@
+{
+  "$defs": {
+    "ProviderInvocationArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "createdAtUtc": {
+          "format": "date-time",
+          "title": "Createdatutc",
+          "type": "string"
+        },
+        "evidenceMode": {
+          "const": "hash_only",
+          "default": "hash_only",
+          "title": "Evidencemode",
+          "type": "string"
+        },
+        "invocationId": {
+          "title": "Invocationid",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "policyDecision": {
+          "additionalProperties": true,
+          "title": "Policydecision",
+          "type": "object"
+        },
+        "providerKind": {
+          "title": "Providerkind",
+          "type": "string"
+        },
+        "rawPersistence": {
+          "const": false,
+          "default": false,
+          "title": "Rawpersistence",
+          "type": "boolean"
+        },
+        "requestHash": {
+          "title": "Requesthash",
+          "type": "string"
+        },
+        "responseHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Responsehash"
+        },
+        "runtimeMode": {
+          "enum": [
+            "offline_conformance",
+            "dry_run",
+            "canary_live",
+            "disabled"
+          ],
+          "title": "Runtimemode",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "provider.invocation.v1",
+          "default": "provider.invocation.v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked",
+            "conditional",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "toolPolicy": {
+          "$ref": "#/$defs/ProviderToolPolicy"
+        }
+      },
+      "required": [
+        "status",
+        "invocationId",
+        "providerKind",
+        "model",
+        "runtimeMode",
+        "policyDecision",
+        "requestHash",
+        "toolPolicy"
+      ],
+      "title": "ProviderInvocationArtifact",
+      "type": "object"
+    },
+    "ProviderToolPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "customToolsPolicy": {
+          "default": "proposal_only",
+          "enum": [
+            "proposal_only",
+            "approval_required",
+            "execute"
+          ],
+          "title": "Customtoolspolicy",
+          "type": "string"
+        },
+        "requestedServerTools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requestedservertools",
+          "type": "array"
+        },
+        "serverToolsPolicy": {
+          "default": "denied",
+          "enum": [
+            "denied",
+            "approval_required"
+          ],
+          "title": "Servertoolspolicy",
+          "type": "string"
+        }
+      },
+      "title": "ProviderToolPolicy",
+      "type": "object"
+    },
+    "ProviderWorkflowProofArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "agentId": {
+          "title": "Agentid",
+          "type": "string"
+        },
+        "approvalTicketsCreated": {
+          "default": 0,
+          "title": "Approvalticketscreated",
+          "type": "integer"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "evidenceArtifacts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidenceartifacts",
+          "type": "array"
+        },
+        "executedMutations": {
+          "default": 0,
+          "title": "Executedmutations",
+          "type": "integer"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "proposals": {
+          "items": {
+            "$ref": "#/$defs/ProviderWorkflowProposal"
+          },
+          "title": "Proposals",
+          "type": "array"
+        },
+        "providerInvocations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Providerinvocations",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": "provider.workflow-proof.v1",
+          "default": "provider.workflow-proof.v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "workflowId": {
+          "title": "Workflowid",
+          "type": "string"
+        },
+        "workflowKind": {
+          "const": "read_only_ops_triage",
+          "title": "Workflowkind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "workflowId",
+        "workflowKind",
+        "agentId"
+      ],
+      "title": "ProviderWorkflowProofArtifact",
+      "type": "object"
+    },
+    "ProviderWorkflowProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "effectSummary": {
+          "title": "Effectsummary",
+          "type": "string"
+        },
+        "executionMode": {
+          "const": "proposal_only",
+          "default": "proposal_only",
+          "title": "Executionmode",
+          "type": "string"
+        },
+        "proposalId": {
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "riskClass": {
+          "enum": [
+            "read_only",
+            "mutation",
+            "destructive"
+          ],
+          "title": "Riskclass",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposalId",
+        "actionId",
+        "riskClass",
+        "effectSummary"
+      ],
+      "title": "ProviderWorkflowProposal",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "contractVersion": {
+      "const": "control-plane.provider-runtime/v1",
+      "default": "control-plane.provider-runtime/v1",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "enabled": {
+      "default": false,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "latestInvocations": {
+      "items": {
+        "$ref": "#/$defs/ProviderInvocationArtifact"
+      },
+      "title": "Latestinvocations",
+      "type": "array"
+    },
+    "workflowProofs": {
+      "items": {
+        "$ref": "#/$defs/ProviderWorkflowProofArtifact"
+      },
+      "title": "Workflowproofs",
+      "type": "array"
+    }
+  },
+  "title": "ProviderRuntimeSnapshot",
+  "type": "object"
+}

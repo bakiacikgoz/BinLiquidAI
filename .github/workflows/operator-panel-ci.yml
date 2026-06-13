@@ -5,12 +5,16 @@ on:
     paths:
       - 'apps/operator-panel/**'
       - 'binliquid/cli.py'
+      - 'binliquid/control_plane/provider_*.py'
+      - 'contracts/operator_panel/**'
       - 'docs/RELEASE_GATE_v0.5.md'
       - '.github/workflows/operator-panel-ci.yml'
   pull_request:
     paths:
       - 'apps/operator-panel/**'
       - 'binliquid/cli.py'
+      - 'binliquid/control_plane/provider_*.py'
+      - 'contracts/operator_panel/**'
       - 'docs/RELEASE_GATE_v0.5.md'
       - '.github/workflows/operator-panel-ci.yml'
 
@@ -51,6 +55,9 @@ jobs:
 
       - name: UI frontend QA
         run: pnpm --dir apps/operator-panel qa:frontend
+
+      - name: Provider workflow proof e2e
+        run: pnpm --dir apps/operator-panel test:e2e -- provider-workflow-proof.spec.ts
 
       - name: Publish UI QA summary
         if: always()

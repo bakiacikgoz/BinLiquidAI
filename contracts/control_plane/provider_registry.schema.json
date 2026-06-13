@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "ProviderRegistryEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "canaryOnly": {
+          "default": true,
+          "title": "Canaryonly",
+          "type": "boolean"
+        },
+        "credentialState": {
+          "default": "missing",
+          "enum": [
+            "missing",
+            "configured",
+            "not_required",
+            "redacted"
+          ],
+          "title": "Credentialstate",
+          "type": "string"
+        },
+        "customToolsPolicy": {
+          "default": "proposal_only",
+          "enum": [
+            "proposal_only",
+            "approval_required",
+            "execute"
+          ],
+          "title": "Customtoolspolicy",
+          "type": "string"
+        },
+        "displayName": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Displayname",
+          "type": "string"
+        },
+        "lastConformanceStatus": {
+          "anyOf": [
+            {
+              "enum": [
+                "pass",
+                "fail",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastconformancestatus"
+        },
+        "providerKind": {
+          "enum": [
+            "ollama",
+            "transformers",
+            "openai_responses",
+            "anthropic_messages",
+            "google_gemini",
+            "deepseek_chat"
+          ],
+          "title": "Providerkind",
+          "type": "string"
+        },
+        "retentionPolicy": {
+          "const": "hash_only_store_false",
+          "default": "hash_only_store_false",
+          "title": "Retentionpolicy",
+          "type": "string"
+        },
+        "serverToolsPolicy": {
+          "default": "denied",
+          "enum": [
+            "denied",
+            "approval_required"
+          ],
+          "title": "Servertoolspolicy",
+          "type": "string"
+        },
+        "status": {
+          "default": "blocked",
+          "enum": [
+            "available",
+            "blocked",
+            "conditional",
+            "canary_only"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "supportsStreaming": {
+          "default": false,
+          "title": "Supportsstreaming",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "providerKind",
+        "displayName"
+      ],
+      "title": "ProviderRegistryEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "contractVersion": {
+      "const": "control-plane.provider-governance/v1",
+      "default": "control-plane.provider-governance/v1",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "overallStatus": {
+      "default": "conditional",
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Overallstatus",
+      "type": "string"
+    },
+    "providers": {
+      "items": {
+        "$ref": "#/$defs/ProviderRegistryEntry"
+      },
+      "title": "Providers",
+      "type": "array"
+    }
+  },
+  "title": "ProviderGovernanceSnapshot",
+  "type": "object"
+}

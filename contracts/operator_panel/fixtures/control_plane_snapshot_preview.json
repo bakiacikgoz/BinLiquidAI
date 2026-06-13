@@ -677,6 +677,134 @@
       "supportsDryRun": true
     }
   ],
+  "providerGovernance": {
+    "blockingReasons": [
+      "blocked_external_credentials"
+    ],
+    "contractVersion": "control-plane.provider-governance/v1",
+    "generatedAtUtc": "2026-06-01T12:00:00Z",
+    "overallStatus": "conditional",
+    "providers": [
+      {
+        "blockingReasons": [],
+        "canaryOnly": false,
+        "credentialState": "not_required",
+        "customToolsPolicy": "proposal_only",
+        "displayName": "Ollama Local",
+        "lastConformanceStatus": "unknown",
+        "providerKind": "ollama",
+        "retentionPolicy": "hash_only_store_false",
+        "serverToolsPolicy": "denied",
+        "status": "conditional",
+        "supportsStreaming": true
+      },
+      {
+        "blockingReasons": [],
+        "canaryOnly": false,
+        "credentialState": "not_required",
+        "customToolsPolicy": "proposal_only",
+        "displayName": "Transformers Local",
+        "lastConformanceStatus": "unknown",
+        "providerKind": "transformers",
+        "retentionPolicy": "hash_only_store_false",
+        "serverToolsPolicy": "denied",
+        "status": "conditional",
+        "supportsStreaming": false
+      },
+      {
+        "blockingReasons": [
+          "blocked_external_credentials"
+        ],
+        "canaryOnly": true,
+        "credentialState": "missing",
+        "customToolsPolicy": "proposal_only",
+        "displayName": "OpenAI Responses Native Preview",
+        "lastConformanceStatus": "pass",
+        "providerKind": "openai_responses",
+        "retentionPolicy": "hash_only_store_false",
+        "serverToolsPolicy": "denied",
+        "status": "blocked",
+        "supportsStreaming": true
+      },
+      {
+        "blockingReasons": [
+          "blocked_external_credentials"
+        ],
+        "canaryOnly": true,
+        "credentialState": "missing",
+        "customToolsPolicy": "proposal_only",
+        "displayName": "Anthropic Claude Messages Native Preview",
+        "lastConformanceStatus": "pass",
+        "providerKind": "anthropic_messages",
+        "retentionPolicy": "hash_only_store_false",
+        "serverToolsPolicy": "denied",
+        "status": "blocked",
+        "supportsStreaming": true
+      }
+    ]
+  },
+  "providerRuntime": {
+    "blockingReasons": [],
+    "contractVersion": "control-plane.provider-runtime/v1",
+    "enabled": true,
+    "generatedAtUtc": "2026-06-01T12:00:00Z",
+    "latestInvocations": [
+      {
+        "blockingReasons": [],
+        "createdAtUtc": "2026-06-01T12:00:00Z",
+        "evidenceMode": "hash_only",
+        "invocationId": "provider-inv-preview",
+        "model": "gpt-placeholder",
+        "policyDecision": {
+          "decision": "allow",
+          "policyHash": "sha256:provider-governance-v1",
+          "reasonCodes": [
+            "PROVIDER_POLICY_PASS"
+          ]
+        },
+        "providerKind": "openai_responses",
+        "rawPersistence": false,
+        "requestHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "responseHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "runtimeMode": "dry_run",
+        "schemaVersion": "provider.invocation.v1",
+        "status": "pass",
+        "toolPolicy": {
+          "customToolsPolicy": "proposal_only",
+          "requestedServerTools": [],
+          "serverToolsPolicy": "denied"
+        }
+      }
+    ],
+    "workflowProofs": [
+      {
+        "agentId": "provider-governed-ops",
+        "approvalTicketsCreated": 1,
+        "blockingReasons": [],
+        "evidenceArtifacts": [
+          "artifacts/provider-runtime/invocations/provider-inv-preview.json"
+        ],
+        "executedMutations": 0,
+        "generatedAtUtc": "2026-06-01T12:00:00Z",
+        "proposals": [
+          {
+            "actionId": "restart-service",
+            "effectSummary": "restart service is approval-gated",
+            "executionMode": "proposal_only",
+            "proposalId": "proposal-restart-service",
+            "riskClass": "mutation"
+          }
+        ],
+        "providerInvocations": [
+          "provider-inv-preview"
+        ],
+        "schemaVersion": "provider.workflow-proof.v1",
+        "status": "pass",
+        "workflowId": "read-only-ops-triage",
+        "workflowKind": "read_only_ops_triage"
+      }
+    ]
+  },
   "partialReasons": [
     "DATA_SOURCE_PREVIEW_FIXTURE",
     "metrics_snapshot",

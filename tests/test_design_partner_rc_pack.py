@@ -32,6 +32,8 @@ def test_design_partner_rc_pack_generator(tmp_path: Path) -> None:
     assert payload["version"] == "control-plane.design-partner-rc-pack/v1"
     assert payload["status"] == "conditional"
     assert payload["claimBoundaries"]["computerUseLive"] == "blocked"
+    assert payload["providerGovernance"]["status"] == "conditional"
+    assert payload["providerGovernance"]["conformanceArtifacts"]
     assert payload["artifacts"]
     assert all("status" in item for item in payload["artifacts"])
     assert (output / "manifest.json").exists()
