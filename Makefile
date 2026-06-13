@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-pr-readiness design-partner-rc-audit-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -88,6 +88,42 @@ vision-gate:
 		--evidence-root artifacts/computer_use \
 		--output artifacts/computer_use/macos_supervised_v2_gate.json \
 		--markdown artifacts/computer_use/MACOS_SUPERVISED_V2_GATE.md \
+		--json
+
+provider-native-gate:
+	uv run python scripts/run_provider_native_adapter_gate.py --profile enterprise --json
+
+provider-runtime-gate:
+	uv run pytest -q tests/test_provider_runtime_evidence.py tests/test_provider_invocation_coordinator.py
+	uv run binliquid provider invoke \
+		--provider openai_responses \
+		--model gpt-placeholder \
+		--profile enterprise \
+		--mode dry-run \
+		--once "Inspect service alerts and draft read-only triage summary" \
+		--json
+
+provider-workflow-proof-gate:
+	uv run pytest -q tests/test_provider_runtime_workflow_proof.py
+	uv run python scripts/run_provider_runtime_workflow_proof.py \
+		--profile enterprise \
+		--provider openai_responses \
+		--mode dry-run \
+		--output-root artifacts/provider-runtime/workflow-proof \
+		--json
+
+design-partner-rc-audit-gate:
+	uv run python scripts/run_design_partner_rc_audit_gate.py \
+		--profile enterprise \
+		--allow-expected-conditionals \
+		--output artifacts/design-partner-rc/rc_audit_gate.json \
+		--json
+
+provider-governance-pr-readiness:
+	uv run python scripts/check_provider_governance_pr_readiness.py \
+		--profile enterprise \
+		--branch $$(git branch --show-current) \
+		--output artifacts/provider-governance-pr/readiness.json \
 		--json
 
 control-plane-schemas:
@@ -301,6 +337,10 @@ rust-gate:
 mainline-gate:
 	uv run --extra dev ruff check .
 	uv run --extra dev pytest -q
+	$(MAKE) provider-native-gate
+	$(MAKE) provider-runtime-gate
+	$(MAKE) provider-workflow-proof-gate
+	$(MAKE) design-partner-rc-audit-gate
 	$(MAKE) control-plane-gate
 	$(MAKE) vision-gate
 	$(MAKE) ui-gate

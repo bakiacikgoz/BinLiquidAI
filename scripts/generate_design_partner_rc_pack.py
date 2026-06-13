@@ -19,6 +19,12 @@ from binliquid.control_plane.design_partner_rc import (
     is_expected_blocked_claim_boundary_alert,
 )
 from binliquid.control_plane.pilot_operations import build_design_partner_beta_status
+from binliquid.control_plane.provider_conformance import run_provider_native_gate
+from binliquid.control_plane.provider_runtime_workflows import (
+    ProviderWorkflowProofRequest,
+    run_provider_workflow_proof,
+    workflow_proof_hash,
+)
 from binliquid.control_plane.snapshot import build_control_plane_snapshot
 from binliquid.runtime.config import RuntimeConfig
 
@@ -78,7 +84,21 @@ def main() -> None:
         alerts=snapshot.alerts,
         execution_surfaces=snapshot.execution_surfaces,
         design_partner_beta=beta_status,
+        provider_governance=snapshot.provider_governance,
         generated_at=snapshot.generated_at_utc,
+    )
+    provider_gate = run_provider_native_gate(
+        profile=args.profile,
+        output_dir=output / "provider-governance",
+    )
+    workflow_proof = run_provider_workflow_proof(
+        ProviderWorkflowProofRequest(
+            workflow_kind="read_only_ops_triage",
+            provider_kind="openai_responses",
+            profile=args.profile,
+            runtime_mode="dry_run",
+            output_root=output / "provider-runtime" / "workflow-proof",
+        )
     )
 
     _write_json(
@@ -109,6 +129,8 @@ def main() -> None:
         "evidencePackCount": len(snapshot.evidence_packs),
         "readyReportCount": sum(1 for report in snapshot.reports if report.status == "ready"),
         "activeErrorAlertCount": _active_error_alert_count(snapshot),
+        "providerGovernance": _provider_governance_manifest(snapshot, provider_gate),
+        "providerWorkflowProof": _provider_workflow_proof_manifest(workflow_proof),
     }
     _write_report(output / "DESIGN_PARTNER_RC_REPORT.md", initial_manifest)
 
@@ -148,6 +170,8 @@ def main() -> None:
         "evidencePackCount": len(snapshot.evidence_packs),
         "readyReportCount": sum(1 for report in snapshot.reports if report.status == "ready"),
         "activeErrorAlertCount": _active_error_alert_count(snapshot),
+        "providerGovernance": _provider_governance_manifest(snapshot, provider_gate),
+        "providerWorkflowProof": _provider_workflow_proof_manifest(workflow_proof),
     }
     _write_json(output / "manifest.json", manifest)
     _write_report(output / "DESIGN_PARTNER_RC_REPORT.md", manifest)
@@ -196,6 +220,18 @@ def _artifact_payload_status(path: Path) -> str:
 
 
 def _write_report(path: Path, manifest: dict[str, object]) -> None:
+    provider_governance = manifest.get("providerGovernance")
+    provider_status = "unknown"
+    provider_gate_status = "unknown"
+    if isinstance(provider_governance, dict):
+        provider_status = str(provider_governance.get("status", "unknown"))
+        provider_gate_status = str(provider_governance.get("gateStatus", "unknown"))
+    provider_workflow = manifest.get("providerWorkflowProof")
+    workflow_status = "unknown"
+    workflow_mutations = "unknown"
+    if isinstance(provider_workflow, dict):
+        workflow_status = str(provider_workflow.get("status", "unknown"))
+        workflow_mutations = str(provider_workflow.get("executedMutations", "unknown"))
     lines = [
         "# Design Partner RC Report",
         "",
@@ -210,6 +246,17 @@ def _write_report(path: Path, manifest: dict[str, object]) -> None:
         "- Computer-use live execution remains blocked.",
         "- Public desktop installer claim remains blocked.",
         "- Preview fixtures are not treated as live evidence.",
+        "- Provider native checks use offline fixtures only; external live calls remain disabled.",
+        "",
+        "## Provider Governance",
+        "",
+        f"- Status: {provider_status}",
+        f"- Offline conformance: {provider_gate_status}",
+        "",
+        "## Provider Workflow Proof",
+        "",
+        f"- Status: {workflow_status}",
+        f"- Executed mutations: {workflow_mutations}",
         "",
         "## Artifacts",
         "",
@@ -259,6 +306,50 @@ def _claim_boundaries(snapshot: object) -> dict[str, str]:
     return {
         "computerUseLive": _surface_status(surfaces, "computer-use"),
         "publicDesktopInstaller": _surface_status(surfaces, "public-desktop-installer"),
+    }
+
+
+def _provider_governance_manifest(snapshot: object, gate: dict[str, object]) -> dict[str, object]:
+    provider_governance = getattr(snapshot, "provider_governance", None)
+    reports = gate.get("reports", [])
+    conformance_artifacts = []
+    if isinstance(reports, list):
+        for report in reports:
+            if isinstance(report, dict):
+                conformance_artifacts.append(
+                    {
+                        "providerKind": report.get("providerKind"),
+                        "status": report.get("status"),
+                        "path": report.get("evidencePath"),
+                        "offline": report.get("offline"),
+                    }
+                )
+    return {
+        "status": getattr(provider_governance, "overall_status", "blocked"),
+        "gateStatus": gate.get("status", "fail"),
+        "contractVersion": getattr(
+            provider_governance,
+            "contract_version",
+            "control-plane.provider-governance/v1",
+        ),
+        "conformanceArtifacts": conformance_artifacts,
+        "blockingReasons": list(getattr(provider_governance, "blocking_reasons", [])),
+    }
+
+
+def _provider_workflow_proof_manifest(workflow_proof: object) -> dict[str, object]:
+    artifact_path = Path(str(getattr(workflow_proof, "artifact_path", "")))
+    artifact_hash = workflow_proof_hash(artifact_path) if artifact_path.exists() else None
+    return {
+        "status": getattr(workflow_proof, "status", "unknown"),
+        "workflowId": getattr(workflow_proof, "workflow_id", "unknown"),
+        "workflowKind": "read_only_ops_triage",
+        "executedMutations": getattr(workflow_proof, "executed_mutations", None),
+        "approvalTicketsCreated": getattr(workflow_proof, "approval_tickets_created", None),
+        "artifactPath": _display_path(artifact_path) if artifact_path.exists() else None,
+        "artifactHash": artifact_hash,
+        "providerInvocations": list(getattr(workflow_proof, "provider_invocations", [])),
+        "evidenceArtifacts": list(getattr(workflow_proof, "evidence_artifacts", [])),
     }
 
 

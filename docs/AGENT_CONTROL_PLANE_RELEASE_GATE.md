@@ -18,6 +18,10 @@ make control-plane-snapshot-gate
 make evidence-pack-gate
 make operator-panel-productization-gate
 make operator-panel-tauri-smoke
+make provider-native-gate
+make provider-runtime-gate
+make provider-workflow-proof-gate
+make design-partner-rc-audit-gate
 make enterprise-gate
 make pilot-gate
 make ui-gate
@@ -32,6 +36,9 @@ No ship if:
 - primary Operator Panel content exposes raw JSON,
 - productized page screenshot coverage is missing,
 - i18n dictionary or reason-code parity fails,
+- provider native/runtime/workflow proof gates fail,
+- provider evidence contains raw prompt, raw response, secret, or PII payloads,
+- `design-partner-rc-audit-gate` reports blockers or unexpected warnings,
 - claim guard allows unsupported desktop or live computer-use claims,
 - Operator Console exposes live computer-use without qualification evidence,
 - public desktop installer evidence is absent but the release is described as

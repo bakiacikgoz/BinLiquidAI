@@ -11,6 +11,8 @@ open claims that remain intentionally blocked.
 | Beta Operations pack | `designPartnerBeta.status=ready` | `conditional` keeps RC conditional; `blocked` blocks RC. |
 | Runtime truth | No silent fallback and no error data source | Blocking failure. |
 | Preview boundary | Preview fixtures are not live evidence | Conditional until live/CLI evidence exists. |
+| Provider governance | Native provider conformance is pass and provider policies are safe | Conditional when only credentials/target evidence are missing; blocking if policy unsafe. |
+| Provider workflow proof | Read-only provider workflow has `executedMutations=0` and hash-only evidence | Blocking if mutations execute or raw evidence leaks. |
 | Evidence index | At least one evidence pack is available | Conditional until target evidence exists. |
 | Reports | At least one ready report is available | Conditional until target report exists. |
 | Computer-use boundary | Surface remains `blocked` | Blocking failure if opened. |
@@ -52,12 +54,15 @@ RC cannot claim:
 ```bash
 make design-partner-beta-gate
 make design-partner-rc-gate
+make design-partner-rc-audit-gate
 make pilot-readiness-gate
 ```
 
-`make design-partner-rc-gate` may pass with an RC `conditional` status when
-target-environment evidence is intentionally incomplete. It must fail only for
-blocking safety or claim-boundary violations.
+`make design-partner-rc-gate` is the strict release gate. It keeps release
+semantics strict and may exit nonzero when RC remains `conditional`.
+`make design-partner-rc-audit-gate` is the PR/audit gate: it exits zero only
+when there are no blockers and every warning is in the expected conditional
+allowlist.
 
 ## Rollback
 

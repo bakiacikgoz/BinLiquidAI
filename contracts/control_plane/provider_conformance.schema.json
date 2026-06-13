@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "ProviderConformanceCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "checkId": {
+          "title": "Checkid",
+          "type": "string"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "checkId",
+        "status",
+        "reasonCode",
+        "summary"
+      ],
+      "title": "ProviderConformanceCheck",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "evidencePath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidencepath"
+    },
+    "fixturesRun": {
+      "default": 0,
+      "title": "Fixturesrun",
+      "type": "integer"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "offline": {
+      "default": true,
+      "title": "Offline",
+      "type": "boolean"
+    },
+    "policyChecks": {
+      "items": {
+        "$ref": "#/$defs/ProviderConformanceCheck"
+      },
+      "title": "Policychecks",
+      "type": "array"
+    },
+    "providerKind": {
+      "enum": [
+        "openai_responses",
+        "anthropic_messages"
+      ],
+      "title": "Providerkind",
+      "type": "string"
+    },
+    "rawPersistence": {
+      "default": false,
+      "title": "Rawpersistence",
+      "type": "boolean"
+    },
+    "requestHashes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Requesthashes",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "control-plane.provider-conformance/v1",
+      "default": "control-plane.provider-conformance/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "default": "fail",
+      "enum": [
+        "pass",
+        "fail",
+        "conditional"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "providerKind"
+  ],
+  "title": "ProviderConformanceReport",
+  "type": "object"
+}

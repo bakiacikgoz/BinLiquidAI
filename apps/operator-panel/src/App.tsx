@@ -1195,6 +1195,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const codeIntelligence = controlPlaneSnapshot?.codeIntelligence ?? null;
   const pilotOperations = controlPlaneSnapshot?.pilotOperations ?? null;
   const designPartnerBeta = controlPlaneSnapshot?.designPartnerBeta ?? null;
+  const providerGovernance = controlPlaneSnapshot?.providerGovernance ?? null;
+  const providerRuntime = controlPlaneSnapshot?.providerRuntime ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -1689,6 +1691,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             codeIntelligence={codeIntelligence}
             pilotOperations={pilotOperations}
             designPartnerBeta={designPartnerBeta}
+            providerGovernance={providerGovernance}
+            providerRuntime={providerRuntime}
             locale={locale}
           />
         ) : null}

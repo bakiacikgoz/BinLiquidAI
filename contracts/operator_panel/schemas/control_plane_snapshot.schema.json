@@ -1660,6 +1660,463 @@
       "title": "PolicyPackSummary",
       "type": "object"
     },
+    "ProviderGovernanceSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "contractVersion": {
+          "const": "control-plane.provider-governance/v1",
+          "default": "control-plane.provider-governance/v1",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "overallStatus": {
+          "default": "conditional",
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Overallstatus",
+          "type": "string"
+        },
+        "providers": {
+          "items": {
+            "$ref": "#/$defs/ProviderRegistryEntry"
+          },
+          "title": "Providers",
+          "type": "array"
+        }
+      },
+      "title": "ProviderGovernanceSnapshot",
+      "type": "object"
+    },
+    "ProviderInvocationArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "createdAtUtc": {
+          "format": "date-time",
+          "title": "Createdatutc",
+          "type": "string"
+        },
+        "evidenceMode": {
+          "const": "hash_only",
+          "default": "hash_only",
+          "title": "Evidencemode",
+          "type": "string"
+        },
+        "invocationId": {
+          "title": "Invocationid",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "policyDecision": {
+          "additionalProperties": true,
+          "title": "Policydecision",
+          "type": "object"
+        },
+        "providerKind": {
+          "title": "Providerkind",
+          "type": "string"
+        },
+        "rawPersistence": {
+          "const": false,
+          "default": false,
+          "title": "Rawpersistence",
+          "type": "boolean"
+        },
+        "requestHash": {
+          "title": "Requesthash",
+          "type": "string"
+        },
+        "responseHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Responsehash"
+        },
+        "runtimeMode": {
+          "enum": [
+            "offline_conformance",
+            "dry_run",
+            "canary_live",
+            "disabled"
+          ],
+          "title": "Runtimemode",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "provider.invocation.v1",
+          "default": "provider.invocation.v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked",
+            "conditional",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "toolPolicy": {
+          "$ref": "#/$defs/ProviderToolPolicy"
+        }
+      },
+      "required": [
+        "status",
+        "invocationId",
+        "providerKind",
+        "model",
+        "runtimeMode",
+        "policyDecision",
+        "requestHash",
+        "toolPolicy"
+      ],
+      "title": "ProviderInvocationArtifact",
+      "type": "object"
+    },
+    "ProviderRegistryEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "canaryOnly": {
+          "default": true,
+          "title": "Canaryonly",
+          "type": "boolean"
+        },
+        "credentialState": {
+          "default": "missing",
+          "enum": [
+            "missing",
+            "configured",
+            "not_required",
+            "redacted"
+          ],
+          "title": "Credentialstate",
+          "type": "string"
+        },
+        "customToolsPolicy": {
+          "default": "proposal_only",
+          "enum": [
+            "proposal_only",
+            "approval_required",
+            "execute"
+          ],
+          "title": "Customtoolspolicy",
+          "type": "string"
+        },
+        "displayName": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Displayname",
+          "type": "string"
+        },
+        "lastConformanceStatus": {
+          "anyOf": [
+            {
+              "enum": [
+                "pass",
+                "fail",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastconformancestatus"
+        },
+        "providerKind": {
+          "enum": [
+            "ollama",
+            "transformers",
+            "openai_responses",
+            "anthropic_messages",
+            "google_gemini",
+            "deepseek_chat"
+          ],
+          "title": "Providerkind",
+          "type": "string"
+        },
+        "retentionPolicy": {
+          "const": "hash_only_store_false",
+          "default": "hash_only_store_false",
+          "title": "Retentionpolicy",
+          "type": "string"
+        },
+        "serverToolsPolicy": {
+          "default": "denied",
+          "enum": [
+            "denied",
+            "approval_required"
+          ],
+          "title": "Servertoolspolicy",
+          "type": "string"
+        },
+        "status": {
+          "default": "blocked",
+          "enum": [
+            "available",
+            "blocked",
+            "conditional",
+            "canary_only"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "supportsStreaming": {
+          "default": false,
+          "title": "Supportsstreaming",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "providerKind",
+        "displayName"
+      ],
+      "title": "ProviderRegistryEntry",
+      "type": "object"
+    },
+    "ProviderRuntimeSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "contractVersion": {
+          "const": "control-plane.provider-runtime/v1",
+          "default": "control-plane.provider-runtime/v1",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "latestInvocations": {
+          "items": {
+            "$ref": "#/$defs/ProviderInvocationArtifact"
+          },
+          "title": "Latestinvocations",
+          "type": "array"
+        },
+        "workflowProofs": {
+          "items": {
+            "$ref": "#/$defs/ProviderWorkflowProofArtifact"
+          },
+          "title": "Workflowproofs",
+          "type": "array"
+        }
+      },
+      "title": "ProviderRuntimeSnapshot",
+      "type": "object"
+    },
+    "ProviderToolPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "customToolsPolicy": {
+          "default": "proposal_only",
+          "enum": [
+            "proposal_only",
+            "approval_required",
+            "execute"
+          ],
+          "title": "Customtoolspolicy",
+          "type": "string"
+        },
+        "requestedServerTools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requestedservertools",
+          "type": "array"
+        },
+        "serverToolsPolicy": {
+          "default": "denied",
+          "enum": [
+            "denied",
+            "approval_required"
+          ],
+          "title": "Servertoolspolicy",
+          "type": "string"
+        }
+      },
+      "title": "ProviderToolPolicy",
+      "type": "object"
+    },
+    "ProviderWorkflowProofArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "agentId": {
+          "title": "Agentid",
+          "type": "string"
+        },
+        "approvalTicketsCreated": {
+          "default": 0,
+          "title": "Approvalticketscreated",
+          "type": "integer"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "evidenceArtifacts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidenceartifacts",
+          "type": "array"
+        },
+        "executedMutations": {
+          "default": 0,
+          "title": "Executedmutations",
+          "type": "integer"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "proposals": {
+          "items": {
+            "$ref": "#/$defs/ProviderWorkflowProposal"
+          },
+          "title": "Proposals",
+          "type": "array"
+        },
+        "providerInvocations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Providerinvocations",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": "provider.workflow-proof.v1",
+          "default": "provider.workflow-proof.v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "workflowId": {
+          "title": "Workflowid",
+          "type": "string"
+        },
+        "workflowKind": {
+          "const": "read_only_ops_triage",
+          "title": "Workflowkind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "workflowId",
+        "workflowKind",
+        "agentId"
+      ],
+      "title": "ProviderWorkflowProofArtifact",
+      "type": "object"
+    },
+    "ProviderWorkflowProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "effectSummary": {
+          "title": "Effectsummary",
+          "type": "string"
+        },
+        "executionMode": {
+          "const": "proposal_only",
+          "default": "proposal_only",
+          "title": "Executionmode",
+          "type": "string"
+        },
+        "proposalId": {
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "riskClass": {
+          "enum": [
+            "read_only",
+            "mutation",
+            "destructive"
+          ],
+          "title": "Riskclass",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposalId",
+        "actionId",
+        "riskClass",
+        "effectSummary"
+      ],
+      "title": "ProviderWorkflowProposal",
+      "type": "object"
+    },
     "QuickActionSummary": {
       "additionalProperties": false,
       "properties": {
@@ -2212,6 +2669,12 @@
       },
       "title": "Policypacks",
       "type": "array"
+    },
+    "providerGovernance": {
+      "$ref": "#/$defs/ProviderGovernanceSnapshot"
+    },
+    "providerRuntime": {
+      "$ref": "#/$defs/ProviderRuntimeSnapshot"
     },
     "quickActions": {
       "items": {

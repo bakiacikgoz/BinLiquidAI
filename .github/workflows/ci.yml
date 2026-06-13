@@ -31,6 +31,15 @@ jobs:
       - name: Config resolve gate
         run: uv run binliquid config resolve --profile balanced --json
 
+      - name: Provider governance gates
+        env:
+          BINLIQUID_PROVIDER_LIVE_CANARY_OPT_IN: "0"
+        run: |
+          make provider-native-gate
+          make provider-runtime-gate
+          make provider-workflow-proof-gate
+          make design-partner-rc-audit-gate
+
       - name: Write test summary artifact
         run: |
           mkdir -p artifacts

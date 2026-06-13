@@ -61,7 +61,7 @@ export function TopControls({
           <span
             className="warning-inline topbar-warning-inline"
             role="status"
-            aria-label={operatorWarning}
+            aria-label="Identity required"
             title={operatorWarning}
           >
             <Icon name="shield" />

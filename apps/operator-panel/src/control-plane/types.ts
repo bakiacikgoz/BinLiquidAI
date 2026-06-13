@@ -350,6 +350,85 @@ export interface DesignPartnerBetaStatus {
   warnings: string[];
 }
 
+export interface ProviderRegistryEntry {
+  providerKind:
+    | 'ollama'
+    | 'transformers'
+    | 'openai_responses'
+    | 'anthropic_messages'
+    | 'google_gemini'
+    | 'deepseek_chat';
+  displayName: string;
+  status: 'available' | 'blocked' | 'conditional' | 'canary_only';
+  credentialState: 'missing' | 'configured' | 'not_required' | 'redacted';
+  canaryOnly: boolean;
+  supportsStreaming: boolean;
+  serverToolsPolicy: 'denied' | 'approval_required';
+  customToolsPolicy: 'proposal_only' | 'approval_required' | 'execute';
+  retentionPolicy: 'hash_only_store_false';
+  lastConformanceStatus?: 'pass' | 'fail' | 'unknown' | null;
+  blockingReasons: string[];
+}
+
+export interface ProviderGovernanceSnapshot {
+  contractVersion: 'control-plane.provider-governance/v1';
+  generatedAtUtc: string;
+  providers: ProviderRegistryEntry[];
+  overallStatus: 'ready' | 'conditional' | 'blocked';
+  blockingReasons: string[];
+}
+
+export interface ProviderInvocationArtifact {
+  schemaVersion: 'provider.invocation.v1';
+  status: 'pass' | 'blocked' | 'conditional' | 'error';
+  invocationId: string;
+  providerKind: string;
+  model: string;
+  runtimeMode: 'offline_conformance' | 'dry_run' | 'canary_live' | 'disabled';
+  policyDecision: Record<string, unknown>;
+  requestHash: string;
+  responseHash?: string | null;
+  rawPersistence: false;
+  evidenceMode: 'hash_only';
+  toolPolicy: {
+    serverToolsPolicy: 'denied' | 'approval_required';
+    customToolsPolicy: 'proposal_only' | 'approval_required' | 'execute';
+    requestedServerTools: string[];
+  };
+  blockingReasons: string[];
+  createdAtUtc: string;
+}
+
+export interface ProviderWorkflowProofArtifact {
+  schemaVersion: 'provider.workflow-proof.v1';
+  status: 'pass' | 'conditional' | 'blocked' | 'error';
+  workflowId: string;
+  workflowKind: 'read_only_ops_triage';
+  agentId: string;
+  providerInvocations: string[];
+  proposals: Array<{
+    proposalId: string;
+    actionId: string;
+    riskClass: 'read_only' | 'mutation' | 'destructive';
+    executionMode: 'proposal_only';
+    effectSummary: string;
+  }>;
+  executedMutations: number;
+  approvalTicketsCreated: number;
+  evidenceArtifacts: string[];
+  blockingReasons: string[];
+  generatedAtUtc: string;
+}
+
+export interface ProviderRuntimeSnapshot {
+  contractVersion: 'control-plane.provider-runtime/v1';
+  generatedAtUtc: string;
+  enabled: boolean;
+  latestInvocations: ProviderInvocationArtifact[];
+  workflowProofs: ProviderWorkflowProofArtifact[];
+  blockingReasons: string[];
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -372,6 +451,8 @@ export interface ControlPlaneSnapshot {
   codeIntelligence: CodeIntelligenceSummary;
   pilotOperations: PilotOperationsStatus;
   designPartnerBeta: DesignPartnerBetaStatus;
+  providerGovernance: ProviderGovernanceSnapshot;
+  providerRuntime: ProviderRuntimeSnapshot;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

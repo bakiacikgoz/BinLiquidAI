@@ -5,9 +5,12 @@ import type {
   PilotLaunchReadinessStatus,
   PilotLaunchStatusTile,
   PilotOperationsStatus,
+  ProviderGovernanceSnapshot,
+  ProviderRuntimeSnapshot,
 } from '../../control-plane/types';
 import type { UiLocale } from '../../i18n';
 import { DesignPartnerBetaReadinessCard } from './DesignPartnerBetaReadinessCard';
+import { ProviderTrustSurface } from './ProviderTrustSurface';
 
 const copy = {
   en: {
@@ -79,6 +82,8 @@ export function ControlPlaneDashboard({
   codeIntelligence,
   pilotOperations,
   designPartnerBeta,
+  providerGovernance,
+  providerRuntime,
   locale = 'en',
 }: {
   doctor: unknown;
@@ -89,6 +94,8 @@ export function ControlPlaneDashboard({
   codeIntelligence?: CodeIntelligenceSummary | null;
   pilotOperations?: PilotOperationsStatus | null;
   designPartnerBeta?: DesignPartnerBetaStatus | null;
+  providerGovernance?: ProviderGovernanceSnapshot | null;
+  providerRuntime?: ProviderRuntimeSnapshot | null;
   locale?: UiLocale;
 }) {
   const text = copy[locale];
@@ -120,6 +127,7 @@ export function ControlPlaneDashboard({
         <SafetyPostureCard doctorRecord={doctorRecord} claimCounts={claimCounts} text={text} />
         <PilotLaunchCandidateCard pilotLaunch={pilotLaunch} text={text} />
         <NextActionsCard pilotLaunch={pilotLaunch} text={text} />
+        <ProviderTrustSurface snapshot={providerGovernance} runtime={providerRuntime} locale={locale} />
         <DesignPartnerBetaReadinessCard
           codeIntelligence={codeIntelligence}
           pilotOperations={pilotOperations}

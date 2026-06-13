@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "ProviderWorkflowProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "actionId": {
+          "title": "Actionid",
+          "type": "string"
+        },
+        "effectSummary": {
+          "title": "Effectsummary",
+          "type": "string"
+        },
+        "executionMode": {
+          "const": "proposal_only",
+          "default": "proposal_only",
+          "title": "Executionmode",
+          "type": "string"
+        },
+        "proposalId": {
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "riskClass": {
+          "enum": [
+            "read_only",
+            "mutation",
+            "destructive"
+          ],
+          "title": "Riskclass",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposalId",
+        "actionId",
+        "riskClass",
+        "effectSummary"
+      ],
+      "title": "ProviderWorkflowProposal",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "title": "Agentid",
+      "type": "string"
+    },
+    "approvalTicketsCreated": {
+      "default": 0,
+      "title": "Approvalticketscreated",
+      "type": "integer"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "evidenceArtifacts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidenceartifacts",
+      "type": "array"
+    },
+    "executedMutations": {
+      "default": 0,
+      "title": "Executedmutations",
+      "type": "integer"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "proposals": {
+      "items": {
+        "$ref": "#/$defs/ProviderWorkflowProposal"
+      },
+      "title": "Proposals",
+      "type": "array"
+    },
+    "providerInvocations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Providerinvocations",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "provider.workflow-proof.v1",
+      "default": "provider.workflow-proof.v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked",
+        "error"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workflowId": {
+      "title": "Workflowid",
+      "type": "string"
+    },
+    "workflowKind": {
+      "const": "read_only_ops_triage",
+      "title": "Workflowkind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "workflowId",
+    "workflowKind",
+    "agentId"
+  ],
+  "title": "ProviderWorkflowProofArtifact",
+  "type": "object"
+}

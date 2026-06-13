@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from binliquid.control_plane.models import (
     AlertSummary,
@@ -11,6 +13,7 @@ from binliquid.control_plane.models import (
     DesignPartnerRcStatus,
     EvidencePackSummary,
     ExecutionSurfaceSummary,
+    ProviderGovernanceSnapshot,
     ReportSummary,
 )
 
@@ -33,6 +36,76 @@ EXPECTED_BLOCKED_BOUNDARY_REASONS = {
     "WINDOWS_SIGNED_RC_EVIDENCE_MISSING",
 }
 
+EXPECTED_RC_AUDIT_CONDITIONALS = {
+    "design-partner-beta",
+    "provider-governance",
+    "evidence-index",
+    "reports",
+    "preview-source",
+    "enterprise-hat-a",
+    "active-alerts",
+    "artifact:external_gateway_smoke.json",
+    "artifact:policy_pack_promotion.json",
+    "artifact:evidence_index.json",
+    "artifact:reports-alerts-logs/manifest.json",
+    "artifact:control-plane-snapshot.json",
+    "artifact:claim-guard-matrix.json",
+    "artifact:design-partner-rc-status.json",
+    "artifact:DESIGN_PARTNER_RC_REPORT.md",
+}
+
+
+@dataclass(frozen=True)
+class DesignPartnerRcAuditResult:
+    strict_status: Literal["pass", "conditional", "blocked"]
+    audit_status: Literal["pass", "blocked"]
+    expected_conditionals: tuple[str, ...]
+    unexpected_warnings: tuple[str, ...]
+    blockers: tuple[str, ...]
+    exit_mode: Literal["strict", "blocker_only"]
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "schemaVersion": "control-plane.design-partner-rc-audit/v1",
+            "strictStatus": self.strict_status,
+            "auditStatus": self.audit_status,
+            "expectedConditionals": list(self.expected_conditionals),
+            "unexpectedWarnings": list(self.unexpected_warnings),
+            "blockers": list(self.blockers),
+            "exitMode": self.exit_mode,
+        }
+
+
+def evaluate_design_partner_rc_audit(
+    rc_manifest: Mapping[str, Any],
+    *,
+    expected_conditionals: set[str],
+    fail_on_unexpected_warning: bool = True,
+) -> DesignPartnerRcAuditResult:
+    blockers = tuple(sorted(str(item) for item in rc_manifest.get("blockers", []) if item))
+    warnings = tuple(sorted(str(item) for item in rc_manifest.get("warnings", []) if item))
+    expected = tuple(item for item in warnings if item in expected_conditionals)
+    unexpected = tuple(item for item in warnings if item not in expected_conditionals)
+    manifest_status = str(
+        rc_manifest.get("status", rc_manifest.get("designPartnerRcStatus", "pass"))
+    )
+    strict_status: Literal["pass", "conditional", "blocked"]
+    if blockers or manifest_status == "blocked":
+        strict_status = "blocked"
+    elif warnings or manifest_status == "conditional":
+        strict_status = "conditional"
+    else:
+        strict_status = "pass"
+    audit_blocked = bool(blockers) or (fail_on_unexpected_warning and bool(unexpected))
+    return DesignPartnerRcAuditResult(
+        strict_status=strict_status,
+        audit_status="blocked" if audit_blocked else "pass",
+        expected_conditionals=tuple(sorted(expected)),
+        unexpected_warnings=tuple(sorted(unexpected)),
+        blockers=blockers,
+        exit_mode="blocker_only",
+    )
+
 
 def build_design_partner_rc_status(
     *,
@@ -43,6 +116,7 @@ def build_design_partner_rc_status(
     alerts: list[AlertSummary],
     execution_surfaces: list[ExecutionSurfaceSummary],
     design_partner_beta: DesignPartnerBetaStatus | None = None,
+    provider_governance: ProviderGovernanceSnapshot | None = None,
     generated_at: datetime | None = None,
     artifact_root: str = "artifacts/design-partner-rc",
 ) -> DesignPartnerRcStatus:
@@ -64,6 +138,7 @@ def build_design_partner_rc_status(
             f"mode={data_source.mode}",
         ),
         _beta_precondition_check(design_partner_beta),
+        _provider_governance_check(provider_governance),
         _conditional_check(
             "evidence-index",
             "Evidence coverage",
@@ -175,6 +250,46 @@ def _beta_precondition_check(
         status="passed" if design_partner_beta.status == "ready" else "conditional",
         detail=f"status={design_partner_beta.status}",
         blocking=False,
+    )
+
+
+def _provider_governance_check(
+    provider_governance: ProviderGovernanceSnapshot | None,
+) -> DesignPartnerRcCheck:
+    if provider_governance is None:
+        return DesignPartnerRcCheck(
+            check_id="provider-governance",
+            label="Provider governance",
+            status="passed",
+            detail="status=not_requested",
+            blocking=False,
+        )
+    external = [
+        provider
+        for provider in provider_governance.providers
+        if provider.provider_kind in {"openai_responses", "anthropic_messages"}
+    ]
+    conformance_ready = all(provider.last_conformance_status == "pass" for provider in external)
+    policies_safe = all(
+        provider.server_tools_policy == "denied"
+        and provider.custom_tools_policy == "proposal_only"
+        and provider.retention_policy == "hash_only_store_false"
+        for provider in external
+    )
+    ready = provider_governance.overall_status == "ready" and conformance_ready and policies_safe
+    conditional = (
+        provider_governance.overall_status == "conditional" and conformance_ready and policies_safe
+    )
+    return DesignPartnerRcCheck(
+        check_id="provider-governance",
+        label="Provider governance",
+        status="passed" if ready else "conditional" if conditional else "failed",
+        detail=(
+            f"status={provider_governance.overall_status} "
+            f"externalProviders={len(external)} "
+            f"blockingReasons={','.join(provider_governance.blocking_reasons) or 'none'}"
+        ),
+        blocking=not (ready or conditional),
     )
 
 

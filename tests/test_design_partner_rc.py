@@ -10,6 +10,8 @@ from binliquid.control_plane.models import (
     DesignPartnerBetaStatus,
     EvidencePackSummary,
     ExecutionSurfaceSummary,
+    ProviderGovernanceSnapshot,
+    ProviderRegistryEntry,
     ReportSummary,
 )
 
@@ -111,6 +113,42 @@ def test_design_partner_rc_ready_when_required_evidence_is_present() -> None:
     assert status.status == "ready"
     assert status.blockers == []
     assert status.warnings == []
+
+
+def test_design_partner_rc_includes_provider_governance_warning_when_credentials_missing() -> None:
+    status = build_design_partner_rc_status(
+        data_source=_data_source(),
+        claims=_claims("allowed"),
+        evidence_packs=_ready_evidence_packs(),
+        reports=_ready_reports(),
+        alerts=_resolved_alerts(),
+        execution_surfaces=_blocked_surfaces(),
+        design_partner_beta=_beta_status("ready"),
+        provider_governance=ProviderGovernanceSnapshot(
+            generated_at_utc=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+            overall_status="conditional",
+            blocking_reasons=["blocked_external_credentials"],
+            providers=[
+                ProviderRegistryEntry(
+                    provider_kind="openai_responses",
+                    display_name="OpenAI Responses Native Preview",
+                    status="blocked",
+                    credential_state="missing",
+                    canary_only=True,
+                    supports_streaming=True,
+                    server_tools_policy="denied",
+                    custom_tools_policy="proposal_only",
+                    retention_policy="hash_only_store_false",
+                    last_conformance_status="pass",
+                    blocking_reasons=["blocked_external_credentials"],
+                )
+            ],
+        ),
+        generated_at=datetime(2026, 6, 1, 12, 0, tzinfo=UTC),
+    )
+
+    assert status.status == "conditional"
+    assert "provider-governance" in status.warnings
 
 
 def test_design_partner_rc_ignores_expected_blocked_boundary_alerts() -> None:
