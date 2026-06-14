@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "bundleSha256": {
+      "title": "Bundlesha256",
+      "type": "string"
+    },
+    "completedValidation": {
+      "title": "Completedvalidation",
+      "type": "boolean"
+    },
+    "nonDeveloperOperator": {
+      "title": "Nondeveloperoperator",
+      "type": "boolean"
+    },
+    "notesRedacted": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notesredacted"
+    },
+    "operatorDisplayName": {
+      "title": "Operatordisplayname",
+      "type": "string"
+    },
+    "operatorRole": {
+      "title": "Operatorrole",
+      "type": "string"
+    },
+    "releasePackId": {
+      "title": "Releasepackid",
+      "type": "string"
+    },
+    "reviewedRunbook": {
+      "title": "Reviewedrunbook",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "binliquid-non-developer-operator-attestation/v1",
+      "default": "binliquid-non-developer-operator-attestation/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "signedAtUtc": {
+      "format": "date-time",
+      "title": "Signedatutc",
+      "type": "string"
+    },
+    "targetEnvironmentLabelHash": {
+      "title": "Targetenvironmentlabelhash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "releasePackId",
+    "targetEnvironmentLabelHash",
+    "bundleSha256",
+    "operatorDisplayName",
+    "operatorRole",
+    "nonDeveloperOperator",
+    "reviewedRunbook",
+    "completedValidation",
+    "signedAtUtc"
+  ],
+  "title": "OperatorAttestationBinding",
+  "type": "object"
+}

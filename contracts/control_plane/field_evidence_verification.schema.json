@@ -1,0 +1,112 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "bundleSha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bundlesha256"
+    },
+    "evidenceRefs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidencerefs",
+      "type": "array"
+    },
+    "itemCount": {
+      "default": 0,
+      "title": "Itemcount",
+      "type": "integer"
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "rehearsal",
+            "target_environment"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mode"
+    },
+    "piiPersistence": {
+      "default": false,
+      "title": "Piipersistence",
+      "type": "boolean"
+    },
+    "rawPersistence": {
+      "default": false,
+      "title": "Rawpersistence",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "control-plane.field-evidence-verification/v1",
+      "default": "control-plane.field-evidence-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "secretPersistence": {
+      "default": false,
+      "title": "Secretpersistence",
+      "type": "boolean"
+    },
+    "sessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sessionid"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked",
+        "invalid"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "verifiedAtUtc": {
+      "format": "date-time",
+      "title": "Verifiedatutc",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "FieldEvidenceVerificationResult",
+  "type": "object"
+}

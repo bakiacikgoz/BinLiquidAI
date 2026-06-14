@@ -825,6 +825,30 @@
       "TARGET_ENVIRONMENT_REHEARSAL_ONLY"
     ]
   },
+  "designPartnerFieldEvidence": {
+    "attestationStatus": "valid",
+    "blockedClaims": [
+      "public-desktop-installer",
+      "live-macos-computer-use",
+      "live-windows-computer-use",
+      "live-linux-computer-use",
+      "multi-tenant-cloud-control-plane"
+    ],
+    "blockingReasons": [],
+    "evidenceMode": "hash_only",
+    "generatedAtUtc": "2026-06-14T00:00:00Z",
+    "itemCount": 6,
+    "latestAttestationPath": "artifacts/design-partner-field-evidence/attestation_validation.json",
+    "latestBundlePath": "artifacts/design-partner-field-evidence/target_evidence_bundle.json",
+    "latestPromotionPath": "artifacts/design-partner-field-evidence/strict_rc_promotion.json",
+    "mode": "target_environment",
+    "rawPersistence": false,
+    "schemaVersion": "control-plane.design-partner-field-evidence/v1",
+    "sessionId": "field-preview-session",
+    "status": "ready",
+    "strictRcStatus": "ready",
+    "warnings": []
+  },
   "governedPilotWorkflow": {
     "blockedClaims": [
       "public-desktop-installer",

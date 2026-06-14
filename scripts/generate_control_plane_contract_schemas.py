@@ -16,6 +16,15 @@ from binliquid.control_plane.external_contracts import (  # noqa: E402
     ExternalAgentRequestV11,
     ExternalAgentV11Result,
 )
+from binliquid.control_plane.field_evidence import (  # noqa: E402
+    DesignPartnerFieldEvidenceSnapshot,
+    DesignPartnerFieldPackManifest,
+    FieldEvidenceBundle,
+    FieldEvidenceSession,
+    FieldEvidenceVerificationResult,
+    OperatorAttestationBinding,
+    OperatorAttestationValidationResult,
+)
 from binliquid.control_plane.install_rehearsal import InstallRehearsalReport  # noqa: E402
 from binliquid.control_plane.models import (  # noqa: E402
     ActionProposal,
@@ -57,6 +66,7 @@ from binliquid.control_plane.pilot_workflow_models import (  # noqa: E402
     GovernedPilotWorkflowVerification,
 )
 from binliquid.control_plane.policy_pack_store import PolicyPackLifecycleRecord  # noqa: E402
+from binliquid.control_plane.strict_rc_promotion import StrictRCPromotionReport  # noqa: E402
 
 SCHEMAS = {
     "agent_spec": AgentSpec,
@@ -102,6 +112,14 @@ SCHEMAS = {
     "governed_pilot_workflow_report": GovernedPilotWorkflowReport,
     "governed_pilot_workflow_verification": GovernedPilotWorkflowVerification,
     "governed_pilot_workflow_snapshot": GovernedPilotWorkflowSnapshot,
+    "field_evidence_session": FieldEvidenceSession,
+    "field_evidence_bundle": FieldEvidenceBundle,
+    "field_evidence_verification": FieldEvidenceVerificationResult,
+    "operator_attestation_binding": OperatorAttestationBinding,
+    "operator_attestation_binding_verification": OperatorAttestationValidationResult,
+    "strict_rc_promotion": StrictRCPromotionReport,
+    "design_partner_field_evidence_snapshot": DesignPartnerFieldEvidenceSnapshot,
+    "design_partner_field_pack": DesignPartnerFieldPackManifest,
 }
 
 OPERATOR_PANEL_SCHEMAS = {

@@ -1,0 +1,102 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attestationValidationPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attestationvalidationpath"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "bundlePath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bundlepath"
+    },
+    "fieldRoot": {
+      "title": "Fieldroot",
+      "type": "string"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "rcRoot": {
+      "title": "Rcroot",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "control-plane.design-partner-field-pack/v1",
+      "default": "control-plane.design-partner-field-pack/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "sessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sessionid"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "strictRcReportPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Strictrcreportpath"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "fieldRoot",
+    "rcRoot"
+  ],
+  "title": "DesignPartnerFieldPackManifest",
+  "type": "object"
+}

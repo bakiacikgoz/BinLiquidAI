@@ -1,0 +1,81 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "bundleSha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bundlesha256"
+    },
+    "releasePackId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Releasepackid"
+    },
+    "schemaVersion": {
+      "const": "control-plane.operator-attestation-binding-verification/v1",
+      "default": "control-plane.operator-attestation-binding-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "sessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sessionid"
+    },
+    "status": {
+      "enum": [
+        "valid",
+        "missing",
+        "invalid",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "validatedAtUtc": {
+      "format": "date-time",
+      "title": "Validatedatutc",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "OperatorAttestationValidationResult",
+  "type": "object"
+}

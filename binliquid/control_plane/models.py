@@ -1383,6 +1383,37 @@ class TargetEvidenceClosureSummary(StrictModel):
     )
 
 
+class DesignPartnerFieldEvidenceSnapshot(StrictModel):
+    schema_version: Literal["control-plane.design-partner-field-evidence/v1"] = Field(
+        default="control-plane.design-partner-field-evidence/v1",
+        alias="schemaVersion",
+    )
+    generated_at_utc: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        alias="generatedAtUtc",
+    )
+    status: Literal["ready", "conditional", "blocked", "missing"] = "missing"
+    mode: Literal["rehearsal", "target_environment"] | None = None
+    session_id: str | None = Field(default=None, alias="sessionId")
+    evidence_mode: Literal["hash_only"] = Field(default="hash_only", alias="evidenceMode")
+    raw_persistence: bool = Field(default=False, alias="rawPersistence")
+    attestation_status: Literal["missing", "valid", "invalid", "blocked"] = Field(
+        default="missing",
+        alias="attestationStatus",
+    )
+    strict_rc_status: Literal["ready", "conditional", "blocked", "missing"] = Field(
+        default="missing",
+        alias="strictRcStatus",
+    )
+    item_count: int = Field(default=0, alias="itemCount")
+    blocked_claims: list[str] = Field(default_factory=list, alias="blockedClaims")
+    latest_bundle_path: str | None = Field(default=None, alias="latestBundlePath")
+    latest_attestation_path: str | None = Field(default=None, alias="latestAttestationPath")
+    latest_promotion_path: str | None = Field(default=None, alias="latestPromotionPath")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
@@ -1434,6 +1465,10 @@ class ControlPlaneSnapshot(StrictModel):
     target_evidence_closure: TargetEvidenceClosureSummary = Field(
         default_factory=TargetEvidenceClosureSummary,
         alias="targetEvidenceClosure",
+    )
+    design_partner_field_evidence: DesignPartnerFieldEvidenceSnapshot = Field(
+        default_factory=DesignPartnerFieldEvidenceSnapshot,
+        alias="designPartnerFieldEvidence",
     )
     memory_governance: MemoryAuthoritySnapshot = Field(
         default_factory=disabled_memory_authority_snapshot,

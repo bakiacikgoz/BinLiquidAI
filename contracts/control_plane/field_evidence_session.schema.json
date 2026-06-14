@@ -1,0 +1,151 @@
+{
+  "$defs": {
+    "TargetEnvironmentDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "configHash": {
+          "title": "Confighash",
+          "type": "string"
+        },
+        "createdAtUtc": {
+          "format": "date-time",
+          "title": "Createdatutc",
+          "type": "string"
+        },
+        "environmentId": {
+          "title": "Environmentid",
+          "type": "string"
+        },
+        "environmentLabel": {
+          "title": "Environmentlabel",
+          "type": "string"
+        },
+        "environmentLabelHash": {
+          "title": "Environmentlabelhash",
+          "type": "string"
+        },
+        "platformSummary": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Platformsummary",
+          "type": "object"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "runtimeMode": {
+          "const": "self_hosted",
+          "default": "self_hosted",
+          "title": "Runtimemode",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "control-plane.target-environment/v1",
+          "default": "control-plane.target-environment/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        }
+      },
+      "required": [
+        "environmentId",
+        "environmentLabel",
+        "environmentLabelHash",
+        "profile",
+        "configHash"
+      ],
+      "title": "TargetEnvironmentDescriptor",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactRoot": {
+      "title": "Artifactroot",
+      "type": "string"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "commitSha": {
+      "title": "Commitsha",
+      "type": "string"
+    },
+    "expiresAtUtc": {
+      "format": "date-time",
+      "title": "Expiresatutc",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "rehearsal",
+        "target_environment"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "preparedAtUtc": {
+      "format": "date-time",
+      "title": "Preparedatutc",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "control-plane.field-evidence-session/v1",
+      "default": "control-plane.field-evidence-session/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "sessionId": {
+      "title": "Sessionid",
+      "type": "string"
+    },
+    "status": {
+      "default": "prepared",
+      "enum": [
+        "prepared",
+        "collecting",
+        "collected",
+        "verified",
+        "attested",
+        "promotion_evaluated",
+        "expired",
+        "blocked",
+        "invalid",
+        "rc_ready"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "targetEnvironment": {
+      "$ref": "#/$defs/TargetEnvironmentDescriptor"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sessionId",
+    "mode",
+    "targetEnvironment",
+    "preparedAtUtc",
+    "expiresAtUtc",
+    "commitSha",
+    "profile",
+    "artifactRoot"
+  ],
+  "title": "FieldEvidenceSession",
+  "type": "object"
+}

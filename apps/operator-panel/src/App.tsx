@@ -128,6 +128,7 @@ import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
 import { MemorySemanticIndexView } from './memory-semantic/MemorySemanticIndexView';
+import { DesignPartnerFieldEvidenceView } from './provider-governance/DesignPartnerFieldEvidenceView';
 import type { ShellViewKey } from './components/shell/Sidebar';
 import type { RouteId } from './routeRegistry';
 
@@ -1211,6 +1212,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const memorySemanticIndex = controlPlaneSnapshot?.memorySemanticIndex ?? null;
   const memoryPolicyEnforcement = controlPlaneSnapshot?.memoryPolicyEnforcement ?? null;
   const governedPilotWorkflow = controlPlaneSnapshot?.governedPilotWorkflow ?? null;
+  const designPartnerFieldEvidence = controlPlaneSnapshot?.designPartnerFieldEvidence ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2546,6 +2548,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'governed-pilot-workflow' ? (
           <GovernedPilotWorkflowView snapshot={governedPilotWorkflow} locale={locale} />
+        ) : null}
+
+        {activeView === 'design-partner-field-evidence' ? (
+          <DesignPartnerFieldEvidenceView snapshot={designPartnerFieldEvidence} locale={locale} />
         ) : null}
 
         {activeView === 'operations' ? (

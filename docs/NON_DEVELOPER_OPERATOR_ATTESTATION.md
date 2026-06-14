@@ -65,3 +65,21 @@ when:
 
 If no attestation is provided, the drill remains valid only as
 `operator_proxy_dry_run`.
+
+## Field Evidence Binding
+
+For design-partner field evidence closure, the attestation is bound to a
+specific target-environment session and evidence bundle:
+
+```bash
+uv run binliquid pilot field attest-verify \
+  --session artifacts/design-partner-field-evidence/session.json \
+  --bundle artifacts/design-partner-field-evidence/target_evidence_bundle.json \
+  --operator-attestation artifacts/design-partner-field-evidence/operator_attestation.json \
+  --output artifacts/design-partner-field-evidence/attestation_validation.json
+```
+
+The attestation must include the exact `sessionId`,
+`targetEnvironmentLabelHash`, and `bundleSha256` from the generated evidence
+files. Placeholder operator names, implementation actor roles, missing booleans,
+or mismatched hashes are invalid and cannot support strict RC promotion.

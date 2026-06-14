@@ -58,6 +58,16 @@ from binliquid.control_plane.external_gateway import (
     submit_external_action_file,
     submit_external_action_v1_1_file,
 )
+from binliquid.control_plane.field_evidence import (
+    build_design_partner_field_pack,
+    collect_field_evidence_bundle,
+    load_field_bundle,
+    load_field_session,
+    prepare_field_evidence_session,
+    validate_independent_operator_attestation,
+    verify_field_evidence_bundle,
+    write_attestation_template,
+)
 from binliquid.control_plane.install_rehearsal import run_install_rehearsal
 from binliquid.control_plane.operations_runner import dry_run_operation
 from binliquid.control_plane.pilot_operations import generate_pilot_operations_artifacts
@@ -112,6 +122,7 @@ from binliquid.control_plane.reports import build_reports_alerts_logs_manifest
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
 from binliquid.control_plane.security_review import generate_security_review_pack
 from binliquid.control_plane.snapshot import build_control_plane_snapshot
+from binliquid.control_plane.strict_rc_promotion import promote_strict_rc
 from binliquid.core.llm_ollama import OllamaLLM, check_provider_chain
 from binliquid.core.orchestrator import Orchestrator
 from binliquid.core.planner import Planner
@@ -251,6 +262,8 @@ control_plane_operations_app = typer.Typer(help="Control Plane operation workflo
 pilot_app = typer.Typer(help="Design partner pilot operations commands")
 pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
 control_plane_pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
+pilot_field_app = typer.Typer(help="Design partner field evidence commands")
+control_plane_pilot_field_app = typer.Typer(help="Design partner field evidence commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -309,6 +322,8 @@ control_plane_app.add_typer(control_plane_operations_app, name="operations")
 app.add_typer(pilot_app, name="pilot")
 pilot_app.add_typer(pilot_workflow_app, name="workflow")
 control_plane_pilot_app.add_typer(control_plane_pilot_workflow_app, name="workflow")
+pilot_app.add_typer(pilot_field_app, name="field")
+control_plane_pilot_app.add_typer(control_plane_pilot_field_app, name="field")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -469,9 +484,7 @@ def _build_orchestrator(
         selected_router_mode = "rule"
     router = _build_router(config=config, router_mode=selected_router_mode)
     effective_shadow_enabled = (
-        config.shadow_router_enabled
-        if shadow_router_enabled is None
-        else shadow_router_enabled
+        config.shadow_router_enabled if shadow_router_enabled is None else shadow_router_enabled
     )
     if sltc_mode == "shadow":
         effective_shadow_enabled = True
@@ -678,9 +691,7 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
         }
 
     provider_names = (
-        ["ollama", "transformers"]
-        if normalized_provider == "all"
-        else [normalized_provider]
+        ["ollama", "transformers"] if normalized_provider == "all" else [normalized_provider]
     )
     providers: list[dict[str, object]] = []
 
@@ -859,9 +870,7 @@ def _computer_use_capability_snapshot(
     current_platform_label: str,
     current_commit: str,
 ) -> dict[str, object]:
-    evidence_by_platform, evidence_paths = _computer_use_evidence_payloads(
-        computer_use_config
-    )
+    evidence_by_platform, evidence_paths = _computer_use_evidence_payloads(computer_use_config)
     return resolve_capability_decision_snapshot(
         config=computer_use_config,
         profile=profile,
@@ -1113,13 +1122,10 @@ def control_plane_doctor(
     identity_payload = describe_actor(config)
     identity_available = (not config.identity.enabled) or bool(identity_payload.get("verified"))
     signing = key_status(config)
-    signing_available = (
-        config.security.mode != "enterprise"
-        or (
-            signing.get("enterprise_compatible") is True
-            and signing.get("private_key_present") is True
-            and int(signing.get("trusted_key_count") or 0) > 0
-        )
+    signing_available = config.security.mode != "enterprise" or (
+        signing.get("enterprise_compatible") is True
+        and signing.get("private_key_present") is True
+        and int(signing.get("trusted_key_count") or 0) > 0
     )
     readiness = build_readiness_report(config)
     blocking_reasons: list[str] = []
@@ -1911,6 +1917,210 @@ def pilot_workflow_export(
         raise typer.Exit(code=1)
 
 
+def _normalize_field_evidence_mode(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized not in {"rehearsal", "target_environment"}:
+        raise typer.BadParameter("mode must be rehearsal or target-environment")
+    return normalized
+
+
+@pilot_field_app.command("prepare")
+@control_plane_pilot_field_app.command("prepare")
+def pilot_field_prepare(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    mode: str = typer.Option("rehearsal", "--mode", help="rehearsal or target-environment"),
+    target_environment_label: str = typer.Option(
+        ...,
+        "--target-environment-label",
+        help="Redacted field target environment label.",
+    ),
+    output_root: str = typer.Option(
+        "artifacts/design-partner-field-evidence",
+        "--output-root",
+        help="Field evidence output root.",
+    ),
+    force_new_session: bool = typer.Option(
+        False,
+        "--force-new-session/--reuse-session",
+        help="Replace an existing prepared session.",
+    ),
+    ack_target_environment: bool = typer.Option(
+        False,
+        "--ack-target-environment",
+        help="Required for target-environment sessions.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    normalized_mode = _normalize_field_evidence_mode(mode)
+    if normalized_mode == "target_environment" and not ack_target_environment:
+        _emit_payload(
+            {
+                "status": "blocked",
+                "blockingReasons": ["TARGET_ENVIRONMENT_ACK_REQUIRED"],
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=2)
+    session = prepare_field_evidence_session(
+        config=RuntimeConfig.from_profile(profile),
+        mode=normalized_mode,  # type: ignore[arg-type]
+        environment_label=target_environment_label,
+        output_root=Path(output_root),
+        force_new_session=force_new_session,
+    )
+    _emit_payload(session.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@pilot_field_app.command("collect")
+@control_plane_pilot_field_app.command("collect")
+def pilot_field_collect(
+    session_path: str = typer.Option(..., "--session", help="Prepared field session JSON path."),
+    evidence_root: str = typer.Option("artifacts", "--evidence-root", help="Source evidence root."),
+    output_root: str | None = typer.Option(None, "--output-root", help="Bundle output root."),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    session = load_field_session(Path(session_path))
+    bundle = collect_field_evidence_bundle(
+        session=session,
+        evidence_root=Path(evidence_root),
+        output_root=Path(output_root) if output_root else Path(session_path).parent,
+    )
+    _emit_payload(bundle.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if bundle.blocking_reasons:
+        raise typer.Exit(code=1)
+
+
+@pilot_field_app.command("verify")
+@control_plane_pilot_field_app.command("verify")
+def pilot_field_verify(
+    bundle: str = typer.Option(..., "--bundle", help="Field target evidence bundle path."),
+    output: str | None = typer.Option(None, "--output", help="Optional verification JSON path."),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    result = verify_field_evidence_bundle(bundle_path=Path(bundle))
+    if output:
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        Path(output).write_text(
+            json.dumps(result.model_dump(mode="json", by_alias=True), indent=2, sort_keys=True)
+            + "\n",
+            encoding="utf-8",
+        )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status in {"blocked", "invalid"}:
+        raise typer.Exit(code=1)
+
+
+@pilot_field_app.command("attestation-template")
+@control_plane_pilot_field_app.command("attestation-template")
+def pilot_field_attestation_template(
+    session_path: str = typer.Option(..., "--session", help="Prepared field session JSON path."),
+    bundle: str = typer.Option(..., "--bundle", help="Field target evidence bundle path."),
+    output: str = typer.Option(..., "--output", help="Attestation template output path."),
+    release_pack_id: str = typer.Option("design-partner-rc-v1", "--release-pack-id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    output_path = write_attestation_template(
+        session=load_field_session(Path(session_path)),
+        bundle=load_field_bundle(Path(bundle)),
+        output_path=Path(output),
+        release_pack_id=release_pack_id,
+    )
+    _emit_payload({"status": "created", "path": str(output_path)}, json_output=json_output)
+
+
+@pilot_field_app.command("attest-verify")
+@control_plane_pilot_field_app.command("attest-verify")
+def pilot_field_attest_verify(
+    session_path: str = typer.Option(..., "--session", help="Prepared field session JSON path."),
+    bundle: str = typer.Option(..., "--bundle", help="Field target evidence bundle path."),
+    operator_attestation: str = typer.Option(
+        ...,
+        "--operator-attestation",
+        help="Independent non-developer operator attestation JSON.",
+    ),
+    output: str | None = typer.Option(None, "--output", help="Optional validation JSON path."),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    session = load_field_session(Path(session_path))
+    evidence_bundle = load_field_bundle(Path(bundle))
+    result = validate_independent_operator_attestation(
+        attestation_path=Path(operator_attestation),
+        session=session,
+        bundle=evidence_bundle,
+    )
+    output_path = Path(output) if output else Path(bundle).parent / "attestation_validation.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(result.model_dump(mode="json", by_alias=True), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status != "valid":
+        raise typer.Exit(code=1)
+
+
+@pilot_field_app.command("promote-rc")
+@control_plane_pilot_field_app.command("promote-rc")
+def pilot_field_promote_rc(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    field_root: str = typer.Option(
+        "artifacts/design-partner-field-evidence",
+        "--field-root",
+        help="Field evidence artifact root.",
+    ),
+    rc_root: str = typer.Option(
+        "artifacts/design-partner-rc",
+        "--rc-root",
+        help="Existing design partner RC artifact root.",
+    ),
+    output_root: str | None = typer.Option(None, "--output-root", help="Promotion output root."),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    report = promote_strict_rc(
+        profile=profile,
+        field_root=Path(field_root),
+        rc_root=Path(rc_root),
+        output_root=Path(output_root) if output_root else Path(field_root),
+    )
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=1)
+    if report.status == "conditional":
+        raise typer.Exit(code=2)
+
+
+@pilot_field_app.command("pack")
+@control_plane_pilot_field_app.command("pack")
+def pilot_field_pack(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    field_root: str = typer.Option(
+        "artifacts/design-partner-field-evidence",
+        "--field-root",
+        help="Field evidence artifact root.",
+    ),
+    rc_root: str = typer.Option(
+        "artifacts/design-partner-rc",
+        "--rc-root",
+        help="Existing design partner RC artifact root.",
+    ),
+    output_root: str = typer.Option(
+        "artifacts/design-partner-field-pack",
+        "--output-root",
+        help="Field evidence release pack output root.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    manifest = build_design_partner_field_pack(
+        field_root=Path(field_root),
+        rc_root=Path(rc_root),
+        output_root=Path(output_root),
+        config=RuntimeConfig.from_profile(profile),
+    )
+    _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if manifest.status == "blocked":
+        raise typer.Exit(code=1)
+
+
 @control_plane_claims_app.command("verify")
 def control_plane_claims_verify(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
@@ -2119,10 +2329,10 @@ def config_resolve(
 
     payload = _with_contract_version(
         {
-        "profile": profile,
-        "status": "ok",
-        "resolved": redact_config_payload(resolved.model_dump(mode="python")),
-        "source_map": source_map,
+            "profile": profile,
+            "status": "ok",
+            "resolved": redact_config_payload(resolved.model_dump(mode="python")),
+            "source_map": source_map,
         }
     )
     if json_output:
@@ -3269,8 +3479,7 @@ def operator_capabilities(
             "adapterStatus": "safari_applescript",
             "reasonCode": "MACOS_COMPUTER_USE_PILOT",
             "summary": (
-                "macOS computer-use pilot is qualification-gated behind "
-                "fail-closed controls."
+                "macOS computer-use pilot is qualification-gated behind fail-closed controls."
             ),
         }
     )
@@ -4374,9 +4583,7 @@ def team_status(
     try:
         payload = _with_contract_version(load_job_status(job_id, root_dir=root_dir))
     except Exception as exc:  # noqa: BLE001
-        typer.echo(
-            json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2)
-        )
+        typer.echo(json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2))
         raise typer.Exit(code=1) from None
 
     if json_output:
@@ -4421,9 +4628,7 @@ def team_replay(
     try:
         payload = _with_contract_version(replay_job(job_id, root_dir=root_dir, verify=verify))
     except Exception as exc:  # noqa: BLE001
-        typer.echo(
-            json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2)
-        )
+        typer.echo(json.dumps({"status": "error", "error": str(exc), "job_id": job_id}, indent=2))
         raise typer.Exit(code=1) from None
     if json_output:
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -4522,6 +4727,7 @@ def team_pilot_check(
 
     live_builder = None
     if mode.strip().lower() == "live-provider":
+
         def _live_builder(runtime_config: RuntimeConfig):
             return _build_orchestrator(
                 runtime_config,
@@ -4568,9 +4774,7 @@ def team_pilot_check(
         counters = payload.get("counters", {})
         checks = payload.get("checks", {})
         replay_status = (
-            "ok"
-            if checks.get("replay_integrity", {}).get("status") == "pass"
-            else "fail"
+            "ok" if checks.get("replay_integrity", {}).get("status") == "pass" else "fail"
         )
         tamper_status = (
             "fail"
@@ -4930,11 +5134,7 @@ def qualification_run_cmd(
     try:
         selected_workloads = None
         if workloads is not None:
-            selected_workloads = [
-                item.strip()
-                for item in workloads.split(",")
-                if item.strip()
-            ]
+            selected_workloads = [item.strip() for item in workloads.split(",") if item.strip()]
         payload = run_qualification(
             config=resolved,
             mode=mode,

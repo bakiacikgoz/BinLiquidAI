@@ -443,6 +443,25 @@ export interface TargetEvidenceClosureSummary {
   attestationStatus: 'missing' | 'present' | 'signed' | 'invalid';
 }
 
+export interface DesignPartnerFieldEvidenceSnapshot {
+  schemaVersion: 'control-plane.design-partner-field-evidence/v1';
+  generatedAtUtc: string;
+  status: 'ready' | 'conditional' | 'blocked' | 'missing';
+  mode?: 'rehearsal' | 'target_environment' | null;
+  sessionId?: string | null;
+  evidenceMode: 'hash_only';
+  rawPersistence: boolean;
+  attestationStatus: 'missing' | 'valid' | 'invalid' | 'blocked';
+  strictRcStatus: 'ready' | 'conditional' | 'blocked' | 'missing';
+  itemCount: number;
+  blockedClaims: string[];
+  latestBundlePath?: string | null;
+  latestAttestationPath?: string | null;
+  latestPromotionPath?: string | null;
+  blockingReasons: string[];
+  warnings: string[];
+}
+
 export interface MemoryAuthorityRecordsSummary {
   active: number;
   expired: number;
@@ -603,6 +622,7 @@ export interface ControlPlaneSnapshot {
   providerGovernance: ProviderGovernanceSnapshot;
   providerRuntime: ProviderRuntimeSnapshot;
   targetEvidenceClosure: TargetEvidenceClosureSummary;
+  designPartnerFieldEvidence?: DesignPartnerFieldEvidenceSnapshot;
   memoryGovernance?: MemoryAuthoritySnapshot;
   memoryRuntime?: MemoryRuntimeSnapshot;
   memorySync?: MemorySyncSnapshot;

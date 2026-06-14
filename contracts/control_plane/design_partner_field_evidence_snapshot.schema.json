@@ -1,0 +1,152 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attestationStatus": {
+      "default": "missing",
+      "enum": [
+        "missing",
+        "valid",
+        "invalid",
+        "blocked"
+      ],
+      "title": "Attestationstatus",
+      "type": "string"
+    },
+    "blockedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockedclaims",
+      "type": "array"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "evidenceMode": {
+      "const": "hash_only",
+      "default": "hash_only",
+      "title": "Evidencemode",
+      "type": "string"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "itemCount": {
+      "default": 0,
+      "title": "Itemcount",
+      "type": "integer"
+    },
+    "latestAttestationPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latestattestationpath"
+    },
+    "latestBundlePath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latestbundlepath"
+    },
+    "latestPromotionPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latestpromotionpath"
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "rehearsal",
+            "target_environment"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mode"
+    },
+    "rawPersistence": {
+      "default": false,
+      "title": "Rawpersistence",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "control-plane.design-partner-field-evidence/v1",
+      "default": "control-plane.design-partner-field-evidence/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "sessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sessionid"
+    },
+    "status": {
+      "default": "missing",
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked",
+        "missing"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "strictRcStatus": {
+      "default": "missing",
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked",
+        "missing"
+      ],
+      "title": "Strictrcstatus",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "title": "DesignPartnerFieldEvidenceSnapshot",
+  "type": "object"
+}
