@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "control-plane.governed-pilot-workflow-report/v1",
+  "blockedClaims": [],
+  "blockingReasons": [
+    "RAW_LEAK_DETECTED"
+  ],
+  "claimGuardEvidenceRef": null,
+  "claimGuardStatus": "fail",
+  "evidenceManifestPath": null,
+  "evidenceMode": "hash_only",
+  "generatedAtUtc": "2026-06-14T00:00:00Z",
+  "mode": "deterministic",
+  "profile": "enterprise",
+  "rawLeakDetected": true,
+  "rawPersistence": false,
+  "reportHash": "sha256:fixture",
+  "reportPath": "artifacts/governed-pilot-workflow/raw-leak/report.json",
+  "runId": "raw-leak-fixture",
+  "status": "fail",
+  "steps": [
+    {
+      "approval": {
+        "componentId": "approval-gate",
+        "evidenceRefs": [],
+        "metrics": {},
+        "reasonCodes": [
+          "RAW_LEAK_DETECTED"
+        ],
+        "status": "fail"
+      },
+      "blockingReasons": [
+        "RAW_LEAK_DETECTED"
+      ],
+      "evidence": {
+        "componentId": "hash-only-evidence",
+        "evidenceRefs": [],
+        "metrics": {
+          "leak": "BEGIN RAW prompt data"
+        },
+        "reasonCodes": [
+          "RAW_LEAK_DETECTED"
+        ],
+        "status": "fail"
+      },
+      "memory": {
+        "componentId": "memory-runtime-policy",
+        "evidenceRefs": [],
+        "metrics": {},
+        "reasonCodes": [
+          "RAW_LEAK_DETECTED"
+        ],
+        "status": "fail"
+      },
+      "provider": {
+        "componentId": "provider-runtime-dry-run",
+        "evidenceRefs": [],
+        "metrics": {},
+        "reasonCodes": [
+          "RAW_LEAK_DETECTED"
+        ],
+        "status": "fail"
+      },
+      "scenarioId": "raw-leak-fixture",
+      "status": "fail",
+      "userIntentHash": "sha256:fixture",
+      "warnings": []
+    }
+  ],
+  "summaryPath": null,
+  "unsupportedClaimAllowed": false,
+  "warnings": [],
+  "workflowId": "raw-leak-fixture"
+}

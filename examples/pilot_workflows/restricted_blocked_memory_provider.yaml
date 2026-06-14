@@ -1,0 +1,42 @@
+schemaVersion: control-plane.governed-pilot-workflow-spec/v1
+workflowId: restricted-blocked-memory-provider
+title: Restricted governed pilot proof with blocked live claims
+profile: enterprise
+mode: deterministic
+environmentLabel: local-deterministic-restricted
+claimsUnderTest:
+  - enterprise-self-hosted-agent-control-plane
+blockedClaims:
+  - public-desktop-installer
+  - live-macos-computer-use
+  - multi-tenant-cloud-control-plane
+scenarios:
+  - scenarioId: restricted-dry-run
+    title: Restricted dry-run keeps live surfaces blocked
+    userIntent: Prepare an approval-only operational recommendation from governed evidence.
+    memory:
+      workspaceId: workspace-main
+      principalId: operator-main
+      actorId: operator-main
+      requesterRole: operator
+      agentId: agent-alpha
+      teamId: team-alpha
+      query: provider governance follow ups
+      semanticRuntimeMode: observe
+      requiredStatuses:
+        - pass
+      writeExpectation: proposal_only
+    provider:
+      providerKind: anthropic_messages
+      model: claude-placeholder
+      runtimeMode: dry_run
+      expectedStatus: pass
+      evidenceMode: hash_only
+      rawPersistence: false
+    approval:
+      expectedStatus: proposal_only
+      executedMutations: 0
+    evidence:
+      evidenceMode: hash_only
+      rawPersistence: false
+      requireVerifierPass: true

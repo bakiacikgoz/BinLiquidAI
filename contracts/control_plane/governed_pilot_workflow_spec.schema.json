@@ -1,0 +1,281 @@
+{
+  "$defs": {
+    "GovernedPilotScenario": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/PilotWorkflowApprovalExpectation"
+        },
+        "evidence": {
+          "$ref": "#/$defs/PilotWorkflowEvidenceExpectation"
+        },
+        "memory": {
+          "$ref": "#/$defs/PilotWorkflowMemoryExpectation"
+        },
+        "provider": {
+          "$ref": "#/$defs/PilotWorkflowProviderExpectation"
+        },
+        "scenarioId": {
+          "title": "Scenarioid",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "userIntent": {
+          "title": "Userintent",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scenarioId",
+        "title",
+        "userIntent"
+      ],
+      "title": "GovernedPilotScenario",
+      "type": "object"
+    },
+    "PilotWorkflowApprovalExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "executedMutations": {
+          "const": 0,
+          "default": 0,
+          "title": "Executedmutations",
+          "type": "integer"
+        },
+        "expectedStatus": {
+          "default": "proposal_only",
+          "enum": [
+            "proposal_only",
+            "approval_required",
+            "blocked"
+          ],
+          "title": "Expectedstatus",
+          "type": "string"
+        }
+      },
+      "title": "PilotWorkflowApprovalExpectation",
+      "type": "object"
+    },
+    "PilotWorkflowEvidenceExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidenceMode": {
+          "const": "hash_only",
+          "default": "hash_only",
+          "title": "Evidencemode",
+          "type": "string"
+        },
+        "rawPersistence": {
+          "const": false,
+          "default": false,
+          "title": "Rawpersistence",
+          "type": "boolean"
+        },
+        "requireVerifierPass": {
+          "default": true,
+          "title": "Requireverifierpass",
+          "type": "boolean"
+        }
+      },
+      "title": "PilotWorkflowEvidenceExpectation",
+      "type": "object"
+    },
+    "PilotWorkflowMemoryExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "actorId": {
+          "default": "operator-main",
+          "title": "Actorid",
+          "type": "string"
+        },
+        "agentId": {
+          "default": "agent-alpha",
+          "title": "Agentid",
+          "type": "string"
+        },
+        "principalId": {
+          "default": "operator-main",
+          "title": "Principalid",
+          "type": "string"
+        },
+        "query": {
+          "default": "hash only policy evidence",
+          "title": "Query",
+          "type": "string"
+        },
+        "requesterRole": {
+          "default": "operator",
+          "title": "Requesterrole",
+          "type": "string"
+        },
+        "requiredStatuses": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requiredstatuses",
+          "type": "array"
+        },
+        "semanticRuntimeMode": {
+          "default": "enforced",
+          "enum": [
+            "disabled",
+            "observe",
+            "enforced"
+          ],
+          "title": "Semanticruntimemode",
+          "type": "string"
+        },
+        "teamId": {
+          "default": "team-alpha",
+          "title": "Teamid",
+          "type": "string"
+        },
+        "workspaceId": {
+          "default": "workspace-main",
+          "title": "Workspaceid",
+          "type": "string"
+        },
+        "writeExpectation": {
+          "default": "proposal_only",
+          "enum": [
+            "proposal_only",
+            "written",
+            "blocked"
+          ],
+          "title": "Writeexpectation",
+          "type": "string"
+        }
+      },
+      "title": "PilotWorkflowMemoryExpectation",
+      "type": "object"
+    },
+    "PilotWorkflowProviderExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "evidenceMode": {
+          "const": "hash_only",
+          "default": "hash_only",
+          "title": "Evidencemode",
+          "type": "string"
+        },
+        "expectedStatus": {
+          "default": "pass",
+          "enum": [
+            "pass",
+            "blocked",
+            "conditional",
+            "error"
+          ],
+          "title": "Expectedstatus",
+          "type": "string"
+        },
+        "model": {
+          "default": "gpt-placeholder",
+          "title": "Model",
+          "type": "string"
+        },
+        "providerKind": {
+          "default": "openai_responses",
+          "enum": [
+            "openai_responses",
+            "anthropic_messages"
+          ],
+          "title": "Providerkind",
+          "type": "string"
+        },
+        "rawPersistence": {
+          "const": false,
+          "default": false,
+          "title": "Rawpersistence",
+          "type": "boolean"
+        },
+        "runtimeMode": {
+          "default": "dry_run",
+          "enum": [
+            "dry_run",
+            "offline_conformance",
+            "disabled"
+          ],
+          "title": "Runtimemode",
+          "type": "string"
+        }
+      },
+      "title": "PilotWorkflowProviderExpectation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockedclaims",
+      "type": "array"
+    },
+    "claimsUnderTest": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Claimsundertest",
+      "type": "array"
+    },
+    "environmentLabel": {
+      "default": "local-deterministic",
+      "title": "Environmentlabel",
+      "type": "string"
+    },
+    "mode": {
+      "default": "deterministic",
+      "enum": [
+        "deterministic",
+        "dry_run",
+        "target_rehearsal"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "profile": {
+      "default": "enterprise",
+      "title": "Profile",
+      "type": "string"
+    },
+    "scenarios": {
+      "items": {
+        "$ref": "#/$defs/GovernedPilotScenario"
+      },
+      "title": "Scenarios",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "control-plane.governed-pilot-workflow-spec/v1",
+      "default": "control-plane.governed-pilot-workflow-spec/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "workflowId": {
+      "title": "Workflowid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflowId",
+    "title"
+  ],
+  "title": "GovernedPilotWorkflowSpec",
+  "type": "object"
+}

@@ -942,6 +942,147 @@
       "title": "ExecutionSurfaceSummary",
       "type": "object"
     },
+    "GovernedPilotWorkflowSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "blockedClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedclaims",
+          "type": "array"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "claimGuardStatus": {
+          "default": "missing",
+          "title": "Claimguardstatus",
+          "type": "string"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "evidenceMode": {
+          "const": "hash_only",
+          "default": "hash_only",
+          "title": "Evidencemode",
+          "type": "string"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "latestReportPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latestreportpath"
+        },
+        "latestSummaryPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latestsummarypath"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mode"
+        },
+        "rawPersistence": {
+          "default": false,
+          "title": "Rawpersistence",
+          "type": "boolean"
+        },
+        "runId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runid"
+        },
+        "schemaVersion": {
+          "const": "control-plane.governed-pilot-workflow/v1",
+          "default": "control-plane.governed-pilot-workflow/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "default": "missing",
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "verifierStatus": {
+          "default": "missing",
+          "enum": [
+            "pass",
+            "fail",
+            "missing"
+          ],
+          "title": "Verifierstatus",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "workflowId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workflowid"
+        }
+      },
+      "title": "GovernedPilotWorkflowSnapshot",
+      "type": "object"
+    },
     "LogEventSummary": {
       "additionalProperties": false,
       "properties": {
@@ -3407,6 +3548,9 @@
       "format": "date-time",
       "title": "Generatedatutc",
       "type": "string"
+    },
+    "governedPilotWorkflow": {
+      "$ref": "#/$defs/GovernedPilotWorkflowSnapshot"
     },
     "logs": {
       "items": {

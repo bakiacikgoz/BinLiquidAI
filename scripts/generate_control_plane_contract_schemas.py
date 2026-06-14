@@ -50,6 +50,12 @@ from binliquid.control_plane.models import (  # noqa: E402
     TargetEvidenceClosureSummary,
     TargetEvidenceSession,
 )
+from binliquid.control_plane.pilot_workflow_models import (  # noqa: E402
+    GovernedPilotWorkflowReport,
+    GovernedPilotWorkflowSnapshot,
+    GovernedPilotWorkflowSpec,
+    GovernedPilotWorkflowVerification,
+)
 from binliquid.control_plane.policy_pack_store import PolicyPackLifecycleRecord  # noqa: E402
 
 SCHEMAS = {
@@ -92,6 +98,10 @@ SCHEMAS = {
     "external_agent_response": ExternalActionResponse,
     "external_agent_request_v1_1": ExternalAgentRequestV11,
     "external_agent_result_v1_1": ExternalAgentV11Result,
+    "governed_pilot_workflow_spec": GovernedPilotWorkflowSpec,
+    "governed_pilot_workflow_report": GovernedPilotWorkflowReport,
+    "governed_pilot_workflow_verification": GovernedPilotWorkflowVerification,
+    "governed_pilot_workflow_snapshot": GovernedPilotWorkflowSnapshot,
 }
 
 OPERATOR_PANEL_SCHEMAS = {

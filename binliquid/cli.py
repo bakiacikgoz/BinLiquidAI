@@ -62,6 +62,15 @@ from binliquid.control_plane.install_rehearsal import run_install_rehearsal
 from binliquid.control_plane.operations_runner import dry_run_operation
 from binliquid.control_plane.pilot_operations import generate_pilot_operations_artifacts
 from binliquid.control_plane.pilot_pack import generate_design_partner_pilot_pack
+from binliquid.control_plane.pilot_workflow import (
+    load_governed_pilot_workflow_spec,
+    run_governed_pilot_workflow,
+    validate_governed_pilot_workflow_spec,
+)
+from binliquid.control_plane.pilot_workflow_verifier import (
+    export_governed_pilot_workflow_report,
+    verify_governed_pilot_workflow_report,
+)
 from binliquid.control_plane.policy_pack_store import (
     plan_policy_pack_rollback,
     promote_policy_pack,
@@ -240,6 +249,8 @@ control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
 control_plane_reports_app = typer.Typer(help="Control Plane reports and alerts commands")
 control_plane_operations_app = typer.Typer(help="Control Plane operation workflow commands")
 pilot_app = typer.Typer(help="Design partner pilot operations commands")
+pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
+control_plane_pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -296,6 +307,8 @@ control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
 control_plane_app.add_typer(control_plane_reports_app, name="reports")
 control_plane_app.add_typer(control_plane_operations_app, name="operations")
 app.add_typer(pilot_app, name="pilot")
+pilot_app.add_typer(pilot_workflow_app, name="workflow")
+control_plane_pilot_app.add_typer(control_plane_pilot_workflow_app, name="workflow")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -1825,6 +1838,76 @@ def pilot_beta_pack(
     )
     _emit_payload(manifest, json_output=json_output)
     if manifest["status"] == "blocked":
+        raise typer.Exit(code=1)
+
+
+@pilot_workflow_app.command("validate")
+@control_plane_pilot_workflow_app.command("validate")
+def pilot_workflow_validate(
+    spec: str = typer.Option(
+        ...,
+        "--spec",
+        help="Governed pilot workflow YAML/JSON spec path.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    result = validate_governed_pilot_workflow_spec(spec)
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@pilot_workflow_app.command("run")
+@control_plane_pilot_workflow_app.command("run")
+def pilot_workflow_run(
+    spec: str = typer.Option(
+        ...,
+        "--spec",
+        help="Governed pilot workflow YAML/JSON spec path.",
+    ),
+    profile: str | None = typer.Option(None, "--profile", help="Runtime profile override."),
+    mode: str | None = typer.Option(None, "--mode", help="Workflow mode override."),
+    output_root: str = typer.Option(
+        "artifacts/governed-pilot-workflow",
+        "--output-root",
+        help="Governed pilot workflow artifact output root.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    report = run_governed_pilot_workflow(
+        load_governed_pilot_workflow_spec(spec),
+        profile=profile,
+        mode=mode,
+        output_root=output_root,
+    )
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status not in {"pass", "conditional"}:
+        raise typer.Exit(code=1)
+
+
+@pilot_workflow_app.command("verify")
+@control_plane_pilot_workflow_app.command("verify")
+def pilot_workflow_verify(
+    report: str = typer.Option(..., "--report", help="Governed pilot workflow report path."),
+    strict: bool = typer.Option(True, "--strict/--no-strict", help="Verify manifest refs."),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    result = verify_governed_pilot_workflow_report(report, strict=strict)
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@pilot_workflow_app.command("export")
+@control_plane_pilot_workflow_app.command("export")
+def pilot_workflow_export(
+    report: str = typer.Option(..., "--report", help="Governed pilot workflow report path."),
+    output: str = typer.Option(..., "--output", help="Export JSON path."),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    result = export_governed_pilot_workflow_report(report, output)
+    _emit_payload(result, json_output=json_output)
+    if result["status"] != "pass":
         raise typer.Exit(code=1)
 
 

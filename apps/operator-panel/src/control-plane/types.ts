@@ -559,6 +559,25 @@ export interface MemoryPolicyEnforcementSnapshot {
   rawContentIncluded: false;
 }
 
+export interface GovernedPilotWorkflowSnapshot {
+  schemaVersion: 'control-plane.governed-pilot-workflow/v1';
+  generatedAtUtc: string;
+  enabled: boolean;
+  status: 'pass' | 'conditional' | 'blocked' | 'missing';
+  workflowId?: string | null;
+  runId?: string | null;
+  mode?: string | null;
+  evidenceMode: 'hash_only';
+  rawPersistence: boolean;
+  claimGuardStatus: string;
+  blockedClaims: string[];
+  latestReportPath?: string | null;
+  latestSummaryPath?: string | null;
+  verifierStatus: 'pass' | 'fail' | 'missing';
+  blockingReasons: string[];
+  warnings: string[];
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -590,6 +609,7 @@ export interface ControlPlaneSnapshot {
   memoryAuthority?: WorkspaceMemoryAuthorityHealth;
   memorySemanticIndex?: MemorySemanticIndexSnapshot;
   memoryPolicyEnforcement?: MemoryPolicyEnforcementSnapshot;
+  governedPilotWorkflow?: GovernedPilotWorkflowSnapshot;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

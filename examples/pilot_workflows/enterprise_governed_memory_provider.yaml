@@ -1,0 +1,46 @@
+schemaVersion: control-plane.governed-pilot-workflow-spec/v1
+workflowId: enterprise-governed-memory-provider
+title: Enterprise governed memory and provider pilot proof
+profile: enterprise
+mode: deterministic
+environmentLabel: local-deterministic
+claimsUnderTest:
+  - enterprise-self-hosted-agent-control-plane
+blockedClaims:
+  - public-desktop-installer
+  - live-macos-computer-use
+  - live-windows-computer-use
+  - live-linux-computer-use
+  - multi-tenant-cloud-control-plane
+scenarios:
+  - scenarioId: governed-memory-provider-dry-run
+    title: Governed memory read, provider dry-run, approval-only mutation
+    userIntent: Draft a remediation plan from governed memory and provider dry-run evidence.
+    memory:
+      workspaceId: workspace-main
+      principalId: operator-main
+      actorId: operator-main
+      requesterRole: operator
+      agentId: agent-alpha
+      teamId: team-alpha
+      query: hash only policy evidence
+      semanticRuntimeMode: enforced
+      requiredStatuses:
+        - pass
+      writeExpectation: proposal_only
+    provider:
+      providerKind: openai_responses
+      model: gpt-placeholder
+      runtimeMode: dry_run
+      expectedStatus: pass
+      evidenceMode: hash_only
+      rawPersistence: false
+    approval:
+      expectedStatus: proposal_only
+      executedMutations: 0
+    evidence:
+      evidenceMode: hash_only
+      rawPersistence: false
+      requireVerifierPass: true
+notes:
+  - Deterministic local proof only; target partner evidence remains out of scope.

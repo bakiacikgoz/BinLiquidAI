@@ -123,6 +123,7 @@ import { loadControlPlaneSnapshot } from './control-plane/snapshot';
 import type { ControlPlaneSnapshot, EvidencePackSummary, OperationDescriptor, PageViewModel } from './control-plane/types';
 import { asControlPlaneClaimMatrix } from './controlPlaneMappers';
 import { MemoryAuthorityView } from './memory-authority/MemoryAuthorityView';
+import { GovernedPilotWorkflowView } from './governed-pilot-workflow/GovernedPilotWorkflowView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
@@ -1209,6 +1210,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const memoryAuthority = controlPlaneSnapshot?.memoryAuthority ?? null;
   const memorySemanticIndex = controlPlaneSnapshot?.memorySemanticIndex ?? null;
   const memoryPolicyEnforcement = controlPlaneSnapshot?.memoryPolicyEnforcement ?? null;
+  const governedPilotWorkflow = controlPlaneSnapshot?.governedPilotWorkflow ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2540,6 +2542,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'memory-semantic' ? (
           <MemorySemanticIndexView snapshot={memorySemanticIndex} locale={locale} />
+        ) : null}
+
+        {activeView === 'governed-pilot-workflow' ? (
+          <GovernedPilotWorkflowView snapshot={governedPilotWorkflow} locale={locale} />
         ) : null}
 
         {activeView === 'operations' ? (

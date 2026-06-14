@@ -1,0 +1,288 @@
+{
+  "$defs": {
+    "PilotWorkflowComponentResult": {
+      "additionalProperties": false,
+      "properties": {
+        "componentId": {
+          "title": "Componentid",
+          "type": "string"
+        },
+        "evidenceRefs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidencerefs",
+          "type": "array"
+        },
+        "metrics": {
+          "additionalProperties": true,
+          "title": "Metrics",
+          "type": "object"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "fail"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "componentId",
+        "status"
+      ],
+      "title": "PilotWorkflowComponentResult",
+      "type": "object"
+    },
+    "PilotWorkflowStepResult": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/PilotWorkflowComponentResult"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "evidence": {
+          "$ref": "#/$defs/PilotWorkflowComponentResult"
+        },
+        "memory": {
+          "$ref": "#/$defs/PilotWorkflowComponentResult"
+        },
+        "provider": {
+          "$ref": "#/$defs/PilotWorkflowComponentResult"
+        },
+        "scenarioId": {
+          "title": "Scenarioid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "fail"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "userIntentHash": {
+          "title": "Userintenthash",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "scenarioId",
+        "status",
+        "userIntentHash",
+        "memory",
+        "provider",
+        "approval",
+        "evidence"
+      ],
+      "title": "PilotWorkflowStepResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockedclaims",
+      "type": "array"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "claimGuardEvidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Claimguardevidenceref"
+    },
+    "claimGuardStatus": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked",
+        "fail"
+      ],
+      "title": "Claimguardstatus",
+      "type": "string"
+    },
+    "evidenceManifestPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidencemanifestpath"
+    },
+    "evidenceMode": {
+      "const": "hash_only",
+      "default": "hash_only",
+      "title": "Evidencemode",
+      "type": "string"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "deterministic",
+        "dry_run",
+        "target_rehearsal"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rawLeakDetected": {
+      "default": false,
+      "title": "Rawleakdetected",
+      "type": "boolean"
+    },
+    "rawPersistence": {
+      "const": false,
+      "default": false,
+      "title": "Rawpersistence",
+      "type": "boolean"
+    },
+    "reportHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reporthash"
+    },
+    "reportPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reportpath"
+    },
+    "runId": {
+      "title": "Runid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "control-plane.governed-pilot-workflow-report/v1",
+      "default": "control-plane.governed-pilot-workflow-report/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "specHash": {
+      "title": "Spechash",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked",
+        "fail"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/PilotWorkflowStepResult"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "summaryPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summarypath"
+    },
+    "unsupportedClaimAllowed": {
+      "default": false,
+      "title": "Unsupportedclaimallowed",
+      "type": "boolean"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "workflowId": {
+      "title": "Workflowid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflowId",
+    "runId",
+    "profile",
+    "mode",
+    "status",
+    "specHash",
+    "claimGuardStatus"
+  ],
+  "title": "GovernedPilotWorkflowReport",
+  "type": "object"
+}

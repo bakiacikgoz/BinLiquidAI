@@ -825,6 +825,30 @@
       "TARGET_ENVIRONMENT_REHEARSAL_ONLY"
     ]
   },
+  "governedPilotWorkflow": {
+    "blockedClaims": [
+      "public-desktop-installer",
+      "live-macos-computer-use",
+      "live-windows-computer-use",
+      "live-linux-computer-use",
+      "multi-tenant-cloud-control-plane"
+    ],
+    "blockingReasons": [],
+    "claimGuardStatus": "pass",
+    "enabled": true,
+    "evidenceMode": "hash_only",
+    "generatedAtUtc": "2026-06-14T00:00:00Z",
+    "latestReportPath": "artifacts/governed-pilot-workflow/latest/report.json",
+    "latestSummaryPath": "artifacts/governed-pilot-workflow/latest/REPORT.md",
+    "mode": "deterministic",
+    "rawPersistence": false,
+    "runId": "enterprise-governed-memory-provider-20260614000000",
+    "schemaVersion": "control-plane.governed-pilot-workflow/v1",
+    "status": "pass",
+    "verifierStatus": "pass",
+    "warnings": [],
+    "workflowId": "enterprise-governed-memory-provider"
+  },
   "partialReasons": [
     "DATA_SOURCE_PREVIEW_FIXTURE",
     "metrics_snapshot",

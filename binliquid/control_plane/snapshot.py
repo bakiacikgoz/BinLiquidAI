@@ -42,6 +42,7 @@ from binliquid.control_plane.pilot_operations import (
     build_design_partner_beta_status,
     build_pilot_operations_status,
 )
+from binliquid.control_plane.pilot_workflow import build_governed_pilot_workflow_snapshot
 from binliquid.control_plane.provider_registry import build_provider_governance_snapshot
 from binliquid.control_plane.rbac_admin import build_admin_summary
 from binliquid.control_plane.registry import AgentRegistry
@@ -236,6 +237,10 @@ def build_control_plane_snapshot(
             semanticRuntimeMode=config.memory.runtime.semantic_runtime_mode,
             reasonCodes=[f"MEMORY_POLICY_SNAPSHOT_FAILED:{type(exc).__name__}"],
         )
+    governed_pilot_workflow = build_governed_pilot_workflow_snapshot(
+        artifact_root=evidence_root,
+        generated_at=generated_at,
+    )
     design_partner_rc = build_design_partner_rc_status(
         data_source=data_source,
         claims=claims.model_dump(mode="json"),
@@ -309,6 +314,7 @@ def build_control_plane_snapshot(
         memory_authority=memory_authority,
         memory_semantic_index=memory_semantic_index,
         memory_policy_enforcement=memory_policy_enforcement,
+        governed_pilot_workflow=governed_pilot_workflow,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )

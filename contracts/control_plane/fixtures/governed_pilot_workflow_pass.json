@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "control-plane.governed-pilot-workflow-report/v1",
+  "blockedClaims": [
+    "public-desktop-installer",
+    "live-macos-computer-use"
+  ],
+  "blockingReasons": [],
+  "claimGuardEvidenceRef": "artifacts/governed-pilot-workflow/latest/claim_guard.json",
+  "claimGuardStatus": "pass",
+  "evidenceManifestPath": "artifacts/governed-pilot-workflow/latest/evidence_manifest.json",
+  "evidenceMode": "hash_only",
+  "generatedAtUtc": "2026-06-14T00:00:00Z",
+  "mode": "deterministic",
+  "profile": "enterprise",
+  "rawLeakDetected": false,
+  "rawPersistence": false,
+  "reportHash": "sha256:fixture",
+  "reportPath": "artifacts/governed-pilot-workflow/latest/report.json",
+  "runId": "enterprise-governed-memory-provider-20260614000000",
+  "status": "pass",
+  "steps": [],
+  "summaryPath": "artifacts/governed-pilot-workflow/latest/REPORT.md",
+  "unsupportedClaimAllowed": false,
+  "warnings": [],
+  "workflowId": "enterprise-governed-memory-provider"
+}

@@ -106,3 +106,8 @@ Tracking issue: https://github.com/bakiacikgoz/BinLiquidAI/issues/4.
 - Richer admin UI.
 - Broader cloud-native integrations.
 - Full PKCS#11/HSM breadth.
+# Governed Pilot Workflow Follow-Ups
+
+- Add signed target-environment attestation once a design partner has an approved evidence window.
+- Promote target rehearsal from blocked validation to a signed, opt-in workflow with operator attestation.
+- Add historical governed pilot workflow trend cards to the Operator Panel.

@@ -167,3 +167,12 @@ The deterministic UI demo is documented in
 - Regenerate artifacts and rerun `make pilot-readiness-gate` after any code or
   fixture change that affects the Operator Panel, control-plane snapshot,
   evidence, claims, i18n, or Tauri bridge.
+# Governed Pilot Workflow Closure
+
+Design-partner pilot readiness must include a passing governed pilot workflow report before target evidence is treated as release closure evidence. The workflow is deterministic and dry-run only; target customer execution, public desktop installer claims, live computer-use claims, and multi-tenant cloud claims remain out of scope unless separate signed evidence exists.
+
+Primary command:
+
+```bash
+make governed-pilot-workflow-gate
+```

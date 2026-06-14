@@ -45,3 +45,12 @@ No ship if:
   public desktop ready,
 - target-environment signed qualification evidence is absent but enterprise Hat
   A readiness is described as fully ready.
+# Governed Pilot Workflow
+
+Release closure now includes the governed pilot workflow gate:
+
+```bash
+make governed-pilot-workflow-gate
+```
+
+The gate validates the workflow spec, runs deterministic memory/provider/approval evidence, verifies hash-only reports, regenerates schemas, and checks the Operator Panel route.

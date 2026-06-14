@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from binliquid.control_plane.pilot_workflow_models import GovernedPilotWorkflowSnapshot
 from binliquid.memory.models import MemoryAuthoritySnapshot, disabled_memory_authority_snapshot
 from binliquid.memory.runtime_policy_snapshot import MemoryPolicyEnforcementSnapshot
 from binliquid.memory.runtime_snapshot import MemoryRuntimeSnapshot, MemorySyncSnapshot
@@ -1457,6 +1458,10 @@ class ControlPlaneSnapshot(StrictModel):
     memory_policy_enforcement: MemoryPolicyEnforcementSnapshot = Field(
         default_factory=MemoryPolicyEnforcementSnapshot,
         alias="memoryPolicyEnforcement",
+    )
+    governed_pilot_workflow: GovernedPilotWorkflowSnapshot = Field(
+        default_factory=GovernedPilotWorkflowSnapshot,
+        alias="governedPilotWorkflow",
     )
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

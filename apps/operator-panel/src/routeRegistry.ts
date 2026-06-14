@@ -16,6 +16,7 @@ export type RouteId =
   | 'memory-authority'
   | 'memory-runtime'
   | 'memory-semantic'
+  | 'governed-pilot-workflow'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -102,6 +103,13 @@ export const routeGroups: RouteGroup[] = [
         label: 'Semantic Memory',
         heading: 'Semantic Memory',
         icon: 'archive',
+      },
+      {
+        id: 'governed-pilot-workflow',
+        routeId: 'governed-pilot-workflow',
+        label: 'Governed Pilot Workflow',
+        heading: 'Governed Pilot Workflow',
+        icon: 'target',
       },
       { id: 'operations', routeId: 'operations', label: 'Yürütmeler', heading: 'Operations', icon: 'clipboard' },
       { id: 'settings', routeId: 'settings', label: 'Ayarlar', heading: 'Settings', icon: 'settings' },

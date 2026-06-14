@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "control-plane.governed-pilot-workflow-report/v1",
+  "blockedClaims": [],
+  "blockingReasons": [
+    "UNSUPPORTED_CLAIM_ALLOWED"
+  ],
+  "claimGuardEvidenceRef": "artifacts/governed-pilot-workflow/latest/claim_guard.json",
+  "claimGuardStatus": "fail",
+  "evidenceManifestPath": null,
+  "evidenceMode": "hash_only",
+  "generatedAtUtc": "2026-06-14T00:00:00Z",
+  "mode": "deterministic",
+  "profile": "enterprise",
+  "rawLeakDetected": false,
+  "rawPersistence": false,
+  "reportHash": "sha256:fixture",
+  "reportPath": "artifacts/governed-pilot-workflow/claim-overreach/report.json",
+  "runId": "claim-overreach-fixture",
+  "status": "fail",
+  "steps": [],
+  "summaryPath": null,
+  "unsupportedClaimAllowed": true,
+  "warnings": [],
+  "workflowId": "claim-overreach-fixture"
+}
