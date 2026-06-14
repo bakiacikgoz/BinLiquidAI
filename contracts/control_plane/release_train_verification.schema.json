@@ -1,0 +1,94 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "gateStatuses": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Gatestatuses",
+      "type": "object"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "headBranch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headbranch"
+    },
+    "headSha": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headsha"
+    },
+    "manifestPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Manifestpath"
+    },
+    "missingArtifacts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missingartifacts",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "control-plane.release-train-verification/v1",
+      "default": "control-plane.release-train-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "ReleaseTrainVerificationReport",
+  "type": "object"
+}

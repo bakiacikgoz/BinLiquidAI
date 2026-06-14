@@ -18,6 +18,7 @@ Run the relevant gate before requesting merge:
 FALLOW_GATE_MODE=enforce make operator-panel-fallow-gate
 make design-partner-beta-gate
 make design-partner-rc-gate
+make design-partner-handoff-gate
 make pilot-readiness-gate
 make mainline-gate
 git diff --check
@@ -26,6 +27,11 @@ git diff --check
 For a Beta-only branch, `design-partner-rc-gate` may remain conditional if the RC
 evidence closure is intentionally not part of the branch. For RC closure work,
 `design-partner-rc-gate` must pass with `status=pass` and no warnings.
+For design partner RC handoff work, `design-partner-handoff-gate` is the
+operator handoff readiness gate. It may pass with an intentionally conditional
+handoff when target-environment evidence is absent, but it must block on claim
+overreach, leaked raw material, secret markers, hash mismatches, or false ready
+claims.
 
 ## PR Path
 

@@ -1,0 +1,325 @@
+{
+  "$defs": {
+    "ArtifactRootRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactId": {
+          "title": "Artifactid",
+          "type": "string"
+        },
+        "exists": {
+          "title": "Exists",
+          "type": "boolean"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        }
+      },
+      "required": [
+        "artifactId",
+        "path",
+        "exists"
+      ],
+      "title": "ArtifactRootRef",
+      "type": "object"
+    },
+    "ClaimBoundarySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalFreeIrreversibleMutation": {
+          "default": "blocked",
+          "title": "Approvalfreeirreversiblemutation",
+          "type": "string"
+        },
+        "blockedClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedclaims",
+          "type": "array"
+        },
+        "conditionalClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conditionalclaims",
+          "type": "array"
+        },
+        "deferredClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deferredclaims",
+          "type": "array"
+        },
+        "liveComputerUse": {
+          "default": "unknown",
+          "title": "Livecomputeruse",
+          "type": "string"
+        },
+        "publicDesktop": {
+          "default": "unknown",
+          "title": "Publicdesktop",
+          "type": "string"
+        },
+        "unsupportedClaimAllowed": {
+          "default": false,
+          "title": "Unsupportedclaimallowed",
+          "type": "boolean"
+        }
+      },
+      "title": "ClaimBoundarySummary",
+      "type": "object"
+    },
+    "ReleaseTrainGateRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifactpath"
+        },
+        "command": {
+          "title": "Command",
+          "type": "string"
+        },
+        "gateId": {
+          "title": "Gateid",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "status": {
+          "default": "missing",
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "gateId",
+        "command"
+      ],
+      "title": "ReleaseTrainGateRef",
+      "type": "object"
+    },
+    "ReleaseTrainStackItem": {
+      "additionalProperties": false,
+      "properties": {
+        "baseBranch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Basebranch"
+        },
+        "branch": {
+          "title": "Branch",
+          "type": "string"
+        },
+        "headSha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headsha"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "prNumber": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prnumber"
+        },
+        "role": {
+          "enum": [
+            "workspace_memory_authority",
+            "semantic_memory",
+            "memory_policy",
+            "governed_workflow",
+            "field_evidence",
+            "handoff_ops"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "status": {
+          "default": "unknown",
+          "enum": [
+            "pending",
+            "open",
+            "merged",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "branch",
+        "role"
+      ],
+      "title": "ReleaseTrainStackItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactRoots": {
+      "items": {
+        "$ref": "#/$defs/ArtifactRootRef"
+      },
+      "title": "Artifactroots",
+      "type": "array"
+    },
+    "baseBranch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Basebranch"
+    },
+    "claimBoundaries": {
+      "$ref": "#/$defs/ClaimBoundarySummary"
+    },
+    "expectedConditionals": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Expectedconditionals",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "headBranch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headbranch"
+    },
+    "headSha": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headsha"
+    },
+    "mode": {
+      "default": "local",
+      "enum": [
+        "local",
+        "ci",
+        "mainline_post_merge"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "requiredGates": {
+      "items": {
+        "$ref": "#/$defs/ReleaseTrainGateRef"
+      },
+      "title": "Requiredgates",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "control-plane.release-train-manifest/v1",
+      "default": "control-plane.release-train-manifest/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "stack": {
+      "items": {
+        "$ref": "#/$defs/ReleaseTrainStackItem"
+      },
+      "title": "Stack",
+      "type": "array"
+    },
+    "worktreeDirty": {
+      "default": false,
+      "title": "Worktreedirty",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "profile",
+    "claimBoundaries"
+  ],
+  "title": "ReleaseTrainManifest",
+  "type": "object"
+}

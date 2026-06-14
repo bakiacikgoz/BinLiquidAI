@@ -1,0 +1,227 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactId": {
+          "title": "Artifactid",
+          "type": "string"
+        },
+        "exists": {
+          "default": true,
+          "title": "Exists",
+          "type": "boolean"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        }
+      },
+      "required": [
+        "artifactId",
+        "path"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ClaimBoundarySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalFreeIrreversibleMutation": {
+          "default": "blocked",
+          "title": "Approvalfreeirreversiblemutation",
+          "type": "string"
+        },
+        "blockedClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedclaims",
+          "type": "array"
+        },
+        "conditionalClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conditionalclaims",
+          "type": "array"
+        },
+        "deferredClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deferredclaims",
+          "type": "array"
+        },
+        "liveComputerUse": {
+          "default": "unknown",
+          "title": "Livecomputeruse",
+          "type": "string"
+        },
+        "publicDesktop": {
+          "default": "unknown",
+          "title": "Publicdesktop",
+          "type": "string"
+        },
+        "unsupportedClaimAllowed": {
+          "default": false,
+          "title": "Unsupportedclaimallowed",
+          "type": "boolean"
+        }
+      },
+      "title": "ClaimBoundarySummary",
+      "type": "object"
+    },
+    "HandoffComponentSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "HandoffComponentSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/ArtifactRef"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "claimBoundaries": {
+      "$ref": "#/$defs/ClaimBoundarySummary"
+    },
+    "environmentLabel": {
+      "title": "Environmentlabel",
+      "type": "string"
+    },
+    "fieldEvidence": {
+      "$ref": "#/$defs/HandoffComponentSummary"
+    },
+    "firstRunDrill": {
+      "$ref": "#/$defs/HandoffComponentSummary"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "operatorAttestation": {
+      "$ref": "#/$defs/HandoffComponentSummary"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "releaseTrain": {
+      "$ref": "#/$defs/HandoffComponentSummary"
+    },
+    "schemaVersion": {
+      "const": "control-plane.design-partner-handoff/v1",
+      "default": "control-plane.design-partner-handoff/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "strictRc": {
+      "$ref": "#/$defs/HandoffComponentSummary"
+    },
+    "supportBundle": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "profile",
+    "environmentLabel",
+    "releaseTrain",
+    "strictRc",
+    "fieldEvidence",
+    "operatorAttestation",
+    "firstRunDrill",
+    "claimBoundaries"
+  ],
+  "title": "DesignPartnerHandoffManifest",
+  "type": "object"
+}

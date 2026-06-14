@@ -1,0 +1,197 @@
+{
+  "$defs": {
+    "PilotOpsDrillMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "blockedCount": {
+          "default": 0,
+          "title": "Blockedcount",
+          "type": "integer"
+        },
+        "conditionalCount": {
+          "default": 0,
+          "title": "Conditionalcount",
+          "type": "integer"
+        },
+        "passedCount": {
+          "default": 0,
+          "title": "Passedcount",
+          "type": "integer"
+        },
+        "skippedCount": {
+          "default": 0,
+          "title": "Skippedcount",
+          "type": "integer"
+        },
+        "stepCount": {
+          "default": 0,
+          "title": "Stepcount",
+          "type": "integer"
+        }
+      },
+      "title": "PilotOpsDrillMetrics",
+      "type": "object"
+    },
+    "PilotOpsDrillStep": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifactpath"
+        },
+        "command": {
+          "title": "Command",
+          "type": "string"
+        },
+        "durationMs": {
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "exitCode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exitcode"
+        },
+        "finishedAtUtc": {
+          "format": "date-time",
+          "title": "Finishedatutc",
+          "type": "string"
+        },
+        "outputHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outputhash"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "startedAtUtc": {
+          "format": "date-time",
+          "title": "Startedatutc",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "stepId": {
+          "title": "Stepid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stepId",
+        "command",
+        "status",
+        "startedAtUtc",
+        "finishedAtUtc",
+        "durationMs"
+      ],
+      "title": "PilotOpsDrillStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactRoot": {
+      "title": "Artifactroot",
+      "type": "string"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "metrics": {
+      "$ref": "#/$defs/PilotOpsDrillMetrics"
+    },
+    "mode": {
+      "default": "deterministic",
+      "enum": [
+        "deterministic",
+        "target_environment"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "control-plane.pilot-ops-drill/v1",
+      "default": "control-plane.pilot-ops-drill/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/PilotOpsDrillStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "profile",
+    "artifactRoot"
+  ],
+  "title": "PilotOpsDrillReport",
+  "type": "object"
+}

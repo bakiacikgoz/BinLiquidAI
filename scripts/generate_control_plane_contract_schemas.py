@@ -9,6 +9,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from binliquid.control_plane.admin_store import AdminChangeProposal  # noqa: E402
+from binliquid.control_plane.design_partner_handoff import (  # noqa: E402
+    DesignPartnerHandoffManifest,
+    DesignPartnerHandoffSnapshot,
+    DesignPartnerHandoffVerificationReport,
+)
 from binliquid.control_plane.external_agent_client import ExternalAgentPilotManifest  # noqa: E402
 from binliquid.control_plane.external_contracts import (  # noqa: E402
     ExternalActionRequest,
@@ -59,6 +64,7 @@ from binliquid.control_plane.models import (  # noqa: E402
     TargetEvidenceClosureSummary,
     TargetEvidenceSession,
 )
+from binliquid.control_plane.pilot_ops_drill import PilotOpsDrillReport  # noqa: E402
 from binliquid.control_plane.pilot_workflow_models import (  # noqa: E402
     GovernedPilotWorkflowReport,
     GovernedPilotWorkflowSnapshot,
@@ -66,6 +72,10 @@ from binliquid.control_plane.pilot_workflow_models import (  # noqa: E402
     GovernedPilotWorkflowVerification,
 )
 from binliquid.control_plane.policy_pack_store import PolicyPackLifecycleRecord  # noqa: E402
+from binliquid.control_plane.release_train import (  # noqa: E402
+    ReleaseTrainManifest,
+    ReleaseTrainVerificationReport,
+)
 from binliquid.control_plane.strict_rc_promotion import StrictRCPromotionReport  # noqa: E402
 
 SCHEMAS = {
@@ -120,6 +130,12 @@ SCHEMAS = {
     "strict_rc_promotion": StrictRCPromotionReport,
     "design_partner_field_evidence_snapshot": DesignPartnerFieldEvidenceSnapshot,
     "design_partner_field_pack": DesignPartnerFieldPackManifest,
+    "release_train_manifest": ReleaseTrainManifest,
+    "release_train_verification": ReleaseTrainVerificationReport,
+    "pilot_ops_drill_report": PilotOpsDrillReport,
+    "design_partner_handoff_manifest": DesignPartnerHandoffManifest,
+    "design_partner_handoff_verification": DesignPartnerHandoffVerificationReport,
+    "design_partner_handoff_snapshot": DesignPartnerHandoffSnapshot,
 }
 
 OPERATOR_PANEL_SCHEMAS = {

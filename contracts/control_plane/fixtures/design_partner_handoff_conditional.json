@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "control-plane.design-partner-handoff/v1",
+  "generatedAtUtc": "2026-06-14T00:00:00Z",
+  "status": "conditional",
+  "profile": "enterprise",
+  "environmentLabel": "design-partner-rc-local",
+  "releaseTrain": {
+    "status": "conditional",
+    "path": "artifacts/design-partner-handoff/RELEASE_TRAIN_REPORT.json",
+    "blockers": [],
+    "warnings": [
+      "REQUIRED_GATE_MISSING:design-partner-field-evidence-gate"
+    ]
+  },
+  "strictRc": {
+    "status": "conditional",
+    "path": "artifacts/design-partner-field-evidence/strict_rc_promotion.json",
+    "blockers": [],
+    "warnings": [
+      "STRICT_RC_PROMOTION_MISSING"
+    ]
+  },
+  "fieldEvidence": {
+    "status": "conditional",
+    "path": "artifacts/design-partner-field-evidence/target_evidence_bundle.json",
+    "blockers": [],
+    "warnings": []
+  },
+  "operatorAttestation": {
+    "status": "missing",
+    "path": "artifacts/design-partner-field-evidence/attestation_validation.json",
+    "blockers": [],
+    "warnings": []
+  },
+  "firstRunDrill": {
+    "status": "conditional",
+    "path": "artifacts/design-partner-handoff/PILOT_OPS_DRILL_REPORT.json",
+    "blockers": [],
+    "warnings": [
+      "DRILL_STEP_CONDITIONAL:identity-whoami"
+    ]
+  },
+  "supportBundle": null,
+  "claimBoundaries": {
+    "publicDesktop": "blocked",
+    "liveComputerUse": "blocked",
+    "approvalFreeIrreversibleMutation": "blocked",
+    "blockedClaims": [
+      "public-desktop-installer"
+    ],
+    "conditionalClaims": [],
+    "deferredClaims": [
+      "live-macos-computer-use"
+    ],
+    "unsupportedClaimAllowed": false
+  },
+  "artifacts": [],
+  "blockers": [],
+  "warnings": [
+    "RELEASE_TRAIN_CONDITIONAL",
+    "STRICT_RC_NOT_READY",
+    "PILOT_OPS_DRILL_CONDITIONAL"
+  ]
+}

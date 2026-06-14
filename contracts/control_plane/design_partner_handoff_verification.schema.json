@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifactCount": {
+      "default": 0,
+      "title": "Artifactcount",
+      "type": "integer"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "hashMismatches": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Hashmismatches",
+      "type": "array"
+    },
+    "manifestPath": {
+      "title": "Manifestpath",
+      "type": "string"
+    },
+    "missingArtifacts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missingartifacts",
+      "type": "array"
+    },
+    "rawLeakDetected": {
+      "default": false,
+      "title": "Rawleakdetected",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "control-plane.design-partner-handoff-verification/v1",
+      "default": "control-plane.design-partner-handoff-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "secretLeakDetected": {
+      "default": false,
+      "title": "Secretleakdetected",
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "unsupportedClaimAllowed": {
+      "default": false,
+      "title": "Unsupportedclaimallowed",
+      "type": "boolean"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "manifestPath"
+  ],
+  "title": "DesignPartnerHandoffVerificationReport",
+  "type": "object"
+}

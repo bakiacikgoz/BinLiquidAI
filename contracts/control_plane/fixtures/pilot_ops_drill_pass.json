@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "control-plane.pilot-ops-drill/v1",
+  "generatedAtUtc": "2026-06-14T00:00:00Z",
+  "status": "pass",
+  "mode": "deterministic",
+  "profile": "enterprise",
+  "steps": [
+    {
+      "stepId": "config-resolve",
+      "command": "binliquid config resolve --profile enterprise",
+      "status": "pass",
+      "exitCode": 0,
+      "startedAtUtc": "2026-06-14T00:00:00Z",
+      "finishedAtUtc": "2026-06-14T00:00:01Z",
+      "durationMs": 1000,
+      "outputHash": "fixture",
+      "artifactPath": null,
+      "reasonCodes": []
+    }
+  ],
+  "metrics": {
+    "stepCount": 1,
+    "passedCount": 1,
+    "conditionalCount": 0,
+    "blockedCount": 0,
+    "skippedCount": 0
+  },
+  "blockers": [],
+  "warnings": [],
+  "artifactRoot": "artifacts/design-partner-handoff"
+}

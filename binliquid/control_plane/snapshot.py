@@ -9,6 +9,7 @@ from binliquid import __version__
 from binliquid.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from binliquid.control_plane.agent_registry_v2 import agent_registry_v2_item
 from binliquid.control_plane.claim_guard import ClaimGuard
+from binliquid.control_plane.design_partner_handoff import build_design_partner_handoff_snapshot
 from binliquid.control_plane.design_partner_rc import build_design_partner_rc_status
 from binliquid.control_plane.field_evidence import build_design_partner_field_evidence_snapshot
 from binliquid.control_plane.models import (
@@ -20,6 +21,7 @@ from binliquid.control_plane.models import (
     DashboardSummary,
     DataSourceState,
     DesignPartnerFieldEvidenceSnapshot,
+    DesignPartnerHandoffSnapshot,
     EvidencePackManifest,
     EvidencePackSummary,
     ExecutionSurfaceSummary,
@@ -199,6 +201,12 @@ def build_control_plane_snapshot(
     design_partner_field_evidence = DesignPartnerFieldEvidenceSnapshot.model_validate(
         field_evidence_snapshot.model_dump(mode="json", by_alias=True)
     )
+    handoff_snapshot = build_design_partner_handoff_snapshot(
+        artifact_root=Path(evidence_root),
+    )
+    design_partner_handoff = DesignPartnerHandoffSnapshot.model_validate(
+        handoff_snapshot.model_dump(mode="json", by_alias=True)
+    )
     memory_governance = build_memory_governance_snapshot(config=config, evidence_root=evidence_root)
     memory_runtime = build_memory_runtime_snapshot(
         config=config,
@@ -318,6 +326,7 @@ def build_control_plane_snapshot(
         provider_runtime=provider_runtime,
         target_evidence_closure=target_evidence_closure,
         design_partner_field_evidence=design_partner_field_evidence,
+        design_partner_handoff=design_partner_handoff,
         memory_governance=memory_governance,
         memory_runtime=memory_runtime,
         memory_sync=memory_sync,

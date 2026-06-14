@@ -18,6 +18,7 @@ export type RouteId =
   | 'memory-semantic'
   | 'governed-pilot-workflow'
   | 'design-partner-field-evidence'
+  | 'design-partner-handoff'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -118,6 +119,13 @@ export const routeGroups: RouteGroup[] = [
         label: 'Design Partner Field Evidence',
         heading: 'Design Partner Field Evidence',
         icon: 'shield',
+      },
+      {
+        id: 'design-partner-handoff',
+        routeId: 'design-partner-handoff',
+        label: 'Design Partner Handoff',
+        heading: 'Design Partner Handoff',
+        icon: 'clipboard',
       },
       { id: 'operations', routeId: 'operations', label: 'Yürütmeler', heading: 'Operations', icon: 'clipboard' },
       { id: 'settings', routeId: 'settings', label: 'Ayarlar', heading: 'Settings', icon: 'settings' },

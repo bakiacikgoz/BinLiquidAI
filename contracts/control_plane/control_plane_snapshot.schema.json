@@ -831,6 +831,86 @@
       "title": "DesignPartnerFieldEvidenceSnapshot",
       "type": "object"
     },
+    "DesignPartnerHandoffSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "claimBoundarySummary": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Claimboundarysummary",
+          "type": "object"
+        },
+        "firstRunDrillStatus": {
+          "default": "missing",
+          "title": "Firstrundrillstatus",
+          "type": "string"
+        },
+        "handoffPackPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Handoffpackpath"
+        },
+        "lastGeneratedAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastgeneratedatutc"
+        },
+        "releaseTrainStatus": {
+          "default": "missing",
+          "title": "Releasetrainstatus",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "control-plane.design-partner-handoff-snapshot/v1",
+          "default": "control-plane.design-partner-handoff-snapshot/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "default": "missing",
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "DesignPartnerHandoffSnapshot",
+      "type": "object"
+    },
     "DesignPartnerRcCheck": {
       "additionalProperties": false,
       "properties": {
@@ -3681,6 +3761,9 @@
     },
     "designPartnerFieldEvidence": {
       "$ref": "#/$defs/DesignPartnerFieldEvidenceSnapshot"
+    },
+    "designPartnerHandoff": {
+      "$ref": "#/$defs/DesignPartnerHandoffSnapshot"
     },
     "designPartnerRc": {
       "$ref": "#/$defs/DesignPartnerRcStatus"

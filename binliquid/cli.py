@@ -45,6 +45,11 @@ from binliquid.control_plane.admin_store import (
 from binliquid.control_plane.agent_registry_v2 import build_agent_registry_v2
 from binliquid.control_plane.beta_pack import generate_design_partner_beta_pack
 from binliquid.control_plane.claim_guard import ClaimGuard
+from binliquid.control_plane.design_partner_handoff import (
+    build_design_partner_handoff_pack,
+    load_design_partner_handoff_manifest,
+    verify_design_partner_handoff_pack,
+)
 from binliquid.control_plane.errors import ControlPlaneError
 from binliquid.control_plane.evidence_corpus import (
     build_evidence_verification_corpus,
@@ -71,6 +76,7 @@ from binliquid.control_plane.field_evidence import (
 from binliquid.control_plane.install_rehearsal import run_install_rehearsal
 from binliquid.control_plane.operations_runner import dry_run_operation
 from binliquid.control_plane.pilot_operations import generate_pilot_operations_artifacts
+from binliquid.control_plane.pilot_ops_drill import run_pilot_ops_drill
 from binliquid.control_plane.pilot_pack import generate_design_partner_pilot_pack
 from binliquid.control_plane.pilot_workflow import (
     load_governed_pilot_workflow_spec,
@@ -118,6 +124,13 @@ from binliquid.control_plane.rbac_admin import (
 )
 from binliquid.control_plane.readiness import build_readiness_report
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
+from binliquid.control_plane.release_train import (
+    build_release_train_manifest,
+    load_release_train_manifest,
+    verify_release_train,
+    write_release_train_manifest,
+    write_release_train_verification,
+)
 from binliquid.control_plane.reports import build_reports_alerts_logs_manifest
 from binliquid.control_plane.run_coordinator import ControlPlaneRunCoordinator
 from binliquid.control_plane.security_review import generate_security_review_pack
@@ -264,6 +277,10 @@ pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
 control_plane_pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
 pilot_field_app = typer.Typer(help="Design partner field evidence commands")
 control_plane_pilot_field_app = typer.Typer(help="Design partner field evidence commands")
+pilot_ops_app = typer.Typer(help="Design partner pilot operations drill commands")
+release_app = typer.Typer(help="Release readiness commands")
+release_train_app = typer.Typer(help="Release train verification commands")
+release_handoff_app = typer.Typer(help="Design partner handoff commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -324,6 +341,10 @@ pilot_app.add_typer(pilot_workflow_app, name="workflow")
 control_plane_pilot_app.add_typer(control_plane_pilot_workflow_app, name="workflow")
 pilot_app.add_typer(pilot_field_app, name="field")
 control_plane_pilot_app.add_typer(control_plane_pilot_field_app, name="field")
+pilot_app.add_typer(pilot_ops_app, name="ops")
+app.add_typer(release_app, name="release")
+release_app.add_typer(release_train_app, name="train")
+release_app.add_typer(release_handoff_app, name="handoff")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -2119,6 +2140,138 @@ def pilot_field_pack(
     _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
     if manifest.status == "blocked":
         raise typer.Exit(code=1)
+
+
+@release_train_app.command("manifest")
+def release_train_manifest(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    mode: str = typer.Option("local", "--mode", help="local, ci, or mainline_post_merge"),
+    artifact_root: str = typer.Option("artifacts", "--artifact-root"),
+    output: str | None = typer.Option(
+        None,
+        "--output",
+        help="Optional release train manifest output path.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    if mode not in {"local", "ci", "mainline_post_merge"}:
+        raise typer.BadParameter("mode must be local, ci, or mainline_post_merge")
+    manifest = build_release_train_manifest(
+        profile=profile,
+        mode=mode,  # type: ignore[arg-type]
+        artifact_root=Path(artifact_root),
+    )
+    if output:
+        write_release_train_manifest(manifest=manifest, output_path=Path(output))
+    _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@release_train_app.command("verify")
+def release_train_verify(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    manifest_path: str | None = typer.Option(None, "--manifest", help="Manifest path."),
+    artifact_root: str = typer.Option("artifacts", "--artifact-root"),
+    output: str | None = typer.Option(None, "--output", help="Optional verification output path."),
+    strict: bool = typer.Option(False, "--strict/--no-strict"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    if manifest_path:
+        manifest = load_release_train_manifest(Path(manifest_path))
+        report_path = Path(manifest_path)
+    else:
+        manifest = build_release_train_manifest(profile=profile, artifact_root=Path(artifact_root))
+        report_path = None
+    report = verify_release_train(manifest, strict=strict, manifest_path=report_path)
+    if output:
+        write_release_train_verification(report=report, output_path=Path(output))
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=4)
+    if report.status == "conditional":
+        raise typer.Exit(code=3)
+
+
+@pilot_ops_app.command("drill")
+def pilot_ops_drill(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    mode: str = typer.Option("deterministic", "--mode", help="deterministic or target_environment"),
+    output_root: str = typer.Option(
+        "artifacts/design-partner-handoff",
+        "--output-root",
+        help="Pilot ops drill output root.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    if mode not in {"deterministic", "target_environment"}:
+        raise typer.BadParameter("mode must be deterministic or target_environment")
+    report = run_pilot_ops_drill(
+        profile=profile,
+        mode=mode,  # type: ignore[arg-type]
+        output_root=Path(output_root),
+    )
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=4)
+    if report.status == "conditional":
+        raise typer.Exit(code=3)
+
+
+@release_handoff_app.command("build")
+def release_handoff_build(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    environment_label: str = typer.Option(
+        "design-partner-rc-local",
+        "--environment-label",
+        help="Redacted handoff environment label.",
+    ),
+    output_root: str = typer.Option(
+        "artifacts/design-partner-handoff",
+        "--output-root",
+        help="Design partner handoff output root.",
+    ),
+    artifact_root: str = typer.Option("artifacts", "--artifact-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    manifest = build_design_partner_handoff_pack(
+        profile=profile,
+        output_root=Path(output_root),
+        environment_label=environment_label,
+        artifact_root=Path(artifact_root),
+    )
+    _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if manifest.status == "blocked":
+        raise typer.Exit(code=4)
+    if manifest.status == "conditional":
+        raise typer.Exit(code=3)
+
+
+@release_handoff_app.command("verify")
+def release_handoff_verify(
+    manifest_path: str = typer.Option(..., "--manifest", help="Handoff manifest path."),
+    strict: bool = typer.Option(False, "--strict/--no-strict"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    report = verify_design_partner_handoff_pack(
+        manifest_path=Path(manifest_path),
+        strict=strict,
+    )
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=4)
+    if report.status == "conditional":
+        raise typer.Exit(code=3)
+
+
+@release_handoff_app.command("show")
+def release_handoff_show(
+    manifest_path: str = typer.Option(
+        "artifacts/design-partner-handoff/manifest.json",
+        "--manifest",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    manifest = load_design_partner_handoff_manifest(Path(manifest_path))
+    _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
 
 
 @control_plane_claims_app.command("verify")

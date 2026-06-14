@@ -124,6 +124,7 @@ import type { ControlPlaneSnapshot, EvidencePackSummary, OperationDescriptor, Pa
 import { asControlPlaneClaimMatrix } from './controlPlaneMappers';
 import { MemoryAuthorityView } from './memory-authority/MemoryAuthorityView';
 import { GovernedPilotWorkflowView } from './governed-pilot-workflow/GovernedPilotWorkflowView';
+import { DesignPartnerHandoffView } from './design-partner-handoff/DesignPartnerHandoffView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
@@ -1213,6 +1214,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const memoryPolicyEnforcement = controlPlaneSnapshot?.memoryPolicyEnforcement ?? null;
   const governedPilotWorkflow = controlPlaneSnapshot?.governedPilotWorkflow ?? null;
   const designPartnerFieldEvidence = controlPlaneSnapshot?.designPartnerFieldEvidence ?? null;
+  const designPartnerHandoff = controlPlaneSnapshot?.designPartnerHandoff ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2552,6 +2554,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'design-partner-field-evidence' ? (
           <DesignPartnerFieldEvidenceView snapshot={designPartnerFieldEvidence} locale={locale} />
+        ) : null}
+
+        {activeView === 'design-partner-handoff' ? (
+          <DesignPartnerHandoffView snapshot={designPartnerHandoff} locale={locale} />
         ) : null}
 
         {activeView === 'operations' ? (

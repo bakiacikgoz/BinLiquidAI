@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "control-plane.pilot-ops-drill/v1",
+  "generatedAtUtc": "2026-06-14T00:00:00Z",
+  "status": "conditional",
+  "mode": "deterministic",
+  "profile": "enterprise",
+  "steps": [
+    {
+      "stepId": "identity-whoami",
+      "command": "binliquid auth whoami --profile enterprise",
+      "status": "conditional",
+      "exitCode": 3,
+      "startedAtUtc": "2026-06-14T00:00:00Z",
+      "finishedAtUtc": "2026-06-14T00:00:01Z",
+      "durationMs": 1000,
+      "outputHash": "fixture",
+      "artifactPath": null,
+      "reasonCodes": [
+        "DRILL_STEP_CONDITIONAL:identity-whoami"
+      ]
+    }
+  ],
+  "metrics": {
+    "stepCount": 1,
+    "passedCount": 0,
+    "conditionalCount": 1,
+    "blockedCount": 0,
+    "skippedCount": 0
+  },
+  "blockers": [],
+  "warnings": [
+    "DRILL_STEP_CONDITIONAL:identity-whoami"
+  ],
+  "artifactRoot": "artifacts/design-partner-handoff"
+}

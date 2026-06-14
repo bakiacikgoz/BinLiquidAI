@@ -1414,6 +1414,24 @@ class DesignPartnerFieldEvidenceSnapshot(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class DesignPartnerHandoffSnapshot(StrictModel):
+    schema_version: Literal["control-plane.design-partner-handoff-snapshot/v1"] = Field(
+        default="control-plane.design-partner-handoff-snapshot/v1",
+        alias="schemaVersion",
+    )
+    status: Literal["ready", "conditional", "blocked", "missing"] = "missing"
+    handoff_pack_path: str | None = Field(default=None, alias="handoffPackPath")
+    release_train_status: str = Field(default="missing", alias="releaseTrainStatus")
+    first_run_drill_status: str = Field(default="missing", alias="firstRunDrillStatus")
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    last_generated_at_utc: datetime | None = Field(default=None, alias="lastGeneratedAtUtc")
+    claim_boundary_summary: dict[str, str] = Field(
+        default_factory=dict,
+        alias="claimBoundarySummary",
+    )
+
+
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
@@ -1469,6 +1487,10 @@ class ControlPlaneSnapshot(StrictModel):
     design_partner_field_evidence: DesignPartnerFieldEvidenceSnapshot = Field(
         default_factory=DesignPartnerFieldEvidenceSnapshot,
         alias="designPartnerFieldEvidence",
+    )
+    design_partner_handoff: DesignPartnerHandoffSnapshot = Field(
+        default_factory=DesignPartnerHandoffSnapshot,
+        alias="designPartnerHandoff",
     )
     memory_governance: MemoryAuthoritySnapshot = Field(
         default_factory=disabled_memory_authority_snapshot,

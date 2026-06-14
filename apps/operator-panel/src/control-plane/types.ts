@@ -462,6 +462,18 @@ export interface DesignPartnerFieldEvidenceSnapshot {
   warnings: string[];
 }
 
+export interface DesignPartnerHandoffSnapshot {
+  schemaVersion: 'control-plane.design-partner-handoff-snapshot/v1';
+  status: 'ready' | 'conditional' | 'blocked' | 'missing';
+  handoffPackPath?: string | null;
+  releaseTrainStatus: string;
+  firstRunDrillStatus: string;
+  blockers: string[];
+  warnings: string[];
+  lastGeneratedAtUtc?: string | null;
+  claimBoundarySummary: Record<string, string>;
+}
+
 export interface MemoryAuthorityRecordsSummary {
   active: number;
   expired: number;
@@ -623,6 +635,7 @@ export interface ControlPlaneSnapshot {
   providerRuntime: ProviderRuntimeSnapshot;
   targetEvidenceClosure: TargetEvidenceClosureSummary;
   designPartnerFieldEvidence?: DesignPartnerFieldEvidenceSnapshot;
+  designPartnerHandoff?: DesignPartnerHandoffSnapshot;
   memoryGovernance?: MemoryAuthoritySnapshot;
   memoryRuntime?: MemoryRuntimeSnapshot;
   memorySync?: MemorySyncSnapshot;

@@ -55,6 +55,7 @@ RC cannot claim:
 make design-partner-beta-gate
 make design-partner-rc-gate
 make design-partner-rc-audit-gate
+make design-partner-handoff-gate
 make pilot-readiness-gate
 ```
 
@@ -63,6 +64,21 @@ semantics strict and may exit nonzero when RC remains `conditional`.
 `make design-partner-rc-audit-gate` is the PR/audit gate: it exits zero only
 when there are no blockers and every warning is in the expected conditional
 allowlist.
+`make design-partner-handoff-gate` builds and verifies the operator handoff
+pack, release train manifest, first-run drill, claim boundary card, and Operator
+Panel `Design Partner Handoff` route. It keeps public desktop release, live
+computer-use, approval-free destructive mutation, and auto-release actions out
+of scope.
+
+## Handoff Pack
+
+Use `docs/DESIGN_PARTNER_RC_HANDOFF_PACK.md`,
+`docs/DESIGN_PARTNER_FIRST_RUN_OPERATIONS.md`,
+`docs/MAINLINE_RC_RELEASE_TRAIN.md`,
+`docs/DESIGN_PARTNER_SUPPORT_ESCALATION.md`, and
+`docs/CLAIM_BOUNDARY_CARD_TEMPLATE.md` as the operator-facing handoff source.
+The pack remains conditional until target evidence and independent attestation
+are present, and it blocks on any false ready or unsupported claim.
 
 ## Rollback
 

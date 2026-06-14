@@ -849,6 +849,21 @@
     "strictRcStatus": "ready",
     "warnings": []
   },
+  "designPartnerHandoff": {
+    "blockers": [],
+    "claimBoundarySummary": {
+      "approvalFreeIrreversibleMutation": "blocked",
+      "liveComputerUse": "blocked",
+      "publicDesktop": "blocked"
+    },
+    "firstRunDrillStatus": "pass",
+    "handoffPackPath": "artifacts/design-partner-handoff/manifest.json",
+    "lastGeneratedAtUtc": "2026-06-14T00:00:00Z",
+    "releaseTrainStatus": "pass",
+    "schemaVersion": "control-plane.design-partner-handoff-snapshot/v1",
+    "status": "ready",
+    "warnings": []
+  },
   "governedPilotWorkflow": {
     "blockedClaims": [
       "public-desktop-installer",

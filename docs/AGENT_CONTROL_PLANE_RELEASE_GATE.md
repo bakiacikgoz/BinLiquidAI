@@ -23,6 +23,7 @@ make provider-runtime-gate
 make provider-workflow-proof-gate
 make design-partner-rc-audit-gate
 make design-partner-field-evidence-gate
+make design-partner-handoff-gate
 make enterprise-gate
 make pilot-gate
 make ui-gate
@@ -42,6 +43,8 @@ No ship if:
 - `design-partner-rc-audit-gate` reports blockers or unexpected warnings,
 - `design-partner-field-evidence-gate` fails or strict RC promotion is not
   ready for target-environment evidence,
+- `design-partner-handoff-gate` fails or handoff verification reports a false
+  ready, raw/secret marker, or unsupported claim,
 - claim guard allows unsupported desktop or live computer-use claims,
 - Operator Console exposes live computer-use without qualification evidence,
 - public desktop installer evidence is absent but the release is described as
@@ -69,3 +72,15 @@ make design-partner-field-evidence-gate
 The gate prepares a target-environment session, collects hash-only field
 evidence, verifies independent operator attestation, evaluates strict RC
 promotion, generates the field pack, and checks the Operator Panel route.
+
+# Design Partner Handoff
+
+The operator-facing handoff gate is:
+
+```bash
+make design-partner-handoff-gate
+```
+
+It verifies the release train manifest, first-run operations drill, handoff pack
+builder/verifier, snapshot schema, Operator Panel route, and no-ship claim
+boundaries.
