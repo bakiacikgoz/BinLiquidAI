@@ -51,6 +51,10 @@ from binliquid.enterprise.identity import describe_actor
 from binliquid.enterprise.signing import key_status
 from binliquid.governance.approval_store import ApprovalStore
 from binliquid.governance.policy import load_policy
+from binliquid.memory.runtime_policy_snapshot import (
+    MemoryPolicyEnforcementSnapshot,
+    build_memory_policy_enforcement_snapshot,
+)
 from binliquid.memory.runtime_snapshot import (
     build_memory_runtime_snapshot,
     build_memory_sync_snapshot,
@@ -218,6 +222,20 @@ def build_control_plane_snapshot(
             enabled=False,
             reasonCodes=[f"MEMORY_SEMANTIC_SNAPSHOT_FAILED:{type(exc).__name__}"],
         )
+    try:
+        memory_policy_enforcement = build_memory_policy_enforcement_snapshot(
+            config=config,
+            evidence_root=evidence_root,
+            generated_at=generated_at,
+        )
+    except Exception as exc:  # pragma: no cover - snapshot must stay diagnosable
+        memory_policy_enforcement = MemoryPolicyEnforcementSnapshot(
+            generatedAtUtc=generated_at,
+            status="blocked",
+            enabled=config.memory.runtime.policy_enforcement_enabled,
+            semanticRuntimeMode=config.memory.runtime.semantic_runtime_mode,
+            reasonCodes=[f"MEMORY_POLICY_SNAPSHOT_FAILED:{type(exc).__name__}"],
+        )
     design_partner_rc = build_design_partner_rc_status(
         data_source=data_source,
         claims=claims.model_dump(mode="json"),
@@ -290,6 +308,7 @@ def build_control_plane_snapshot(
         memory_sync=memory_sync,
         memory_authority=memory_authority,
         memory_semantic_index=memory_semantic_index,
+        memory_policy_enforcement=memory_policy_enforcement,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )

@@ -2,6 +2,8 @@
 
 Semantic memory is a governed retrieval layer on top of Workspace Memory Authority. It is disabled by default and never stores raw memory content, raw prompts, raw queries, PII, or secrets in index artifacts or operator evidence.
 
+Runtime injection is governed by Agent Memory Policy Enforcement v1. Semantic retrieval must receive an already authorized workspace/scope candidate set before scoring, and `memory.runtime.semantic_runtime_mode` controls disabled, shadow, and enforced runtime behavior. See `docs/MEMORY_RUNTIME_POLICY_ENFORCEMENT.md`.
+
 Default config:
 
 ```toml

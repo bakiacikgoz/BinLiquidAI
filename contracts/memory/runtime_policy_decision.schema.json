@@ -1,0 +1,147 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "anyOf": [
+        {
+          "enum": [
+            "allow",
+            "degrade",
+            "deny",
+            "disabled"
+          ],
+          "type": "string"
+        },
+        {
+          "enum": [
+            "allow",
+            "proposal_only",
+            "requires_approval",
+            "deny",
+            "disabled"
+          ],
+          "type": "string"
+        }
+      ],
+      "title": "Action"
+    },
+    "allowedScopeHashes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowedscopehashes",
+      "type": "array"
+    },
+    "deniedScopeHashes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Deniedscopehashes",
+      "type": "array"
+    },
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "operation": {
+      "enum": [
+        "read",
+        "write"
+      ],
+      "title": "Operation",
+      "type": "string"
+    },
+    "principalHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Principalhash"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "requestedScopeHashes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Requestedscopehashes",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "agent-memory-runtime-policy-decision/v1",
+      "default": "agent-memory-runtime-policy-decision/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "semanticRuntimeMode": {
+      "default": "disabled",
+      "enum": [
+        "disabled",
+        "shadow",
+        "enforced"
+      ],
+      "title": "Semanticruntimemode",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "empty",
+        "degraded",
+        "denied",
+        "disabled",
+        "error"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workspaceHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workspacehash"
+    }
+  },
+  "required": [
+    "operation",
+    "action",
+    "status",
+    "profile"
+  ],
+  "title": "AgentMemoryRuntimePolicyDecision",
+  "type": "object"
+}

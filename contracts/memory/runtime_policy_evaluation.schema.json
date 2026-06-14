@@ -1,0 +1,76 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifactPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Artifactpath"
+    },
+    "caseCount": {
+      "minimum": 0,
+      "title": "Casecount",
+      "type": "integer"
+    },
+    "failedCount": {
+      "minimum": 0,
+      "title": "Failedcount",
+      "type": "integer"
+    },
+    "failures": {
+      "default": [],
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Failures",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "passedCount": {
+      "minimum": 0,
+      "title": "Passedcount",
+      "type": "integer"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "agent-memory-runtime-policy-evaluation/v1",
+      "default": "agent-memory-runtime-policy-evaluation/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "caseCount",
+    "passedCount",
+    "failedCount"
+  ],
+  "title": "MemoryRuntimePolicyEvaluationReport",
+  "type": "object"
+}

@@ -199,6 +199,7 @@ benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
 memory_index_app = typer.Typer(help="Memory index commands")
 memory_runtime_app = typer.Typer(help="Memory runtime commands")
+memory_runtime_policy_app = typer.Typer(help="Memory runtime policy commands")
 memory_sync_app = typer.Typer(help="Memory sync pack commands")
 memory_workspace_app = typer.Typer(help="Workspace memory authority commands")
 memory_principal_app = typer.Typer(help="Workspace memory principal commands")
@@ -254,6 +255,7 @@ app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(memory_app, name="memory")
 memory_app.add_typer(memory_index_app, name="index")
 memory_app.add_typer(memory_runtime_app, name="runtime")
+memory_runtime_app.add_typer(memory_runtime_policy_app, name="policy")
 memory_app.add_typer(memory_sync_app, name="sync")
 memory_app.add_typer(memory_workspace_app, name="workspace")
 memory_app.add_typer(memory_principal_app, name="principal")
@@ -5301,6 +5303,140 @@ def memory_runtime_context(
             sort_keys=True,
         )
     )
+
+
+@memory_runtime_policy_app.command("doctor")
+def memory_runtime_policy_doctor(
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    config = RuntimeConfig.from_profile(profile)
+    bridge = build_memory_runtime_bridge(config)
+    from binliquid.memory.runtime_policy import AgentMemoryPolicyGateway
+
+    report = AgentMemoryPolicyGateway(
+        config=config,
+        bridge=bridge,
+        workspace_authority=bridge.workspace_authority,
+    ).doctor()
+    _echo_json(report.model_dump(mode="json", by_alias=True))
+    if report.status == "blocked":
+        raise typer.Exit(code=1)
+
+
+@memory_runtime_policy_app.command("simulate")
+def memory_runtime_policy_simulate(
+    operation: str = typer.Option("read", "--operation", help="read or write"),
+    query: str = typer.Option("provider governance", "--query", help="Read query"),
+    summary: str = typer.Option(
+        "runtime policy simulation summary",
+        "--summary",
+        help="Write summary",
+    ),
+    profile: str = typer.Option("enterprise", help="Config profile"),
+    actor: str = typer.Option("operator-main", "--actor", help="Actor id"),
+    role: str = typer.Option("operator", "--role", help="Requester role"),
+    principal_id: str | None = typer.Option(None, "--principal-id"),
+    workspace_id: str | None = typer.Option(None, "--workspace-id"),
+    agent_id: str | None = typer.Option(None, "--agent-id"),
+    team_id: str | None = typer.Option(None, "--team-id"),
+    case_id: str | None = typer.Option(None, "--case-id"),
+    scope: str | None = typer.Option(None, "--scope"),
+    semantic_mode: str = typer.Option("disabled", "--semantic-mode"),
+    fixture: bool = typer.Option(True, "--fixture/--no-fixture"),
+) -> None:
+    ensure_artifact_scaffold()
+    if fixture:
+        from binliquid.memory.runtime_policy_fixtures import build_memory_runtime_policy_fixture
+
+        built = build_memory_runtime_policy_fixture(
+            Path(".binliquid/memory-runtime-policy-cli"),
+            profile=profile,
+            semantic_mode=semantic_mode,
+            semantic_enabled=semantic_mode != "disabled",
+        )
+        config = built.config
+        bridge = built.bridge
+    else:
+        config = RuntimeConfig.from_profile(profile)
+        config.memory.runtime.policy_enforcement_enabled = True
+        config.memory.runtime.semantic_runtime_mode = semantic_mode
+        bridge = build_memory_runtime_bridge(config)
+    if operation == "read":
+        pack = bridge.retrieve_context(
+            RuntimeMemoryRequest(
+                run_id="cli-memory-policy-simulate",
+                query=query,
+                actor_id=actor,
+                requester_role=role,
+                agent_id=agent_id,
+                team_id=team_id,
+                case_id=case_id,
+                workspace_id=workspace_id or config.memory.workspace_authority.default_workspace_id,
+                principal_id=principal_id,
+            )
+        )
+        _echo_json(
+            {
+                "status": pack.status,
+                "operation": "read",
+                "queryHash": hash_identity(query),
+                "hitIdHashes": [hash_identity(hit.memory_id) for hit in pack.hits],
+                "evidenceRef": pack.evidence_ref,
+                "rawContentIncluded": False,
+            }
+        )
+        if pack.status in {"denied", "error"}:
+            raise typer.Exit(code=1)
+        return
+    if operation != "write":
+        raise typer.BadParameter("operation must be read or write")
+    result = bridge.propose_post_run_write(
+        run_id="cli-memory-policy-simulate",
+        actor_id=actor,
+        role=role,
+        user_input="cli policy simulate input",
+        assistant_output=summary,
+        scope=scope,
+        agent_id=agent_id,
+    )
+    _echo_json(
+        {
+            "status": result.status,
+            "operation": "write",
+            "contentHash": result.content_hash,
+            "proposalIdHash": hash_identity(result.proposal_id),
+            "evidenceRef": result.evidence_ref,
+            "blockingReasons": result.blocking_reasons,
+            "rawContentIncluded": False,
+        }
+    )
+    if result.status in {"denied", "error", "conflict"}:
+        raise typer.Exit(code=1)
+
+
+@memory_runtime_policy_app.command("evaluate")
+def memory_runtime_policy_evaluate(
+    suite: str = typer.Option(
+        "benchmarks/tasks/memory/runtime_policy_cases.jsonl",
+        "--suite",
+    ),
+    output: str = typer.Option(
+        "artifacts/memory-runtime-policy/evaluation.json",
+        "--output",
+    ),
+    profile: str = typer.Option("enterprise", help="Config profile"),
+) -> None:
+    from binliquid.memory.runtime_policy_evaluator import run_policy_evaluation
+
+    report = run_policy_evaluation(
+        suite_path=Path(suite),
+        output_path=Path(output),
+        profile=profile,
+    )
+    _echo_json(report.model_dump(mode="json", by_alias=True))
+    if report.status != "pass":
+        raise typer.Exit(code=1)
 
 
 @memory_sync_app.command("export")

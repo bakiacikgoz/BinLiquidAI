@@ -1,0 +1,64 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "policyEnforcementEnabled": {
+      "title": "Policyenforcementenabled",
+      "type": "boolean"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "agent-memory-runtime-policy-doctor/v1",
+      "default": "agent-memory-runtime-policy-doctor/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "semanticRuntimeAvailable": {
+      "title": "Semanticruntimeavailable",
+      "type": "boolean"
+    },
+    "semanticRuntimeMode": {
+      "enum": [
+        "disabled",
+        "shadow",
+        "enforced"
+      ],
+      "title": "Semanticruntimemode",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "degraded",
+        "disabled",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workspaceAuthorityEnabled": {
+      "title": "Workspaceauthorityenabled",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "status",
+    "policyEnforcementEnabled",
+    "semanticRuntimeMode",
+    "workspaceAuthorityEnabled",
+    "semanticRuntimeAvailable"
+  ],
+  "title": "AgentMemoryRuntimePolicyDoctorReport",
+  "type": "object"
+}

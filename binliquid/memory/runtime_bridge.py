@@ -78,6 +78,18 @@ class MemoryRuntimeBridge:
         )
 
     def retrieve_context(self, request: RuntimeMemoryRequest) -> MemoryContextPack:
+        if self.config.memory.runtime.policy_enforcement_enabled:
+            from binliquid.memory.runtime_policy import AgentMemoryPolicyGateway
+
+            return AgentMemoryPolicyGateway(
+                config=self.config,
+                bridge=self,
+                workspace_authority=self.workspace_authority,
+                evidence_root=Path(self.evidence_root).parent / "memory-runtime-policy",
+            ).retrieve_context(request).context_pack
+        return self._retrieve_context_unenforced(request)
+
+    def _retrieve_context_unenforced(self, request: RuntimeMemoryRequest) -> MemoryContextPack:
         runtime_cfg = self.config.memory.runtime
         if not self.enabled:
             return empty_context_pack(
@@ -123,6 +135,59 @@ class MemoryRuntimeBridge:
         )
 
     def propose_post_run_write(
+        self,
+        *,
+        run_id: str,
+        actor_id: str,
+        role: str,
+        user_input: str,
+        assistant_output: str,
+        scope: str | None = None,
+        owner_type: str | None = None,
+        owner: str | None = None,
+        visibility: str | None = None,
+        memory_target: str | None = None,
+        expected_state_version: int | None = None,
+        agent_id: str | None = None,
+    ) -> MemoryWriteResult:
+        if self.config.memory.runtime.policy_enforcement_enabled:
+            from binliquid.memory.runtime_policy import AgentMemoryPolicyGateway
+
+            return AgentMemoryPolicyGateway(
+                config=self.config,
+                bridge=self,
+                workspace_authority=self.workspace_authority,
+                evidence_root=Path(self.evidence_root).parent / "memory-runtime-policy",
+            ).propose_post_run_write(
+                run_id=run_id,
+                actor_id=actor_id,
+                role=role,
+                user_input=user_input,
+                assistant_output=assistant_output,
+                scope=scope,
+                owner_type=owner_type,
+                owner=owner,
+                visibility=visibility,
+                memory_target=memory_target,
+                expected_state_version=expected_state_version,
+                agent_id=agent_id,
+            )
+        return self._propose_post_run_write_unenforced(
+            run_id=run_id,
+            actor_id=actor_id,
+            role=role,
+            user_input=user_input,
+            assistant_output=assistant_output,
+            scope=scope,
+            owner_type=owner_type,
+            owner=owner,
+            visibility=visibility,
+            memory_target=memory_target,
+            expected_state_version=expected_state_version,
+            agent_id=agent_id,
+        )
+
+    def _propose_post_run_write_unenforced(
         self,
         *,
         run_id: str,

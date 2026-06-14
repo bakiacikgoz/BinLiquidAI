@@ -24,6 +24,12 @@ class MemoryContextHit(StrictModel):
     score: float = Field(ge=0.0)
     created_at: datetime = Field(alias="createdAt")
     policy_tags: list[str] = Field(default_factory=list, alias="policyTags")
+    source_kind: str = Field(default="runtime_bridge", alias="sourceKind")
+    policy_decision_ref: str | None = Field(default=None, alias="policyDecisionRef")
+    semantic_score_breakdown: dict[str, float] = Field(
+        default_factory=dict,
+        alias="semanticScoreBreakdown",
+    )
 
 
 class MemoryContextPack(StrictModel):

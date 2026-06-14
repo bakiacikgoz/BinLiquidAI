@@ -40,6 +40,8 @@ class MemoryRuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     enabled: bool = False
+    policy_enforcement_enabled: bool = False
+    semantic_runtime_mode: Literal["disabled", "shadow", "enforced"] = "disabled"
     context_top_k: int = Field(default=4, ge=0, le=50)
     max_context_chars: int = Field(default=4000, ge=0, le=16000)
     post_run_write_enabled: bool = False
@@ -503,6 +505,12 @@ class RuntimeConfig(BaseModel):
                 rank_recency_weight=memory_data.get("rank_recency_weight", 0.3),
                 runtime=MemoryRuntimeConfig(
                     enabled=memory_runtime_data.get("enabled", False),
+                    policy_enforcement_enabled=memory_runtime_data.get(
+                        "policy_enforcement_enabled", False
+                    ),
+                    semantic_runtime_mode=memory_runtime_data.get(
+                        "semantic_runtime_mode", "disabled"
+                    ),
                     context_top_k=memory_runtime_data.get("context_top_k", 4),
                     max_context_chars=memory_runtime_data.get("max_context_chars", 4000),
                     post_run_write_enabled=memory_runtime_data.get(

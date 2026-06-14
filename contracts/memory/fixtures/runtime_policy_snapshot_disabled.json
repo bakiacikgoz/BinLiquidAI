@@ -1,0 +1,18 @@
+{
+  "approvalRequiredCount": 0,
+  "contractVersion": "memory-policy-enforcement-snapshot/v1",
+  "degradedCount": 0,
+  "deniedCount": 0,
+  "enabled": false,
+  "generatedAtUtc": "2026-06-14T00:00:00Z",
+  "latestEvidenceRefs": [],
+  "rawContentIncluded": false,
+  "rawLeakCount": 0,
+  "readEventCount": 0,
+  "reasonCodes": [
+    "MEMORY_RUNTIME_POLICY_DISABLED"
+  ],
+  "semanticRuntimeMode": "disabled",
+  "status": "disabled",
+  "writeEventCount": 0
+}

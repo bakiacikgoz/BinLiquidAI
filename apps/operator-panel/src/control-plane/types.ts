@@ -542,6 +542,23 @@ export interface MemorySemanticIndexSnapshot {
   reasonCodes: string[];
 }
 
+export interface MemoryPolicyEnforcementSnapshot {
+  contractVersion: 'memory-policy-enforcement-snapshot/v1';
+  generatedAtUtc: string;
+  status: 'disabled' | 'pass' | 'degraded' | 'blocked';
+  enabled: boolean;
+  semanticRuntimeMode: 'disabled' | 'shadow' | 'enforced';
+  readEventCount: number;
+  writeEventCount: number;
+  deniedCount: number;
+  approvalRequiredCount: number;
+  degradedCount: number;
+  rawLeakCount: number;
+  latestEvidenceRefs: string[];
+  reasonCodes: string[];
+  rawContentIncluded: false;
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -572,6 +589,7 @@ export interface ControlPlaneSnapshot {
   memorySync?: MemorySyncSnapshot;
   memoryAuthority?: WorkspaceMemoryAuthorityHealth;
   memorySemanticIndex?: MemorySemanticIndexSnapshot;
+  memoryPolicyEnforcement?: MemoryPolicyEnforcementSnapshot;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

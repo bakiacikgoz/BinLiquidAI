@@ -70,6 +70,8 @@ rank_salience_weight = 0.7
 rank_recency_weight = 0.3
 
 [memory.runtime]
+policy_enforcement_enabled = false
+semantic_runtime_mode = "disabled"
 enabled = false
 context_top_k = 4
 max_context_chars = 4000

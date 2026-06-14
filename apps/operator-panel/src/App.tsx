@@ -125,6 +125,7 @@ import { asControlPlaneClaimMatrix } from './controlPlaneMappers';
 import { MemoryAuthorityView } from './memory-authority/MemoryAuthorityView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
+import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
 import { MemorySemanticIndexView } from './memory-semantic/MemorySemanticIndexView';
 import type { ShellViewKey } from './components/shell/Sidebar';
 import type { RouteId } from './routeRegistry';
@@ -1207,6 +1208,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const memorySync = controlPlaneSnapshot?.memorySync ?? null;
   const memoryAuthority = controlPlaneSnapshot?.memoryAuthority ?? null;
   const memorySemanticIndex = controlPlaneSnapshot?.memorySemanticIndex ?? null;
+  const memoryPolicyEnforcement = controlPlaneSnapshot?.memoryPolicyEnforcement ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2522,7 +2524,14 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'memory-runtime' ? (
-          <MemoryRuntimeView runtime={memoryRuntime} sync={memorySync} locale={locale} />
+          <>
+            <MemoryRuntimeView runtime={memoryRuntime} sync={memorySync} locale={locale} />
+            <section className="workspace">
+              <div className="section-grid">
+                <MemoryRuntimePolicyView snapshot={memoryPolicyEnforcement} locale={locale} />
+              </div>
+            </section>
+          </>
         ) : null}
 
         {activeView === 'memory-authority' ? (

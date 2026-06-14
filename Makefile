@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-runtime-policy-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -134,6 +134,25 @@ memory-operator-panel-gate:
 memory-runtime-gate:
 	uv run pytest -q tests/test_memory_runtime_bridge.py tests/test_orchestrator_memory_runtime.py tests/test_team_memory_runtime_bridge.py tests/test_control_plane_snapshot_memory_runtime.py
 	uv run python scripts/run_memory_runtime_gate.py
+
+memory-runtime-policy-gate:
+	uv run python scripts/generate_memory_runtime_policy_contract_schemas.py
+	uv run --extra dev pytest -q \
+		tests/test_memory_runtime_policy_models.py \
+		tests/test_memory_principal_resolver.py \
+		tests/test_memory_runtime_policy_gateway.py \
+		tests/test_memory_runtime_policy_semantic.py \
+		tests/test_orchestrator_memory_policy_enforcement.py \
+		tests/test_team_memory_policy_enforcement.py \
+		tests/test_control_plane_snapshot_memory_policy.py \
+		tests/test_memory_runtime_policy_cli.py \
+		tests/test_memory_runtime_policy_privacy.py
+	uv run binliquid memory runtime policy evaluate \
+		--suite benchmarks/tasks/memory/runtime_policy_cases.jsonl \
+		--output artifacts/memory-runtime-policy/evaluation.json \
+		--profile enterprise
+	uv run python scripts/run_memory_runtime_policy_gate.py
+	pnpm -C apps/operator-panel exec vitest run src/memory-runtime/MemoryRuntimePolicyView.test.tsx
 
 memory-context-pack-gate:
 	uv run pytest -q tests/test_memory_context_pack.py

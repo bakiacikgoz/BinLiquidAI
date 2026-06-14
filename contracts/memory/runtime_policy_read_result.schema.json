@@ -1,0 +1,458 @@
+{
+  "$defs": {
+    "AgentMemoryRuntimePolicyDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "enum": [
+                "allow",
+                "degrade",
+                "deny",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            {
+              "enum": [
+                "allow",
+                "proposal_only",
+                "requires_approval",
+                "deny",
+                "disabled"
+              ],
+              "type": "string"
+            }
+          ],
+          "title": "Action"
+        },
+        "allowedScopeHashes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowedscopehashes",
+          "type": "array"
+        },
+        "deniedScopeHashes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deniedscopehashes",
+          "type": "array"
+        },
+        "evidenceRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidenceref"
+        },
+        "operation": {
+          "enum": [
+            "read",
+            "write"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "principalHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Principalhash"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "rawContentIncluded": {
+          "const": false,
+          "default": false,
+          "title": "Rawcontentincluded",
+          "type": "boolean"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "requestedScopeHashes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requestedscopehashes",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": "agent-memory-runtime-policy-decision/v1",
+          "default": "agent-memory-runtime-policy-decision/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "semanticRuntimeMode": {
+          "default": "disabled",
+          "enum": [
+            "disabled",
+            "shadow",
+            "enforced"
+          ],
+          "title": "Semanticruntimemode",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "empty",
+            "degraded",
+            "denied",
+            "disabled",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "workspaceHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspacehash"
+        }
+      },
+      "required": [
+        "operation",
+        "action",
+        "status",
+        "profile"
+      ],
+      "title": "AgentMemoryRuntimePolicyDecision",
+      "type": "object"
+    },
+    "MemoryContextHit": {
+      "additionalProperties": false,
+      "properties": {
+        "contentHash": {
+          "title": "Contenthash",
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "memoryId": {
+          "title": "Memoryid",
+          "type": "string"
+        },
+        "policyDecisionRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Policydecisionref"
+        },
+        "policyTags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Policytags",
+          "type": "array"
+        },
+        "redactedSummary": {
+          "title": "Redactedsummary",
+          "type": "string"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "score": {
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "semanticScoreBreakdown": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Semanticscorebreakdown",
+          "type": "object"
+        },
+        "sourceKind": {
+          "default": "runtime_bridge",
+          "title": "Sourcekind",
+          "type": "string"
+        },
+        "visibility": {
+          "title": "Visibility",
+          "type": "string"
+        }
+      },
+      "required": [
+        "memoryId",
+        "scope",
+        "visibility",
+        "redactedSummary",
+        "contentHash",
+        "score",
+        "createdAt"
+      ],
+      "title": "MemoryContextHit",
+      "type": "object"
+    },
+    "MemoryContextPack": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAtUtc": {
+          "format": "date-time",
+          "title": "Createdatutc",
+          "type": "string"
+        },
+        "degradedReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Degradedreason"
+        },
+        "deniedScopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deniedscopes",
+          "type": "array"
+        },
+        "evidenceRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidenceref"
+        },
+        "hits": {
+          "items": {
+            "$ref": "#/$defs/MemoryContextHit"
+          },
+          "title": "Hits",
+          "type": "array"
+        },
+        "packId": {
+          "title": "Packid",
+          "type": "string"
+        },
+        "queryHash": {
+          "title": "Queryhash",
+          "type": "string"
+        },
+        "rawContentIncluded": {
+          "const": false,
+          "default": false,
+          "title": "Rawcontentincluded",
+          "type": "boolean"
+        },
+        "retrievalFingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrievalfingerprint"
+        },
+        "runId": {
+          "title": "Runid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "empty",
+            "denied",
+            "degraded",
+            "disabled",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "version": {
+          "const": "memory.context-pack/v1",
+          "default": "memory.context-pack/v1",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "packId",
+        "runId",
+        "queryHash",
+        "status"
+      ],
+      "title": "MemoryContextPack",
+      "type": "object"
+    },
+    "ResolvedMemoryPrincipal": {
+      "additionalProperties": false,
+      "properties": {
+        "allowedScopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowedscopes",
+          "type": "array"
+        },
+        "deniedScopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deniedscopes",
+          "type": "array"
+        },
+        "principalHash": {
+          "title": "Principalhash",
+          "type": "string"
+        },
+        "principalId": {
+          "title": "Principalid",
+          "type": "string"
+        },
+        "principalKind": {
+          "enum": [
+            "operator",
+            "session",
+            "agent",
+            "team_agent",
+            "external_agent"
+          ],
+          "title": "Principalkind",
+          "type": "string"
+        },
+        "rawContentIncluded": {
+          "const": false,
+          "default": false,
+          "title": "Rawcontentincluded",
+          "type": "boolean"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "requestedScopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requestedscopes",
+          "type": "array"
+        },
+        "roles": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "status": {
+          "default": "pass",
+          "enum": [
+            "pass",
+            "degraded",
+            "denied",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "workspaceId": {
+          "title": "Workspaceid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "principalKind",
+        "principalId",
+        "principalHash",
+        "workspaceId"
+      ],
+      "title": "ResolvedMemoryPrincipal",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contextPack": {
+      "$ref": "#/$defs/MemoryContextPack"
+    },
+    "decision": {
+      "$ref": "#/$defs/AgentMemoryRuntimePolicyDecision"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "resolvedPrincipal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResolvedMemoryPrincipal"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "decision",
+    "contextPack"
+  ],
+  "title": "AgentMemoryRuntimePolicyReadResult",
+  "type": "object"
+}

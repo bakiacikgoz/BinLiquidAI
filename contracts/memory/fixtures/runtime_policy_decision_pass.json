@@ -1,0 +1,20 @@
+{
+  "action": "allow",
+  "allowedScopeHashes": [
+    "a6e0a4fcfcbf87f27938b1d90a6b80ee5e91b2604102f0a90f1d420fa21c6056"
+  ],
+  "deniedScopeHashes": [],
+  "evidenceRef": "artifacts/memory-runtime-policy/events/mem_policy_evt_fixture.json",
+  "operation": "read",
+  "principalHash": "2a8a386dd99f2f3875f57e86c8e85f4d350daedbe15f3cbff0bdaed36b2398dd",
+  "profile": "enterprise",
+  "rawContentIncluded": false,
+  "reasonCodes": [],
+  "requestedScopeHashes": [
+    "a6e0a4fcfcbf87f27938b1d90a6b80ee5e91b2604102f0a90f1d420fa21c6056"
+  ],
+  "schemaVersion": "agent-memory-runtime-policy-decision/v1",
+  "semanticRuntimeMode": "enforced",
+  "status": "pass",
+  "workspaceHash": "daf7c0ff6c4c9c451b52f0446735f65a53f9ee815b7f5e3e5b057804d58146c4"
+}
