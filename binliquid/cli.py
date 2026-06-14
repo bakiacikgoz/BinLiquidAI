@@ -151,6 +151,12 @@ from binliquid.memory.models import (
 from binliquid.memory.persistent_store import PersistentMemoryStore
 from binliquid.memory.runtime_bridge import RuntimeMemoryRequest, build_memory_runtime_bridge
 from binliquid.memory.salience_gate import SalienceGate
+from binliquid.memory.semantic import (
+    IndexRebuildRequest,
+    MemorySearchRequest,
+    SemanticMemoryService,
+)
+from binliquid.memory.semantic.backends.turbovec_backend import TurboVecSemanticBackend
 from binliquid.memory.session_store import SessionStore
 from binliquid.memory.sync_importer import import_memory_sync_pack
 from binliquid.memory.sync_pack import (
@@ -201,6 +207,8 @@ memory_authority_app = typer.Typer(help="Workspace memory authority query/write 
 memory_workspace_sync_app = typer.Typer(help="Workspace memory sync v2 commands")
 memory_workspace_conflicts_app = typer.Typer(help="Workspace memory conflict commands")
 memory_workspace_migrate_app = typer.Typer(help="Workspace memory migration commands")
+memory_semantic_app = typer.Typer(help="Semantic memory index commands")
+memory_semantic_backend_app = typer.Typer(help="Semantic memory backend commands")
 research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
 provider_app = typer.Typer(help="Provider discovery commands")
@@ -254,6 +262,8 @@ memory_app.add_typer(memory_authority_app, name="authority")
 memory_workspace_app.add_typer(memory_workspace_sync_app, name="sync")
 memory_workspace_app.add_typer(memory_workspace_conflicts_app, name="conflicts")
 memory_workspace_app.add_typer(memory_workspace_migrate_app, name="migrate")
+memory_app.add_typer(memory_semantic_app, name="semantic")
+memory_semantic_app.add_typer(memory_semantic_backend_app, name="backend")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
 app.add_typer(provider_app, name="provider")
@@ -311,6 +321,11 @@ _WORKSPACE_PERMISSION_OPTION = typer.Option(
     ...,
     "--permission",
     help="Repeatable permission",
+)
+_MEMORY_SEMANTIC_SCOPE_OPTION = typer.Option(
+    [],
+    "--scope",
+    help="Repeatable semantic scope in scope_type:scope_id form",
 )
 
 
@@ -5540,6 +5555,106 @@ def memory_authority_propose_write(
         )
     )
     _echo_json(result.model_dump(mode="json", by_alias=True))
+
+
+def _semantic_service(profile: str) -> SemanticMemoryService:
+    config = RuntimeConfig.from_profile(profile)
+    authority = build_workspace_memory_authority(config)
+    return SemanticMemoryService(config=config, authority=authority)
+
+
+@memory_semantic_app.command("status")
+def memory_semantic_status(
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    service = _semantic_service(profile)
+    _echo_json(service.status(workspace_id).model_dump(mode="json", by_alias=True))
+
+
+@memory_semantic_app.command("rebuild")
+def memory_semantic_rebuild(
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+    apply: bool = typer.Option(False, "--apply", help="Persist the rebuilt index"),
+    dry_run: bool = typer.Option(True, "--dry-run/--no-dry-run"),
+) -> None:
+    service = _semantic_service(profile)
+    result = service.rebuild(
+        IndexRebuildRequest(
+            workspaceId=workspace_id,
+            apply=apply,
+            dryRun=dry_run or not apply,
+        )
+    )
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+    if result.status in {"blocked", "error"}:
+        raise typer.Exit(code=1)
+
+
+@memory_semantic_app.command("search")
+def memory_semantic_search(
+    query: str = typer.Option(..., "--query"),
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    principal_id: str = typer.Option("agent-local", "--principal-id"),
+    requested_scope: list[str] = _MEMORY_SEMANTIC_SCOPE_OPTION,
+    limit: int = typer.Option(8, min=1, max=50),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    service = _semantic_service(profile)
+    result = service.search(
+        MemorySearchRequest(
+            query=query,
+            principalId=principal_id,
+            workspaceId=workspace_id,
+            requestedScopes=tuple(requested_scope),
+            limit=limit,
+        )
+    )
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+    if result.status in {"blocked", "error"}:
+        raise typer.Exit(code=1)
+
+
+@memory_semantic_app.command("evaluate")
+def memory_semantic_evaluate(
+    suite: str = typer.Option(
+        "tests/fixtures/memory_semantic/retrieval_quality.jsonl",
+        "--suite",
+    ),
+    output: str = typer.Option(
+        "artifacts/memory-semantic/retrieval_quality_report.json",
+        "--output",
+    ),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    from binliquid.memory.semantic.evaluator import run_retrieval_quality_suite
+
+    service = _semantic_service(profile)
+    report = run_retrieval_quality_suite(
+        suite_path=suite,
+        search_fn=service.search,
+        output_path=output,
+    )
+    _echo_json(report.model_dump(mode="json", by_alias=True))
+    if report.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@memory_semantic_backend_app.command("doctor")
+def memory_semantic_backend_doctor(
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    service = _semantic_service(profile)
+    turbovec_status = TurboVecSemanticBackend().status(workspace_id)
+    payload = {
+        "status": "pass",
+        "defaultBackend": service.status(workspace_id).model_dump(mode="json", by_alias=True),
+        "turbovec": turbovec_status.model_dump(mode="json", by_alias=True),
+        "rawContentIncluded": False,
+    }
+    _echo_json(payload)
 
 
 @memory_workspace_sync_app.command("export")

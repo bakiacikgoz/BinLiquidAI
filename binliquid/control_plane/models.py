@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from binliquid.memory.models import MemoryAuthoritySnapshot, disabled_memory_authority_snapshot
 from binliquid.memory.runtime_snapshot import MemoryRuntimeSnapshot, MemorySyncSnapshot
+from binliquid.memory.semantic import MemorySemanticIndexSnapshot
 from binliquid.memory.workspace_models import WorkspaceMemoryAuthorityHealth
 
 
@@ -1447,6 +1448,10 @@ class ControlPlaneSnapshot(StrictModel):
     memory_authority: WorkspaceMemoryAuthorityHealth = Field(
         default_factory=WorkspaceMemoryAuthorityHealth,
         alias="memoryAuthority",
+    )
+    memory_semantic_index: MemorySemanticIndexSnapshot = Field(
+        default_factory=MemorySemanticIndexSnapshot,
+        alias="memorySemanticIndex",
     )
     quick_actions: list[QuickActionSummary] = Field(default_factory=list, alias="quickActions")
     partial_reasons: list[str] = Field(default_factory=list, alias="partialReasons")

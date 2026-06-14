@@ -125,6 +125,7 @@ import { asControlPlaneClaimMatrix } from './controlPlaneMappers';
 import { MemoryAuthorityView } from './memory-authority/MemoryAuthorityView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
+import { MemorySemanticIndexView } from './memory-semantic/MemorySemanticIndexView';
 import type { ShellViewKey } from './components/shell/Sidebar';
 import type { RouteId } from './routeRegistry';
 
@@ -1205,6 +1206,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const memoryRuntime = controlPlaneSnapshot?.memoryRuntime ?? null;
   const memorySync = controlPlaneSnapshot?.memorySync ?? null;
   const memoryAuthority = controlPlaneSnapshot?.memoryAuthority ?? null;
+  const memorySemanticIndex = controlPlaneSnapshot?.memorySemanticIndex ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2525,6 +2527,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'memory-authority' ? (
           <MemoryAuthorityView authority={memoryAuthority} locale={locale} />
+        ) : null}
+
+        {activeView === 'memory-semantic' ? (
+          <MemorySemanticIndexView snapshot={memorySemanticIndex} locale={locale} />
         ) : null}
 
         {activeView === 'operations' ? (

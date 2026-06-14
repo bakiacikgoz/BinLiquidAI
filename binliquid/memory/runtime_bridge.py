@@ -188,6 +188,63 @@ class MemoryRuntimeBridge:
         runtime_cfg = self.config.memory.runtime
         workspace_id = _workspace_id(self.config, request)
         principal_id = _principal_id(self.config, request)
+        if (
+            self.config.memory.semantic.enabled
+            and self.config.memory.semantic.runtime_injection_enabled
+        ):
+            from binliquid.memory.semantic.models import MemorySearchRequest
+
+            requested_scopes = tuple(
+                f"{scope_type}:{scope_id}"
+                for scope_type, scope_id in _workspace_scope_queries(request, principal_id)
+            )
+            semantic_result = self.workspace_authority.semantic_search(
+                MemorySearchRequest(
+                    query=request.query,
+                    principalId=principal_id,
+                    workspaceId=workspace_id,
+                    requestedScopes=requested_scopes,
+                    limit=max(1, runtime_cfg.context_top_k),
+                    allowStaleIndex=False,
+                )
+            )
+            hits = [
+                MemoryContextHit(
+                    memoryId=hit.memory_id,
+                    scope=hit.scope_type,
+                    visibility=hit.scope_type,
+                    redactedSummary=hit.redacted_summary,
+                    contentHash=hit.content_hash,
+                    score=hit.score_breakdown.final,
+                    createdAt=hit.created_at_utc,
+                    policyTags=[],
+                )
+                for hit in semantic_result.hits
+            ]
+            status: Literal["pass", "empty", "denied"] = "pass" if hits else "empty"
+            if semantic_result.status == "blocked":
+                status = "denied"
+            return MemoryContextPack(
+                packId=stable_id(
+                    "mem_ctx",
+                    request.run_id,
+                    request.query,
+                    workspace_id,
+                    principal_id,
+                    "semantic",
+                ),
+                runId=request.run_id,
+                queryHash=hash_identity(request.query),
+                status=status,
+                hits=hits,
+                evidenceRef=semantic_result.evidence_ref,
+                deniedScopes=[],
+                rawContentIncluded=False,
+                truncated=False,
+                degradedReason="MEMORY_SEMANTIC_RETRIEVAL_BLOCKED"
+                if semantic_result.status == "blocked"
+                else None,
+            )
         hits: list[MemoryContextHit] = []
         denied_scopes: list[str] = []
         evidence_ref: str | None = None

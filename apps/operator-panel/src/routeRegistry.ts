@@ -15,6 +15,7 @@ export type RouteId =
   | 'memory-governance'
   | 'memory-authority'
   | 'memory-runtime'
+  | 'memory-semantic'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -94,6 +95,13 @@ export const routeGroups: RouteGroup[] = [
         label: 'Memory Authority',
         heading: 'Memory Authority',
         icon: 'shield',
+      },
+      {
+        id: 'memory-semantic',
+        routeId: 'memory-semantic',
+        label: 'Semantic Memory',
+        heading: 'Semantic Memory',
+        icon: 'archive',
       },
       { id: 'operations', routeId: 'operations', label: 'Yürütmeler', heading: 'Operations', icon: 'clipboard' },
       { id: 'settings', routeId: 'settings', label: 'Ayarlar', heading: 'Settings', icon: 'settings' },

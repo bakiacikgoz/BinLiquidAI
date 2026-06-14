@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "backendKind": {
+      "enum": [
+        "in_memory_fixture",
+        "sqlite_text",
+        "turbovec",
+        "null"
+      ],
+      "title": "Backendkind",
+      "type": "string"
+    },
+    "indexedRecordCount": {
+      "minimum": 0,
+      "title": "Indexedrecordcount",
+      "type": "integer"
+    },
+    "p95LatencyMs": {
+      "minimum": 0.0,
+      "title": "P95Latencyms",
+      "type": "number"
+    },
+    "queryCount": {
+      "minimum": 0,
+      "title": "Querycount",
+      "type": "integer"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "degraded",
+        "unavailable_optional"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "backendKind",
+    "indexedRecordCount",
+    "queryCount",
+    "p95LatencyMs"
+  ],
+  "title": "MemoryBackendBenchmarkReport",
+  "type": "object"
+}

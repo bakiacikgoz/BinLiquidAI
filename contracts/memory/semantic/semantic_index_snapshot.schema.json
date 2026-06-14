@@ -1,0 +1,96 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "backendStatus": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Backendstatus",
+      "type": "object"
+    },
+    "defaultBackend": {
+      "default": "in_memory_fixture",
+      "enum": [
+        "in_memory_fixture",
+        "sqlite_text",
+        "turbovec",
+        "null"
+      ],
+      "title": "Defaultbackend",
+      "type": "string"
+    },
+    "embeddingProfile": {
+      "default": "deterministic-fixture-v1",
+      "title": "Embeddingprofile",
+      "type": "string"
+    },
+    "enabled": {
+      "default": false,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "experimentalBackends": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Experimentalbackends",
+      "type": "object"
+    },
+    "lastEvaluationStatus": {
+      "default": "missing",
+      "enum": [
+        "pass",
+        "fail",
+        "missing"
+      ],
+      "title": "Lastevaluationstatus",
+      "type": "string"
+    },
+    "rawPersistence": {
+      "const": false,
+      "default": false,
+      "title": "Rawpersistence",
+      "type": "boolean"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "recordCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Recordcount",
+      "type": "integer"
+    },
+    "runtimeInjectionEnabled": {
+      "default": false,
+      "title": "Runtimeinjectionenabled",
+      "type": "boolean"
+    },
+    "status": {
+      "default": "available_disabled",
+      "enum": [
+        "available_disabled",
+        "ready",
+        "stale",
+        "rebuild_required",
+        "blocked",
+        "error",
+        "unavailable_optional"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workspaceShardCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Workspaceshardcount",
+      "type": "integer"
+    }
+  },
+  "title": "MemorySemanticIndexSnapshot",
+  "type": "object"
+}

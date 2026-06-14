@@ -1,0 +1,337 @@
+{
+  "$defs": {
+    "HybridRetrievalScore": {
+      "additionalProperties": false,
+      "properties": {
+        "final": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Final",
+          "type": "number"
+        },
+        "lexical": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Lexical",
+          "type": "number"
+        },
+        "recency": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Recency",
+          "type": "number"
+        },
+        "semantic": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Semantic",
+          "type": "number"
+        }
+      },
+      "title": "HybridRetrievalScore",
+      "type": "object"
+    },
+    "MemoryAccessDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "allow",
+            "deny",
+            "proposal_only",
+            "requires_approval"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "evidenceRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidenceref"
+        },
+        "matchedRules": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Matchedrules",
+          "type": "array"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "redactionRequired": {
+          "default": true,
+          "title": "Redactionrequired",
+          "type": "boolean"
+        },
+        "requiresApproval": {
+          "default": false,
+          "title": "Requiresapproval",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "action",
+        "reasonCode"
+      ],
+      "title": "MemoryAccessDecision",
+      "type": "object"
+    },
+    "MemoryRetrievalHit": {
+      "additionalProperties": false,
+      "properties": {
+        "contentHash": {
+          "title": "Contenthash",
+          "type": "string"
+        },
+        "createdAtUtc": {
+          "format": "date-time",
+          "title": "Createdatutc",
+          "type": "string"
+        },
+        "memoryId": {
+          "title": "Memoryid",
+          "type": "string"
+        },
+        "policyDecision": {
+          "$ref": "#/$defs/MemoryAccessDecision"
+        },
+        "rawContentIncluded": {
+          "const": false,
+          "default": false,
+          "title": "Rawcontentincluded",
+          "type": "boolean"
+        },
+        "redactedSummary": {
+          "title": "Redactedsummary",
+          "type": "string"
+        },
+        "scopeId": {
+          "title": "Scopeid",
+          "type": "string"
+        },
+        "scopeType": {
+          "enum": [
+            "personal",
+            "agent",
+            "team",
+            "project",
+            "case",
+            "organization",
+            "global_readonly"
+          ],
+          "title": "Scopetype",
+          "type": "string"
+        },
+        "scoreBreakdown": {
+          "$ref": "#/$defs/HybridRetrievalScore"
+        },
+        "stateVersion": {
+          "title": "Stateversion",
+          "type": "integer"
+        },
+        "workspaceId": {
+          "title": "Workspaceid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "memoryId",
+        "workspaceId",
+        "scopeType",
+        "scopeId",
+        "redactedSummary",
+        "contentHash",
+        "scoreBreakdown",
+        "policyDecision",
+        "createdAtUtc",
+        "stateVersion"
+      ],
+      "title": "MemoryRetrievalHit",
+      "type": "object"
+    },
+    "SemanticIndexStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "backendKind": {
+          "default": "in_memory_fixture",
+          "enum": [
+            "in_memory_fixture",
+            "sqlite_text",
+            "turbovec",
+            "null"
+          ],
+          "title": "Backendkind",
+          "type": "string"
+        },
+        "embeddingProfileId": {
+          "default": "deterministic-fixture-v1",
+          "title": "Embeddingprofileid",
+          "type": "string"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "indexStateVersion": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Indexstateversion",
+          "type": "integer"
+        },
+        "rawPersistence": {
+          "const": false,
+          "default": false,
+          "title": "Rawpersistence",
+          "type": "boolean"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "recordCount": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Recordcount",
+          "type": "integer"
+        },
+        "sourceStateVersion": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Sourcestateversion",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "available_disabled",
+            "ready",
+            "stale",
+            "rebuild_required",
+            "blocked",
+            "error",
+            "unavailable_optional"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "workspaceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspaceid"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SemanticIndexStatus",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "expiredResultCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Expiredresultcount",
+      "type": "integer"
+    },
+    "hits": {
+      "items": {
+        "$ref": "#/$defs/MemoryRetrievalHit"
+      },
+      "title": "Hits",
+      "type": "array"
+    },
+    "indexStatus": {
+      "$ref": "#/$defs/SemanticIndexStatus"
+    },
+    "queryHash": {
+      "title": "Queryhash",
+      "type": "string"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "rawLeakCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Rawleakcount",
+      "type": "integer"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "scopeViolationCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Scopeviolationcount",
+      "type": "integer"
+    },
+    "staleResultCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Staleresultcount",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "degraded",
+        "blocked",
+        "error",
+        "empty"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "queryHash",
+    "indexStatus"
+  ],
+  "title": "MemorySearchResult",
+  "type": "object"
+}

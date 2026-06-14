@@ -1,18 +1,16 @@
 # TurboVec Experimental Backend
 
-TurboVec support is a guarded optional adapter. It is not a default runtime dependency and does not affect release claims.
+TurboVec is represented as an optional experimental backend. It is disabled by default, cannot be used for runtime injection by default, and does not add a required dependency.
 
-Required posture:
+If the `turbovec` Python package is missing, backend doctor reports:
 
-- `turbovec_experimental_enabled=false` by default.
-- Missing package or disabled flag must produce a non-failing `disabled` or `unavailable` status.
-- Dimension and bit-depth guards are read from config before backend activation.
-- Artifacts must describe TurboVec as experimental only.
-
-Validation:
-
-```bash
-uv run python scripts/run_memory_index_gate.py
+```json
+{
+  "status": "unavailable_optional",
+  "reasonCodes": ["MEMORY_TURBOVEC_OPTIONAL_DEPENDENCY_MISSING"]
+}
 ```
 
-The gate expects TurboVec to stay disabled unless an operator intentionally enables the experimental path.
+Default gates must continue to pass without TurboVec installed.
+
+Enablement requires an explicit config change under `[memory.semantic.backends.turbovec]` plus a separate production hardening review.

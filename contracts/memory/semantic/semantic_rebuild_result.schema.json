@@ -1,0 +1,172 @@
+{
+  "$defs": {
+    "SemanticIndexManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "backendKind": {
+          "enum": [
+            "in_memory_fixture",
+            "sqlite_text",
+            "turbovec",
+            "null"
+          ],
+          "title": "Backendkind",
+          "type": "string"
+        },
+        "createdAtUtc": {
+          "format": "date-time",
+          "title": "Createdatutc",
+          "type": "string"
+        },
+        "dimensions": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Dimensions",
+          "type": "integer"
+        },
+        "embeddingProfileId": {
+          "title": "Embeddingprofileid",
+          "type": "string"
+        },
+        "indexId": {
+          "title": "Indexid",
+          "type": "string"
+        },
+        "indexStateVersion": {
+          "minimum": 0,
+          "title": "Indexstateversion",
+          "type": "integer"
+        },
+        "rawPersistence": {
+          "const": false,
+          "default": false,
+          "title": "Rawpersistence",
+          "type": "boolean"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "recordCount": {
+          "minimum": 0,
+          "title": "Recordcount",
+          "type": "integer"
+        },
+        "redactionMode": {
+          "const": "redacted_summary_only",
+          "default": "redacted_summary_only",
+          "title": "Redactionmode",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "memory-semantic-index-manifest/v1",
+          "default": "memory-semantic-index-manifest/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "sourceStateVersion": {
+          "minimum": 0,
+          "title": "Sourcestateversion",
+          "type": "integer"
+        },
+        "status": {
+          "default": "ready",
+          "enum": [
+            "available_disabled",
+            "ready",
+            "stale",
+            "rebuild_required",
+            "blocked",
+            "error",
+            "unavailable_optional"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tombstoneCount": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tombstonecount",
+          "type": "integer"
+        },
+        "updatedAtUtc": {
+          "format": "date-time",
+          "title": "Updatedatutc",
+          "type": "string"
+        },
+        "workspaceId": {
+          "title": "Workspaceid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "indexId",
+        "workspaceId",
+        "backendKind",
+        "embeddingProfileId",
+        "sourceStateVersion",
+        "indexStateVersion",
+        "recordCount"
+      ],
+      "title": "SemanticIndexManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "indexedRecordCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Indexedrecordcount",
+      "type": "integer"
+    },
+    "manifest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SemanticIndexManifest"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "skippedRecordCount": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Skippedrecordcount",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked",
+        "error",
+        "dry_run"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "IndexRebuildResult",
+  "type": "object"
+}

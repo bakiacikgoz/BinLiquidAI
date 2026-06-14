@@ -78,6 +78,41 @@ class MemoryWorkspaceAuthorityConfig(BaseModel):
     migration_apply_enabled: bool = False
 
 
+class MemorySemanticTurboVecConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = False
+    experimental: bool = True
+    bit_width: int = Field(default=4, ge=1, le=8)
+    allow_runtime_injection: bool = False
+
+
+class MemorySemanticBackendsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    turbovec: MemorySemanticTurboVecConfig = Field(default_factory=MemorySemanticTurboVecConfig)
+
+
+class MemorySemanticConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = False
+    runtime_injection_enabled: bool = False
+    backend: Literal["in_memory_fixture", "sqlite_text", "turbovec", "null"] = "in_memory_fixture"
+    embedding_profile: str = "deterministic-fixture-v1"
+    max_hits: int = Field(default=8, ge=1, le=50)
+    allow_stale_index: bool = False
+    raw_persistence: bool = False
+    backends: MemorySemanticBackendsConfig = Field(default_factory=MemorySemanticBackendsConfig)
+
+    @field_validator("raw_persistence")
+    @classmethod
+    def _raw_persistence_must_stay_disabled(cls, value: bool) -> bool:
+        if value:
+            raise ValueError("memory.semantic.raw_persistence must remain false")
+        return value
+
+
 class MemoryConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -123,6 +158,7 @@ class MemoryConfig(BaseModel):
     workspace_authority: MemoryWorkspaceAuthorityConfig = Field(
         default_factory=MemoryWorkspaceAuthorityConfig
     )
+    semantic: MemorySemanticConfig = Field(default_factory=MemorySemanticConfig)
 
 
 class PlannerTuningConfig(BaseModel):
@@ -377,6 +413,9 @@ class RuntimeConfig(BaseModel):
         memory_runtime_data = memory_data.get("runtime", {})
         memory_sync_data = memory_data.get("sync", {})
         memory_workspace_authority_data = memory_data.get("workspace_authority", {})
+        memory_semantic_data = memory_data.get("semantic", {})
+        memory_semantic_backends_data = memory_semantic_data.get("backends", {})
+        memory_semantic_turbovec_data = memory_semantic_backends_data.get("turbovec", {})
         planner_data = data.get("planner", {})
         code_verify_data = data.get("code_verify", {})
         governance_data = data.get("governance", {})
@@ -507,6 +546,31 @@ class RuntimeConfig(BaseModel):
                     ),
                     migration_apply_enabled=memory_workspace_authority_data.get(
                         "migration_apply_enabled", False
+                    ),
+                ),
+                semantic=MemorySemanticConfig(
+                    enabled=memory_semantic_data.get("enabled", False),
+                    runtime_injection_enabled=memory_semantic_data.get(
+                        "runtime_injection_enabled", False
+                    ),
+                    backend=memory_semantic_data.get("backend", "in_memory_fixture"),
+                    embedding_profile=memory_semantic_data.get(
+                        "embedding_profile", "deterministic-fixture-v1"
+                    ),
+                    max_hits=memory_semantic_data.get("max_hits", 8),
+                    allow_stale_index=memory_semantic_data.get("allow_stale_index", False),
+                    raw_persistence=memory_semantic_data.get("raw_persistence", False),
+                    backends=MemorySemanticBackendsConfig(
+                        turbovec=MemorySemanticTurboVecConfig(
+                            enabled=memory_semantic_turbovec_data.get("enabled", False),
+                            experimental=memory_semantic_turbovec_data.get(
+                                "experimental", True
+                            ),
+                            bit_width=memory_semantic_turbovec_data.get("bit_width", 4),
+                            allow_runtime_injection=memory_semantic_turbovec_data.get(
+                                "allow_runtime_injection", False
+                            ),
+                        )
                     ),
                 ),
             ),

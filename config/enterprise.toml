@@ -93,6 +93,21 @@ raw_content_persistence = false
 network_listener_enabled = false
 migration_apply_enabled = false
 
+[memory.semantic]
+enabled = false
+runtime_injection_enabled = false
+backend = "in_memory_fixture"
+embedding_profile = "deterministic-fixture-v1"
+max_hits = 8
+allow_stale_index = false
+raw_persistence = false
+
+[memory.semantic.backends.turbovec]
+enabled = false
+experimental = true
+bit_width = 4
+allow_runtime_injection = false
+
 [memory.keyword_weights]
 remember = 0.18
 "hatırla" = 0.18

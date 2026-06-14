@@ -260,6 +260,14 @@ class WorkspaceMemoryAuthority:
             blockingReasons=blocking_reasons,
         )
 
+    def semantic_search(self, request: object) -> object:
+        from binliquid.memory.semantic.service import SemanticMemoryService
+
+        return SemanticMemoryService(
+            config=self.config,
+            authority=self,
+        ).search(request)
+
     def _write_evidence(
         self,
         *,

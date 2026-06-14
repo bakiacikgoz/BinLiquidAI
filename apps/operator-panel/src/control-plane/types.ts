@@ -527,6 +527,21 @@ export interface WorkspaceMemoryAuthorityHealth {
   blockingReasons: string[];
 }
 
+export interface MemorySemanticIndexSnapshot {
+  status: 'available_disabled' | 'ready' | 'stale' | 'rebuild_required' | 'blocked' | 'error' | 'unavailable_optional';
+  enabled: boolean;
+  runtimeInjectionEnabled: boolean;
+  defaultBackend: 'in_memory_fixture' | 'sqlite_text' | 'turbovec' | 'null';
+  embeddingProfile: string;
+  workspaceShardCount: number;
+  recordCount: number;
+  lastEvaluationStatus: 'pass' | 'fail' | 'missing';
+  experimentalBackends: Record<string, string>;
+  backendStatus: Record<string, string>;
+  rawPersistence: false;
+  reasonCodes: string[];
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -556,6 +571,7 @@ export interface ControlPlaneSnapshot {
   memoryRuntime?: MemoryRuntimeSnapshot;
   memorySync?: MemorySyncSnapshot;
   memoryAuthority?: WorkspaceMemoryAuthorityHealth;
+  memorySemanticIndex?: MemorySemanticIndexSnapshot;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

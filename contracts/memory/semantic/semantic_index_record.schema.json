@@ -1,0 +1,97 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "contentHash": {
+      "title": "Contenthash",
+      "type": "string"
+    },
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "embedding": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Embedding",
+      "type": "array"
+    },
+    "embeddingHash": {
+      "title": "Embeddinghash",
+      "type": "string"
+    },
+    "memoryId": {
+      "title": "Memoryid",
+      "type": "string"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "redactedSummary": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Redactedsummary",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "memory-semantic-index-record/v1",
+      "default": "memory-semantic-index-record/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "scopeId": {
+      "title": "Scopeid",
+      "type": "string"
+    },
+    "scopeType": {
+      "enum": [
+        "personal",
+        "agent",
+        "team",
+        "project",
+        "case",
+        "organization",
+        "global_readonly"
+      ],
+      "title": "Scopetype",
+      "type": "string"
+    },
+    "stateVersion": {
+      "minimum": 1,
+      "title": "Stateversion",
+      "type": "integer"
+    },
+    "summaryHash": {
+      "title": "Summaryhash",
+      "type": "string"
+    },
+    "updatedAtUtc": {
+      "format": "date-time",
+      "title": "Updatedatutc",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "memoryId",
+    "workspaceId",
+    "scopeType",
+    "scopeId",
+    "contentHash",
+    "redactedSummary",
+    "summaryHash",
+    "embeddingHash",
+    "stateVersion",
+    "createdAtUtc",
+    "updatedAtUtc"
+  ],
+  "title": "MemoryIndexRecord",
+  "type": "object"
+}
