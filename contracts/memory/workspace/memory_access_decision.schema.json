@@ -1,0 +1,54 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "allow",
+        "deny",
+        "proposal_only",
+        "requires_approval"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "matchedRules": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Matchedrules",
+      "type": "array"
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "redactionRequired": {
+      "default": true,
+      "title": "Redactionrequired",
+      "type": "boolean"
+    },
+    "requiresApproval": {
+      "default": false,
+      "title": "Requiresapproval",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "action",
+    "reasonCode"
+  ],
+  "title": "MemoryAccessDecision",
+  "type": "object"
+}

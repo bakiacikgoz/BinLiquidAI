@@ -1,0 +1,180 @@
+{
+  "$defs": {
+    "WorkspaceMemoryConflict": {
+      "additionalProperties": false,
+      "properties": {
+        "conflictId": {
+          "title": "Conflictid",
+          "type": "string"
+        },
+        "conflictType": {
+          "enum": [
+            "state_version_mismatch",
+            "same_target_different_hash",
+            "tombstone_vs_update",
+            "acl_denied",
+            "classification_upgrade_required"
+          ],
+          "title": "Conflicttype",
+          "type": "string"
+        },
+        "createdAtUtc": {
+          "format": "date-time",
+          "title": "Createdatutc",
+          "type": "string"
+        },
+        "decision": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "accepted",
+            "rejected",
+            "merged"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "incomingStateVersion": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Incomingstateversion"
+        },
+        "localStateVersion": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Localstateversion"
+        },
+        "memoryId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memoryid"
+        },
+        "memoryTarget": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memorytarget"
+        },
+        "requiresApproval": {
+          "default": true,
+          "title": "Requiresapproval",
+          "type": "boolean"
+        },
+        "workspaceId": {
+          "title": "Workspaceid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "conflictId",
+        "workspaceId",
+        "conflictType"
+      ],
+      "title": "WorkspaceMemoryConflict",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approvalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approvalid"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "conflicts": {
+      "items": {
+        "$ref": "#/$defs/WorkspaceMemoryConflict"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "dryRun": {
+      "title": "Dryrun",
+      "type": "boolean"
+    },
+    "packId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Packid"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "recordsApplied": {
+      "default": 0,
+      "title": "Recordsapplied",
+      "type": "integer"
+    },
+    "recordsSeen": {
+      "default": 0,
+      "title": "Recordsseen",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked",
+        "applied"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "dryRun"
+  ],
+  "title": "WorkspaceMemorySyncImportReport",
+  "type": "object"
+}

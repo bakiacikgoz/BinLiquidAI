@@ -1,0 +1,105 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "aclId": {
+      "title": "Aclid",
+      "type": "string"
+    },
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "effect": {
+      "enum": [
+        "allow",
+        "deny"
+      ],
+      "title": "Effect",
+      "type": "string"
+    },
+    "permissions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Permissions",
+      "type": "array"
+    },
+    "principalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Principalid"
+    },
+    "reason": {
+      "maxLength": 400,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "role": {
+      "anyOf": [
+        {
+          "enum": [
+            "owner",
+            "admin",
+            "operator",
+            "agent",
+            "viewer",
+            "auditor"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Role"
+    },
+    "schemaVersion": {
+      "const": "memory-scope-acl/v1",
+      "default": "memory-scope-acl/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "scopeId": {
+      "title": "Scopeid",
+      "type": "string"
+    },
+    "scopeType": {
+      "enum": [
+        "personal",
+        "agent",
+        "team",
+        "project",
+        "case",
+        "organization",
+        "global_readonly"
+      ],
+      "title": "Scopetype",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "aclId",
+    "workspaceId",
+    "scopeType",
+    "scopeId",
+    "permissions",
+    "effect",
+    "reason"
+  ],
+  "title": "MemoryScopeAclRule",
+  "type": "object"
+}

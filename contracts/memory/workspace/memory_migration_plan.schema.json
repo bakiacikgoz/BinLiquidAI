@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "LegacyMemoryRecordPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "contentHash": {
+          "title": "Contenthash",
+          "type": "string"
+        },
+        "sourceRecordId": {
+          "title": "Sourcerecordid",
+          "type": "string"
+        },
+        "summaryHash": {
+          "title": "Summaryhash",
+          "type": "string"
+        },
+        "targetScopeId": {
+          "title": "Targetscopeid",
+          "type": "string"
+        },
+        "targetScopeType": {
+          "enum": [
+            "personal",
+            "agent",
+            "team",
+            "project",
+            "case",
+            "organization",
+            "global_readonly"
+          ],
+          "title": "Targetscopetype",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sourceRecordId",
+        "targetScopeType",
+        "targetScopeId",
+        "summaryHash",
+        "contentHash"
+      ],
+      "title": "LegacyMemoryRecordPlan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "plans": {
+      "items": {
+        "$ref": "#/$defs/LegacyMemoryRecordPlan"
+      },
+      "title": "Plans",
+      "type": "array"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "recordsPlanned": {
+      "default": 0,
+      "title": "Recordsplanned",
+      "type": "integer"
+    },
+    "recordsSeen": {
+      "default": 0,
+      "title": "Recordsseen",
+      "type": "integer"
+    },
+    "schemaVersion": {
+      "const": "memory-migration-plan/v1",
+      "default": "memory-migration-plan/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "warning",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "workspaceId"
+  ],
+  "title": "LegacyMemoryMigrationPlanResult",
+  "type": "object"
+}

@@ -141,7 +141,13 @@ from binliquid.governance.runtime import (
 from binliquid.memory.authority import build_memory_authority, proposal_from_cli
 from binliquid.memory.evaluation import run_memory_retrieval_eval
 from binliquid.memory.manager import MemoryManager
-from binliquid.memory.models import MemoryRetrievalRequest, MemoryScopeFilter, hash_identity
+from binliquid.memory.migration_planner import plan_legacy_memory_migration
+from binliquid.memory.models import (
+    MemoryRetrievalRequest,
+    MemoryScopeFilter,
+    hash_identity,
+    stable_id,
+)
 from binliquid.memory.persistent_store import PersistentMemoryStore
 from binliquid.memory.runtime_bridge import RuntimeMemoryRequest, build_memory_runtime_bridge
 from binliquid.memory.salience_gate import SalienceGate
@@ -152,6 +158,17 @@ from binliquid.memory.sync_pack import (
     owner_filter,
     verify_memory_sync_pack,
 )
+from binliquid.memory.workspace_authority import build_workspace_memory_authority
+from binliquid.memory.workspace_models import (
+    LegacyMemoryMigrationPlanRequest,
+    MemoryPrincipal,
+    MemoryScopeAclRule,
+    MemoryWorkspace,
+    MemoryWorkspaceMembership,
+    WorkspaceMemoryQueryRequest,
+    WorkspaceMemoryWriteRequest,
+)
+from binliquid.memory.workspace_sync import WorkspaceMemorySyncCoordinator
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
@@ -177,6 +194,13 @@ memory_app = typer.Typer(help="Memory commands")
 memory_index_app = typer.Typer(help="Memory index commands")
 memory_runtime_app = typer.Typer(help="Memory runtime commands")
 memory_sync_app = typer.Typer(help="Memory sync pack commands")
+memory_workspace_app = typer.Typer(help="Workspace memory authority commands")
+memory_principal_app = typer.Typer(help="Workspace memory principal commands")
+memory_scope_app = typer.Typer(help="Workspace memory scope ACL commands")
+memory_authority_app = typer.Typer(help="Workspace memory authority query/write commands")
+memory_workspace_sync_app = typer.Typer(help="Workspace memory sync v2 commands")
+memory_workspace_conflicts_app = typer.Typer(help="Workspace memory conflict commands")
+memory_workspace_migrate_app = typer.Typer(help="Workspace memory migration commands")
 research_app = typer.Typer(help="Research commands")
 config_app = typer.Typer(help="Config commands")
 provider_app = typer.Typer(help="Provider discovery commands")
@@ -223,6 +247,13 @@ app.add_typer(memory_app, name="memory")
 memory_app.add_typer(memory_index_app, name="index")
 memory_app.add_typer(memory_runtime_app, name="runtime")
 memory_app.add_typer(memory_sync_app, name="sync")
+memory_app.add_typer(memory_workspace_app, name="workspace")
+memory_app.add_typer(memory_principal_app, name="principal")
+memory_app.add_typer(memory_scope_app, name="scope")
+memory_app.add_typer(memory_authority_app, name="authority")
+memory_workspace_app.add_typer(memory_workspace_sync_app, name="sync")
+memory_workspace_app.add_typer(memory_workspace_conflicts_app, name="conflicts")
+memory_workspace_app.add_typer(memory_workspace_migrate_app, name="migrate")
 app.add_typer(research_app, name="research")
 app.add_typer(config_app, name="config")
 app.add_typer(provider_app, name="provider")
@@ -270,6 +301,16 @@ _MEMORY_ALLOWED_SCOPE_OPTION = typer.Option(
     None,
     "--allowed-scope",
     help="Policy-allowed retrieval scope",
+)
+_WORKSPACE_ROLE_OPTION = typer.Option(
+    ["viewer"],
+    "--role",
+    help="Repeatable workspace role",
+)
+_WORKSPACE_PERMISSION_OPTION = typer.Option(
+    ...,
+    "--permission",
+    help="Repeatable permission",
 )
 
 
@@ -5322,6 +5363,287 @@ def memory_sync_import(
     )
     if report.status == "blocked" and apply:
         raise typer.Exit(code=1)
+
+
+@memory_workspace_app.command("init")
+def memory_workspace_init(
+    workspace_id: str = typer.Option("default", "--workspace-id", help="Workspace id"),
+    owner_principal_id: str = typer.Option(
+        "agent-local",
+        "--owner-principal-id",
+        help="Owner principal id",
+    ),
+    display_name: str = typer.Option("Default workspace", "--display-name"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    authority.store.upsert_principal(
+        MemoryPrincipal(
+            principalId=owner_principal_id,
+            principalType="operator",
+            displayName=owner_principal_id,
+        )
+    )
+    workspace_result = authority.store.create_workspace(
+        MemoryWorkspace(
+            workspaceId=workspace_id,
+            displayName=display_name,
+            ownerPrincipalId=owner_principal_id,
+        )
+    )
+    membership_result = authority.store.grant_membership(
+        MemoryWorkspaceMembership(
+            membershipId=stable_id("wm_member", workspace_id, owner_principal_id),
+            workspaceId=workspace_id,
+            principalId=owner_principal_id,
+            roles=("owner",),
+            grantedBy=owner_principal_id,
+        )
+    )
+    _echo_json(
+        {
+            "status": "pass",
+            "workspace": workspace_result.model_dump(mode="json", by_alias=True),
+            "membership": membership_result.model_dump(mode="json", by_alias=True),
+            "rawContentIncluded": False,
+        }
+    )
+
+
+@memory_principal_app.command("add")
+def memory_principal_add(
+    principal_id: str = typer.Option(..., "--principal-id"),
+    principal_type: str = typer.Option("agent", "--principal-type"),
+    display_name: str | None = typer.Option(None, "--display-name"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    result = authority.store.upsert_principal(
+        MemoryPrincipal(
+            principalId=principal_id,
+            principalType=principal_type,
+            displayName=display_name or principal_id,
+        )
+    )
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+
+
+@memory_workspace_app.command("grant")
+def memory_workspace_grant(
+    workspace_id: str = typer.Option(..., "--workspace-id"),
+    principal_id: str = typer.Option(..., "--principal-id"),
+    role: list[str] = _WORKSPACE_ROLE_OPTION,
+    granted_by: str = typer.Option("agent-local", "--granted-by"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    result = authority.store.grant_membership(
+        MemoryWorkspaceMembership(
+            membershipId=stable_id("wm_member", workspace_id, principal_id),
+            workspaceId=workspace_id,
+            principalId=principal_id,
+            roles=tuple(role),
+            grantedBy=granted_by,
+        )
+    )
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+
+
+@memory_scope_app.command("grant")
+def memory_scope_grant(
+    workspace_id: str = typer.Option(..., "--workspace-id"),
+    scope_type: str = typer.Option(..., "--scope-type"),
+    scope_id: str = typer.Option(..., "--scope-id"),
+    permission: list[str] = _WORKSPACE_PERMISSION_OPTION,
+    effect: str = typer.Option("allow", "--effect"),
+    principal_id: str | None = typer.Option(None, "--principal-id"),
+    role: str | None = typer.Option(None, "--role"),
+    reason: str = typer.Option("operator ACL grant", "--reason"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    rule = MemoryScopeAclRule(
+        aclId=stable_id(
+            "wm_acl",
+            workspace_id,
+            scope_type,
+            scope_id,
+            principal_id or role,
+            ",".join(permission),
+            effect,
+        ),
+        workspaceId=workspace_id,
+        scopeType=scope_type,
+        scopeId=scope_id,
+        principalId=principal_id,
+        role=role,
+        permissions=tuple(permission),
+        effect=effect,
+        reason=reason,
+    )
+    result = authority.store.upsert_acl_rule(rule)
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+
+
+@memory_authority_app.command("query")
+def memory_authority_query(
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    principal_id: str = typer.Option("agent-local", "--principal-id"),
+    scope_type: str = typer.Option("personal", "--scope-type"),
+    scope_id: str = typer.Option("agent-local", "--scope-id"),
+    query: str = typer.Option("", "--query"),
+    limit: int = typer.Option(5, min=1, max=50),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    result = authority.query(
+        WorkspaceMemoryQueryRequest(
+            workspaceId=workspace_id,
+            principalId=principal_id,
+            scopeType=scope_type,
+            scopeId=scope_id,
+            query=query,
+            limit=limit,
+        )
+    )
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+
+
+@memory_authority_app.command("propose-write")
+def memory_authority_propose_write(
+    summary: str = typer.Option(..., "--summary"),
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    principal_id: str = typer.Option("agent-local", "--principal-id"),
+    scope_type: str = typer.Option("personal", "--scope-type"),
+    scope_id: str = typer.Option("agent-local", "--scope-id"),
+    memory_target: str | None = typer.Option(None, "--memory-target"),
+    expected_state_version: int | None = typer.Option(None, "--expected-state-version"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    ensure_artifact_scaffold()
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    result = authority.propose_or_write(
+        WorkspaceMemoryWriteRequest(
+            workspaceId=workspace_id,
+            principalId=principal_id,
+            scopeType=scope_type,
+            scopeId=scope_id,
+            summary=summary,
+            memoryTarget=memory_target,
+            expectedStateVersion=expected_state_version,
+            reason="operator authority propose-write",
+        )
+    )
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+
+
+@memory_workspace_sync_app.command("export")
+def memory_workspace_sync_export(
+    output: str = typer.Option(..., "--output"),
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    source_client_id: str = typer.Option("cli-local", "--source-client-id"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+    limit: int = typer.Option(10000, min=1, max=10000),
+) -> None:
+    ensure_artifact_scaffold()
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    coordinator = WorkspaceMemorySyncCoordinator(store=authority.store)
+    pack = coordinator.export_pack(
+        workspace_id=workspace_id,
+        source_client_id=source_client_id,
+        output_path=output,
+        limit=limit,
+    )
+    _echo_json(pack.manifest.model_dump(mode="json", by_alias=True))
+
+
+@memory_workspace_sync_app.command("verify")
+def memory_workspace_sync_verify(input_path: str = typer.Option(..., "--input")) -> None:
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile("balanced"))
+    result = WorkspaceMemorySyncCoordinator(store=authority.store).verify_pack(input_path)
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+    if result.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@memory_workspace_sync_app.command("import")
+def memory_workspace_sync_import(
+    input_path: str = typer.Option(..., "--input"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    report = WorkspaceMemorySyncCoordinator(store=authority.store).import_pack(
+        input_path=input_path,
+        dry_run=True,
+    )
+    _echo_json(report.model_dump(mode="json", by_alias=True))
+    if report.status == "blocked":
+        raise typer.Exit(code=1)
+
+
+@memory_workspace_sync_app.command("apply")
+def memory_workspace_sync_apply(
+    input_path: str = typer.Option(..., "--input"),
+    approval_id: str | None = typer.Option(None, "--approval-id"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    report = WorkspaceMemorySyncCoordinator(store=authority.store).import_pack(
+        input_path=input_path,
+        dry_run=False,
+        approval_id=approval_id,
+    )
+    _echo_json(report.model_dump(mode="json", by_alias=True))
+    if report.status == "blocked":
+        raise typer.Exit(code=1)
+
+
+@memory_workspace_conflicts_app.command("list")
+def memory_workspace_conflicts_list(
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    profile: str = typer.Option("balanced", help="Config profile"),
+) -> None:
+    authority = build_workspace_memory_authority(RuntimeConfig.from_profile(profile))
+    _echo_json(
+        {
+            "status": "pass",
+            "workspaceId": workspace_id,
+            "conflicts": [
+                item.model_dump(mode="json", by_alias=True)
+                for item in authority.store.list_conflicts(workspace_id)
+            ],
+            "rawContentIncluded": False,
+        }
+    )
+
+
+@memory_workspace_migrate_app.command("legacy-dry-run")
+def memory_workspace_migrate_legacy_dry_run(
+    legacy_db_path: str = typer.Option(..., "--legacy-db-path"),
+    workspace_id: str = typer.Option("default", "--workspace-id"),
+    default_scope: str = typer.Option("personal", "--default-scope"),
+    output: str | None = typer.Option(None, "--output"),
+) -> None:
+    result = plan_legacy_memory_migration(
+        LegacyMemoryMigrationPlanRequest(
+            legacyDbPath=legacy_db_path,
+            workspaceId=workspace_id,
+            defaultScope=default_scope,
+            outputPath=output,
+        )
+    )
+    _echo_json(result.model_dump(mode="json", by_alias=True))
+    if result.status == "blocked":
+        raise typer.Exit(code=1)
+
+
+def _echo_json(payload: object) -> None:
+    typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
 
 
 @research_app.command("train-router")

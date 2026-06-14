@@ -65,6 +65,19 @@ class MemorySyncConfig(BaseModel):
     allow_cross_environment_import: bool = False
 
 
+class MemoryWorkspaceAuthorityConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = False
+    mode: Literal["local"] = "local"
+    default_workspace_id: str = "default"
+    default_principal_id: str = "agent-local"
+    db_path: str = ".binliquid/workspace_memory.sqlite3"
+    raw_content_persistence: bool = False
+    network_listener_enabled: bool = False
+    migration_apply_enabled: bool = False
+
+
 class MemoryConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -107,6 +120,9 @@ class MemoryConfig(BaseModel):
     rank_recency_weight: float = Field(default=0.3, ge=0.0, le=1.0)
     runtime: MemoryRuntimeConfig = Field(default_factory=MemoryRuntimeConfig)
     sync: MemorySyncConfig = Field(default_factory=MemorySyncConfig)
+    workspace_authority: MemoryWorkspaceAuthorityConfig = Field(
+        default_factory=MemoryWorkspaceAuthorityConfig
+    )
 
 
 class PlannerTuningConfig(BaseModel):
@@ -360,6 +376,7 @@ class RuntimeConfig(BaseModel):
         memory_data = data.get("memory", {})
         memory_runtime_data = memory_data.get("runtime", {})
         memory_sync_data = memory_data.get("sync", {})
+        memory_workspace_authority_data = memory_data.get("workspace_authority", {})
         planner_data = data.get("planner", {})
         code_verify_data = data.get("code_verify", {})
         governance_data = data.get("governance", {})
@@ -468,6 +485,28 @@ class RuntimeConfig(BaseModel):
                     ),
                     allow_cross_environment_import=memory_sync_data.get(
                         "allow_cross_environment_import", False
+                    ),
+                ),
+                workspace_authority=MemoryWorkspaceAuthorityConfig(
+                    enabled=memory_workspace_authority_data.get("enabled", False),
+                    mode=memory_workspace_authority_data.get("mode", "local"),
+                    default_workspace_id=memory_workspace_authority_data.get(
+                        "default_workspace_id", "default"
+                    ),
+                    default_principal_id=memory_workspace_authority_data.get(
+                        "default_principal_id", "agent-local"
+                    ),
+                    db_path=memory_workspace_authority_data.get(
+                        "db_path", ".binliquid/workspace_memory.sqlite3"
+                    ),
+                    raw_content_persistence=memory_workspace_authority_data.get(
+                        "raw_content_persistence", False
+                    ),
+                    network_listener_enabled=memory_workspace_authority_data.get(
+                        "network_listener_enabled", False
+                    ),
+                    migration_apply_enabled=memory_workspace_authority_data.get(
+                        "migration_apply_enabled", False
                     ),
                 ),
             ),

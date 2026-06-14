@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "memoryId": {
+      "title": "Memoryid",
+      "type": "string"
+    },
+    "rawContentIncluded": {
+      "const": false,
+      "default": false,
+      "title": "Rawcontentincluded",
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "tombstoned",
+        "denied",
+        "missing"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "memoryId"
+  ],
+  "title": "WorkspaceMemoryTombstoneResult",
+  "type": "object"
+}

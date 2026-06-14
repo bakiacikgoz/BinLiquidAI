@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -142,6 +142,41 @@ memory-context-pack-gate:
 memory-sync-gate:
 	uv run pytest -q tests/test_memory_sync_pack.py tests/test_memory_sync_importer.py tests/test_memory_sync_cli.py
 	uv run python scripts/run_memory_sync_gate.py
+
+workspace-memory-authority-gate:
+	uv run pytest -q \
+		tests/test_memory_workspace_authority.py \
+		tests/test_memory_access_evaluator.py \
+		tests/test_memory_workspace_sync.py \
+		tests/test_memory_migration_planner.py \
+		tests/test_memory_authority_cli.py \
+		tests/test_memory_runtime_workspace_integration.py \
+		tests/test_memory_authority_snapshot.py \
+		tests/test_memory_authority_no_raw_leakage.py
+	uv run python scripts/generate_memory_workspace_contract_schemas.py
+	uv run python scripts/run_workspace_memory_authority_gate.py
+	$(MAKE) memory-rbac-gate
+	$(MAKE) memory-workspace-sync-gate
+	$(MAKE) memory-migration-dry-run-gate
+	$(MAKE) memory-authority-operator-gate
+
+memory-rbac-gate:
+	uv run pytest -q tests/test_memory_access_evaluator.py
+	uv run python scripts/run_memory_rbac_gate.py
+
+memory-workspace-sync-gate:
+	uv run pytest -q tests/test_memory_workspace_sync.py
+	uv run python scripts/run_memory_workspace_sync_gate.py
+
+memory-migration-dry-run-gate:
+	uv run pytest -q tests/test_memory_migration_planner.py
+	uv run python scripts/run_memory_migration_dry_run_gate.py
+
+memory-authority-operator-gate:
+	uv run pytest -q tests/test_memory_authority_snapshot.py
+	uv run python scripts/run_memory_authority_operator_gate.py
+	pnpm --dir apps/operator-panel install --frozen-lockfile
+	pnpm --dir apps/operator-panel exec vitest run src/memory-authority/MemoryAuthorityView.test.tsx src/routeRegistry.test.ts
 
 governed-memory-v1-gate:
 	uv run pytest -q tests/test_memory_v3_governance.py tests/test_memory_cli_v3.py tests/test_control_plane_snapshot_memory_v3.py

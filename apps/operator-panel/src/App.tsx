@@ -122,6 +122,7 @@ import { RightRail } from './components/shell/RightRail';
 import { loadControlPlaneSnapshot } from './control-plane/snapshot';
 import type { ControlPlaneSnapshot, EvidencePackSummary, OperationDescriptor, PageViewModel } from './control-plane/types';
 import { asControlPlaneClaimMatrix } from './controlPlaneMappers';
+import { MemoryAuthorityView } from './memory-authority/MemoryAuthorityView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import type { ShellViewKey } from './components/shell/Sidebar';
@@ -1203,6 +1204,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const memoryGovernance = controlPlaneSnapshot?.memoryGovernance ?? null;
   const memoryRuntime = controlPlaneSnapshot?.memoryRuntime ?? null;
   const memorySync = controlPlaneSnapshot?.memorySync ?? null;
+  const memoryAuthority = controlPlaneSnapshot?.memoryAuthority ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2519,6 +2521,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'memory-runtime' ? (
           <MemoryRuntimeView runtime={memoryRuntime} sync={memorySync} locale={locale} />
+        ) : null}
+
+        {activeView === 'memory-authority' ? (
+          <MemoryAuthorityView authority={memoryAuthority} locale={locale} />
         ) : null}
 
         {activeView === 'operations' ? (

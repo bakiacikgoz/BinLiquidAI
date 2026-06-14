@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "displayName": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Displayname",
+      "type": "string"
+    },
+    "externalSubjectRefHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Externalsubjectrefhash"
+    },
+    "principalId": {
+      "title": "Principalid",
+      "type": "string"
+    },
+    "principalType": {
+      "enum": [
+        "user",
+        "agent",
+        "service",
+        "operator"
+      ],
+      "title": "Principaltype",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "memory-principal/v1",
+      "default": "memory-principal/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "default": "active",
+      "enum": [
+        "active",
+        "disabled",
+        "revoked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "principalId",
+    "principalType",
+    "displayName"
+  ],
+  "title": "MemoryPrincipal",
+  "type": "object"
+}

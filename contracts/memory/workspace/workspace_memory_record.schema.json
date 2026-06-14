@@ -1,0 +1,222 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "classification": {
+      "default": "internal",
+      "enum": [
+        "public",
+        "internal",
+        "restricted",
+        "secret_like"
+      ],
+      "title": "Classification",
+      "type": "string"
+    },
+    "confidence": {
+      "default": 0.5,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "contentHash": {
+      "title": "Contenthash",
+      "type": "string"
+    },
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "embeddingRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embeddingref"
+    },
+    "expiresAtUtc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expiresatutc"
+    },
+    "memoryId": {
+      "title": "Memoryid",
+      "type": "string"
+    },
+    "memoryTarget": {
+      "anyOf": [
+        {
+          "maxLength": 160,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Memorytarget"
+    },
+    "ownerPrincipalId": {
+      "title": "Ownerprincipalid",
+      "type": "string"
+    },
+    "policyTags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Policytags",
+      "type": "array"
+    },
+    "redactedPreview": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Redactedpreview"
+    },
+    "salience": {
+      "default": 0.5,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Salience",
+      "type": "number"
+    },
+    "schemaVersion": {
+      "const": "workspace-memory-record/v1",
+      "default": "workspace-memory-record/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "scopeId": {
+      "title": "Scopeid",
+      "type": "string"
+    },
+    "scopeType": {
+      "enum": [
+        "personal",
+        "agent",
+        "team",
+        "project",
+        "case",
+        "organization",
+        "global_readonly"
+      ],
+      "title": "Scopetype",
+      "type": "string"
+    },
+    "sourceAgentId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sourceagentid"
+    },
+    "sourceRunId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sourcerunid"
+    },
+    "sourceUserId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sourceuserid"
+    },
+    "stateVersion": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Stateversion",
+      "type": "integer"
+    },
+    "summary": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    },
+    "tombstonedAtUtc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tombstonedatutc"
+    },
+    "ttlDays": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ttldays"
+    },
+    "updatedAtUtc": {
+      "format": "date-time",
+      "title": "Updatedatutc",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "memoryId",
+    "workspaceId",
+    "scopeType",
+    "scopeId",
+    "ownerPrincipalId",
+    "contentHash",
+    "summary"
+  ],
+  "title": "WorkspaceMemoryRecord",
+  "type": "object"
+}

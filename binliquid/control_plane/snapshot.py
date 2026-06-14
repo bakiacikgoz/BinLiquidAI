@@ -56,6 +56,8 @@ from binliquid.memory.runtime_snapshot import (
     build_memory_sync_snapshot,
 )
 from binliquid.memory.snapshot import build_memory_governance_snapshot
+from binliquid.memory.workspace_authority import build_workspace_memory_authority
+from binliquid.memory.workspace_models import WorkspaceMemoryAuthorityHealth
 from binliquid.runtime.config import RuntimeConfig
 
 SNAPSHOT_CONTRACT_VERSION = "control-plane.snapshot/v1"
@@ -193,6 +195,16 @@ def build_control_plane_snapshot(
         evidence_root=evidence_root,
         generated_at=generated_at,
     )
+    try:
+        memory_authority = build_workspace_memory_authority(
+            config,
+            evidence_root=Path(evidence_root) / "memory-authority",
+        ).health()
+    except Exception as exc:  # pragma: no cover - snapshot must stay diagnosable
+        memory_authority = WorkspaceMemoryAuthorityHealth(
+            status="blocked",
+            blockingReasons=[f"MEMORY_AUTHORITY_SNAPSHOT_FAILED:{type(exc).__name__}"],
+        )
     design_partner_rc = build_design_partner_rc_status(
         data_source=data_source,
         claims=claims.model_dump(mode="json"),
@@ -263,6 +275,7 @@ def build_control_plane_snapshot(
         memory_governance=memory_governance,
         memory_runtime=memory_runtime,
         memory_sync=memory_sync,
+        memory_authority=memory_authority,
         quick_actions=_quick_actions(approvals=approvals, evidence_packs=evidence_packs),
         partial_reasons=sorted(set(partial_reasons)),
     )

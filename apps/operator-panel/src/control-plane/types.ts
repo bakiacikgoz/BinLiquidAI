@@ -513,6 +513,20 @@ export interface MemorySyncSnapshot {
   warnings: string[];
 }
 
+export interface WorkspaceMemoryAuthorityHealth {
+  status: 'available' | 'disabled' | 'setup_required' | 'blocked';
+  mode: 'local_authority';
+  workspaceCount: number;
+  principalCount: number;
+  activeScopeCount: number;
+  pendingProposalCount: number;
+  pendingConflictCount: number;
+  lastSyncPackStatus?: string | null;
+  rawContentExposed: false;
+  networkListenerEnabled: false;
+  blockingReasons: string[];
+}
+
 export interface ControlPlaneSnapshot {
   contractVersion: 'control-plane.snapshot/v1';
   generatedAtUtc: string;
@@ -541,6 +555,7 @@ export interface ControlPlaneSnapshot {
   memoryGovernance?: MemoryAuthoritySnapshot;
   memoryRuntime?: MemoryRuntimeSnapshot;
   memorySync?: MemorySyncSnapshot;
+  memoryAuthority?: WorkspaceMemoryAuthorityHealth;
   quickActions: QuickActionSummary[];
   partialReasons: string[];
 }

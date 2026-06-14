@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "grantedAtUtc": {
+      "format": "date-time",
+      "title": "Grantedatutc",
+      "type": "string"
+    },
+    "grantedBy": {
+      "title": "Grantedby",
+      "type": "string"
+    },
+    "membershipId": {
+      "title": "Membershipid",
+      "type": "string"
+    },
+    "principalId": {
+      "title": "Principalid",
+      "type": "string"
+    },
+    "roles": {
+      "items": {
+        "enum": [
+          "owner",
+          "admin",
+          "operator",
+          "agent",
+          "viewer",
+          "auditor"
+        ],
+        "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "memory-membership/v1",
+      "default": "memory-membership/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "default": "active",
+      "enum": [
+        "active",
+        "suspended"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "membershipId",
+    "workspaceId",
+    "principalId",
+    "roles",
+    "grantedBy"
+  ],
+  "title": "MemoryWorkspaceMembership",
+  "type": "object"
+}

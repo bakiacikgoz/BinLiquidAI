@@ -13,6 +13,7 @@ export type RouteId =
   | 'tasks'
   | 'system'
   | 'memory-governance'
+  | 'memory-authority'
   | 'memory-runtime'
   | 'operations'
   | 'settings'
@@ -86,6 +87,13 @@ export const routeGroups: RouteGroup[] = [
         label: 'Memory Runtime',
         heading: 'Memory Runtime',
         icon: 'layers',
+      },
+      {
+        id: 'memory-authority',
+        routeId: 'memory-authority',
+        label: 'Memory Authority',
+        heading: 'Memory Authority',
+        icon: 'shield',
       },
       { id: 'operations', routeId: 'operations', label: 'Yürütmeler', heading: 'Operations', icon: 'clipboard' },
       { id: 'settings', routeId: 'settings', label: 'Ayarlar', heading: 'Settings', icon: 'settings' },

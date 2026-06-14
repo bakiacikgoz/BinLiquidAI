@@ -6,6 +6,7 @@ from typing import Literal
 
 from binliquid.memory.authority import MemoryAuthority, build_memory_authority
 from binliquid.memory.context_pack import (
+    MemoryContextHit,
     MemoryContextPack,
     context_pack_from_retrieval,
     empty_context_pack,
@@ -20,6 +21,15 @@ from binliquid.memory.models import (
     MemoryWriteResult,
     hash_identity,
     stable_id,
+)
+from binliquid.memory.workspace_authority import (
+    WorkspaceMemoryAuthority,
+    build_workspace_memory_authority,
+)
+from binliquid.memory.workspace_models import (
+    MemoryAccessDecision,
+    WorkspaceMemoryQueryRequest,
+    WorkspaceMemoryWriteRequest,
 )
 from binliquid.memory.write_candidate import (
     MemoryWriteCandidateBuilder,
@@ -38,6 +48,8 @@ class RuntimeMemoryRequest:
     team_id: str | None = None
     case_id: str | None = None
     project_id: str | None = None
+    workspace_id: str | None = None
+    principal_id: str | None = None
     namespace: str = "default"
 
 
@@ -47,15 +59,23 @@ class MemoryRuntimeBridge:
         *,
         config: RuntimeConfig,
         authority: MemoryAuthority,
+        workspace_authority: WorkspaceMemoryAuthority | None = None,
         evidence_root: str | Path = "artifacts/memory-runtime",
     ) -> None:
         self.config = config
         self.authority = authority
+        self.workspace_authority = workspace_authority
         self.evidence_root = Path(evidence_root)
 
     @property
     def enabled(self) -> bool:
-        return bool(self.config.memory.v3_enabled and self.config.memory.runtime.enabled)
+        return bool(
+            self.config.memory.runtime.enabled
+            and (
+                self.config.memory.v3_enabled
+                or self.config.memory.workspace_authority.enabled
+            )
+        )
 
     def retrieve_context(self, request: RuntimeMemoryRequest) -> MemoryContextPack:
         runtime_cfg = self.config.memory.runtime
@@ -66,6 +86,8 @@ class MemoryRuntimeBridge:
                 status="disabled",
                 degraded_reason="MEMORY_RUNTIME_DISABLED",
             )
+        if self._workspace_authority_enabled:
+            return self._retrieve_workspace_context(request)
         filters = _scope_filters(request)
         if not filters:
             status: Literal["degraded", "error"] = "degraded"
@@ -118,6 +140,19 @@ class MemoryRuntimeBridge:
     ) -> MemoryWriteResult:
         if not self.enabled or not self.config.memory.runtime.post_run_write_enabled:
             return _disabled_write_result(run_id=run_id, reason="MEMORY_RUNTIME_WRITE_DISABLED")
+        if self._workspace_authority_enabled:
+            return self._workspace_post_run_write(
+                run_id=run_id,
+                actor_id=actor_id,
+                role=role,
+                user_input=user_input,
+                assistant_output=assistant_output,
+                scope=scope,
+                owner=owner,
+                memory_target=memory_target,
+                expected_state_version=expected_state_version,
+                agent_id=agent_id,
+            )
         resolved_scope = scope or self.config.memory.runtime.post_run_default_scope
         resolved_owner_type = owner_type or _owner_type_for_scope(resolved_scope)
         resolved_visibility = visibility or _visibility_for_scope(resolved_scope)
@@ -141,6 +176,128 @@ class MemoryRuntimeBridge:
             return _disabled_write_result(run_id=run_id, reason="MEMORY_RUNTIME_WRITE_EMPTY")
         return self.authority.propose_write(proposal)
 
+    @property
+    def _workspace_authority_enabled(self) -> bool:
+        return bool(
+            self.workspace_authority is not None
+            and self.config.memory.workspace_authority.enabled
+        )
+
+    def _retrieve_workspace_context(self, request: RuntimeMemoryRequest) -> MemoryContextPack:
+        assert self.workspace_authority is not None
+        runtime_cfg = self.config.memory.runtime
+        workspace_id = _workspace_id(self.config, request)
+        principal_id = _principal_id(self.config, request)
+        hits: list[MemoryContextHit] = []
+        denied_scopes: list[str] = []
+        evidence_ref: str | None = None
+        for scope_type, scope_id in _workspace_scope_queries(request, principal_id):
+            result = self.workspace_authority.query(
+                WorkspaceMemoryQueryRequest(
+                    workspaceId=workspace_id,
+                    principalId=principal_id,
+                    scopeType=scope_type,
+                    scopeId=scope_id,
+                    query=request.query,
+                    limit=max(1, runtime_cfg.context_top_k),
+                )
+            )
+            evidence_ref = evidence_ref or result.evidence_ref
+            if result.status == "denied":
+                denied_scopes.append(f"{scope_type}:{scope_id}")
+                continue
+            for record in result.records:
+                hits.append(
+                    MemoryContextHit(
+                        memoryId=record.memory_id,
+                        scope=record.scope_type,
+                        visibility=record.scope_type,
+                        redactedSummary=record.redacted_preview or record.summary,
+                        contentHash=record.content_hash,
+                        score=record.salience,
+                        createdAt=record.created_at_utc,
+                        policyTags=list(record.policy_tags),
+                    )
+                )
+                if len(hits) >= max(1, runtime_cfg.context_top_k):
+                    break
+            if len(hits) >= max(1, runtime_cfg.context_top_k):
+                break
+        status: Literal["pass", "empty", "denied"] = "pass" if hits else "empty"
+        if not hits and denied_scopes:
+            status = "denied"
+        return MemoryContextPack(
+            packId=stable_id("mem_ctx", request.run_id, request.query, workspace_id, principal_id),
+            runId=request.run_id,
+            queryHash=hash_identity(request.query),
+            status=status,
+            hits=hits,
+            evidenceRef=evidence_ref,
+            deniedScopes=denied_scopes,
+            rawContentIncluded=False,
+            truncated=False,
+            degradedReason="MEMORY_RETRIEVAL_DENIED" if status == "denied" else None,
+        )
+
+    def _workspace_post_run_write(
+        self,
+        *,
+        run_id: str,
+        actor_id: str,
+        role: str,
+        user_input: str,
+        assistant_output: str,
+        scope: str | None,
+        owner: str | None,
+        memory_target: str | None,
+        expected_state_version: int | None,
+        agent_id: str | None,
+    ) -> MemoryWriteResult:
+        assert self.workspace_authority is not None
+        _ = role
+        resolved_scope = scope or self.config.memory.runtime.post_run_default_scope
+        workspace_id = self.config.memory.workspace_authority.default_workspace_id
+        principal_id = actor_id or self.config.memory.workspace_authority.default_principal_id
+        scope_id = _workspace_scope_id(
+            scope=resolved_scope,
+            owner=owner,
+            actor_id=actor_id,
+            agent_id=agent_id,
+        )
+        decision = self.workspace_authority.propose_or_write(
+            WorkspaceMemoryWriteRequest(
+                workspaceId=workspace_id,
+                principalId=principal_id,
+                scopeType=resolved_scope,
+                scopeId=scope_id,
+                summary=f"User: {user_input}\nAssistant: {assistant_output}",
+                memoryTarget=memory_target,
+                expectedStateVersion=expected_state_version,
+                sourceAgentId=agent_id,
+                sourceRunId=run_id,
+                reason="runtime post-run write",
+            )
+        )
+        status_map = {
+            "committed": "written",
+            "proposal_only": "proposal_only",
+            "requires_approval": "approval_required",
+            "denied": "denied",
+            "conflict": "conflict",
+        }
+        return MemoryWriteResult(
+            status=status_map[decision.status],
+            proposalId=decision.proposal_id or stable_id("wm_prop", run_id, decision.status),
+            memoryId=decision.memory_id,
+            policyDecision=_workspace_policy_decision(decision.decision),
+            evidenceRef=decision.evidence_ref,
+            contentHash=decision.content_hash,
+            stateVersion=decision.state_version,
+            conflictDetected=decision.status == "conflict",
+            blockingReasons=decision.blocking_reasons,
+            rawContentIncluded=False,
+        )
+
 
 def build_memory_runtime_bridge(
     config: RuntimeConfig,
@@ -150,6 +307,10 @@ def build_memory_runtime_bridge(
     return MemoryRuntimeBridge(
         config=config,
         authority=build_memory_authority(config, evidence_root=evidence_root),
+        workspace_authority=build_workspace_memory_authority(
+            config,
+            evidence_root=Path(evidence_root) / "workspace",
+        ),
         evidence_root=evidence_root,
     )
 
@@ -232,6 +393,64 @@ def _visibility_for_scope(scope: str) -> str:
         "project": "project",
         "organization": "organization",
     }.get(scope, "private")
+
+
+def _workspace_id(config: RuntimeConfig, request: RuntimeMemoryRequest) -> str:
+    return request.workspace_id or config.memory.workspace_authority.default_workspace_id
+
+
+def _principal_id(config: RuntimeConfig, request: RuntimeMemoryRequest) -> str:
+    return (
+        request.principal_id
+        or request.actor_id
+        or config.memory.workspace_authority.default_principal_id
+    )
+
+
+def _workspace_scope_queries(
+    request: RuntimeMemoryRequest,
+    principal_id: str,
+) -> list[tuple[str, str]]:
+    queries: list[tuple[str, str]] = [("personal", principal_id)]
+    if request.agent_id:
+        queries.append(("agent", request.agent_id))
+    if request.team_id:
+        queries.append(("team", request.team_id))
+    if request.case_id:
+        queries.append(("case", request.case_id))
+    if request.project_id:
+        queries.append(("project", request.project_id))
+    return queries
+
+
+def _workspace_scope_id(
+    *,
+    scope: str,
+    owner: str | None,
+    actor_id: str,
+    agent_id: str | None,
+) -> str:
+    if owner:
+        return owner
+    if scope == "agent" and agent_id:
+        return agent_id
+    return actor_id
+
+
+def _workspace_policy_decision(decision: MemoryAccessDecision) -> MemoryPolicyDecision:
+    action_value = decision.action
+    return MemoryPolicyDecision(
+        decision={
+            "allow": MemoryPolicyAction.ALLOW,
+            "deny": MemoryPolicyAction.DENY,
+            "proposal_only": MemoryPolicyAction.PROPOSAL_ONLY,
+            "requires_approval": MemoryPolicyAction.REQUIRE_APPROVAL,
+        }[action_value],
+        reasonCode=decision.reason_code,
+        redactionRequired=decision.redaction_required,
+        indexWriteAllowed=action_value == "allow",
+        blockingReasons=[] if action_value == "allow" else [decision.reason_code],
+    )
 
 
 def _disabled_write_result(*, run_id: str, reason: str) -> MemoryWriteResult:

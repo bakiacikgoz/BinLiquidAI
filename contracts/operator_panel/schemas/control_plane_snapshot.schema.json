@@ -3064,6 +3064,86 @@
       ],
       "title": "UserSummary",
       "type": "object"
+    },
+    "WorkspaceMemoryAuthorityHealth": {
+      "additionalProperties": false,
+      "properties": {
+        "activeScopeCount": {
+          "default": 0,
+          "title": "Activescopecount",
+          "type": "integer"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "lastSyncPackStatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastsyncpackstatus"
+        },
+        "mode": {
+          "const": "local_authority",
+          "default": "local_authority",
+          "title": "Mode",
+          "type": "string"
+        },
+        "networkListenerEnabled": {
+          "const": false,
+          "default": false,
+          "title": "Networklistenerenabled",
+          "type": "boolean"
+        },
+        "pendingConflictCount": {
+          "default": 0,
+          "title": "Pendingconflictcount",
+          "type": "integer"
+        },
+        "pendingProposalCount": {
+          "default": 0,
+          "title": "Pendingproposalcount",
+          "type": "integer"
+        },
+        "principalCount": {
+          "default": 0,
+          "title": "Principalcount",
+          "type": "integer"
+        },
+        "rawContentExposed": {
+          "const": false,
+          "default": false,
+          "title": "Rawcontentexposed",
+          "type": "boolean"
+        },
+        "status": {
+          "default": "disabled",
+          "enum": [
+            "available",
+            "disabled",
+            "setup_required",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "workspaceCount": {
+          "default": 0,
+          "title": "Workspacecount",
+          "type": "integer"
+        }
+      },
+      "title": "WorkspaceMemoryAuthorityHealth",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -3138,6 +3218,9 @@
       },
       "title": "Logs",
       "type": "array"
+    },
+    "memoryAuthority": {
+      "$ref": "#/$defs/WorkspaceMemoryAuthorityHealth"
     },
     "memoryGovernance": {
       "$ref": "#/$defs/MemoryAuthoritySnapshot"

@@ -1,0 +1,64 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "displayName": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Displayname",
+      "type": "string"
+    },
+    "ownerPrincipalId": {
+      "title": "Ownerprincipalid",
+      "type": "string"
+    },
+    "policyPackId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Policypackid"
+    },
+    "schemaVersion": {
+      "const": "memory-workspace/v1",
+      "default": "memory-workspace/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "default": "active",
+      "enum": [
+        "active",
+        "archived",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "updatedAtUtc": {
+      "format": "date-time",
+      "title": "Updatedatutc",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workspaceId",
+    "displayName",
+    "ownerPrincipalId"
+  ],
+  "title": "MemoryWorkspace",
+  "type": "object"
+}
