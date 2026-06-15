@@ -45,6 +45,14 @@ git pull --ff-only origin main
 make mainline-gate
 ```
 
+Before any Design Partner RC discussion, generate and verify the release decision dossier:
+
+```bash
+uv run python scripts/run_rc_release_decision_gate.py --profile enterprise --json
+```
+
+This gate is local and non-destructive. It does not merge, tag, publish, deploy, or impersonate human sign-off.
+
 Merge only after local gates and remote checks pass.
 
 ## Direct Merge Fallback

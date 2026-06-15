@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "missingRoles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missingroles",
+      "type": "array"
+    },
+    "requiredRoles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Requiredroles",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "human-signoff-verification/v1",
+      "default": "human-signoff-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "missing",
+        "partial",
+        "verified",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "verifiedRoles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Verifiedroles",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "HumanSignoffVerificationReport",
+  "type": "object"
+}

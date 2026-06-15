@@ -127,6 +127,7 @@ import { GovernedPilotWorkflowView } from './governed-pilot-workflow/GovernedPil
 import { DesignPartnerHandoffView } from './design-partner-handoff/DesignPartnerHandoffView';
 import { MainlineRcFreezeView } from './mainline-rc-freeze/MainlineRcFreezeView';
 import { RcGateEvidenceView } from './rc-gate-evidence/RcGateEvidenceView';
+import { ReleaseDecisionView } from './release-decision/ReleaseDecisionView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
@@ -1219,6 +1220,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const designPartnerHandoff = controlPlaneSnapshot?.designPartnerHandoff ?? null;
   const mainlineRcFreeze = controlPlaneSnapshot?.mainlineRcFreeze ?? null;
   const rcGateEvidence = controlPlaneSnapshot?.rcGateEvidence ?? null;
+  const rcReleaseDecision = controlPlaneSnapshot?.rcReleaseDecision ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2570,6 +2572,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'rc-gate-evidence' ? (
           <RcGateEvidenceView snapshot={rcGateEvidence} locale={locale} />
+        ) : null}
+
+        {activeView === 'rc-release-decision' ? (
+          <ReleaseDecisionView snapshot={rcReleaseDecision} locale={locale} />
         ) : null}
 
         {activeView === 'operations' ? (

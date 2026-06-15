@@ -1,0 +1,66 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "acceptedBoundaries": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Acceptedboundaries",
+      "type": "array"
+    },
+    "dossierSha256": {
+      "title": "Dossiersha256",
+      "type": "string"
+    },
+    "notesHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Noteshash"
+    },
+    "operatorDisplayNameHash": {
+      "title": "Operatordisplaynamehash",
+      "type": "string"
+    },
+    "role": {
+      "enum": [
+        "release_owner",
+        "security_operator",
+        "pilot_operator",
+        "product_owner"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "human-signoff/v1",
+      "default": "human-signoff/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "signedAtUtc": {
+      "format": "date-time",
+      "title": "Signedatutc",
+      "type": "string"
+    },
+    "signoffId": {
+      "title": "Signoffid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "signoffId",
+    "role",
+    "operatorDisplayNameHash",
+    "dossierSha256",
+    "signedAtUtc"
+  ],
+  "title": "HumanSignoffRecord",
+  "type": "object"
+}

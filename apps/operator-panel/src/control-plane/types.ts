@@ -508,6 +508,27 @@ export interface RcGateEvidenceSnapshot {
   warnings: string[];
 }
 
+export interface RcReleaseDecisionSnapshot {
+  schemaVersion: 'control-plane.rc-release-decision-snapshot/v1';
+  status:
+    | 'not_available'
+    | 'blocked'
+    | 'conditional'
+    | 'approved_for_design_partner_rc'
+    | 'approved_for_hat_a_rc';
+  latestDossierRef?: string | null;
+  latestSummaryRef?: string | null;
+  signoffStatus: string;
+  hatAStatus: string;
+  hatBStatus: string;
+  designPartnerRcStatus: string;
+  noShipBlockingCount: number;
+  externalBlockerCount: number;
+  evidenceRefCount: number;
+  blockingReasons: string[];
+  warnings: string[];
+}
+
 export interface MemoryAuthorityRecordsSummary {
   active: number;
   expired: number;
@@ -672,6 +693,7 @@ export interface ControlPlaneSnapshot {
   designPartnerHandoff?: DesignPartnerHandoffSnapshot;
   mainlineRcFreeze?: MainlineRcFreezeSnapshot;
   rcGateEvidence?: RcGateEvidenceSnapshot;
+  rcReleaseDecision?: RcReleaseDecisionSnapshot;
   memoryGovernance?: MemoryAuthoritySnapshot;
   memoryRuntime?: MemoryRuntimeSnapshot;
   memorySync?: MemorySyncSnapshot;

@@ -14,6 +14,7 @@ from binliquid.memory.runtime_snapshot import MemoryRuntimeSnapshot, MemorySyncS
 from binliquid.memory.semantic import MemorySemanticIndexSnapshot
 from binliquid.memory.workspace_models import WorkspaceMemoryAuthorityHealth
 from binliquid.release.gate_models import RcGateEvidenceSnapshot
+from binliquid.release_decision.models import RcReleaseDecisionSnapshot
 
 
 class StrictModel(BaseModel):
@@ -1519,6 +1520,10 @@ class ControlPlaneSnapshot(StrictModel):
     rc_gate_evidence: RcGateEvidenceSnapshot = Field(
         default_factory=RcGateEvidenceSnapshot,
         alias="rcGateEvidence",
+    )
+    rc_release_decision: RcReleaseDecisionSnapshot = Field(
+        default_factory=RcReleaseDecisionSnapshot,
+        alias="rcReleaseDecision",
     )
     memory_governance: MemoryAuthoritySnapshot = Field(
         default_factory=disabled_memory_authority_snapshot,

@@ -1,5 +1,13 @@
 # RELEASE_CHECKLIST
 
+## RC Release Decision
+
+```bash
+uv run python scripts/run_rc_release_decision_gate.py --profile enterprise --json
+```
+
+Treat `conditional` as expected until real human sign-off files verify. Do not promote public desktop, live computer-use, unsigned artifacts, or raw/secret-persisting evidence from this dossier.
+
 ## Current Closure Status - 2026-05-13
 
 - [x] Hat A source/CLI/enterprise self-hosted candidate evidence published.

@@ -89,6 +89,7 @@ from binliquid.control_plane.release_train import (  # noqa: E402
 )
 from binliquid.control_plane.strict_rc_promotion import StrictRCPromotionReport  # noqa: E402
 from binliquid.release.gate_models import RcGateEvidenceSnapshot  # noqa: E402
+from binliquid.release_decision.models import RcReleaseDecisionSnapshot  # noqa: E402
 
 SCHEMAS = {
     "agent_spec": AgentSpec,
@@ -157,6 +158,7 @@ SCHEMAS = {
     "rc_freeze_verification": RcFreezeVerificationReport,
     "mainline_rc_freeze_snapshot": MainlineRcFreezeSnapshot,
     "rc_gate_evidence_snapshot": RcGateEvidenceSnapshot,
+    "rc_release_decision_snapshot": RcReleaseDecisionSnapshot,
 }
 
 OPERATOR_PANEL_SCHEMAS = {

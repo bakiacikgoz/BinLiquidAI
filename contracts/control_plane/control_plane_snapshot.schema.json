@@ -3322,6 +3322,104 @@
       "title": "RcGateEvidenceSnapshot",
       "type": "object"
     },
+    "RcReleaseDecisionSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "designPartnerRcStatus": {
+          "default": "conditional",
+          "title": "Designpartnerrcstatus",
+          "type": "string"
+        },
+        "evidenceRefCount": {
+          "default": 0,
+          "title": "Evidencerefcount",
+          "type": "integer"
+        },
+        "externalBlockerCount": {
+          "default": 0,
+          "title": "Externalblockercount",
+          "type": "integer"
+        },
+        "hatAStatus": {
+          "default": "not_evaluated",
+          "title": "Hatastatus",
+          "type": "string"
+        },
+        "hatBStatus": {
+          "default": "not_in_scope",
+          "title": "Hatbstatus",
+          "type": "string"
+        },
+        "latestDossierRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latestdossierref"
+        },
+        "latestSummaryRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latestsummaryref"
+        },
+        "noShipBlockingCount": {
+          "default": 0,
+          "title": "Noshipblockingcount",
+          "type": "integer"
+        },
+        "schemaVersion": {
+          "const": "control-plane.rc-release-decision-snapshot/v1",
+          "default": "control-plane.rc-release-decision-snapshot/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "signoffStatus": {
+          "default": "missing",
+          "title": "Signoffstatus",
+          "type": "string"
+        },
+        "status": {
+          "default": "not_available",
+          "enum": [
+            "not_available",
+            "blocked",
+            "conditional",
+            "approved_for_design_partner_rc",
+            "approved_for_hat_a_rc"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "RcReleaseDecisionSnapshot",
+      "type": "object"
+    },
     "ReportSummary": {
       "additionalProperties": false,
       "properties": {
@@ -4072,6 +4170,9 @@
     },
     "rcGateEvidence": {
       "$ref": "#/$defs/RcGateEvidenceSnapshot"
+    },
+    "rcReleaseDecision": {
+      "$ref": "#/$defs/RcReleaseDecisionSnapshot"
     },
     "reports": {
       "items": {

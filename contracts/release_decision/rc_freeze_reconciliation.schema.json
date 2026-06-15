@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactId": {
+          "title": "Artifactid",
+          "type": "string"
+        },
+        "generatedAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generatedatutc"
+        },
+        "kind": {
+          "enum": [
+            "gate_ledger",
+            "freeze_manifest",
+            "handoff",
+            "field_evidence",
+            "claim_matrix",
+            "signoff",
+            "dossier",
+            "scan_report",
+            "summary"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schemaversion"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifactId",
+        "path",
+        "sha256",
+        "kind"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "closedConditionalReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Closedconditionalreasons",
+      "type": "array"
+    },
+    "evidenceRefs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceRef"
+      },
+      "title": "Evidencerefs",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "originalFreezeStatus": {
+      "default": "missing",
+      "title": "Originalfreezestatus",
+      "type": "string"
+    },
+    "reconciledStatus": {
+      "default": "missing",
+      "title": "Reconciledstatus",
+      "type": "string"
+    },
+    "remainingConditionalReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Remainingconditionalreasons",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "rc-freeze-reconciliation/v1",
+      "default": "rc-freeze-reconciliation/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "RcFreezeReconciliationReport",
+  "type": "object"
+}

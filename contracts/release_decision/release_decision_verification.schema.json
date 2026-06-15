@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "allowConditional": {
+      "default": false,
+      "title": "Allowconditional",
+      "type": "boolean"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "dossierSha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dossiersha256"
+    },
+    "schemaVersion": {
+      "const": "release-decision-verification/v1",
+      "default": "release-decision-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "ReleaseDecisionVerificationReport",
+  "type": "object"
+}

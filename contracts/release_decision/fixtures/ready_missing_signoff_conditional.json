@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "release-decision-dossier/v1",
+  "decisionId": "rc-decision-enterprise",
+  "profile": "enterprise",
+  "status": "conditional",
+  "hatAStatus": "conditional",
+  "hatBStatus": "blocked_external_credentials",
+  "designPartnerRcStatus": "conditional",
+  "signoffStatus": "missing",
+  "requiredSignoffRoles": [
+    "release_owner",
+    "security_operator"
+  ],
+  "blockingReasons": [],
+  "warnings": [
+    "CONDITIONAL_RELEASE_DECISION"
+  ]
+}

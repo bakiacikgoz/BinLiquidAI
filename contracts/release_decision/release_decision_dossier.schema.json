@@ -1,0 +1,397 @@
+{
+  "$defs": {
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactId": {
+          "title": "Artifactid",
+          "type": "string"
+        },
+        "generatedAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generatedatutc"
+        },
+        "kind": {
+          "enum": [
+            "gate_ledger",
+            "freeze_manifest",
+            "handoff",
+            "field_evidence",
+            "claim_matrix",
+            "signoff",
+            "dossier",
+            "scan_report",
+            "summary"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schemaversion"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifactId",
+        "path",
+        "sha256",
+        "kind"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "NoShipItem": {
+      "additionalProperties": false,
+      "properties": {
+        "claimId": {
+          "title": "Claimid",
+          "type": "string"
+        },
+        "evidenceRefs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "title": "Evidencerefs",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "resolutionPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolutionpath"
+        },
+        "severity": {
+          "enum": [
+            "blocker",
+            "warning",
+            "external_blocker",
+            "deferred"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "resolved",
+            "accepted_boundary",
+            "deferred"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "severity",
+        "status",
+        "claimId",
+        "reasonCode"
+      ],
+      "title": "NoShipItem",
+      "type": "object"
+    },
+    "NoShipRegister": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptedBoundaryCount": {
+          "default": 0,
+          "title": "Acceptedboundarycount",
+          "type": "integer"
+        },
+        "blockingCount": {
+          "default": 0,
+          "title": "Blockingcount",
+          "type": "integer"
+        },
+        "externalBlockerCount": {
+          "default": 0,
+          "title": "Externalblockercount",
+          "type": "integer"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/NoShipItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": "release.no-ship-register/v1",
+          "default": "release.no-ship-register/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "clear",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "NoShipRegister",
+      "type": "object"
+    },
+    "RcFreezeReconciliationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "closedConditionalReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Closedconditionalreasons",
+          "type": "array"
+        },
+        "evidenceRefs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "title": "Evidencerefs",
+          "type": "array"
+        },
+        "generatedAtUtc": {
+          "format": "date-time",
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "originalFreezeStatus": {
+          "default": "missing",
+          "title": "Originalfreezestatus",
+          "type": "string"
+        },
+        "reconciledStatus": {
+          "default": "missing",
+          "title": "Reconciledstatus",
+          "type": "string"
+        },
+        "remainingConditionalReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Remainingconditionalreasons",
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": "rc-freeze-reconciliation/v1",
+          "default": "rc-freeze-reconciliation/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "RcFreezeReconciliationReport",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "branch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Branch"
+    },
+    "decisionId": {
+      "title": "Decisionid",
+      "type": "string"
+    },
+    "designPartnerRcStatus": {
+      "enum": [
+        "approved",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Designpartnerrcstatus",
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceRef"
+      },
+      "title": "Evidencerefs",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "hatAStatus": {
+      "enum": [
+        "approved",
+        "conditional",
+        "blocked",
+        "not_evaluated"
+      ],
+      "title": "Hatastatus",
+      "type": "string"
+    },
+    "hatBStatus": {
+      "enum": [
+        "blocked_external_credentials",
+        "conditional",
+        "approved",
+        "not_in_scope"
+      ],
+      "title": "Hatbstatus",
+      "type": "string"
+    },
+    "headSha": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headsha"
+    },
+    "noShipRegister": {
+      "$ref": "#/$defs/NoShipRegister"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rcFreezeReconciliation": {
+      "$ref": "#/$defs/RcFreezeReconciliationReport"
+    },
+    "requiredSignoffRoles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Requiredsignoffroles",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "release-decision-dossier/v1",
+      "default": "release-decision-dossier/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "signoffStatus": {
+      "enum": [
+        "missing",
+        "partial",
+        "verified",
+        "blocked"
+      ],
+      "title": "Signoffstatus",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "blocked",
+        "conditional",
+        "approved_for_design_partner_rc",
+        "approved_for_hat_a_rc"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "decisionId",
+    "profile",
+    "status",
+    "hatAStatus",
+    "hatBStatus",
+    "designPartnerRcStatus",
+    "signoffStatus",
+    "requiredSignoffRoles"
+  ],
+  "title": "ReleaseDecisionDossier",
+  "type": "object"
+}

@@ -898,6 +898,23 @@
     "verifiedGateCount": 10,
     "warnings": []
   },
+  "rcReleaseDecision": {
+    "blockingReasons": [],
+    "designPartnerRcStatus": "conditional",
+    "evidenceRefCount": 2,
+    "externalBlockerCount": 2,
+    "hatAStatus": "conditional",
+    "hatBStatus": "blocked_external_credentials",
+    "latestDossierRef": "artifacts/rc-release-decision/release_decision_dossier.json",
+    "latestSummaryRef": "artifacts/rc-release-decision/release_decision_summary.md",
+    "noShipBlockingCount": 0,
+    "schemaVersion": "control-plane.rc-release-decision-snapshot/v1",
+    "signoffStatus": "missing",
+    "status": "conditional",
+    "warnings": [
+      "CONDITIONAL_RELEASE_DECISION"
+    ]
+  },
   "governedPilotWorkflow": {
     "blockedClaims": [
       "public-desktop-installer",

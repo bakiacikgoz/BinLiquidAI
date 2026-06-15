@@ -231,6 +231,15 @@ from binliquid.release.gate_plan import build_release_gate_plan
 from binliquid.release.gate_runner import run_release_gate_plan
 from binliquid.release.gate_verifier import verify_gate_evidence_ledger
 from binliquid.release.snapshot import build_rc_gate_evidence_snapshot
+from binliquid.release_decision.dossier import (
+    build_release_decision_from_artifacts,
+    export_release_decision_pack,
+    verify_release_decision_dossier,
+    write_release_decision_pack,
+)
+from binliquid.release_decision.models import ReleaseDecisionDossier
+from binliquid.release_decision.reconciler import build_reconciliation_input, reconcile_rc_freeze
+from binliquid.release_decision.signoff import verify_human_signoffs, write_signoff_template
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
@@ -309,6 +318,8 @@ release_train_app = typer.Typer(help="Release train verification commands")
 release_handoff_app = typer.Typer(help="Design partner handoff commands")
 release_mainline_app = typer.Typer(help="Mainline stack rehearsal commands")
 release_rc_freeze_app = typer.Typer(help="Mainline RC freeze commands")
+release_rc_app = typer.Typer(help="RC release reconciliation commands")
+release_decision_app = typer.Typer(help="RC release decision dossier commands")
 release_gates_app = typer.Typer(help="Cross-platform release gate evidence commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
@@ -379,6 +390,8 @@ release_app.add_typer(release_train_app, name="train")
 release_app.add_typer(release_handoff_app, name="handoff")
 release_app.add_typer(release_mainline_app, name="mainline")
 release_app.add_typer(release_rc_freeze_app, name="rc-freeze")
+release_app.add_typer(release_rc_app, name="rc")
+release_app.add_typer(release_decision_app, name="decision")
 release_app.add_typer(release_gates_app, name="gates")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
@@ -2495,6 +2508,114 @@ def release_rc_freeze_export(
 ) -> None:
     exported = export_rc_freeze_pack(manifest_path=Path(manifest_path), output=Path(output))
     _emit_payload({"status": "pass", "output": str(exported)}, json_output=json_output)
+
+
+@release_rc_app.command("reconcile")
+def release_rc_reconcile(
+    profile: str = typer.Option("enterprise", "--profile"),
+    gate_ledger_path: str = typer.Option(..., "--gate-ledger"),
+    freeze_manifest_path: str = typer.Option(..., "--freeze-manifest"),
+    output: str | None = typer.Option(None, "--output"),
+    allow_conditional: bool = typer.Option(False, "--allow-conditional/--no-allow-conditional"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    reconciliation_input = build_reconciliation_input(
+        gate_ledger_path=Path(gate_ledger_path),
+        freeze_manifest_path=Path(freeze_manifest_path),
+        repo_root=Path.cwd(),
+        profile=profile,
+    )
+    report = reconcile_rc_freeze(reconciliation_input)
+    if output:
+        target = Path(output)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(report.model_dump(mode="json", by_alias=True), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=2)
+    if report.status == "conditional" and not allow_conditional:
+        raise typer.Exit(code=3)
+
+
+@release_decision_app.command("build")
+def release_decision_build(
+    profile: str = typer.Option("enterprise", "--profile"),
+    artifact_root: str = typer.Option("artifacts", "--artifact-root"),
+    output_root: str = typer.Option("artifacts/rc-release-decision", "--output-root"),
+    signoff_root: str | None = typer.Option(None, "--signoff-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    dossier = build_release_decision_from_artifacts(
+        profile=profile,
+        artifact_root=Path(artifact_root),
+        output_root=Path(output_root),
+        signoff_root=Path(signoff_root) if signoff_root else None,
+    )
+    write_release_decision_pack(dossier, output_root=Path(output_root))
+    _emit_payload(dossier.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@release_decision_app.command("verify")
+def release_decision_verify(
+    dossier_path: str = typer.Option(..., "--dossier"),
+    allow_conditional: bool = typer.Option(False, "--allow-conditional/--no-allow-conditional"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    path = Path(dossier_path)
+    dossier = ReleaseDecisionDossier.model_validate_json(path.read_text(encoding="utf-8"))
+    report = verify_release_decision_dossier(
+        dossier,
+        allow_conditional=allow_conditional,
+        dossier_path=path,
+    )
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=2)
+    if report.status == "conditional" and not allow_conditional:
+        raise typer.Exit(code=3)
+
+
+@release_decision_app.command("signoff-template")
+def release_decision_signoff_template(
+    dossier_sha256: str = typer.Option(..., "--dossier-sha256"),
+    role: str = typer.Option(..., "--role"),
+    output: str = typer.Option(..., "--output"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    record = write_signoff_template(
+        dossier_hash=dossier_sha256,
+        role=role,  # type: ignore[arg-type]
+        output=Path(output),
+    )
+    _emit_payload(record.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@release_decision_app.command("signoff-verify")
+def release_decision_signoff_verify(
+    dossier_sha256: str = typer.Option(..., "--dossier-sha256"),
+    signoff_root: str = typer.Option(..., "--signoff-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    report = verify_human_signoffs(dossier_hash=dossier_sha256, signoff_root=Path(signoff_root))
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=2)
+
+
+@release_decision_app.command("export")
+def release_decision_export(
+    dossier_path: str = typer.Option(..., "--dossier"),
+    output_root: str = typer.Option(..., "--output-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    manifest = export_release_decision_pack(
+        dossier_path=Path(dossier_path),
+        output_root=Path(output_root),
+    )
+    _emit_payload(manifest, json_output=json_output)
 
 
 @release_gates_app.command("plan")

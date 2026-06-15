@@ -21,6 +21,7 @@ export type RouteId =
   | 'design-partner-handoff'
   | 'mainline-rc-freeze'
   | 'rc-gate-evidence'
+  | 'rc-release-decision'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -165,5 +166,13 @@ export const routeGroups: RouteGroup[] = [
     ],
   },
 ];
+
+routeGroups[1]?.routes.splice(routeGroups[1].routes.length - 2, 0, {
+  id: 'rc-release-decision',
+  routeId: 'rc-release-decision',
+  label: 'RC Release Decision',
+  heading: 'RC Release Decision',
+  icon: 'check',
+});
 
 export const routes = routeGroups.flatMap((group) => group.routes);

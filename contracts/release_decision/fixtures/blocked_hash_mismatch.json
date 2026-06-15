@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "rc-freeze-reconciliation/v1",
+  "status": "blocked",
+  "originalFreezeStatus": "conditional",
+  "reconciledStatus": "blocked",
+  "closedConditionalReasons": [],
+  "remainingConditionalReasons": [],
+  "blockingReasons": [
+    "ARTIFACT_HASH_MISMATCH"
+  ],
+  "warnings": []
+}

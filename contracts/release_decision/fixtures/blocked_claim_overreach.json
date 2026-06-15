@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "release-decision-dossier/v1",
+  "decisionId": "rc-decision-enterprise",
+  "profile": "enterprise",
+  "status": "blocked",
+  "hatAStatus": "blocked",
+  "hatBStatus": "blocked_external_credentials",
+  "designPartnerRcStatus": "blocked",
+  "signoffStatus": "verified",
+  "requiredSignoffRoles": [
+    "release_owner",
+    "security_operator"
+  ],
+  "blockingReasons": [
+    "PUBLIC_DESKTOP_OVERCLAIM"
+  ],
+  "warnings": []
+}
