@@ -864,6 +864,23 @@
     "status": "ready",
     "warnings": []
   },
+  "mainlineRcFreeze": {
+    "artifactScanStatus": "missing",
+    "blockers": [],
+    "evidenceMode": "hash_only",
+    "freezeId": null,
+    "gateEvidenceStatus": "missing",
+    "lastGeneratedAtUtc": null,
+    "manifestPath": null,
+    "mergeRehearsalStatus": "missing",
+    "rawPersistence": false,
+    "schemaVersion": "control-plane.mainline-rc-freeze-snapshot/v1",
+    "stackStatus": "missing",
+    "status": "missing",
+    "warnings": [
+      "MAINLINE_RC_FREEZE_MISSING"
+    ]
+  },
   "governedPilotWorkflow": {
     "blockedClaims": [
       "public-desktop-installer",

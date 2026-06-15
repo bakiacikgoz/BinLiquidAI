@@ -74,6 +74,22 @@ from binliquid.control_plane.field_evidence import (
     write_attestation_template,
 )
 from binliquid.control_plane.install_rehearsal import run_install_rehearsal
+from binliquid.control_plane.mainline_rc_freeze import (
+    build_gate_evidence_summary,
+    build_mainline_rc_freeze_snapshot,
+    build_rc_freeze_manifest,
+    export_rc_freeze_pack,
+    verify_rc_freeze_manifest,
+    write_rc_freeze_manifest,
+)
+from binliquid.control_plane.mainline_stack import (
+    MergeRehearsalSpec,
+    load_stack_graph_spec,
+    run_merge_rehearsal,
+    verify_stack_graph,
+    write_merge_rehearsal_report,
+    write_stack_graph_report,
+)
 from binliquid.control_plane.operations_runner import dry_run_operation
 from binliquid.control_plane.pilot_operations import generate_pilot_operations_artifacts
 from binliquid.control_plane.pilot_ops_drill import run_pilot_ops_drill
@@ -125,6 +141,7 @@ from binliquid.control_plane.rbac_admin import (
 from binliquid.control_plane.readiness import build_readiness_report
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
 from binliquid.control_plane.release_train import (
+    ClaimBoundarySummary,
     build_release_train_manifest,
     load_release_train_manifest,
     verify_release_train,
@@ -272,6 +289,8 @@ control_plane_gateway_app = typer.Typer(help="External agent gateway commands")
 control_plane_rbac_app = typer.Typer(help="Control Plane RBAC admin commands")
 control_plane_reports_app = typer.Typer(help="Control Plane reports and alerts commands")
 control_plane_operations_app = typer.Typer(help="Control Plane operation workflow commands")
+control_plane_release_app = typer.Typer(help="Control Plane release commands")
+control_plane_release_freeze_app = typer.Typer(help="Control Plane release freeze commands")
 pilot_app = typer.Typer(help="Design partner pilot operations commands")
 pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
 control_plane_pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
@@ -281,6 +300,8 @@ pilot_ops_app = typer.Typer(help="Design partner pilot operations drill commands
 release_app = typer.Typer(help="Release readiness commands")
 release_train_app = typer.Typer(help="Release train verification commands")
 release_handoff_app = typer.Typer(help="Design partner handoff commands")
+release_mainline_app = typer.Typer(help="Mainline stack rehearsal commands")
+release_rc_freeze_app = typer.Typer(help="Mainline RC freeze commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -336,6 +357,8 @@ control_plane_app.add_typer(control_plane_gateway_app, name="gateway")
 control_plane_app.add_typer(control_plane_rbac_app, name="rbac")
 control_plane_app.add_typer(control_plane_reports_app, name="reports")
 control_plane_app.add_typer(control_plane_operations_app, name="operations")
+control_plane_app.add_typer(control_plane_release_app, name="release")
+control_plane_release_app.add_typer(control_plane_release_freeze_app, name="freeze")
 app.add_typer(pilot_app, name="pilot")
 pilot_app.add_typer(pilot_workflow_app, name="workflow")
 control_plane_pilot_app.add_typer(control_plane_pilot_workflow_app, name="workflow")
@@ -345,6 +368,8 @@ pilot_app.add_typer(pilot_ops_app, name="ops")
 app.add_typer(release_app, name="release")
 release_app.add_typer(release_train_app, name="train")
 release_app.add_typer(release_handoff_app, name="handoff")
+release_app.add_typer(release_mainline_app, name="mainline")
+release_app.add_typer(release_rc_freeze_app, name="rc-freeze")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -1107,6 +1132,49 @@ def _emit_payload(payload: dict[str, Any], *, json_output: bool) -> None:
     else:
         for key, value in payload.items():
             typer.echo(f"{key}={value}")
+
+
+def _release_branch_exists(branch: str) -> bool:
+    candidates = [branch]
+    if not branch.startswith("origin/"):
+        candidates.append(f"origin/{branch}")
+    for candidate in candidates:
+        try:
+            subprocess.check_output(
+                ["git", "rev-parse", "--verify", f"{candidate}^{{commit}}"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def _claim_boundaries_for_freeze(claims: dict[str, Any]) -> ClaimBoundarySummary:
+    statuses = {
+        str(item.get("claim_id")): str(item.get("status"))
+        for item in claims.get("claims", [])
+        if isinstance(item, dict)
+    }
+    live_statuses = [
+        statuses.get("live-macos-computer-use", "unknown"),
+        statuses.get("live-windows-computer-use", "unknown"),
+        statuses.get("live-linux-computer-use", "unknown"),
+    ]
+    return ClaimBoundarySummary(
+        publicDesktop=statuses.get("public-desktop-installer", "blocked"),
+        liveComputerUse="blocked"
+        if all(status in {"blocked", "deferred"} for status in live_statuses)
+        else "allowed",
+        approvalFreeIrreversibleMutation="blocked",
+        blockedClaims=sorted(claim for claim, status in statuses.items() if status == "blocked"),
+        conditionalClaims=sorted(
+            claim for claim, status in statuses.items() if status == "conditional"
+        ),
+        deferredClaims=sorted(claim for claim, status in statuses.items() if status == "deferred"),
+        unsupportedClaimAllowed=False,
+    )
 
 
 def _admin_actor(actor_id: str) -> IdentityAssertion:
@@ -2272,6 +2340,152 @@ def release_handoff_show(
 ) -> None:
     manifest = load_design_partner_handoff_manifest(Path(manifest_path))
     _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@release_mainline_app.command("stack-verify")
+def release_mainline_stack_verify(
+    stack: str = typer.Option(..., "--stack", help="Stack graph YAML/JSON spec."),
+    output_root: str | None = typer.Option(
+        None,
+        "--output-root",
+        help="Optional output root for stack verification report.",
+    ),
+    fail_on_conditional: bool = typer.Option(
+        False,
+        "--fail-on-conditional/--no-fail-on-conditional",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    spec = load_stack_graph_spec(Path(stack))
+    report = verify_stack_graph(spec, branch_exists=_release_branch_exists)
+    if output_root:
+        write_stack_graph_report(report, Path(output_root))
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=4)
+    if report.status == "conditional" and fail_on_conditional:
+        raise typer.Exit(code=3)
+
+
+@release_mainline_app.command("rehearse")
+def release_mainline_rehearse(
+    base: str = typer.Option(..., "--base", help="Base ref for non-destructive rehearsal."),
+    head: str = typer.Option(..., "--head", help="Head ref for non-destructive rehearsal."),
+    mode: str = typer.Option("dry-run", "--mode", help="dry-run or temp-worktree"),
+    output_root: str = typer.Option(
+        "artifacts/mainline-rc-freeze",
+        "--output-root",
+        help="Output root under artifacts.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    if mode not in {"dry-run", "temp-worktree"}:
+        raise typer.BadParameter("mode must be dry-run or temp-worktree")
+    report = run_merge_rehearsal(
+        MergeRehearsalSpec(
+            baseRef=base,
+            headRef=head,
+            mode=mode,  # type: ignore[arg-type]
+            outputRoot=output_root,
+        )
+    )
+    write_merge_rehearsal_report(report, Path(output_root))
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=4)
+    if report.status == "conditional":
+        raise typer.Exit(code=3)
+
+
+@release_rc_freeze_app.command("build")
+def release_rc_freeze_build(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    stack: str = typer.Option(..., "--stack", help="Stack graph YAML/JSON spec."),
+    evidence_root: str = typer.Option("artifacts", "--evidence-root"),
+    output_root: str = typer.Option("artifacts/mainline-rc-freeze", "--output-root"),
+    freeze_id: str | None = typer.Option(None, "--freeze-id"),
+    base: str = typer.Option("main", "--base"),
+    head: str = typer.Option("codex/design-partner-rc-handoff-ops-readiness-v1", "--head"),
+    mode: str = typer.Option("dry-run", "--mode"),
+    fail_on_conditional: bool = typer.Option(
+        False,
+        "--fail-on-conditional/--no-fail-on-conditional",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    if mode not in {"dry-run", "temp-worktree"}:
+        raise typer.BadParameter("mode must be dry-run or temp-worktree")
+    spec = load_stack_graph_spec(Path(stack))
+    stack_report = verify_stack_graph(spec, branch_exists=_release_branch_exists)
+    rehearsal_report = run_merge_rehearsal(
+        MergeRehearsalSpec(
+            baseRef=base,
+            headRef=head,
+            mode=mode,  # type: ignore[arg-type]
+            outputRoot=output_root,
+        )
+    )
+    claims = ClaimGuard(config=RuntimeConfig.from_profile(profile)).evaluate(
+        evidence_root=evidence_root
+    )
+    claim_boundaries = _claim_boundaries_for_freeze(claims.model_dump(mode="json"))
+    manifest = build_rc_freeze_manifest(
+        profile=profile,
+        output_root=Path(output_root),
+        stack_report=stack_report,
+        rehearsal_report=rehearsal_report,
+        gate_evidence=build_gate_evidence_summary(artifact_root=Path(evidence_root)),
+        claim_boundaries=claim_boundaries,
+        evidence_root=Path(evidence_root),
+        freeze_id=freeze_id,
+    )
+    write_rc_freeze_manifest(manifest, Path(output_root))
+    _emit_payload(manifest.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if manifest.status == "blocked":
+        raise typer.Exit(code=4)
+    if manifest.status == "conditional" and fail_on_conditional:
+        raise typer.Exit(code=3)
+
+
+@release_rc_freeze_app.command("verify")
+def release_rc_freeze_verify(
+    manifest_path: str = typer.Option(..., "--manifest", help="RC freeze manifest path."),
+    fail_on_conditional: bool = typer.Option(
+        False,
+        "--fail-on-conditional/--no-fail-on-conditional",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    report = verify_rc_freeze_manifest(manifest_path=Path(manifest_path))
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=4)
+    if report.status == "conditional" and fail_on_conditional:
+        raise typer.Exit(code=3)
+
+
+@release_rc_freeze_app.command("export")
+def release_rc_freeze_export(
+    manifest_path: str = typer.Option(..., "--manifest", help="RC freeze manifest path."),
+    output: str = typer.Option(..., "--output", help="Export target path."),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    exported = export_rc_freeze_pack(manifest_path=Path(manifest_path), output=Path(output))
+    _emit_payload({"status": "pass", "output": str(exported)}, json_output=json_output)
+
+
+@control_plane_release_freeze_app.command("snapshot")
+def control_plane_release_freeze_snapshot(
+    artifact_root: str = typer.Option("artifacts", "--artifact-root"),
+    fail_on_missing: bool = typer.Option(False, "--fail-on-missing/--no-fail-on-missing"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    snapshot = build_mainline_rc_freeze_snapshot(artifact_root=Path(artifact_root))
+    _emit_payload(snapshot.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if snapshot.status == "blocked":
+        raise typer.Exit(code=4)
+    if snapshot.status == "missing" and fail_on_missing:
+        raise typer.Exit(code=3)
 
 
 @control_plane_claims_app.command("verify")

@@ -1,0 +1,27 @@
+# Mainline RC Freeze Runbook
+
+This runbook keeps the stacked Design Partner RC chain local, deterministic, and non-destructive before human-reviewed mainline merge.
+
+## Boundaries
+
+- Do not merge PRs automatically.
+- Do not push to `main`.
+- Do not publish releases or tags.
+- Do not enable live computer-use or public desktop installer claims.
+- Do not persist raw prompts, responses, screenshots, secrets, or PII.
+
+## Local Gate
+
+```bash
+make mainline-rc-freeze-gate
+```
+
+Review `artifacts/mainline-rc-freeze/manifest.json` and `artifacts/mainline-rc-freeze/RC_FREEZE_DECISION.md`.
+
+## Decision Rules
+
+- `blocked`: stop and fix blockers before any merge discussion.
+- `conditional`: review warnings and remote CI manually.
+- `ready`: eligible for human-reviewed stacked PR merge sequencing, not automatic merge.
+
+Remote CI, review approvals, and actual merge order remain separate human-controlled checks.

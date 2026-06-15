@@ -1,0 +1,114 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "baseRef": {
+      "title": "Baseref",
+      "type": "string"
+    },
+    "baseSha": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Basesha"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "changedFileCount": {
+      "default": 0,
+      "title": "Changedfilecount",
+      "type": "integer"
+    },
+    "conflictCount": {
+      "default": 0,
+      "title": "Conflictcount",
+      "type": "integer"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "headRef": {
+      "title": "Headref",
+      "type": "string"
+    },
+    "headSha": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headsha"
+    },
+    "mode": {
+      "enum": [
+        "dry-run",
+        "temp-worktree"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "outputRoot": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Outputroot"
+    },
+    "schemaVersion": {
+      "const": "control-plane.mainline-merge-rehearsal/v1",
+      "default": "control-plane.mainline-merge-rehearsal/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "worktreeMutated": {
+      "default": false,
+      "title": "Worktreemutated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "status",
+    "baseRef",
+    "headRef",
+    "mode"
+  ],
+  "title": "MergeRehearsalReport",
+  "type": "object"
+}

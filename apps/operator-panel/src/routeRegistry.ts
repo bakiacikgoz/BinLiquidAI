@@ -19,6 +19,7 @@ export type RouteId =
   | 'governed-pilot-workflow'
   | 'design-partner-field-evidence'
   | 'design-partner-handoff'
+  | 'mainline-rc-freeze'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -126,6 +127,13 @@ export const routeGroups: RouteGroup[] = [
         label: 'Design Partner Handoff',
         heading: 'Design Partner Handoff',
         icon: 'clipboard',
+      },
+      {
+        id: 'mainline-rc-freeze',
+        routeId: 'mainline-rc-freeze',
+        label: 'Mainline RC Freeze',
+        heading: 'Mainline RC Freeze',
+        icon: 'shield',
       },
       { id: 'operations', routeId: 'operations', label: 'Yürütmeler', heading: 'Operations', icon: 'clipboard' },
       { id: 'settings', routeId: 'settings', label: 'Ayarlar', heading: 'Settings', icon: 'settings' },

@@ -1,0 +1,106 @@
+{
+  "$defs": {
+    "StackPrRef": {
+      "additionalProperties": false,
+      "properties": {
+        "baseBranch": {
+          "title": "Basebranch",
+          "type": "string"
+        },
+        "branch": {
+          "title": "Branch",
+          "type": "string"
+        },
+        "headSha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headsha"
+        },
+        "prNumber": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prnumber"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "branch",
+        "baseBranch"
+      ],
+      "title": "StackPrRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "baseBranch": {
+      "title": "Basebranch",
+      "type": "string"
+    },
+    "headBranch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headbranch"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/StackPrRef"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "control-plane.mainline-stack-spec/v1",
+      "default": "control-plane.mainline-stack-spec/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "stackName": {
+      "title": "Stackname",
+      "type": "string"
+    }
+  },
+  "required": [
+    "stackName",
+    "baseBranch"
+  ],
+  "title": "StackGraphSpec",
+  "type": "object"
+}

@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "GateEvidenceItem": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifactpath"
+        },
+        "command": {
+          "title": "Command",
+          "type": "string"
+        },
+        "gateId": {
+          "title": "Gateid",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "gateId",
+        "command",
+        "status"
+      ],
+      "title": "GateEvidenceItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/GateEvidenceItem"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "control-plane.gate-evidence-summary/v1",
+      "default": "control-plane.gate-evidence-summary/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked",
+        "missing"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "GateEvidenceSummary",
+  "type": "object"
+}

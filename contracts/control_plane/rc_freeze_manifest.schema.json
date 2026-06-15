@@ -1,0 +1,156 @@
+{
+  "$defs": {
+    "ClaimBoundarySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalFreeIrreversibleMutation": {
+          "default": "blocked",
+          "title": "Approvalfreeirreversiblemutation",
+          "type": "string"
+        },
+        "blockedClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedclaims",
+          "type": "array"
+        },
+        "conditionalClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conditionalclaims",
+          "type": "array"
+        },
+        "deferredClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deferredclaims",
+          "type": "array"
+        },
+        "liveComputerUse": {
+          "default": "unknown",
+          "title": "Livecomputeruse",
+          "type": "string"
+        },
+        "publicDesktop": {
+          "default": "unknown",
+          "title": "Publicdesktop",
+          "type": "string"
+        },
+        "unsupportedClaimAllowed": {
+          "default": false,
+          "title": "Unsupportedclaimallowed",
+          "type": "boolean"
+        }
+      },
+      "title": "ClaimBoundarySummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactScan": {
+      "additionalProperties": true,
+      "title": "Artifactscan",
+      "type": "object"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "claimBoundaries": {
+      "$ref": "#/$defs/ClaimBoundarySummary"
+    },
+    "evidenceMode": {
+      "const": "hash_only",
+      "default": "hash_only",
+      "title": "Evidencemode",
+      "type": "string"
+    },
+    "freezeId": {
+      "title": "Freezeid",
+      "type": "string"
+    },
+    "gateEvidence": {
+      "additionalProperties": true,
+      "title": "Gateevidence",
+      "type": "object"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "manifestSha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Manifestsha256"
+    },
+    "mergeRehearsal": {
+      "additionalProperties": true,
+      "title": "Mergerehearsal",
+      "type": "object"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rawPersistence": {
+      "const": false,
+      "default": false,
+      "title": "Rawpersistence",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "control-plane.rc-freeze-manifest/v1",
+      "default": "control-plane.rc-freeze-manifest/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "stack": {
+      "additionalProperties": true,
+      "title": "Stack",
+      "type": "object"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "freezeId",
+    "profile",
+    "status",
+    "stack",
+    "mergeRehearsal",
+    "gateEvidence",
+    "claimBoundaries",
+    "artifactScan"
+  ],
+  "title": "RcFreezeManifest",
+  "type": "object"
+}

@@ -31,6 +31,17 @@ from binliquid.control_plane.field_evidence import (  # noqa: E402
     OperatorAttestationValidationResult,
 )
 from binliquid.control_plane.install_rehearsal import InstallRehearsalReport  # noqa: E402
+from binliquid.control_plane.mainline_rc_freeze import (  # noqa: E402
+    GateEvidenceSummary,
+    MainlineRcFreezeSnapshot,
+    RcFreezeManifest,
+    RcFreezeVerificationReport,
+)
+from binliquid.control_plane.mainline_stack import (  # noqa: E402
+    MergeRehearsalReport,
+    StackGraphSpec,
+    StackGraphVerificationReport,
+)
 from binliquid.control_plane.models import (  # noqa: E402
     ActionProposal,
     AgentRecord,
@@ -136,6 +147,14 @@ SCHEMAS = {
     "design_partner_handoff_manifest": DesignPartnerHandoffManifest,
     "design_partner_handoff_verification": DesignPartnerHandoffVerificationReport,
     "design_partner_handoff_snapshot": DesignPartnerHandoffSnapshot,
+    "mainline_stack": StackGraphSpec,
+    "mainline_stack_spec": StackGraphSpec,
+    "mainline_stack_verification": StackGraphVerificationReport,
+    "mainline_merge_rehearsal": MergeRehearsalReport,
+    "gate_evidence_summary": GateEvidenceSummary,
+    "rc_freeze_manifest": RcFreezeManifest,
+    "rc_freeze_verification": RcFreezeVerificationReport,
+    "mainline_rc_freeze_snapshot": MainlineRcFreezeSnapshot,
 }
 
 OPERATOR_PANEL_SCHEMAS = {

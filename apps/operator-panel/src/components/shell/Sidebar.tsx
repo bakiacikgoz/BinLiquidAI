@@ -40,6 +40,7 @@ const routeLabelTr: Partial<Record<RouteId, string>> = {
   'memory-authority': 'Memory authority',
   'memory-runtime': 'Memory runtime',
   'memory-semantic': 'Semantic memory',
+  'mainline-rc-freeze': 'Mainline RC freeze',
   operations: 'Yürütmeler',
   settings: 'Ayarlar',
   logs: 'Loglar',

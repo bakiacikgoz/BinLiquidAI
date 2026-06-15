@@ -1380,6 +1380,111 @@
       "title": "LogEventSummary",
       "type": "object"
     },
+    "MainlineRcFreezeSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactScanStatus": {
+          "default": "missing",
+          "title": "Artifactscanstatus",
+          "type": "string"
+        },
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "evidenceMode": {
+          "default": "hash_only",
+          "title": "Evidencemode",
+          "type": "string"
+        },
+        "freezeId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Freezeid"
+        },
+        "gateEvidenceStatus": {
+          "default": "missing",
+          "title": "Gateevidencestatus",
+          "type": "string"
+        },
+        "lastGeneratedAtUtc": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastgeneratedatutc"
+        },
+        "manifestPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manifestpath"
+        },
+        "mergeRehearsalStatus": {
+          "default": "missing",
+          "title": "Mergerehearsalstatus",
+          "type": "string"
+        },
+        "rawPersistence": {
+          "default": false,
+          "title": "Rawpersistence",
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "const": "control-plane.mainline-rc-freeze-snapshot/v1",
+          "default": "control-plane.mainline-rc-freeze-snapshot/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "stackStatus": {
+          "default": "missing",
+          "title": "Stackstatus",
+          "type": "string"
+        },
+        "status": {
+          "default": "missing",
+          "enum": [
+            "missing",
+            "conditional",
+            "ready",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "MainlineRcFreezeSnapshot",
+      "type": "object"
+    },
     "MemoryAuthorityRecordsSummary": {
       "additionalProperties": false,
       "properties": {
@@ -3796,6 +3901,9 @@
       },
       "title": "Logs",
       "type": "array"
+    },
+    "mainlineRcFreeze": {
+      "$ref": "#/$defs/MainlineRcFreezeSnapshot"
     },
     "memoryAuthority": {
       "$ref": "#/$defs/WorkspaceMemoryAuthorityHealth"

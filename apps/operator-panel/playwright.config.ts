@@ -42,7 +42,7 @@ export default defineConfig({
   ],
   webServer: hasE2eSpecs
     ? {
-        command: 'VITE_OPERATOR_PANEL_PREVIEW=1 corepack pnpm dev --host 127.0.0.1',
+        command: 'node scripts/start-preview-server.mjs',
         url: 'http://127.0.0.1:5173',
         reuseExistingServer: true,
         timeout: 120_000,

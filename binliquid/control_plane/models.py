@@ -1432,6 +1432,25 @@ class DesignPartnerHandoffSnapshot(StrictModel):
     )
 
 
+class MainlineRcFreezeSnapshot(StrictModel):
+    schema_version: Literal["control-plane.mainline-rc-freeze-snapshot/v1"] = Field(
+        default="control-plane.mainline-rc-freeze-snapshot/v1",
+        alias="schemaVersion",
+    )
+    status: Literal["missing", "conditional", "ready", "blocked"] = "missing"
+    freeze_id: str | None = Field(default=None, alias="freezeId")
+    manifest_path: str | None = Field(default=None, alias="manifestPath")
+    stack_status: str = Field(default="missing", alias="stackStatus")
+    merge_rehearsal_status: str = Field(default="missing", alias="mergeRehearsalStatus")
+    gate_evidence_status: str = Field(default="missing", alias="gateEvidenceStatus")
+    artifact_scan_status: str = Field(default="missing", alias="artifactScanStatus")
+    evidence_mode: str = Field(default="hash_only", alias="evidenceMode")
+    raw_persistence: bool = Field(default=False, alias="rawPersistence")
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    last_generated_at_utc: datetime | None = Field(default=None, alias="lastGeneratedAtUtc")
+
+
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
@@ -1491,6 +1510,10 @@ class ControlPlaneSnapshot(StrictModel):
     design_partner_handoff: DesignPartnerHandoffSnapshot = Field(
         default_factory=DesignPartnerHandoffSnapshot,
         alias="designPartnerHandoff",
+    )
+    mainline_rc_freeze: MainlineRcFreezeSnapshot = Field(
+        default_factory=MainlineRcFreezeSnapshot,
+        alias="mainlineRcFreeze",
     )
     memory_governance: MemoryAuthoritySnapshot = Field(
         default_factory=disabled_memory_authority_snapshot,

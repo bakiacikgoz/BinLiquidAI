@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "baseBranch": {
+      "title": "Basebranch",
+      "type": "string"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "headBranch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headbranch"
+    },
+    "schemaVersion": {
+      "const": "control-plane.mainline-stack-verification/v1",
+      "default": "control-plane.mainline-stack-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "stackName": {
+      "title": "Stackname",
+      "type": "string"
+    },
+    "stackOrder": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Stackorder",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "stackName",
+    "baseBranch"
+  ],
+  "title": "StackGraphVerificationReport",
+  "type": "object"
+}

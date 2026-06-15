@@ -1,0 +1,29 @@
+schemaVersion: control-plane.mainline-stack-spec/v1
+stackName: design-partner-rc
+baseBranch: main
+headBranch: codex/design-partner-rc-handoff-ops-readiness-v1
+items:
+  - prNumber: 10
+    branch: codex/workspace-memory-authority-v1
+    baseBranch: main
+    title: Workspace memory authority
+  - prNumber: 11
+    branch: codex/semantic-memory-index-retrieval-quality-v1
+    baseBranch: codex/workspace-memory-authority-v1
+    title: Semantic memory index retrieval quality
+  - prNumber: 12
+    branch: codex/agent-memory-policy-enforcement-v1
+    baseBranch: codex/semantic-memory-index-retrieval-quality-v1
+    title: Agent memory policy enforcement
+  - prNumber: 13
+    branch: codex/governed-pilot-workflow-release-closure-v1
+    baseBranch: codex/agent-memory-policy-enforcement-v1
+    title: Governed pilot workflow release closure
+  - prNumber: 14
+    branch: codex/design-partner-target-evidence-attestation-closure-v1
+    baseBranch: codex/governed-pilot-workflow-release-closure-v1
+    title: Design partner target evidence attestation closure
+  - prNumber: 15
+    branch: codex/design-partner-rc-handoff-ops-readiness-v1
+    baseBranch: codex/design-partner-target-evidence-attestation-closure-v1
+    title: Design partner RC handoff ops readiness

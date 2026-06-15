@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate design-partner-field-evidence-gate design-partner-handoff-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-runtime-policy-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate governed-pilot-workflow-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate design-partner-field-evidence-gate design-partner-handoff-gate mainline-rc-freeze-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-runtime-policy-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate governed-pilot-workflow-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -263,6 +263,39 @@ design-partner-handoff-gate:
 	corepack pnpm --dir apps/operator-panel lint
 	corepack pnpm --dir apps/operator-panel build
 	corepack pnpm --dir apps/operator-panel exec playwright test e2e/design-partner-handoff.spec.ts --pass-with-no-tests
+	git diff --check
+
+mainline-rc-freeze-gate:
+	uv run --extra dev ruff check .
+	uv run --extra dev python -m pytest -q \
+		tests/test_mainline_stack.py \
+		tests/test_release_artifact_scan.py \
+		tests/test_rc_freeze_manifest.py \
+		tests/test_mainline_rc_freeze_cli.py \
+		tests/test_control_plane_snapshot_mainline_rc_freeze.py
+	uv run python scripts/generate_control_plane_contract_schemas.py
+	git diff --exit-code contracts/control_plane contracts/operator_panel/schemas
+	uv run binliquid release mainline stack-verify \
+		--stack examples/release/design_partner_rc_stack.yaml \
+		--json
+	uv run binliquid release mainline rehearse \
+		--base main \
+		--head codex/design-partner-rc-handoff-ops-readiness-v1 \
+		--mode dry-run \
+		--output-root artifacts/mainline-rc-freeze \
+		--json
+	uv run python scripts/generate_mainline_rc_freeze_pack.py \
+		--profile enterprise \
+		--stack examples/release/design_partner_rc_stack.yaml \
+		--evidence-root artifacts \
+		--output-root artifacts/mainline-rc-freeze \
+		--json
+	uv run binliquid release rc-freeze verify \
+		--manifest artifacts/mainline-rc-freeze/manifest.json \
+		--json
+	uv run python scripts/run_mainline_rc_freeze_gate.py --profile enterprise --json
+	corepack pnpm --dir apps/operator-panel exec vitest run src/mainline-rc-freeze/MainlineRcFreezeView.test.tsx
+	corepack pnpm --dir apps/operator-panel exec playwright test e2e/mainline-rc-freeze.spec.ts --pass-with-no-tests
 	git diff --check
 
 governed-memory-v1-gate:

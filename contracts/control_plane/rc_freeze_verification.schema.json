@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "manifestPath": {
+      "title": "Manifestpath",
+      "type": "string"
+    },
+    "manifestSha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Manifestsha256"
+    },
+    "schemaVersion": {
+      "const": "control-plane.rc-freeze-verification/v1",
+      "default": "control-plane.rc-freeze-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "manifestPath"
+  ],
+  "title": "RcFreezeVerificationReport",
+  "type": "object"
+}

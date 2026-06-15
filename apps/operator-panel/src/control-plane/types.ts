@@ -474,6 +474,22 @@ export interface DesignPartnerHandoffSnapshot {
   claimBoundarySummary: Record<string, string>;
 }
 
+export interface MainlineRcFreezeSnapshot {
+  schemaVersion: 'control-plane.mainline-rc-freeze-snapshot/v1';
+  status: 'ready' | 'conditional' | 'blocked' | 'missing';
+  freezeId?: string | null;
+  manifestPath?: string | null;
+  stackStatus: string;
+  mergeRehearsalStatus: string;
+  gateEvidenceStatus: string;
+  artifactScanStatus: string;
+  evidenceMode: string;
+  rawPersistence: boolean;
+  blockers: string[];
+  warnings: string[];
+  lastGeneratedAtUtc?: string | null;
+}
+
 export interface MemoryAuthorityRecordsSummary {
   active: number;
   expired: number;
@@ -636,6 +652,7 @@ export interface ControlPlaneSnapshot {
   targetEvidenceClosure: TargetEvidenceClosureSummary;
   designPartnerFieldEvidence?: DesignPartnerFieldEvidenceSnapshot;
   designPartnerHandoff?: DesignPartnerHandoffSnapshot;
+  mainlineRcFreeze?: MainlineRcFreezeSnapshot;
   memoryGovernance?: MemoryAuthoritySnapshot;
   memoryRuntime?: MemoryRuntimeSnapshot;
   memorySync?: MemorySyncSnapshot;
