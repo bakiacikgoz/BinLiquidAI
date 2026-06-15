@@ -881,6 +881,23 @@
       "MAINLINE_RC_FREEZE_MISSING"
     ]
   },
+  "rcGateEvidence": {
+    "blockingReasons": [],
+    "latestLedgerRef": "artifacts/release-gates/mainline-rc/gate_evidence_ledger.json",
+    "latestVerificationRef": "artifacts/release-gates/mainline-rc/gate_evidence_verification.json",
+    "makeRequired": false,
+    "missingArtifactCount": 0,
+    "missingGateCount": 0,
+    "platform": "windows",
+    "rawMarkerScanStatus": "pass",
+    "readyForRcFreeze": true,
+    "schemaVersion": "control-plane.rc-gate-evidence-snapshot/v1",
+    "secretScanStatus": "pass",
+    "status": "ready",
+    "target": "mainline-rc",
+    "verifiedGateCount": 10,
+    "warnings": []
+  },
   "governedPilotWorkflow": {
     "blockedClaims": [
       "public-desktop-installer",

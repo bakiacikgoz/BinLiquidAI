@@ -1,0 +1,292 @@
+{
+  "$defs": {
+    "GateArtifactRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "allowMissingWhenConditional": {
+          "default": false,
+          "title": "Allowmissingwhenconditional",
+          "type": "boolean"
+        },
+        "gateId": {
+          "title": "Gateid",
+          "type": "string"
+        },
+        "hashOnly": {
+          "default": true,
+          "title": "Hashonly",
+          "type": "boolean"
+        },
+        "kind": {
+          "default": "json",
+          "enum": [
+            "json",
+            "md",
+            "log",
+            "text"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "requiredForReady": {
+          "default": true,
+          "title": "Requiredforready",
+          "type": "boolean"
+        },
+        "requirementId": {
+          "title": "Requirementid",
+          "type": "string"
+        },
+        "schemaRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schemaref"
+        }
+      },
+      "required": [
+        "requirementId",
+        "gateId",
+        "path"
+      ],
+      "title": "GateArtifactRequirement",
+      "type": "object"
+    },
+    "GateCommandSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Argv",
+          "type": "array"
+        },
+        "commandId": {
+          "title": "Commandid",
+          "type": "string"
+        },
+        "cwd": {
+          "default": ".",
+          "title": "Cwd",
+          "type": "string"
+        },
+        "destructive": {
+          "default": false,
+          "title": "Destructive",
+          "type": "boolean"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "expectedExitCodes": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Expectedexitcodes",
+          "type": "array"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "mutatesWorktree": {
+          "default": false,
+          "title": "Mutatesworktree",
+          "type": "boolean"
+        },
+        "platforms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Platforms",
+          "type": "array"
+        },
+        "timeoutSeconds": {
+          "default": 900,
+          "maximum": 14400,
+          "minimum": 1,
+          "title": "Timeoutseconds",
+          "type": "integer"
+        },
+        "writesArtifacts": {
+          "default": true,
+          "title": "Writesartifacts",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "commandId",
+        "label",
+        "argv"
+      ],
+      "title": "GateCommandSpec",
+      "type": "object"
+    },
+    "ReleaseGateSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactRequirements": {
+          "items": {
+            "$ref": "#/$defs/GateArtifactRequirement"
+          },
+          "title": "Artifactrequirements",
+          "type": "array"
+        },
+        "commands": {
+          "items": {
+            "$ref": "#/$defs/GateCommandSpec"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "gateId": {
+          "title": "Gateid",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "gateId"
+      ],
+      "title": "ReleaseGateSpec",
+      "type": "object"
+    },
+    "ReleaseGateTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "allowExpectedConditionals": {
+          "default": false,
+          "title": "Allowexpectedconditionals",
+          "type": "boolean"
+        },
+        "mode": {
+          "default": "rc-full",
+          "enum": [
+            "rc-focused",
+            "rc-full"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "outputRoot": {
+          "title": "Outputroot",
+          "type": "string"
+        },
+        "platform": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "windows",
+            "macos",
+            "linux",
+            "unknown",
+            "github_actions"
+          ],
+          "title": "Platform",
+          "type": "string"
+        },
+        "profile": {
+          "default": "enterprise",
+          "title": "Profile",
+          "type": "string"
+        },
+        "targetId": {
+          "enum": [
+            "mainline-rc",
+            "design-partner-rc",
+            "pilot-readiness"
+          ],
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "targetId",
+        "outputRoot"
+      ],
+      "title": "ReleaseGateTarget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "gates": {
+      "items": {
+        "$ref": "#/$defs/ReleaseGateSpec"
+      },
+      "title": "Gates",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "makeRequired": {
+      "default": false,
+      "title": "Makerequired",
+      "type": "boolean"
+    },
+    "requiredGateIds": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Requiredgateids",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "release.gate-plan/v1",
+      "default": "release.gate-plan/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "target": {
+      "$ref": "#/$defs/ReleaseGateTarget"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "target",
+    "gates",
+    "requiredGateIds"
+  ],
+  "title": "ReleaseGatePlan",
+  "type": "object"
+}

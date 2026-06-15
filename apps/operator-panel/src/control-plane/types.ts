@@ -490,6 +490,24 @@ export interface MainlineRcFreezeSnapshot {
   lastGeneratedAtUtc?: string | null;
 }
 
+export interface RcGateEvidenceSnapshot {
+  schemaVersion: 'control-plane.rc-gate-evidence-snapshot/v1';
+  status: 'ready' | 'conditional' | 'blocked' | 'missing';
+  target: string;
+  latestLedgerRef?: string | null;
+  latestVerificationRef?: string | null;
+  verifiedGateCount: number;
+  missingGateCount: number;
+  missingArtifactCount: number;
+  secretScanStatus: string;
+  rawMarkerScanStatus: string;
+  platform: string;
+  makeRequired: boolean;
+  readyForRcFreeze: boolean;
+  blockingReasons: string[];
+  warnings: string[];
+}
+
 export interface MemoryAuthorityRecordsSummary {
   active: number;
   expired: number;
@@ -653,6 +671,7 @@ export interface ControlPlaneSnapshot {
   designPartnerFieldEvidence?: DesignPartnerFieldEvidenceSnapshot;
   designPartnerHandoff?: DesignPartnerHandoffSnapshot;
   mainlineRcFreeze?: MainlineRcFreezeSnapshot;
+  rcGateEvidence?: RcGateEvidenceSnapshot;
   memoryGovernance?: MemoryAuthoritySnapshot;
   memoryRuntime?: MemoryRuntimeSnapshot;
   memorySync?: MemorySyncSnapshot;

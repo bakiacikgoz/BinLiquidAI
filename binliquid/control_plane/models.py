@@ -13,6 +13,7 @@ from binliquid.memory.runtime_policy_snapshot import MemoryPolicyEnforcementSnap
 from binliquid.memory.runtime_snapshot import MemoryRuntimeSnapshot, MemorySyncSnapshot
 from binliquid.memory.semantic import MemorySemanticIndexSnapshot
 from binliquid.memory.workspace_models import WorkspaceMemoryAuthorityHealth
+from binliquid.release.gate_models import RcGateEvidenceSnapshot
 
 
 class StrictModel(BaseModel):
@@ -1514,6 +1515,10 @@ class ControlPlaneSnapshot(StrictModel):
     mainline_rc_freeze: MainlineRcFreezeSnapshot = Field(
         default_factory=MainlineRcFreezeSnapshot,
         alias="mainlineRcFreeze",
+    )
+    rc_gate_evidence: RcGateEvidenceSnapshot = Field(
+        default_factory=RcGateEvidenceSnapshot,
+        alias="rcGateEvidence",
     )
     memory_governance: MemoryAuthoritySnapshot = Field(
         default_factory=disabled_memory_authority_snapshot,

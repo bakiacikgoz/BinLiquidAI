@@ -1,0 +1,52 @@
+{
+  "artifactRoot": "artifacts/release-gates/mainline-rc",
+  "blockingReasons": [
+    "ARTIFACT_HASH_MISMATCH"
+  ],
+  "branch": "codex/fixture",
+  "gateResults": [
+    {
+      "artifactRefs": [
+        {
+          "contentPersisted": false,
+          "kind": "json",
+          "path": "artifacts/release-gates/mainline-rc/tampered.json",
+          "reasonCodes": [],
+          "scanStatus": "pass",
+          "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "sizeBytes": 2
+        }
+      ],
+      "blockingReasons": [],
+      "commands": [],
+      "durationMs": 1,
+      "finishedAtUtc": "2026-06-15T00:00:00Z",
+      "gateId": "control-plane-gate",
+      "missingArtifactRequirements": [],
+      "rawMarkerScanStatus": "pass",
+      "schemaVersion": "release.gate-run-result/v1",
+      "secretScanStatus": "pass",
+      "startedAtUtc": "2026-06-15T00:00:00Z",
+      "status": "pass",
+      "warnings": [],
+      "worktreeMutated": false
+    }
+  ],
+  "generatedAtUtc": "2026-06-15T00:00:00Z",
+  "ledgerSha256": null,
+  "repoHeadSha": "1111111111111111111111111111111111111111",
+  "requiredGateIds": [
+    "control-plane-gate"
+  ],
+  "schemaVersion": "release.gate-evidence-ledger/v1",
+  "status": "blocked",
+  "target": {
+    "allowExpectedConditionals": false,
+    "mode": "rc-focused",
+    "outputRoot": "artifacts/release-gates/mainline-rc",
+    "platform": "windows",
+    "profile": "enterprise",
+    "targetId": "mainline-rc"
+  },
+  "warnings": []
+}

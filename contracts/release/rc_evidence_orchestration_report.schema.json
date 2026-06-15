@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "ledgerPath": {
+      "title": "Ledgerpath",
+      "type": "string"
+    },
+    "readyForRcFreeze": {
+      "title": "Readyforrcfreeze",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "release.rc-evidence-orchestration/v1",
+      "default": "release.rc-evidence-orchestration/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked",
+        "fail"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "verificationPath": {
+      "title": "Verificationpath",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "ledgerPath",
+    "verificationPath",
+    "readyForRcFreeze"
+  ],
+  "title": "RcEvidenceOrchestrationReport",
+  "type": "object"
+}

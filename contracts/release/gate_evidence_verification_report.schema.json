@@ -1,0 +1,172 @@
+{
+  "$defs": {
+    "GateArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "contentPersisted": {
+          "default": false,
+          "title": "Contentpersisted",
+          "type": "boolean"
+        },
+        "kind": {
+          "default": "unknown",
+          "enum": [
+            "json",
+            "md",
+            "log",
+            "text",
+            "unknown"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "scanStatus": {
+          "default": "pass",
+          "enum": [
+            "pass",
+            "fail",
+            "skipped"
+          ],
+          "title": "Scanstatus",
+          "type": "string"
+        },
+        "schemaRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schemaref"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "sizeBytes": {
+          "minimum": 0,
+          "title": "Sizebytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "sizeBytes"
+      ],
+      "title": "GateArtifactRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "claimImpact": {
+      "default": "no_claim_change",
+      "title": "Claimimpact",
+      "type": "string"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "ledgerRef": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GateArtifactRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "missingArtifactIds": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missingartifactids",
+      "type": "array"
+    },
+    "missingGateIds": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missinggateids",
+      "type": "array"
+    },
+    "readyForRcFreeze": {
+      "default": false,
+      "title": "Readyforrcfreeze",
+      "type": "boolean"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "release.gate-evidence-verification/v1",
+      "default": "release.gate-evidence-verification/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "secretOrRawFindings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Secretorrawfindings",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked",
+        "fail"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tamperedArtifactRefs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tamperedartifactrefs",
+      "type": "array"
+    },
+    "verifiedGateCount": {
+      "default": 0,
+      "title": "Verifiedgatecount",
+      "type": "integer"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "GateEvidenceVerificationReport",
+  "type": "object"
+}

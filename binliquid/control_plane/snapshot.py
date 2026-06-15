@@ -70,6 +70,8 @@ from binliquid.memory.semantic import MemorySemanticIndexSnapshot, build_memory_
 from binliquid.memory.snapshot import build_memory_governance_snapshot
 from binliquid.memory.workspace_authority import build_workspace_memory_authority
 from binliquid.memory.workspace_models import WorkspaceMemoryAuthorityHealth
+from binliquid.release.gate_models import RcGateEvidenceSnapshot
+from binliquid.release.snapshot import build_rc_gate_evidence_snapshot
 from binliquid.runtime.config import RuntimeConfig
 
 SNAPSHOT_CONTRACT_VERSION = "control-plane.snapshot/v1"
@@ -215,6 +217,13 @@ def build_control_plane_snapshot(
     mainline_rc_freeze = MainlineRcFreezeSnapshot.model_validate(
         mainline_rc_freeze_snapshot.model_dump(mode="json", by_alias=True)
     )
+    rc_gate_evidence_snapshot = build_rc_gate_evidence_snapshot(
+        evidence_root=Path(evidence_root),
+        profile=profile,
+    )
+    rc_gate_evidence = RcGateEvidenceSnapshot.model_validate(
+        rc_gate_evidence_snapshot.model_dump(mode="json", by_alias=True)
+    )
     memory_governance = build_memory_governance_snapshot(config=config, evidence_root=evidence_root)
     memory_runtime = build_memory_runtime_snapshot(
         config=config,
@@ -336,6 +345,7 @@ def build_control_plane_snapshot(
         design_partner_field_evidence=design_partner_field_evidence,
         design_partner_handoff=design_partner_handoff,
         mainline_rc_freeze=mainline_rc_freeze,
+        rc_gate_evidence=rc_gate_evidence,
         memory_governance=memory_governance,
         memory_runtime=memory_runtime,
         memory_sync=memory_sync,

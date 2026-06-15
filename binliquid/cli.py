@@ -80,6 +80,7 @@ from binliquid.control_plane.mainline_rc_freeze import (
     build_rc_freeze_manifest,
     export_rc_freeze_pack,
     verify_rc_freeze_manifest,
+    verify_rc_freeze_manifest_with_gate_ledger,
     write_rc_freeze_manifest,
 )
 from binliquid.control_plane.mainline_stack import (
@@ -225,6 +226,11 @@ from binliquid.memory.workspace_models import (
     WorkspaceMemoryWriteRequest,
 )
 from binliquid.memory.workspace_sync import WorkspaceMemorySyncCoordinator
+from binliquid.release.gate_export import export_rc_evidence_orchestration
+from binliquid.release.gate_plan import build_release_gate_plan
+from binliquid.release.gate_runner import run_release_gate_plan
+from binliquid.release.gate_verifier import verify_gate_evidence_ledger
+from binliquid.release.snapshot import build_rc_gate_evidence_snapshot
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
@@ -291,6 +297,7 @@ control_plane_reports_app = typer.Typer(help="Control Plane reports and alerts c
 control_plane_operations_app = typer.Typer(help="Control Plane operation workflow commands")
 control_plane_release_app = typer.Typer(help="Control Plane release commands")
 control_plane_release_freeze_app = typer.Typer(help="Control Plane release freeze commands")
+control_plane_release_gates_app = typer.Typer(help="Control Plane release gate evidence commands")
 pilot_app = typer.Typer(help="Design partner pilot operations commands")
 pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
 control_plane_pilot_workflow_app = typer.Typer(help="Governed pilot workflow commands")
@@ -302,6 +309,7 @@ release_train_app = typer.Typer(help="Release train verification commands")
 release_handoff_app = typer.Typer(help="Design partner handoff commands")
 release_mainline_app = typer.Typer(help="Mainline stack rehearsal commands")
 release_rc_freeze_app = typer.Typer(help="Mainline RC freeze commands")
+release_gates_app = typer.Typer(help="Cross-platform release gate evidence commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -359,6 +367,7 @@ control_plane_app.add_typer(control_plane_reports_app, name="reports")
 control_plane_app.add_typer(control_plane_operations_app, name="operations")
 control_plane_app.add_typer(control_plane_release_app, name="release")
 control_plane_release_app.add_typer(control_plane_release_freeze_app, name="freeze")
+control_plane_release_app.add_typer(control_plane_release_gates_app, name="gates")
 app.add_typer(pilot_app, name="pilot")
 pilot_app.add_typer(pilot_workflow_app, name="workflow")
 control_plane_pilot_app.add_typer(control_plane_pilot_workflow_app, name="workflow")
@@ -370,6 +379,7 @@ release_app.add_typer(release_train_app, name="train")
 release_app.add_typer(release_handoff_app, name="handoff")
 release_app.add_typer(release_mainline_app, name="mainline")
 release_app.add_typer(release_rc_freeze_app, name="rc-freeze")
+release_app.add_typer(release_gates_app, name="gates")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -2450,13 +2460,26 @@ def release_rc_freeze_build(
 @release_rc_freeze_app.command("verify")
 def release_rc_freeze_verify(
     manifest_path: str = typer.Option(..., "--manifest", help="RC freeze manifest path."),
+    gate_ledger_path: str | None = typer.Option(
+        None,
+        "--gate-ledger",
+        help="Optional release gate evidence ledger used to resolve missing gate warnings.",
+    ),
     fail_on_conditional: bool = typer.Option(
         False,
         "--fail-on-conditional/--no-fail-on-conditional",
     ),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    report = verify_rc_freeze_manifest(manifest_path=Path(manifest_path))
+    report = (
+        verify_rc_freeze_manifest_with_gate_ledger(
+            manifest_path=Path(manifest_path),
+            gate_ledger_path=Path(gate_ledger_path),
+            repo_root=Path.cwd(),
+        )
+        if gate_ledger_path
+        else verify_rc_freeze_manifest(manifest_path=Path(manifest_path))
+    )
     _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
     if report.status == "blocked":
         raise typer.Exit(code=4)
@@ -2474,6 +2497,82 @@ def release_rc_freeze_export(
     _emit_payload({"status": "pass", "output": str(exported)}, json_output=json_output)
 
 
+@release_gates_app.command("plan")
+def release_gates_plan(
+    target: str = typer.Option("mainline-rc", "--target"),
+    profile: str = typer.Option("enterprise", "--profile"),
+    mode: str = typer.Option("rc-full", "--mode"),
+    platform: str = typer.Option("auto", "--platform"),
+    output_root: str = typer.Option("artifacts/release-gates/mainline-rc", "--output-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    plan = build_release_gate_plan(
+        target=target,
+        profile=profile,
+        mode=mode,  # type: ignore[arg-type]
+        platform=platform,  # type: ignore[arg-type]
+        repo_root=Path.cwd(),
+        output_root=Path(output_root),
+    )
+    _emit_payload(plan.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@release_gates_app.command("run")
+def release_gates_run(
+    target: str = typer.Option("mainline-rc", "--target"),
+    profile: str = typer.Option("enterprise", "--profile"),
+    mode: str = typer.Option("rc-full", "--mode"),
+    platform: str = typer.Option("auto", "--platform"),
+    output_root: str = typer.Option("artifacts/release-gates/mainline-rc", "--output-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    plan = build_release_gate_plan(
+        target=target,
+        profile=profile,
+        mode=mode,  # type: ignore[arg-type]
+        platform=platform,  # type: ignore[arg-type]
+        repo_root=Path.cwd(),
+        output_root=Path(output_root),
+    )
+    ledger = run_release_gate_plan(plan=plan, repo_root=Path.cwd(), output_root=Path(output_root))
+    _emit_payload(ledger.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if ledger.status == "blocked":
+        raise typer.Exit(code=3)
+    if ledger.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@release_gates_app.command("verify")
+def release_gates_verify(
+    ledger_path: str = typer.Option(..., "--ledger"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    report = verify_gate_evidence_ledger(ledger_path=Path(ledger_path), repo_root=Path.cwd())
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=3)
+    if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@release_gates_app.command("export")
+def release_gates_export(
+    ledger_path: str = typer.Option(..., "--ledger"),
+    output_root: str = typer.Option(..., "--output-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    report = export_rc_evidence_orchestration(
+        ledger_path=Path(ledger_path),
+        output_root=Path(output_root),
+        repo_root=Path.cwd(),
+    )
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "blocked":
+        raise typer.Exit(code=3)
+    if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
 @control_plane_release_freeze_app.command("snapshot")
 def control_plane_release_freeze_snapshot(
     artifact_root: str = typer.Option("artifacts", "--artifact-root"),
@@ -2486,6 +2585,18 @@ def control_plane_release_freeze_snapshot(
         raise typer.Exit(code=4)
     if snapshot.status == "missing" and fail_on_missing:
         raise typer.Exit(code=3)
+
+
+@control_plane_release_gates_app.command("snapshot")
+def control_plane_release_gates_snapshot(
+    profile: str = typer.Option("enterprise", "--profile"),
+    evidence_root: str = typer.Option("artifacts/release-gates/mainline-rc", "--evidence-root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    root = Path(evidence_root)
+    artifact_root = root.parent.parent if root.name == "mainline-rc" else root
+    snapshot = build_rc_gate_evidence_snapshot(evidence_root=artifact_root, profile=profile)
+    _emit_payload(snapshot.model_dump(mode="json", by_alias=True), json_output=json_output)
 
 
 @control_plane_claims_app.command("verify")

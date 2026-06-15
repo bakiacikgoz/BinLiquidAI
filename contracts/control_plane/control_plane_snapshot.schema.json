@@ -3215,6 +3215,113 @@
       "title": "QuickActionSummary",
       "type": "object"
     },
+    "RcGateEvidenceSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "latestLedgerRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latestledgerref"
+        },
+        "latestVerificationRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latestverificationref"
+        },
+        "makeRequired": {
+          "default": false,
+          "title": "Makerequired",
+          "type": "boolean"
+        },
+        "missingArtifactCount": {
+          "default": 0,
+          "title": "Missingartifactcount",
+          "type": "integer"
+        },
+        "missingGateCount": {
+          "default": 0,
+          "title": "Missinggatecount",
+          "type": "integer"
+        },
+        "platform": {
+          "default": "unknown",
+          "title": "Platform",
+          "type": "string"
+        },
+        "rawMarkerScanStatus": {
+          "default": "missing",
+          "title": "Rawmarkerscanstatus",
+          "type": "string"
+        },
+        "readyForRcFreeze": {
+          "default": false,
+          "title": "Readyforrcfreeze",
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "const": "control-plane.rc-gate-evidence-snapshot/v1",
+          "default": "control-plane.rc-gate-evidence-snapshot/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "secretScanStatus": {
+          "default": "missing",
+          "title": "Secretscanstatus",
+          "type": "string"
+        },
+        "status": {
+          "default": "missing",
+          "enum": [
+            "ready",
+            "conditional",
+            "blocked",
+            "missing"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "target": {
+          "default": "mainline-rc",
+          "title": "Target",
+          "type": "string"
+        },
+        "verifiedGateCount": {
+          "default": 0,
+          "title": "Verifiedgatecount",
+          "type": "integer"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "RcGateEvidenceSnapshot",
+      "type": "object"
+    },
     "ReportSummary": {
       "additionalProperties": false,
       "properties": {
@@ -3962,6 +4069,9 @@
       },
       "title": "Quickactions",
       "type": "array"
+    },
+    "rcGateEvidence": {
+      "$ref": "#/$defs/RcGateEvidenceSnapshot"
     },
     "reports": {
       "items": {

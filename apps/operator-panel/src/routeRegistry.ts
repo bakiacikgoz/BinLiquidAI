@@ -20,6 +20,7 @@ export type RouteId =
   | 'design-partner-field-evidence'
   | 'design-partner-handoff'
   | 'mainline-rc-freeze'
+  | 'rc-gate-evidence'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -133,6 +134,13 @@ export const routeGroups: RouteGroup[] = [
         routeId: 'mainline-rc-freeze',
         label: 'Mainline RC Freeze',
         heading: 'Mainline RC Freeze',
+        icon: 'shield',
+      },
+      {
+        id: 'rc-gate-evidence',
+        routeId: 'rc-gate-evidence',
+        label: 'RC Gate Evidence',
+        heading: 'RC Gate Evidence',
         icon: 'shield',
       },
       { id: 'operations', routeId: 'operations', label: 'Yürütmeler', heading: 'Operations', icon: 'clipboard' },

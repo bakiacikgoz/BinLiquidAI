@@ -1,0 +1,254 @@
+{
+  "$defs": {
+    "GateArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "contentPersisted": {
+          "default": false,
+          "title": "Contentpersisted",
+          "type": "boolean"
+        },
+        "kind": {
+          "default": "unknown",
+          "enum": [
+            "json",
+            "md",
+            "log",
+            "text",
+            "unknown"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "scanStatus": {
+          "default": "pass",
+          "enum": [
+            "pass",
+            "fail",
+            "skipped"
+          ],
+          "title": "Scanstatus",
+          "type": "string"
+        },
+        "schemaRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schemaref"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "sizeBytes": {
+          "minimum": 0,
+          "title": "Sizebytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "sizeBytes"
+      ],
+      "title": "GateArtifactRef",
+      "type": "object"
+    },
+    "GateCommandExecution": {
+      "additionalProperties": false,
+      "properties": {
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "commandId": {
+          "title": "Commandid",
+          "type": "string"
+        },
+        "durationMs": {
+          "default": 0,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "exitCode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exitcode"
+        },
+        "redactedStderrTail": {
+          "default": "",
+          "title": "Redactedstderrtail",
+          "type": "string"
+        },
+        "redactedStdoutTail": {
+          "default": "",
+          "title": "Redactedstdouttail",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "blocked",
+            "timeout"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "status"
+      ],
+      "title": "GateCommandExecution",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactRefs": {
+      "items": {
+        "$ref": "#/$defs/GateArtifactRef"
+      },
+      "title": "Artifactrefs",
+      "type": "array"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "commands": {
+      "items": {
+        "$ref": "#/$defs/GateCommandExecution"
+      },
+      "title": "Commands",
+      "type": "array"
+    },
+    "durationMs": {
+      "minimum": 0,
+      "title": "Durationms",
+      "type": "integer"
+    },
+    "exitCode": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exitcode"
+    },
+    "finishedAtUtc": {
+      "format": "date-time",
+      "title": "Finishedatutc",
+      "type": "string"
+    },
+    "gateId": {
+      "title": "Gateid",
+      "type": "string"
+    },
+    "missingArtifactRequirements": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missingartifactrequirements",
+      "type": "array"
+    },
+    "rawMarkerScanStatus": {
+      "default": "pass",
+      "enum": [
+        "pass",
+        "fail",
+        "skipped"
+      ],
+      "title": "Rawmarkerscanstatus",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "release.gate-run-result/v1",
+      "default": "release.gate-run-result/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "secretScanStatus": {
+      "default": "pass",
+      "enum": [
+        "pass",
+        "fail",
+        "skipped"
+      ],
+      "title": "Secretscanstatus",
+      "type": "string"
+    },
+    "startedAtUtc": {
+      "format": "date-time",
+      "title": "Startedatutc",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "blocked",
+        "conditional",
+        "skipped"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "worktreeMutated": {
+      "default": false,
+      "title": "Worktreemutated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "gateId",
+    "status",
+    "startedAtUtc",
+    "finishedAtUtc",
+    "durationMs"
+  ],
+  "title": "GateRunResult",
+  "type": "object"
+}

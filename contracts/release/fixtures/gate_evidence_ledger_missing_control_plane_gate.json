@@ -1,0 +1,25 @@
+{
+  "artifactRoot": "artifacts/release-gates/mainline-rc",
+  "blockingReasons": [],
+  "branch": "codex/fixture",
+  "gateResults": [],
+  "generatedAtUtc": "2026-06-15T00:00:00Z",
+  "ledgerSha256": null,
+  "repoHeadSha": "1111111111111111111111111111111111111111",
+  "requiredGateIds": [
+    "control-plane-gate"
+  ],
+  "schemaVersion": "release.gate-evidence-ledger/v1",
+  "status": "conditional",
+  "target": {
+    "allowExpectedConditionals": false,
+    "mode": "rc-focused",
+    "outputRoot": "artifacts/release-gates/mainline-rc",
+    "platform": "windows",
+    "profile": "enterprise",
+    "targetId": "mainline-rc"
+  },
+  "warnings": [
+    "MISSING_REQUIRED_GATE:control-plane-gate"
+  ]
+}

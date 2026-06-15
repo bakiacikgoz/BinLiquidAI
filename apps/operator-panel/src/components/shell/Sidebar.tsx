@@ -41,6 +41,7 @@ const routeLabelTr: Partial<Record<RouteId, string>> = {
   'memory-runtime': 'Memory runtime',
   'memory-semantic': 'Semantic memory',
   'mainline-rc-freeze': 'Mainline RC freeze',
+  'rc-gate-evidence': 'RC gate evidence',
   operations: 'Yürütmeler',
   settings: 'Ayarlar',
   logs: 'Loglar',

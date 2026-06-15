@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "missingGateIds": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missinggateids",
+      "type": "array"
+    },
+    "readyForRcFreeze": {
+      "title": "Readyforrcfreeze",
+      "type": "boolean"
+    },
+    "resolvedGateIds": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Resolvedgateids",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "release.rc-evidence-backfill/v1",
+      "default": "release.rc-evidence-backfill/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "readyForRcFreeze"
+  ],
+  "title": "RcEvidenceBackfillReport",
+  "type": "object"
+}

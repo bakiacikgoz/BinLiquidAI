@@ -16,6 +16,7 @@ from binliquid.control_plane.release_artifact_scan import ArtifactScanReport, sc
 from binliquid.control_plane.release_train import ClaimBoundarySummary
 from binliquid.control_plane.storage import canonical_json_hash, file_sha256
 from binliquid.memory.models import StrictModel
+from binliquid.release.gate_verifier import verify_gate_evidence_ledger
 
 RcFreezeStatus = Literal["ready", "conditional", "blocked"]
 
@@ -254,6 +255,47 @@ def verify_rc_freeze_manifest(*, manifest_path: Path) -> RcFreezeVerificationRep
         manifestSha256=manifest_hash,
         blockers=sorted(set(blockers)),
         warnings=sorted(set(warnings)),
+    )
+
+
+def verify_rc_freeze_manifest_with_gate_ledger(
+    *,
+    manifest_path: Path,
+    gate_ledger_path: Path,
+    repo_root: Path = Path("."),
+) -> RcFreezeVerificationReport:
+    report = verify_rc_freeze_manifest(manifest_path=manifest_path)
+    if report.status == "blocked":
+        return report
+    gate_report = verify_gate_evidence_ledger(ledger_path=gate_ledger_path, repo_root=repo_root)
+    if gate_report.status == "blocked":
+        return report.model_copy(
+            update={
+                "status": "blocked",
+                "blockers": sorted(set(report.blockers + gate_report.reason_codes)),
+            }
+        )
+    missing_gate_warnings = [
+        item for item in report.warnings if item.startswith("REQUIRED_GATE_MISSING:")
+    ]
+    unresolved = [
+        item.split(":", 1)[1]
+        for item in missing_gate_warnings
+        if item.split(":", 1)[1] in gate_report.missing_gate_ids
+    ]
+    remaining_warnings = [
+        item for item in report.warnings if not item.startswith("REQUIRED_GATE_MISSING:")
+    ]
+    if gate_report.ready_for_rc_freeze and missing_gate_warnings and not unresolved:
+        status: RcFreezeStatus = "ready" if not remaining_warnings else "conditional"
+        return report.model_copy(update={"status": status, "warnings": remaining_warnings})
+    return report.model_copy(
+        update={
+            "status": "conditional",
+            "warnings": sorted(
+                set(report.warnings + [f"RELEASE_GATE_LEDGER_{gate_report.status.upper()}"])
+            ),
+        }
     )
 
 

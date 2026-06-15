@@ -14,4 +14,6 @@ main
 
 `codex/mainline-rc-freeze-stack-collapse-v1` adds verification and freeze evidence only. It does not collapse, merge, rebase, release, or deploy the stack.
 
+`codex/rc-evidence-orchestrator-cross-platform-gates-v1` adds the hash-only RC gate evidence orchestrator for the same train. It proves that the Control Plane and Design Partner handoff gate artifacts are represented locally without performing the collapse, merge, release, or deploy.
+
 After each human-approved merge, rerun the relevant local gate and keep force-push disabled.

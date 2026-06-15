@@ -126,6 +126,7 @@ import { MemoryAuthorityView } from './memory-authority/MemoryAuthorityView';
 import { GovernedPilotWorkflowView } from './governed-pilot-workflow/GovernedPilotWorkflowView';
 import { DesignPartnerHandoffView } from './design-partner-handoff/DesignPartnerHandoffView';
 import { MainlineRcFreezeView } from './mainline-rc-freeze/MainlineRcFreezeView';
+import { RcGateEvidenceView } from './rc-gate-evidence/RcGateEvidenceView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
@@ -1217,6 +1218,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const designPartnerFieldEvidence = controlPlaneSnapshot?.designPartnerFieldEvidence ?? null;
   const designPartnerHandoff = controlPlaneSnapshot?.designPartnerHandoff ?? null;
   const mainlineRcFreeze = controlPlaneSnapshot?.mainlineRcFreeze ?? null;
+  const rcGateEvidence = controlPlaneSnapshot?.rcGateEvidence ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2564,6 +2566,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'mainline-rc-freeze' ? (
           <MainlineRcFreezeView snapshot={mainlineRcFreeze} locale={locale} />
+        ) : null}
+
+        {activeView === 'rc-gate-evidence' ? (
+          <RcGateEvidenceView snapshot={rcGateEvidence} locale={locale} />
         ) : null}
 
         {activeView === 'operations' ? (
