@@ -1452,7 +1452,6 @@ class MainlineRcFreezeSnapshot(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     last_generated_at_utc: datetime | None = Field(default=None, alias="lastGeneratedAtUtc")
 
-
 class ControlPlaneSnapshot(StrictModel):
     contract_version: Literal["control-plane.snapshot/v1"] = Field(
         default="control-plane.snapshot/v1",
