@@ -1,0 +1,174 @@
+{
+  "$defs": {
+    "ProviderEvidenceMode": {
+      "enum": [
+        "hash_only",
+        "redacted_preview"
+      ],
+      "title": "ProviderEvidenceMode",
+      "type": "string"
+    },
+    "ProviderRequestedToolType": {
+      "enum": [
+        "custom_function",
+        "builtin_web_search",
+        "builtin_file_search",
+        "builtin_computer_use",
+        "builtin_code_execution",
+        "builtin_web_fetch",
+        "builtin_bash",
+        "builtin_text_editor",
+        "mcp",
+        "server_tool",
+        "unknown"
+      ],
+      "title": "ProviderRequestedToolType",
+      "type": "string"
+    },
+    "ProviderStoragePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_allowed": {
+          "default": false,
+          "title": "Cache Allowed",
+          "type": "boolean"
+        },
+        "evidence_mode": {
+          "$ref": "#/$defs/ProviderEvidenceMode",
+          "default": "hash_only"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "raw_payload_persistence": {
+          "default": false,
+          "title": "Raw Payload Persistence",
+          "type": "boolean"
+        },
+        "remote_store_allowed": {
+          "default": false,
+          "title": "Remote Store Allowed",
+          "type": "boolean"
+        },
+        "request_store_flag": {
+          "default": false,
+          "title": "Request Store Flag",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "provider_id"
+      ],
+      "title": "ProviderStoragePolicy",
+      "type": "object"
+    },
+    "ProviderToolPolicyDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_required": {
+          "default": false,
+          "title": "Approval Required",
+          "type": "boolean"
+        },
+        "execution_allowed": {
+          "default": false,
+          "title": "Execution Allowed",
+          "type": "boolean"
+        },
+        "proposal_allowed": {
+          "default": false,
+          "title": "Proposal Allowed",
+          "type": "boolean"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "requested_tool_type": {
+          "$ref": "#/$defs/ProviderRequestedToolType"
+        },
+        "status": {
+          "$ref": "#/$defs/ProviderToolPolicyStatus"
+        },
+        "tool_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Name"
+        }
+      },
+      "required": [
+        "status",
+        "requested_tool_type",
+        "reason_code"
+      ],
+      "title": "ProviderToolPolicyDecision",
+      "type": "object"
+    },
+    "ProviderToolPolicyStatus": {
+      "enum": [
+        "allow_proposal",
+        "deny",
+        "requires_approval"
+      ],
+      "title": "ProviderToolPolicyStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "raw_payload_persisted": {
+      "default": false,
+      "title": "Raw Payload Persisted",
+      "type": "boolean"
+    },
+    "request_hash": {
+      "title": "Request Hash",
+      "type": "string"
+    },
+    "storage_policy": {
+      "$ref": "#/$defs/ProviderStoragePolicy"
+    },
+    "tool_policy_decisions": {
+      "items": {
+        "$ref": "#/$defs/ProviderToolPolicyDecision"
+      },
+      "title": "Tool Policy Decisions",
+      "type": "array"
+    },
+    "version": {
+      "default": "model_provider.openai_responses_request/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider_id",
+    "model",
+    "request_hash",
+    "payload",
+    "storage_policy"
+  ],
+  "title": "OpenAIResponsesRequest",
+  "type": "object"
+}

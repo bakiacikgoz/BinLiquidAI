@@ -1,0 +1,11 @@
+{
+  "case_id": "openai_responses_mcp_denied",
+  "expected_status": "blocked",
+  "expected_reason_code": "MCP_TOOL_DEFAULT_DENY",
+  "requested_tools": [
+    {
+      "tool_type": "mcp",
+      "name": "third_party_connector"
+    }
+  ]
+}

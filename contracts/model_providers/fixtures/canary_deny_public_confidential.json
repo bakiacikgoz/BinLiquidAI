@@ -1,0 +1,27 @@
+{
+  "canary_id": "fixture-deny-public-confidential",
+  "data_boundary": "public_cloud",
+  "data_classes": [
+    "confidential"
+  ],
+  "error_class": null,
+  "evidence_path": "artifacts/model-provider-governance/canary/fixture-deny-public-confidential.json",
+  "generated_at_utc": "2026-06-10T08:00:00Z",
+  "latency_ms": null,
+  "live_call_attempted": false,
+  "network_decision": null,
+  "policy_decision": null,
+  "provider_id": "openai-public",
+  "provider_kind": "openai_compatible",
+  "raw_content_persisted": false,
+  "reason_code": "PROVIDER_DATA_BOUNDARY_DENIED",
+  "redaction_summary": null,
+  "request_hash": "sha256:fixture-request",
+  "response_hash": null,
+  "retry_count": 0,
+  "risk_tier": "high",
+  "status": "denied",
+  "status_code_class": null,
+  "usage": null,
+  "version": "model_provider.canary_result/v1"
+}

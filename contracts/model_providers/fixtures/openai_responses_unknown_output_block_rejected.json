@@ -1,0 +1,15 @@
+{
+  "case_id": "openai_responses_unknown_output_block_rejected",
+  "expected_status": "blocked",
+  "expected_reason_code": "OPENAI_RESPONSES_UNSUPPORTED_OUTPUT_BLOCK",
+  "provider_response": {
+    "status": "completed",
+    "model": "gpt-5.1",
+    "output": [
+      {
+        "type": "unsupported_block",
+        "value": "not supported"
+      }
+    ]
+  }
+}

@@ -1,4 +1,8 @@
-import type { AssistantProviderKind, AssistantProviderModelCandidate } from '../../assistant/modelDiscovery';
+import type {
+  AssistantProviderId,
+  AssistantProviderModelCandidate,
+  AssistantProviderModelsProvider,
+} from '../../assistant/modelDiscovery';
 import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
 import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import type { AssistantRuntimeSettings } from '../../settings';
@@ -10,23 +14,16 @@ type AssistantModelPickerProps = {
   onRuntimeSettingsChange: (next: Partial<AssistantRuntimeSettings>) => void;
 };
 
-const PROVIDER_VALUES = ['', 'auto', 'ollama', 'transformers'];
-const FALLBACK_VALUES = ['', 'transformers', 'ollama'];
+const LEGACY_PROVIDER_VALUES = ['', 'auto', 'ollama', 'transformers'];
+const FALLBACK_VALUES = ['', 'transformers', 'ollama', 'local-transformers', 'local-ollama'];
 
-function providerFromSettings(settings: AssistantRuntimeSettings): AssistantProviderKind | 'default' {
-  if (
-    settings.assistantProvider === 'auto' ||
-    settings.assistantProvider === 'ollama' ||
-    settings.assistantProvider === 'transformers'
-  ) {
-    return settings.assistantProvider;
-  }
-  return 'default';
+function providerFromSettings(settings: AssistantRuntimeSettings): AssistantProviderId | 'default' {
+  return settings.assistantProvider.trim() || 'default';
 }
 
 function modelsForProvider(
   models: AssistantProviderModelCandidate[],
-  provider: AssistantProviderKind,
+  provider: AssistantProviderId,
 ): AssistantProviderModelCandidate[] {
   return models.filter((model) => model.provider === provider);
 }
@@ -34,6 +31,23 @@ function modelsForProvider(
 function modelOptionLabel(model: AssistantProviderModelCandidate, locale: UiLocale): string {
   const suffix = model.installed ? '' : ` (${translateAssistantText('configured', locale)})`;
   return `${model.displayName || model.id}${suffix}`;
+}
+
+function providerOptionLabel(provider: AssistantProviderModelsProvider, locale: UiLocale): string {
+  const label = provider.displayName || provider.provider;
+  const reason = provider.disabledReason || provider.errorCode;
+  if (!reason || provider.available) {
+    return label;
+  }
+  return `${label} (${translateAssistantText(reason, locale)})`;
+}
+
+function isOllamaProvider(value: string): boolean {
+  return value === 'ollama' || value === 'local-ollama';
+}
+
+function isTransformersProvider(value: string): boolean {
+  return value === 'transformers' || value === 'local-transformers';
 }
 
 export function AssistantModelPicker({
@@ -44,8 +58,21 @@ export function AssistantModelPicker({
 }: AssistantModelPickerProps) {
   const text = assistantUiText[locale];
   const provider = providerFromSettings(runtimeSettings);
-  const ollamaModels = modelsForProvider(modelDiscovery?.models ?? [], 'ollama');
-  const transformerModels = modelsForProvider(modelDiscovery?.models ?? [], 'transformers');
+  const discoveredProviders = modelDiscovery?.providers ?? [];
+  const providerOptions: AssistantProviderModelsProvider[] = [
+    ...LEGACY_PROVIDER_VALUES.map((value) => ({
+      provider: value,
+      displayName: value ? value : text.useProfileDefault,
+      available: true,
+      selectedByConfig: false,
+      models: [],
+    })),
+    ...discoveredProviders.filter(
+      (item) => !LEGACY_PROVIDER_VALUES.includes(item.provider) && !LEGACY_PROVIDER_VALUES.includes(item.legacyProvider ?? ''),
+    ),
+  ];
+  const selectedProviderRecord = discoveredProviders.find((item) => item.provider === provider);
+  const selectedModels = provider === 'default' ? [] : modelsForProvider(modelDiscovery?.models ?? [], provider);
   const discoveryStatus = modelDiscovery?.status ?? 'idle';
   const isDiscovering = discoveryStatus === 'loading';
   const discoveryError = modelDiscovery?.error;
@@ -55,11 +82,11 @@ export function AssistantModelPicker({
   };
 
   const updateProvider = (value: string) => {
-    if (value === 'ollama') {
+    if (isOllamaProvider(value)) {
       onRuntimeSettingsChange({ assistantProvider: value, assistantHfModelId: '' });
       return;
     }
-    if (value === 'transformers') {
+    if (isTransformersProvider(value)) {
       onRuntimeSettingsChange({ assistantProvider: value, assistantModel: '' });
       return;
     }
@@ -90,25 +117,29 @@ export function AssistantModelPicker({
           value={runtimeSettings.assistantProvider}
           onChange={(event) => updateProvider(event.target.value)}
         >
-          {PROVIDER_VALUES.map((value) => (
-            <option key={value || 'default'} value={value}>
-              {optionLabel(value)}
+          {providerOptions.map((item) => (
+            <option
+              key={item.provider || 'default'}
+              value={item.provider}
+              disabled={Boolean(item.provider && !item.available)}
+            >
+              {item.provider ? providerOptionLabel(item, locale) : optionLabel('')}
             </option>
           ))}
         </select>
       </label>
 
-      {provider === 'ollama' ? (
+      {isOllamaProvider(provider) ? (
         <label>
           <span>{text.model}</span>
-          {ollamaModels.length > 0 ? (
+          {selectedModels.length > 0 ? (
             <select
               aria-label="Assistant model"
               value={runtimeSettings.assistantModel}
               onChange={(event) => updateRuntimeSetting('assistantModel', event.target.value)}
             >
               <option value="">{text.useProfileDefault}</option>
-              {ollamaModels.map((model) => (
+              {selectedModels.map((model) => (
                 <option key={`${model.provider}:${model.id}`} value={model.id}>
                   {modelOptionLabel(model, locale)}
                 </option>
@@ -125,17 +156,17 @@ export function AssistantModelPicker({
         </label>
       ) : null}
 
-      {provider === 'transformers' ? (
+      {isTransformersProvider(provider) ? (
         <label>
           <span>{text.hfModelId}</span>
-          {transformerModels.length > 0 ? (
+          {selectedModels.length > 0 ? (
             <select
               aria-label="Assistant HF model id"
               value={runtimeSettings.assistantHfModelId}
               onChange={(event) => updateRuntimeSetting('assistantHfModelId', event.target.value)}
             >
               <option value="">{text.useProfileDefault}</option>
-              {transformerModels.map((model) => (
+              {selectedModels.map((model) => (
                 <option key={`${model.provider}:${model.id}`} value={model.id}>
                   {modelOptionLabel(model, locale)}
                 </option>
@@ -147,6 +178,33 @@ export function AssistantModelPicker({
               value={runtimeSettings.assistantHfModelId}
               onChange={(event) => updateRuntimeSetting('assistantHfModelId', event.target.value)}
               placeholder="Qwen/Qwen2.5"
+            />
+          )}
+        </label>
+      ) : null}
+
+      {provider !== 'default' && provider !== 'auto' && !isOllamaProvider(provider) && !isTransformersProvider(provider) ? (
+        <label>
+          <span>{text.model}</span>
+          {selectedModels.length > 0 ? (
+            <select
+              aria-label="Assistant model"
+              value={runtimeSettings.assistantModel}
+              onChange={(event) => updateRuntimeSetting('assistantModel', event.target.value)}
+            >
+              <option value="">{text.useProfileDefault}</option>
+              {selectedModels.map((model) => (
+                <option key={`${model.provider}:${model.id}`} value={model.id}>
+                  {modelOptionLabel(model, locale)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              aria-label="Assistant model"
+              value={runtimeSettings.assistantModel}
+              onChange={(event) => updateRuntimeSetting('assistantModel', event.target.value)}
+              placeholder={selectedProviderRecord?.models[0]?.id || 'model-id'}
             />
           )}
         </label>
@@ -175,7 +233,13 @@ export function AssistantModelPicker({
       </label>
 
       <div className="assistant-model-discovery-status" aria-live="polite">
-        {discoveryHelper ? <span>{discoveryHelper}</span> : <span>{`${modelDiscovery?.models.length ?? 0} ${text.modelsFound}`}</span>}
+        {selectedProviderRecord?.disabledReason ? (
+          <span>{translateAssistantText(selectedProviderRecord.disabledReason, locale)}</span>
+        ) : discoveryHelper ? (
+          <span>{discoveryHelper}</span>
+        ) : (
+          <span>{`${modelDiscovery?.models.length ?? 0} ${text.modelsFound}`}</span>
+        )}
         {modelDiscovery ? (
           <button
             type="button"
@@ -188,6 +252,49 @@ export function AssistantModelPicker({
           </button>
         ) : null}
       </div>
+
+      {discoveredProviders.length > 0 ? (
+        <div className="assistant-provider-registry" aria-label="Provider registry">
+          {discoveredProviders.map((item) => {
+            const status = item.available ? 'enabled' : 'disabled';
+            const detail = item.disabledReason || item.errorCode || '';
+            const boundary = item.dataBoundary || 'unknown';
+            const risk = item.riskTier || 'unknown';
+            const trustSource = item.trustSource || 'bridge_state';
+            const canaryStatus = item.lastCanaryStatus || 'not_run';
+            const canaryReason = item.lastCanaryReason || item.disabledReason || item.errorCode || 'none';
+            const budgetState = item.budgetState || 'unknown';
+            const evidenceAt = item.lastVerifiedEvidenceAtUtc || 'none';
+            const conformanceStatus = item.conformanceStatus || 'unknown';
+            const conformanceSummary = item.conformanceSummary || 'not_run';
+            const nativeStatus = item.nativeAdapterStatus || 'not_applicable';
+            return (
+              <div key={item.provider} className="assistant-provider-registry-row">
+                <strong>{item.displayName || item.provider}</strong>
+                <span>{`${item.kind || item.legacyProvider || 'provider'} / ${boundary}`}</span>
+                <em className={item.available ? 'assistant-success-value' : 'assistant-warning-value'}>
+                  {detail
+                    ? `${status}: ${risk}: ${translateAssistantText(detail, locale)}`
+                    : `${status}: ${risk}`}
+                </em>
+                <small>{`source: ${trustSource}`}</small>
+                <small>{`canary: ${canaryStatus}: ${translateAssistantText(canaryReason, locale)}`}</small>
+                <small>{`budget: ${budgetState}${item.budgetReason ? `: ${translateAssistantText(item.budgetReason, locale)}` : ''}`}</small>
+                <small>{`conformance: ${conformanceStatus}: ${conformanceSummary}`}</small>
+                {item.nativeAdapterKind ? <small>{`native: ${item.nativeAdapterKind}: ${nativeStatus}`}</small> : null}
+                {item.storagePolicy ? <small>{`storage: ${item.storagePolicy}`}</small> : null}
+                {item.serverToolsPolicy ? <small>{`server_tools: ${item.serverToolsPolicy}`}</small> : null}
+                {item.customToolsPolicy ? <small>{`custom_tools: ${item.customToolsPolicy}`}</small> : null}
+                {item.clientToolsPolicy ? <small>{`client_tools: ${item.clientToolsPolicy}`}</small> : null}
+                {item.toolResultLoopPolicy ? <small>{`tool_result_loop: ${item.toolResultLoopPolicy}`}</small> : null}
+                {item.stopReasonPolicy ? <small>{`stop_reason: ${item.stopReasonPolicy}`}</small> : null}
+                {item.liveCanaryStatus ? <small>{`live_canary: ${item.liveCanaryStatus}`}</small> : null}
+                <small>{`evidence: ${evidenceAt}`}</small>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

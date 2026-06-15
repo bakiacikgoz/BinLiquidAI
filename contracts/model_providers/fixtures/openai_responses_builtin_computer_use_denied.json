@@ -1,0 +1,11 @@
+{
+  "case_id": "openai_responses_builtin_computer_use_denied",
+  "expected_status": "blocked",
+  "expected_reason_code": "BUILTIN_COMPUTER_USE_DEFAULT_DENY",
+  "requested_tools": [
+    {
+      "tool_type": "builtin_computer_use",
+      "name": "computer_use"
+    }
+  ]
+}

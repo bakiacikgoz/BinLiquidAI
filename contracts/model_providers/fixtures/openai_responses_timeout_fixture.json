@@ -1,0 +1,6 @@
+{
+  "case_id": "openai_responses_timeout_fixture",
+  "expected_status": "blocked",
+  "expected_reason_code": "OPENAI_RESPONSES_TIMEOUT_FIXTURE",
+  "simulate": "timeout"
+}

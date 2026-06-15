@@ -1,0 +1,370 @@
+{
+  "$defs": {
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    },
+    "ProviderAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latency Ms"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "provider_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderKind"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Provider Kind"
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
+        },
+        "status_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status Code"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "provider_id",
+        "provider_kind",
+        "success"
+      ],
+      "title": "ProviderAttempt",
+      "type": "object"
+    },
+    "ProviderDecisionStatus": {
+      "enum": [
+        "allow",
+        "allow_with_redaction",
+        "require_approval",
+        "deny",
+        "blocked_not_configured"
+      ],
+      "title": "ProviderDecisionStatus",
+      "type": "string"
+    },
+    "ProviderKind": {
+      "enum": [
+        "local_ollama",
+        "local_transformers",
+        "openai_compatible",
+        "openai_responses",
+        "anthropic_messages",
+        "openai",
+        "azure_openai",
+        "anthropic",
+        "google_gemini",
+        "deepseek",
+        "openrouter",
+        "custom_http",
+        "company_internal_api"
+      ],
+      "title": "ProviderKind",
+      "type": "string"
+    },
+    "ProviderPolicyDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_required": {
+          "title": "Approval Required",
+          "type": "boolean"
+        },
+        "effective_data_classes": {
+          "items": {
+            "$ref": "#/$defs/DataClass"
+          },
+          "title": "Effective Data Classes",
+          "type": "array"
+        },
+        "evidence_required": {
+          "title": "Evidence Required",
+          "type": "boolean"
+        },
+        "fallback_allowed": {
+          "title": "Fallback Allowed",
+          "type": "boolean"
+        },
+        "internal_detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Internal Detail"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "redaction_required": {
+          "title": "Redaction Required",
+          "type": "boolean"
+        },
+        "safe_to_call_provider": {
+          "title": "Safe To Call Provider",
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/ProviderDecisionStatus"
+        },
+        "user_message": {
+          "title": "User Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "reason_code",
+        "provider_id",
+        "effective_data_classes",
+        "redaction_required",
+        "approval_required",
+        "evidence_required",
+        "fallback_allowed",
+        "safe_to_call_provider",
+        "user_message"
+      ],
+      "title": "ProviderPolicyDecision",
+      "type": "object"
+    },
+    "RedactionSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "applied": {
+          "default": false,
+          "title": "Applied",
+          "type": "boolean"
+        },
+        "input_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Sha256"
+        },
+        "redacted_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Redacted Sha256"
+        },
+        "replacements": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Replacements",
+          "type": "object"
+        }
+      },
+      "title": "RedactionSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attempts": {
+      "items": {
+        "$ref": "#/$defs/ProviderAttempt"
+      },
+      "title": "Attempts",
+      "type": "array"
+    },
+    "call_id": {
+      "title": "Call Id",
+      "type": "string"
+    },
+    "completed_at_utc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed At Utc"
+    },
+    "created_at_utc": {
+      "format": "date-time",
+      "title": "Created At Utc",
+      "type": "string"
+    },
+    "data_classes": {
+      "items": {
+        "$ref": "#/$defs/DataClass"
+      },
+      "title": "Data Classes",
+      "type": "array"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "policy_decision": {
+      "$ref": "#/$defs/ProviderPolicyDecision"
+    },
+    "prompt_hash": {
+      "title": "Prompt Hash",
+      "type": "string"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "provider_kind": {
+      "title": "Provider Kind",
+      "type": "string"
+    },
+    "redaction_summary": {
+      "$ref": "#/$defs/RedactionSummary"
+    },
+    "request_metadata": {
+      "additionalProperties": true,
+      "title": "Request Metadata",
+      "type": "object"
+    },
+    "response_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Response Hash"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "model_provider.call_envelope/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "system_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "System Hash"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Usage"
+    }
+  },
+  "required": [
+    "call_id",
+    "run_id",
+    "provider_id",
+    "provider_kind",
+    "model",
+    "data_classes",
+    "prompt_hash",
+    "redaction_summary",
+    "policy_decision",
+    "request_metadata"
+  ],
+  "title": "ProviderCallEnvelope",
+  "type": "object"
+}

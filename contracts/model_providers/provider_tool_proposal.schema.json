@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    },
+    "RiskTier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "blocked"
+      ],
+      "title": "RiskTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "arguments_hash": {
+      "title": "Arguments Hash",
+      "type": "string"
+    },
+    "data_class": {
+      "$ref": "#/$defs/DataClass",
+      "default": "public"
+    },
+    "execution_mode": {
+      "default": "proposal_only",
+      "pattern": "^proposal_only$",
+      "title": "Execution Mode",
+      "type": "string"
+    },
+    "governance_action": {
+      "pattern": "^(record_only|requires_approval|deny)$",
+      "title": "Governance Action",
+      "type": "string"
+    },
+    "proposal_id": {
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "provider_tool_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Tool Id"
+    },
+    "redacted_arguments_preview": {
+      "additionalProperties": true,
+      "title": "Redacted Arguments Preview",
+      "type": "object"
+    },
+    "risk_tier": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RiskTier"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "Risk Tier"
+    },
+    "tool_name": {
+      "title": "Tool Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "provider_id",
+    "tool_name",
+    "arguments_hash",
+    "risk_tier",
+    "governance_action"
+  ],
+  "title": "ProviderToolProposal",
+  "type": "object"
+}

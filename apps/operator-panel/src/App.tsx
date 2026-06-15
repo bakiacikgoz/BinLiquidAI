@@ -519,10 +519,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const configRecord = asRecord(configData);
   const assistantRuntimeSettings = getAssistantRuntimeSettings(settings);
   const assistantRuntimeValidationMessage = validateAssistantRuntimeSettings(assistantRuntimeSettings);
-  const assistantModelProvider =
-    settings.assistantProvider === 'ollama' || settings.assistantProvider === 'transformers'
-      ? (settings.assistantProvider as AssistantProviderKind)
-      : 'all';
+  const assistantModelProvider = settings.assistantProvider.trim()
+    ? (settings.assistantProvider.trim() as AssistantProviderKind)
+    : 'all';
   const assistantModels = useAssistantModels({
     settings,
     profile: settings.profile,

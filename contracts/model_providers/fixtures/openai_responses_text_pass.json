@@ -1,0 +1,32 @@
+{
+  "case_id": "openai_responses_text_pass",
+  "expected_status": "pass",
+  "expected_reason_code": "OPENAI_RESPONSES_NORMALIZED",
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Summarize this public status."
+      }
+    ]
+  },
+  "provider_response": {
+    "status": "completed",
+    "model": "gpt-5.1",
+    "output": [
+      {
+        "type": "message",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "Public status is green."
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 8,
+      "output_tokens": 5
+    }
+  }
+}

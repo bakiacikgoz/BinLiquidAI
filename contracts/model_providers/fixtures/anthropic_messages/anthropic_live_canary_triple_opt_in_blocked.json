@@ -1,0 +1,9 @@
+{
+  "case_id": "anthropic_live_canary_triple_opt_in_blocked",
+  "expected_status": "blocked",
+  "expected_reason_code": "ANTHROPIC_LIVE_CANARY_TRIPLE_OPT_IN_REQUIRED",
+  "simulate": "live_canary_guard",
+  "allow_live": false,
+  "provider_live_env": false,
+  "anthropic_live_env": false
+}

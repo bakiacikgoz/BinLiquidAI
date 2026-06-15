@@ -1,0 +1,8 @@
+{
+  "providerId": "openai-public",
+  "dataClasses": ["confidential"],
+  "safeToCallProvider": false,
+  "reasonCode": "PROVIDER_DATA_BOUNDARY_DENIED",
+  "redactionRequired": true,
+  "evidenceRequired": true
+}

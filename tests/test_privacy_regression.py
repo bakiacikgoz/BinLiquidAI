@@ -10,6 +10,7 @@ from binliquid.runtime.config import (
 )
 from binliquid.telemetry.tracer import Tracer
 from binliquid.tools.sandbox_runner import SandboxRunner
+from scripts.run_provider_governance_gate import run_gate
 
 
 def test_tracer_does_not_persist_when_privacy_enabled(tmp_path: Path) -> None:
@@ -79,3 +80,11 @@ def test_computer_use_runtime_defaults_are_raw_screenshot_private() -> None:
     assert config.raw_screenshot_max_count == 0
     assert config.vision_enabled is False
     assert config.macos_live_enabled is False
+
+
+def test_provider_governance_defaults_do_not_enable_remote_or_leak_raw_content() -> None:
+    report = run_gate(profile="enterprise")
+
+    assert report["status"] == "pass"
+    assert report["checks"]["remoteDefaultDisabled"] is True
+    assert report["checks"]["artifactSecretScan"] is True

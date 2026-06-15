@@ -7,6 +7,7 @@
 - Persistent traces only when debug is on and privacy is explicitly disabled
 - Tool execution constrained by allowlist + sandbox runner
 - Governance policy defaults to fail-closed for execution commands
+- Remote model providers are disabled by default and must be explicitly enabled
 
 ## Tool Allowlist
 
@@ -29,6 +30,16 @@ Commands outside allowlist are rejected with deterministic error (`exit_code=126
 - task/tool policy evaluation (`allow|deny|require_approval`)
 - handoff/memory-scope policy evaluation (`allow|deny|require_approval`)
 - async approval queue with audit trail
+- model provider registry validation, data-class policy checks, redaction, and evidence envelopes
+
+## Model Provider Security Boundary
+
+- Provider ids are loaded from `config/providers.toml` and validated before use.
+- Public cloud and aggregator providers require HTTPS and secret references through environment variables.
+- Inline secrets in provider config are rejected.
+- Default public-cloud policy denies confidential, regulated, raw PII, credential, payment, and secret data.
+- Tool-call capable provider requests are proposal-only unless policy explicitly allows them.
+- Fallback downgrade is denied unless the selected provider policy names the target fallback provider id.
 
 ## Prompt/Tool Injection Defense
 

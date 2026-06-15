@@ -1,0 +1,543 @@
+{
+  "$defs": {
+    "DataBoundary": {
+      "enum": [
+        "local",
+        "internal",
+        "private_cloud",
+        "public_cloud",
+        "aggregator",
+        "unknown"
+      ],
+      "title": "DataBoundary",
+      "type": "string"
+    },
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    },
+    "ProviderBudgetDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "default": false,
+          "title": "Allowed",
+          "type": "boolean"
+        },
+        "calls_in_window": {
+          "default": 0,
+          "title": "Calls In Window",
+          "type": "integer"
+        },
+        "canary_call_budget": {
+          "title": "Canary Call Budget",
+          "type": "integer"
+        },
+        "max_prompt_chars": {
+          "title": "Max Prompt Chars",
+          "type": "integer"
+        },
+        "prompt_chars": {
+          "title": "Prompt Chars",
+          "type": "integer"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "rate_limit_per_minute": {
+          "title": "Rate Limit Per Minute",
+          "type": "integer"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "state_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "State Path"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "reason_code",
+        "provider_id",
+        "prompt_chars",
+        "max_prompt_chars",
+        "canary_call_budget",
+        "rate_limit_per_minute"
+      ],
+      "title": "ProviderBudgetDecision",
+      "type": "object"
+    },
+    "ProviderCanaryStatus": {
+      "enum": [
+        "skipped",
+        "denied",
+        "pass",
+        "fail"
+      ],
+      "title": "ProviderCanaryStatus",
+      "type": "string"
+    },
+    "ProviderDecisionStatus": {
+      "enum": [
+        "allow",
+        "allow_with_redaction",
+        "require_approval",
+        "deny",
+        "blocked_not_configured"
+      ],
+      "title": "ProviderDecisionStatus",
+      "type": "string"
+    },
+    "ProviderKind": {
+      "enum": [
+        "local_ollama",
+        "local_transformers",
+        "openai_compatible",
+        "openai_responses",
+        "anthropic_messages",
+        "openai",
+        "azure_openai",
+        "anthropic",
+        "google_gemini",
+        "deepseek",
+        "openrouter",
+        "custom_http",
+        "company_internal_api"
+      ],
+      "title": "ProviderKind",
+      "type": "string"
+    },
+    "ProviderNetworkDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "default": false,
+          "title": "Allowed",
+          "type": "boolean"
+        },
+        "allowed_hosts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Hosts",
+          "type": "array"
+        },
+        "data_boundary": {
+          "$ref": "#/$defs/DataBoundary"
+        },
+        "host": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "scheme": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scheme"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "reason_code",
+        "provider_id",
+        "data_boundary"
+      ],
+      "title": "ProviderNetworkDecision",
+      "type": "object"
+    },
+    "ProviderPolicyDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_required": {
+          "title": "Approval Required",
+          "type": "boolean"
+        },
+        "effective_data_classes": {
+          "items": {
+            "$ref": "#/$defs/DataClass"
+          },
+          "title": "Effective Data Classes",
+          "type": "array"
+        },
+        "evidence_required": {
+          "title": "Evidence Required",
+          "type": "boolean"
+        },
+        "fallback_allowed": {
+          "title": "Fallback Allowed",
+          "type": "boolean"
+        },
+        "internal_detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Internal Detail"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "redaction_required": {
+          "title": "Redaction Required",
+          "type": "boolean"
+        },
+        "safe_to_call_provider": {
+          "title": "Safe To Call Provider",
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/ProviderDecisionStatus"
+        },
+        "user_message": {
+          "title": "User Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "reason_code",
+        "provider_id",
+        "effective_data_classes",
+        "redaction_required",
+        "approval_required",
+        "evidence_required",
+        "fallback_allowed",
+        "safe_to_call_provider",
+        "user_message"
+      ],
+      "title": "ProviderPolicyDecision",
+      "type": "object"
+    },
+    "RedactionSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "applied": {
+          "default": false,
+          "title": "Applied",
+          "type": "boolean"
+        },
+        "input_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Sha256"
+        },
+        "redacted_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Redacted Sha256"
+        },
+        "replacements": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Replacements",
+          "type": "object"
+        }
+      },
+      "title": "RedactionSummary",
+      "type": "object"
+    },
+    "RiskTier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "blocked"
+      ],
+      "title": "RiskTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "budget_decision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderBudgetDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "canary_id": {
+      "title": "Canary Id",
+      "type": "string"
+    },
+    "data_boundary": {
+      "$ref": "#/$defs/DataBoundary"
+    },
+    "data_classes": {
+      "items": {
+        "$ref": "#/$defs/DataClass"
+      },
+      "title": "Data Classes",
+      "type": "array"
+    },
+    "error_class": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Class"
+    },
+    "evidence_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Path"
+    },
+    "generated_at_utc": {
+      "format": "date-time",
+      "title": "Generated At Utc",
+      "type": "string"
+    },
+    "latency_ms": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latency Ms"
+    },
+    "live_call_attempted": {
+      "default": false,
+      "title": "Live Call Attempted",
+      "type": "boolean"
+    },
+    "network_decision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderNetworkDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "policy_decision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderPolicyDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "provider_kind": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderKind"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "Provider Kind"
+    },
+    "raw_content_persisted": {
+      "default": false,
+      "title": "Raw Content Persisted",
+      "type": "boolean"
+    },
+    "reason_code": {
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "redaction_summary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RedactionSummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "request_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Hash"
+    },
+    "response_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Response Hash"
+    },
+    "retry_count": {
+      "default": 0,
+      "title": "Retry Count",
+      "type": "integer"
+    },
+    "risk_tier": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RiskTier"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "Risk Tier"
+    },
+    "status": {
+      "$ref": "#/$defs/ProviderCanaryStatus"
+    },
+    "status_code_class": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Status Code Class"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Usage"
+    },
+    "version": {
+      "default": "model_provider.canary_result/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "canary_id",
+    "provider_id",
+    "provider_kind",
+    "data_boundary",
+    "risk_tier",
+    "data_classes",
+    "status",
+    "reason_code"
+  ],
+  "title": "ProviderCanaryResult",
+  "type": "object"
+}

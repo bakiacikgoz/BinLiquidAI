@@ -1,0 +1,125 @@
+{
+  "$defs": {
+    "NativeProviderKind": {
+      "enum": [
+        "openai_responses",
+        "anthropic_messages",
+        "gemini_native"
+      ],
+      "title": "NativeProviderKind",
+      "type": "string"
+    },
+    "ProviderNativeConformanceCaseResult": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "evidence": {
+          "additionalProperties": true,
+          "title": "Evidence",
+          "type": "object"
+        },
+        "expected_reason_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Reason Code"
+        },
+        "expected_status": {
+          "title": "Expected Status",
+          "type": "string"
+        },
+        "matched_expectation": {
+          "title": "Matched Expectation",
+          "type": "boolean"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "status": {
+          "pattern": "^(pass|blocked|fail)$",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id",
+        "status",
+        "expected_status",
+        "reason_code",
+        "matched_expectation"
+      ],
+      "title": "ProviderNativeConformanceCaseResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/ProviderNativeConformanceCaseResult"
+      },
+      "title": "Cases",
+      "type": "array"
+    },
+    "expected_blocked_count": {
+      "title": "Expected Blocked Count",
+      "type": "integer"
+    },
+    "generated_at_utc": {
+      "format": "date-time",
+      "title": "Generated At Utc",
+      "type": "string"
+    },
+    "pass_count": {
+      "title": "Pass Count",
+      "type": "integer"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "provider_kind": {
+      "$ref": "#/$defs/NativeProviderKind",
+      "default": "openai_responses"
+    },
+    "status": {
+      "pattern": "^(pass|fail)$",
+      "title": "Status",
+      "type": "string"
+    },
+    "total_cases": {
+      "title": "Total Cases",
+      "type": "integer"
+    },
+    "unexpected_failure_count": {
+      "title": "Unexpected Failure Count",
+      "type": "integer"
+    },
+    "version": {
+      "default": "model_provider.native_conformance/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile",
+    "status",
+    "total_cases",
+    "pass_count",
+    "expected_blocked_count",
+    "unexpected_failure_count",
+    "cases"
+  ],
+  "title": "ProviderNativeConformanceReport",
+  "type": "object"
+}

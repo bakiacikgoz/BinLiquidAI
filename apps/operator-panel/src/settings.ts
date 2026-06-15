@@ -69,13 +69,20 @@ export function getAssistantRuntimeSettings(settings: PanelSettings): AssistantR
 
 export function assistantRuntimeOptionsFromSettings(settings: PanelSettings): {
   provider?: string;
+  providerId?: string;
   fallbackProvider?: string;
+  fallbackProviderId?: string;
   model?: string;
   hfModelId?: string;
 } {
+  const provider = cleanRuntimeValue(settings.assistantProvider);
+  const legacyProviders = new Set(['auto', 'ollama', 'transformers']);
+  const fallbackProvider = cleanRuntimeValue(settings.assistantFallbackProvider);
   return {
-    provider: cleanRuntimeValue(settings.assistantProvider) || undefined,
-    fallbackProvider: cleanRuntimeValue(settings.assistantFallbackProvider) || undefined,
+    provider: provider && legacyProviders.has(provider) ? provider : undefined,
+    providerId: provider && !legacyProviders.has(provider) ? provider : undefined,
+    fallbackProvider: fallbackProvider && legacyProviders.has(fallbackProvider) ? fallbackProvider : undefined,
+    fallbackProviderId: fallbackProvider && !legacyProviders.has(fallbackProvider) ? fallbackProvider : undefined,
     model: cleanRuntimeValue(settings.assistantModel) || undefined,
     hfModelId: cleanRuntimeValue(settings.assistantHfModelId) || undefined,
   };
@@ -92,10 +99,10 @@ export function validateAssistantRuntimeSettings(settings: AssistantRuntimeSetti
   if (hfModelId && !MODEL_TOKEN_PATTERN.test(hfModelId)) {
     return 'HF model id may only include letters, numbers, dot, dash, underscore, slash, colon, plus, or @.';
   }
-  if (provider === 'transformers' && model) {
+  if ((provider === 'transformers' || provider === 'local-transformers') && model) {
     return 'Use HF model id for provider=transformers; leave Model empty.';
   }
-  if (provider === 'ollama' && hfModelId) {
+  if ((provider === 'ollama' || provider === 'local-ollama') && hfModelId) {
     return 'Use Model for provider=ollama; leave HF model id empty.';
   }
   return '';

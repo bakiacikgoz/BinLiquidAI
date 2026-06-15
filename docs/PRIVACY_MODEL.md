@@ -14,6 +14,7 @@
 - Router dataset JSONL writes are also privacy-gated.
 - v0.3 audit artifacts are written as privacy-safe/redacted JSON envelopes.
 - v0.4 team artifacts include redacted handoff payloads and hash-chained audit envelopes.
+- Model provider calls write redacted governance envelopes only; prompts are pattern-redacted before evidence persistence.
 
 ## Memory Behavior
 
@@ -64,3 +65,12 @@ Provider output is treated as untrusted observed content. Screen text is not acc
   only for local inference, live capture uses temporary files only when all
   one-run gates pass, and default qualification artifacts keep
   `rawScreenshotPersistedCount=0`.
+
+## Model Provider Privacy
+
+- Local providers remain the default path.
+- Remote provider calls are opt-in through `remote_providers_enabled`.
+- Public cloud providers can receive `public` data only under the default policy.
+- `secret`, `credential`, `payment`, and `raw_pii` data classes are blocked before provider dispatch.
+- Provider evidence envelopes include hashes, reason codes, redaction summaries, attempts, and usage metadata; they must not include raw API keys or bearer tokens.
+- Native provider adapters store hash-only evidence. OpenAI Responses forces `store=false`; Anthropic Messages rejects raw payload persistence and records only hashes, normalized block metadata, stop reasons, policy decisions, and usage summaries.

@@ -1,0 +1,11 @@
+{
+  "case_id": "anthropic_code_execution_denied",
+  "expected_status": "blocked",
+  "expected_reason_code": "ANTHROPIC_SERVER_CODE_EXECUTION_DEFAULT_DENY",
+  "requested_tools": [
+    {
+      "tool_type": "builtin_code_execution",
+      "name": "code_execution"
+    }
+  ]
+}

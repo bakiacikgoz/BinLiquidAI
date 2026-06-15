@@ -48,6 +48,20 @@ Real Safari qualification is not zero-config. Local validation still requires Sa
 
 The currently qualified download path is scoped and fail-closed, but it is only qualified for direct-link browser artifacts. Authenticated or session-bound download flows still need deeper qualification.
 
+## Provider Governance Layer Boundary
+
+The model provider governance layer is a fail-closed registry, policy, redaction, and evidence boundary for model calls. It may be described as experimental/gated provider governance with local-first defaults and OpenAI-compatible adapter support.
+
+It must not be described as:
+
+- a key manager
+- a cloud provider broker
+- an unrestricted model proxy
+- proof that remote/cloud providers are enabled by default
+- proof that confidential data can automatically leave the local or self-hosted boundary
+
+Remote/cloud provider calls require explicit configuration and remain disabled by default.
+
 ## Vision-First Runtime Boundary
 
 The vision-first runtime is a supervised foundation, not an unrestricted autonomous desktop agent. It may be described as a universal vision-first runtime foundation with policy, approval, replay, and deterministic test coverage.

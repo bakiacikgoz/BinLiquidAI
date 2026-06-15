@@ -1,0 +1,11 @@
+{
+  "case_id": "anthropic_text_editor_denied",
+  "expected_status": "blocked",
+  "expected_reason_code": "ANTHROPIC_TEXT_EDITOR_DEFAULT_DENY",
+  "requested_tools": [
+    {
+      "tool_type": "builtin_text_editor",
+      "name": "text_editor"
+    }
+  ]
+}

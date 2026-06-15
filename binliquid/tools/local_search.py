@@ -50,7 +50,7 @@ def find_matches(
 
     results: list[dict[str, str | int]] = []
     for line in proc.stdout.splitlines():
-        parts = line.split(":", 2)
+        parts = line.rsplit(":", 2)
         if len(parts) != 3:
             continue
         path, line_no, text = parts

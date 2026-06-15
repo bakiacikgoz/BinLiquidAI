@@ -1,0 +1,290 @@
+{
+  "$defs": {
+    "DataClass": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "regulated",
+        "pii_redacted",
+        "raw_pii",
+        "secret",
+        "credential",
+        "payment"
+      ],
+      "title": "DataClass",
+      "type": "string"
+    },
+    "ProviderContentBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arguments Hash"
+        },
+        "block_type": {
+          "title": "Block Type",
+          "type": "string"
+        },
+        "text_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text Hash"
+        },
+        "tool_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Id"
+        },
+        "tool_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Name"
+        }
+      },
+      "required": [
+        "block_type"
+      ],
+      "title": "ProviderContentBlock",
+      "type": "object"
+    },
+    "ProviderStopReason": {
+      "enum": [
+        "end_turn",
+        "tool_use",
+        "max_tokens",
+        "stop_sequence",
+        "pause_turn",
+        "refusal",
+        "model_context_window_exceeded",
+        "unknown"
+      ],
+      "title": "ProviderStopReason",
+      "type": "string"
+    },
+    "ProviderToolProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments_hash": {
+          "title": "Arguments Hash",
+          "type": "string"
+        },
+        "data_class": {
+          "$ref": "#/$defs/DataClass",
+          "default": "public"
+        },
+        "execution_mode": {
+          "default": "proposal_only",
+          "pattern": "^proposal_only$",
+          "title": "Execution Mode",
+          "type": "string"
+        },
+        "governance_action": {
+          "pattern": "^(record_only|requires_approval|deny)$",
+          "title": "Governance Action",
+          "type": "string"
+        },
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "provider_tool_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Tool Id"
+        },
+        "redacted_arguments_preview": {
+          "additionalProperties": true,
+          "title": "Redacted Arguments Preview",
+          "type": "object"
+        },
+        "risk_tier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RiskTier"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Risk Tier"
+        },
+        "tool_name": {
+          "title": "Tool Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "provider_id",
+        "tool_name",
+        "arguments_hash",
+        "risk_tier",
+        "governance_action"
+      ],
+      "title": "ProviderToolProposal",
+      "type": "object"
+    },
+    "RiskTier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "blocked"
+      ],
+      "title": "RiskTier",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "content_blocks": {
+      "items": {
+        "$ref": "#/$defs/ProviderContentBlock"
+      },
+      "title": "Content Blocks",
+      "type": "array"
+    },
+    "generated_at_utc": {
+      "format": "date-time",
+      "title": "Generated At Utc",
+      "type": "string"
+    },
+    "latency_ms": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latency Ms"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "output_text_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Text Hash"
+    },
+    "provider_id": {
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "raw_response_persisted": {
+      "default": false,
+      "title": "Raw Response Persisted",
+      "type": "boolean"
+    },
+    "reason_code": {
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "status": {
+      "pattern": "^(pass|blocked)$",
+      "title": "Status",
+      "type": "string"
+    },
+    "stop_reason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderStopReason"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "Stop Reason"
+    },
+    "tool_proposals": {
+      "items": {
+        "$ref": "#/$defs/ProviderToolProposal"
+      },
+      "title": "Tool Proposals",
+      "type": "array"
+    },
+    "tool_result_loop_supported": {
+      "default": false,
+      "title": "Tool Result Loop Supported",
+      "type": "boolean"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Usage"
+    },
+    "version": {
+      "default": "model_provider.anthropic_messages_result/v1",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider_id",
+    "model",
+    "status",
+    "reason_code",
+    "stop_reason"
+  ],
+  "title": "AnthropicMessagesResult",
+  "type": "object"
+}

@@ -1,0 +1,216 @@
+[settings]
+remote_providers_enabled = false
+
+[providers.local-ollama]
+kind = "local_ollama"
+enabled = true
+default_model = "qwen3.5:4b"
+data_boundary = "local"
+retention_policy = "none_claimed"
+supports_streaming = true
+supports_json_mode = true
+supports_json_schema = false
+supports_tool_calling = false
+risk_tier = "low"
+fallback_priority = 10
+
+[providers.company-internal]
+kind = "openai_compatible"
+enabled = true
+base_url = "https://llm.company.local/v1"
+api_key_env = "COMPANY_LLM_API_KEY"
+auth_mode = "bearer_env"
+default_model = "company-secure-agent-model"
+models = ["company-secure-agent-model"]
+data_boundary = "internal"
+retention_policy = "customer_controlled"
+supports_streaming = true
+supports_json_mode = true
+supports_json_schema = true
+supports_tool_calling = true
+risk_tier = "medium"
+fallback_priority = 10
+
+[provider_policies.company-internal]
+allowed_data_classes = ["public", "internal"]
+blocked_data_classes = ["secret", "credential", "payment", "raw_pii"]
+requires_redaction = true
+allow_tool_calls = true
+requires_approval_for_tool_calls = true
+evidence_required = true
+max_prompt_chars = 12000
+max_output_tokens = 512
+timeout_ms = 15000
+max_retries = 0
+daily_call_budget = 100
+canary_call_budget = 5
+rate_limit_per_minute = 2
+allowed_hosts = ["llm.company.local"]
+
+[providers.openai-public]
+kind = "openai_compatible"
+enabled = false
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+auth_mode = "bearer_env"
+default_model = "gpt-5.1"
+models = ["gpt-5.1"]
+data_boundary = "public_cloud"
+retention_policy = "provider_default"
+supports_streaming = true
+supports_json_mode = true
+supports_json_schema = true
+supports_tool_calling = true
+risk_tier = "high"
+
+[provider_policies.openai-public]
+allowed_data_classes = ["public"]
+blocked_data_classes = ["internal", "confidential", "regulated", "raw_pii", "secret", "credential", "payment"]
+requires_redaction = true
+allow_tool_calls = true
+requires_approval_for_tool_calls = true
+evidence_required = true
+max_prompt_chars = 4000
+max_output_tokens = 256
+timeout_ms = 15000
+max_retries = 0
+daily_call_budget = 10
+canary_call_budget = 1
+rate_limit_per_minute = 1
+allowed_hosts = ["api.openai.com"]
+
+[providers.openai-responses-preview]
+kind = "openai_responses"
+enabled = false
+display_name = "OpenAI Responses Native Preview"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+auth_mode = "bearer_env"
+default_model = "gpt-5.1"
+models = ["gpt-5.1"]
+data_boundary = "public_cloud"
+retention_policy = "provider_default"
+supports_streaming = false
+supports_json_mode = true
+supports_json_schema = true
+supports_tool_calling = true
+supports_vision = false
+risk_tier = "high"
+fallback_priority = 85
+
+[provider_policies.openai-responses-preview]
+allowed_data_classes = ["public"]
+blocked_data_classes = ["internal", "confidential", "regulated", "raw_pii", "secret", "credential", "payment"]
+requires_redaction = true
+allow_tool_calls = true
+requires_approval_for_tool_calls = true
+evidence_required = true
+max_prompt_chars = 4000
+max_output_tokens = 256
+timeout_ms = 15000
+max_retries = 0
+daily_call_budget = 10
+canary_call_budget = 1
+rate_limit_per_minute = 1
+allowed_hosts = ["api.openai.com"]
+
+[providers.anthropic-messages-preview]
+kind = "anthropic_messages"
+enabled = false
+display_name = "Anthropic Messages Native Preview"
+base_url = "https://api.anthropic.com"
+api_key_env = "ANTHROPIC_API_KEY"
+auth_mode = "custom_header_env"
+default_model = "claude-sonnet-4-6"
+models = ["claude-sonnet-4-6"]
+data_boundary = "public_cloud"
+retention_policy = "provider_default"
+supports_streaming = false
+supports_json_mode = false
+supports_json_schema = false
+supports_tool_calling = true
+supports_vision = false
+risk_tier = "high"
+fallback_priority = 86
+
+[provider_policies.anthropic-messages-preview]
+allowed_data_classes = ["public"]
+blocked_data_classes = ["internal", "confidential", "regulated", "raw_pii", "secret", "credential", "payment"]
+requires_redaction = true
+allow_tool_calls = true
+requires_approval_for_tool_calls = true
+evidence_required = true
+max_prompt_chars = 4000
+max_output_tokens = 256
+timeout_ms = 15000
+max_retries = 0
+daily_call_budget = 10
+canary_call_budget = 1
+rate_limit_per_minute = 1
+allowed_hosts = ["api.anthropic.com"]
+
+[providers.deepseek-public]
+kind = "deepseek"
+enabled = false
+base_url = "https://api.deepseek.com/v1"
+api_key_env = "DEEPSEEK_API_KEY"
+auth_mode = "bearer_env"
+default_model = "deepseek-v4-flash"
+models = ["deepseek-v4-flash", "deepseek-v4-pro"]
+data_boundary = "public_cloud"
+retention_policy = "provider_default"
+supports_streaming = true
+supports_json_mode = true
+supports_json_schema = false
+supports_tool_calling = true
+risk_tier = "high"
+fallback_priority = 80
+
+[provider_policies.deepseek-public]
+allowed_data_classes = ["public"]
+blocked_data_classes = ["internal", "confidential", "regulated", "raw_pii", "secret", "credential", "payment"]
+requires_redaction = true
+allow_tool_calls = true
+requires_approval_for_tool_calls = true
+evidence_required = true
+max_prompt_chars = 4000
+max_output_tokens = 256
+timeout_ms = 15000
+max_retries = 0
+daily_call_budget = 10
+canary_call_budget = 1
+rate_limit_per_minute = 1
+allowed_hosts = ["api.deepseek.com"]
+
+[providers.gemini-openai-compatible]
+kind = "openai_compatible"
+enabled = false
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+api_key_env = "GEMINI_API_KEY"
+auth_mode = "bearer_env"
+default_model = "gemini-2.5-flash"
+models = ["gemini-2.5-flash"]
+data_boundary = "public_cloud"
+retention_policy = "provider_default"
+supports_streaming = true
+supports_json_mode = true
+supports_json_schema = true
+supports_tool_calling = true
+risk_tier = "high"
+fallback_priority = 90
+
+[provider_policies.gemini-openai-compatible]
+allowed_data_classes = ["public"]
+blocked_data_classes = ["internal", "confidential", "regulated", "raw_pii", "secret", "credential", "payment"]
+requires_redaction = true
+allow_tool_calls = true
+requires_approval_for_tool_calls = true
+evidence_required = true
+max_prompt_chars = 4000
+max_output_tokens = 256
+timeout_ms = 15000
+max_retries = 0
+daily_call_budget = 10
+canary_call_budget = 1
+rate_limit_per_minute = 1
+allowed_hosts = ["generativelanguage.googleapis.com"]

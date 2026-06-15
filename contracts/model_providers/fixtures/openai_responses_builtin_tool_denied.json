@@ -1,0 +1,11 @@
+{
+  "case_id": "openai_responses_builtin_web_search_denied",
+  "expected_status": "blocked",
+  "expected_reason_code": "BUILTIN_WEB_SEARCH_DEFAULT_DENY",
+  "requested_tools": [
+    {
+      "tool_type": "builtin_web_search",
+      "name": "web_search"
+    }
+  ]
+}

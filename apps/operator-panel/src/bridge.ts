@@ -956,7 +956,9 @@ export async function startAssistantTurn(
     sessionId: options.sessionId,
     compiledPrompt: options.compiledPrompt,
     provider: options.provider,
+    providerId: options.providerId,
     fallbackProvider: options.fallbackProvider,
+    fallbackProviderId: options.fallbackProviderId,
     model: options.model,
     hfModelId: options.hfModelId,
   });
@@ -968,11 +970,13 @@ export async function listAssistantModels(
 ): Promise<AssistantProviderModelsResponse> {
   if (isBridgePreviewMode()) {
     const payload = previewAssistantProviderModels(request.profile || settings.profile);
-    if (request.provider && request.provider !== 'all') {
+    if (request.provider && request.provider !== 'all' && request.provider !== 'auto') {
       return {
         ...payload,
         provider: request.provider,
-        providers: payload.providers.filter((item) => item.provider === request.provider),
+        providers: payload.providers.filter(
+          (item) => item.provider === request.provider || item.legacyProvider === request.provider,
+        ),
       };
     }
     return payload;

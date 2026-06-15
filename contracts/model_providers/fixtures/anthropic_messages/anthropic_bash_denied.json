@@ -1,0 +1,11 @@
+{
+  "case_id": "anthropic_bash_denied",
+  "expected_status": "blocked",
+  "expected_reason_code": "ANTHROPIC_BASH_DEFAULT_DENY",
+  "requested_tools": [
+    {
+      "tool_type": "builtin_bash",
+      "name": "bash"
+    }
+  ]
+}
