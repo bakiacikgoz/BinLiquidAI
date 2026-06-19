@@ -3548,6 +3548,19 @@ def _resolve_registry_for_cli(profile: str) -> tuple[RuntimeConfig, Any]:
     return config, registry
 
 
+@provider_registry_app.callback(invoke_without_command=True)
+def provider_registry_callback(
+    ctx: typer.Context,
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Show fail-closed provider governance registry state."""
+    if ctx.invoked_subcommand is not None:
+        return
+    snapshot = build_provider_governance_snapshot(profile=profile)
+    _emit_payload(snapshot.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
 @provider_registry_app.command("list")
 def provider_registry_list(
     profile: str = typer.Option("balanced", help="Config profile"),
@@ -3863,6 +3876,46 @@ def provider_native_conformance_run(
     else:
         typer.echo(f"status={status} provider_kind={provider_kind}")
     if status != "pass":
+        raise typer.Exit(code=1)
+
+
+@provider_native_conformance_app.callback(invoke_without_command=True)
+def provider_native_conformance_callback(
+    ctx: typer.Context,
+    provider: str | None = typer.Option(None, "--provider", help="Native provider kind"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    offline: bool = typer.Option(True, "--offline/--live-canary", help="Use offline fixtures"),
+    output_dir: str = typer.Option(
+        "artifacts/provider-native",
+        "--output-dir",
+        help="Conformance artifact output directory.",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Run offline native provider conformance fixtures."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if provider is None:
+        raise typer.BadParameter("provider is required")
+    try:
+        report = run_provider_native_conformance(
+            provider,
+            profile=profile,
+            offline=offline,
+            output_dir=output_dir,
+        )
+    except KeyError:
+        _emit_payload(
+            {
+                "status": "fail",
+                "providerKind": provider,
+                "blockingReasons": ["PROVIDER_UNKNOWN"],
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1) from None
+    _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if report.status == "fail":
         raise typer.Exit(code=1)
 
 

@@ -7,6 +7,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from binliquid.control_plane.agent_enrollment import EnrolledAgent
+from binliquid.control_plane.enterprise_workspace import utc_now
+from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
 from binliquid.control_plane.external_contracts import ExternalActionRequest
 from binliquid.control_plane.external_gateway import ExternalAgentGateway
 from binliquid.control_plane.models import (
@@ -82,6 +85,7 @@ class ExternalAgentClient:
 
     def submit_action(self, action: ExternalActionRequest) -> ExternalAgentRunResponse:
         registry = AgentRegistry(root_dir=self.root_dir)
+        _ensure_pilot_enrollment(root_dir=self.root_dir, manifest=self.manifest)
         registry.register(_agent_spec_from_manifest(self.manifest), actor="external-agent-client")
         gateway = ExternalAgentGateway(
             config=self.config,
@@ -173,6 +177,10 @@ def run_external_agent_pilot_suite(
 
 
 def _agent_spec_from_manifest(manifest: ExternalAgentPilotManifest) -> AgentSpec:
+    workspace_id = "pilot-workspace"
+    principal_id = f"principal-{manifest.agent_id}"
+    device_id = f"device-{manifest.agent_id}"
+    enrollment_id = f"enrollment-{manifest.agent_id}"
     risk = {
         "read_only": RiskClass.READ_ONLY,
         "mutation": RiskClass.EXTERNAL_WRITE,
@@ -204,5 +212,29 @@ def _agent_spec_from_manifest(manifest: ExternalAgentPilotManifest) -> AgentSpec
             "policy_pack_id": manifest.policy_pack_id,
             "risk_profile": manifest.risk_profile,
             "transport": manifest.transport,
+            "workspace_id": workspace_id,
+            "principal_id": principal_id,
+            "device_id": device_id,
+            "enrollment_id": enrollment_id,
+            "enrollment_status": "active",
+            "workspace_binding_status": "bound",
         },
+    )
+
+
+def _ensure_pilot_enrollment(*, root_dir: Path, manifest: ExternalAgentPilotManifest) -> None:
+    store = EnterpriseWorkspaceStore(root_dir)
+    store.write_enrolled_agent(
+        EnrolledAgent(
+            enrollmentId=f"enrollment-{manifest.agent_id}",
+            workspaceId="pilot-workspace",
+            agentId=manifest.agent_id,
+            principalId=f"principal-{manifest.agent_id}",
+            deviceId=f"device-{manifest.agent_id}",
+            tokenId=f"token-{manifest.agent_id}",
+            status="active",
+            capabilities=tuple(manifest.allowed_actions or ["read"]),
+            policyProfile="enterprise",
+            createdAtUtc=utc_now(),
+        )
     )
