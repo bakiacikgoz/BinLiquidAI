@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-gate provider-v1-1-closure-gate provider-native-adapter-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate design-partner-field-evidence-gate design-partner-handoff-gate mainline-rc-freeze-gate rc-evidence-orchestrator-gate rc-release-decision-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-runtime-policy-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate governed-pilot-workflow-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-gate provider-v1-1-closure-gate provider-native-adapter-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate design-partner-field-evidence-gate design-partner-handoff-gate mainline-rc-freeze-gate rc-evidence-orchestrator-gate rc-release-decision-gate enterprise-workspace-onboarding-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-runtime-policy-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate governed-pilot-workflow-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -369,6 +369,31 @@ rc-evidence-orchestrator-gate:
 
 rc-release-decision-gate:
 	uv run python scripts/run_rc_release_decision_gate.py --profile enterprise --json
+
+enterprise-workspace-onboarding-gate:
+	uv run --extra dev ruff check .
+	uv run python scripts/generate_enterprise_workspace_contract_schemas.py
+	uv run python scripts/generate_control_plane_contract_schemas.py
+	uv run --extra dev python -m pytest -q \
+		tests/test_enterprise_workspace_models.py \
+		tests/test_enterprise_workspace_rbac.py \
+		tests/test_agent_enrollment.py \
+		tests/test_enterprise_workspace_contracts.py \
+		tests/test_enterprise_workspace_store.py \
+		tests/test_enterprise_workspace_cli.py \
+		tests/test_agent_enrollment_cli.py \
+		tests/test_agent_enrollment_evidence.py \
+		tests/test_agent_registry_workspace_binding.py \
+		tests/test_external_gateway_enrollment_guard.py \
+		tests/test_memory_enterprise_workspace_binding.py \
+		tests/test_control_plane_snapshot_enterprise_workspace.py \
+		tests/test_enterprise_workspace_onboarding_gate.py
+	uv run python scripts/run_enterprise_workspace_onboarding_gate.py --profile enterprise --json
+	corepack pnpm --dir apps/operator-panel exec vitest run src/enterprise-workspace/EnterpriseWorkspaceView.test.tsx src/enterprise-workspace/AgentEnrollmentView.test.tsx src/routeRegistry.test.ts
+	corepack pnpm --dir apps/operator-panel lint
+	corepack pnpm --dir apps/operator-panel build
+	corepack pnpm --dir apps/operator-panel exec playwright test e2e/enterprise-workspace.spec.ts --pass-with-no-tests
+	git diff --check
 
 governed-memory-v1-gate:
 	uv run pytest -q tests/test_memory_v3_governance.py tests/test_memory_cli_v3.py tests/test_control_plane_snapshot_memory_v3.py
