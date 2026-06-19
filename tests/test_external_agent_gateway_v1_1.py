@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from binliquid.cli import app
 from binliquid.control_plane.agent_enrollment import EnrolledAgent
 from binliquid.control_plane.enterprise_workspace import (
     EnterpriseDevice,
@@ -14,7 +15,6 @@ from binliquid.control_plane.enterprise_workspace import (
     utc_now,
 )
 from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
-from binliquid.cli import app
 from binliquid.control_plane.external_contracts import (
     ExternalAgentActionV11,
     ExternalAgentRequestV11,

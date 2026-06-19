@@ -16,7 +16,6 @@ from binliquid.memory.principal_resolver import (
 )
 from binliquid.runtime.config import RuntimeConfig
 
-
 NOW = datetime(2026, 6, 19, tzinfo=UTC)
 
 

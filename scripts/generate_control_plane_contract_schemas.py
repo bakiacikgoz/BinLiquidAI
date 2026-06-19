@@ -9,23 +9,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from binliquid.control_plane.admin_store import AdminChangeProposal  # noqa: E402
-from binliquid.control_plane.design_partner_handoff import (  # noqa: E402
-    DesignPartnerHandoffManifest,
-    DesignPartnerHandoffSnapshot,
-    DesignPartnerHandoffVerificationReport,
-)
-from binliquid.control_plane.external_agent_client import ExternalAgentPilotManifest  # noqa: E402
-from binliquid.control_plane.external_contracts import (  # noqa: E402
-    ExternalActionRequest,
-    ExternalActionResponse,
-    ExternalAgentRequestV11,
-    ExternalAgentV11Result,
-)
 from binliquid.control_plane.agent_enrollment import (  # noqa: E402
     AgentEnrollmentDecision,
     AgentEnrollmentRequest,
     AgentEnrollmentToken,
     EnrolledAgent,
+)
+from binliquid.control_plane.design_partner_handoff import (  # noqa: E402
+    DesignPartnerHandoffManifest,
+    DesignPartnerHandoffSnapshot,
+    DesignPartnerHandoffVerificationReport,
 )
 from binliquid.control_plane.enterprise_rbac import WorkspacePermissionDecision  # noqa: E402
 from binliquid.control_plane.enterprise_workspace import (  # noqa: E402
@@ -35,6 +28,13 @@ from binliquid.control_plane.enterprise_workspace import (  # noqa: E402
     EnterpriseWorkspace,
     EnterpriseWorkspaceMembership,
     EnterpriseWorkspaceSnapshot,
+)
+from binliquid.control_plane.external_agent_client import ExternalAgentPilotManifest  # noqa: E402
+from binliquid.control_plane.external_contracts import (  # noqa: E402
+    ExternalActionRequest,
+    ExternalActionResponse,
+    ExternalAgentRequestV11,
+    ExternalAgentV11Result,
 )
 from binliquid.control_plane.field_evidence import (  # noqa: E402
     DesignPartnerFieldEvidenceSnapshot,

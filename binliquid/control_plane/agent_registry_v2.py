@@ -96,7 +96,9 @@ def _metadata_string_or_none(metadata: dict[str, object], key: str) -> str | Non
     return value if isinstance(value, str) and value.strip() else None
 
 
-def _workspace_binding_status(metadata: dict[str, object]) -> Literal["unbound", "bound", "blocked"]:
+def _workspace_binding_status(
+    metadata: dict[str, object],
+) -> Literal["unbound", "bound", "blocked"]:
     status = _metadata_string_or_none(metadata, "workspace_binding_status")
     if status in {"unbound", "bound", "blocked"}:
         return status

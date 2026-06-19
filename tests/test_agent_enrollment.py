@@ -13,7 +13,6 @@ from binliquid.control_plane.agent_enrollment import (
     hash_enrollment_token,
 )
 
-
 NOW = datetime(2026, 6, 19, tzinfo=UTC)
 HASH = "b" * 64
 

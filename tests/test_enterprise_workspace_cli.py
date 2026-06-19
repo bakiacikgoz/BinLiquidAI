@@ -32,7 +32,7 @@ def _prepare_enterprise_fixture(root: Path) -> None:
     assert result.returncode == 0, result.stderr
 
 
-def test_enterprise_workspace_bootstrap_blocks_without_identity(tmp_path: Path, monkeypatch) -> None:
+def test_workspace_bootstrap_blocks_without_identity(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
 
     result = runner.invoke(

@@ -4,8 +4,7 @@ import json
 import secrets
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -44,7 +43,10 @@ class AgentEnrollmentToken(StrictModel):
     )
     allowed_capabilities: tuple[str, ...] = Field(alias="allowedCapabilities")
     policy_profile: str = Field(alias="policyProfile", min_length=1)
-    memory_scopes: tuple[EnrollmentMemoryScope, ...] = Field(default_factory=tuple, alias="memoryScopes")
+    memory_scopes: tuple[EnrollmentMemoryScope, ...] = Field(
+        default_factory=tuple,
+        alias="memoryScopes",
+    )
     created_by_principal_id: str = Field(alias="createdByPrincipalId")
     created_at_utc: datetime = Field(alias="createdAtUtc")
     expires_at_utc: datetime = Field(alias="expiresAtUtc")
@@ -211,7 +213,14 @@ class EnrolledAgent(StrictModel):
     created_at_utc: datetime = Field(alias="createdAtUtc")
     last_seen_at_utc: datetime | None = Field(default=None, alias="lastSeenAtUtc")
 
-    @field_validator("enrollment_id", "workspace_id", "agent_id", "principal_id", "device_id", "token_id")
+    @field_validator(
+        "enrollment_id",
+        "workspace_id",
+        "agent_id",
+        "principal_id",
+        "device_id",
+        "token_id",
+    )
     @classmethod
     def _safe_ids(cls, value: str, info: object) -> str:
         return _validate_safe_id(value, str(getattr(info, "field_name", "id")))
@@ -302,10 +311,17 @@ def create_enrollment_token(
         request.intended_agent_id or request.intended_device_label,
         secrets.token_hex(8),
     )
-    raw_token = generate_bound_raw_enrollment_token(token_id=token_id, workspace_id=request.workspace_id)
+    raw_token = generate_bound_raw_enrollment_token(
+        token_id=token_id,
+        workspace_id=request.workspace_id,
+    )
     token = AgentEnrollmentToken(
         tokenId=token_id,
-        tokenHash=hash_enrollment_token(raw_token, token_id=token_id, workspace_id=request.workspace_id),
+        tokenHash=hash_enrollment_token(
+            raw_token,
+            token_id=token_id,
+            workspace_id=request.workspace_id,
+        ),
         organizationId=organization.organization_id,
         workspaceId=request.workspace_id,
         intendedAgentId=request.intended_agent_id,
@@ -409,7 +425,11 @@ def create_enrollment_request_from_token(
     request = AgentEnrollmentRequest(
         requestId=stable_id("enrreq", token_id, agent_id, device_display_name),
         tokenId=token_id,
-        tokenProofHash=hash_enrollment_token(raw_token, token_id=token_id, workspace_id=workspace_id),
+        tokenProofHash=hash_enrollment_token(
+            raw_token,
+            token_id=token_id,
+            workspace_id=workspace_id,
+        ),
         workspaceId=workspace_id,
         agentId=agent_id,
         agentDisplayName=agent_display_name,

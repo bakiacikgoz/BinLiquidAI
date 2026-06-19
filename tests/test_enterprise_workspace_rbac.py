@@ -42,4 +42,4 @@ def test_viewer_cannot_create_enrollment_token_but_platform_admin_can() -> None:
 
 
 def test_high_risk_roles_are_explicit() -> None:
-    assert HIGH_RISK_ROLES == {"platform_admin", "security_admin", "break_glass_admin"}
+    assert {"platform_admin", "security_admin", "break_glass_admin"} == HIGH_RISK_ROLES

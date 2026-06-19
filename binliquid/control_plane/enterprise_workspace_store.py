@@ -139,7 +139,12 @@ class EnterpriseWorkspaceStore:
         return self._write_model(f"enrolled-agents/{enrollment.enrollment_id}.json", enrollment)
 
     def write_evidence_event(self, *, event_type: str, payload: dict[str, Any]) -> str:
-        event_id = stable_id("event", event_type, canonical_json_hash(payload), utc_now().isoformat())
+        event_id = stable_id(
+            "event",
+            event_type,
+            canonical_json_hash(payload),
+            utc_now().isoformat(),
+        )
         relative = f"evidence/{event_id}.json"
         event = {
             "eventId": event_id,

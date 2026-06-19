@@ -8,7 +8,7 @@ import subprocess
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 
@@ -226,20 +226,6 @@ from binliquid.memory.workspace_models import (
     WorkspaceMemoryWriteRequest,
 )
 from binliquid.memory.workspace_sync import WorkspaceMemorySyncCoordinator
-from binliquid.release.gate_export import export_rc_evidence_orchestration
-from binliquid.release.gate_plan import build_release_gate_plan
-from binliquid.release.gate_runner import run_release_gate_plan
-from binliquid.release.gate_verifier import verify_gate_evidence_ledger
-from binliquid.release.snapshot import build_rc_gate_evidence_snapshot
-from binliquid.release_decision.dossier import (
-    build_release_decision_from_artifacts,
-    export_release_decision_pack,
-    verify_release_decision_dossier,
-    write_release_decision_pack,
-)
-from binliquid.release_decision.models import ReleaseDecisionDossier
-from binliquid.release_decision.reconciler import build_reconciliation_input, reconcile_rc_freeze
-from binliquid.release_decision.signoff import verify_human_signoffs, write_signoff_template
 from binliquid.model_providers.adapters.adapter_factory import ProviderAdapterFactory
 from binliquid.model_providers.canary import run_provider_canary
 from binliquid.model_providers.canary_evidence import (
@@ -271,6 +257,20 @@ from binliquid.model_providers.registry import resolve_model_provider_registry
 from binliquid.model_providers.resolver import resolve_provider_id
 from binliquid.model_providers.router_shadow import recommend_provider_shadow
 from binliquid.model_providers.runtime import ProviderGovernanceLLM
+from binliquid.release.gate_export import export_rc_evidence_orchestration
+from binliquid.release.gate_plan import build_release_gate_plan
+from binliquid.release.gate_runner import run_release_gate_plan
+from binliquid.release.gate_verifier import verify_gate_evidence_ledger
+from binliquid.release.snapshot import build_rc_gate_evidence_snapshot
+from binliquid.release_decision.dossier import (
+    build_release_decision_from_artifacts,
+    export_release_decision_pack,
+    verify_release_decision_dossier,
+    write_release_decision_pack,
+)
+from binliquid.release_decision.models import ReleaseDecisionDossier
+from binliquid.release_decision.reconciler import build_reconciliation_input, reconcile_rc_freeze
+from binliquid.release_decision.signoff import verify_human_signoffs, write_signoff_template
 from binliquid.router.rule_router import RuleRouter
 from binliquid.router.sltc_router import SLTCRouter
 from binliquid.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
@@ -3126,7 +3126,7 @@ def enterprise_workspace_show_command(
 @enterprise_rbac_app.command("check")
 def enterprise_rbac_check_command(
     permission: str = typer.Option(..., "--permission", help="Permission to check"),
-    role: list[str] | None = typer.Option(None, "--role", help="Role id to include"),
+    role: Annotated[list[str] | None, typer.Option("--role", help="Role id to include")] = None,
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     workspace_id: str = typer.Option("", "--workspace-id", help="Workspace id"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
@@ -3145,7 +3145,10 @@ def enterprise_enrollment_token_create_command(
     workspace_id: str = typer.Option(..., "--workspace-id", help="Workspace id"),
     agent_id: str | None = typer.Option(None, "--agent-id", help="Intended agent id"),
     device_label: str = typer.Option(..., "--device-label", help="Intended device label"),
-    capability: list[str] = typer.Option(..., "--capability", help="Allowed capability"),
+    capability: Annotated[
+        list[str],
+        typer.Option("--capability", help="Allowed capability"),
+    ] = ...,
     ttl_minutes: int = typer.Option(15, "--ttl-minutes", help="Token TTL minutes"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
@@ -3225,8 +3228,14 @@ def enterprise_enrollment_request_create_command(
     agent_display_name: str = typer.Option(..., "--agent-display-name", help="Agent display name"),
     device_label: str = typer.Option(..., "--device-label", help="Device label"),
     platform: str = typer.Option("unknown", "--platform", help="Agent host platform"),
-    capability: list[str] = typer.Option(..., "--capability", help="Requested capability"),
-    output: Path | None = typer.Option(None, "--output", help="Request output path"),
+    capability: Annotated[
+        list[str],
+        typer.Option("--capability", help="Requested capability"),
+    ] = ...,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Request output path"),
+    ] = None,
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from binliquid.control_plane.agent_enrollment import create_enrollment_request_from_token
@@ -3245,7 +3254,7 @@ def enterprise_enrollment_request_create_command(
 
 @enterprise_enrollment_request_app.command("import")
 def enterprise_enrollment_request_import_command(
-    path: Path = typer.Option(..., "--path", help="Enrollment request path"),
+    path: Annotated[Path, typer.Option("--path", help="Enrollment request path")] = ...,
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),

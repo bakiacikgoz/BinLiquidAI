@@ -8,7 +8,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$")
 SHA256_HEX_RE = re.compile(r"^[a-f0-9]{64}$")
 
@@ -316,9 +315,12 @@ class EnterpriseWorkspaceBootstrapResult(StrictModel):
 
 def build_bootstrap_principal_from_actor(actor: Any) -> EnterprisePrincipal:
     actor_id = str(actor.actor_id)
+    principal_type = (
+        "break_glass" if bool(getattr(actor, "is_break_glass", False)) else "human_user"
+    )
     return EnterprisePrincipal(
         principalId=stable_id("principal", actor_id),
-        principalType="break_glass" if bool(getattr(actor, "is_break_glass", False)) else "human_user",
+        principalType=principal_type,
         displayName=actor_id,
         status="active",
         externalSubjectRefHash=hash_identity_ref(str(actor.subject)),
@@ -412,8 +414,13 @@ def bootstrap_enterprise_workspace(
             else "unchanged",
         },
     )
+    status = (
+        "created"
+        if any(result.status == "written" for result in write_results)
+        else "unchanged"
+    )
     return EnterpriseWorkspaceBootstrapResult(
-        status="created" if any(result.status == "written" for result in write_results) else "unchanged",
+        status=status,
         organizationId=request.organization_id,
         workspaceId=request.workspace_id,
         bootstrapPrincipalId=principal.principal_id,

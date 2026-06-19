@@ -6,7 +6,6 @@ from pydantic import Field
 
 from binliquid.control_plane.enterprise_workspace import StrictModel
 
-
 CanonicalRoleId = Literal[
     "viewer",
     "operator",
@@ -88,7 +87,9 @@ ROLE_CATALOG: dict[str, CanonicalRole] = {
         roleId="operator",
         label="Operator",
         risk="medium",
-        permissions=tuple(sorted(VIEWER_PERMISSIONS | {"agent.run", "memory.read", "approval.read"})),
+        permissions=tuple(
+            sorted(VIEWER_PERMISSIONS | {"agent.run", "memory.read", "approval.read"})
+        ),
     ),
     "approver": CanonicalRole(
         roleId="approver",
@@ -106,7 +107,9 @@ ROLE_CATALOG: dict[str, CanonicalRole] = {
         roleId="policy_admin",
         label="Policy Admin",
         risk="high",
-        permissions=tuple(sorted(VIEWER_PERMISSIONS | {"policy.read", "policy.write", "policy.promote"})),
+        permissions=tuple(
+            sorted(VIEWER_PERMISSIONS | {"policy.read", "policy.write", "policy.promote"})
+        ),
     ),
     "security_admin": CanonicalRole(
         roleId="security_admin",

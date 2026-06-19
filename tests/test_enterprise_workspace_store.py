@@ -10,7 +10,6 @@ from binliquid.control_plane.enterprise_workspace import (
 )
 from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
 
-
 NOW = datetime(2026, 6, 19, tzinfo=UTC)
 
 

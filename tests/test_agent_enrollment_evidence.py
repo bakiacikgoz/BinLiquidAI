@@ -9,8 +9,10 @@ from binliquid.control_plane.agent_enrollment import (
     AgentEnrollmentTokenCreateRequest,
     create_enrollment_token,
 )
-from binliquid.control_plane.enterprise_workspace import EnterpriseWorkspaceBootstrapRequest
-from binliquid.control_plane.enterprise_workspace import bootstrap_enterprise_workspace
+from binliquid.control_plane.enterprise_workspace import (
+    EnterpriseWorkspaceBootstrapRequest,
+    bootstrap_enterprise_workspace,
+)
 from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
 from binliquid.runtime.config import RuntimeConfig
 

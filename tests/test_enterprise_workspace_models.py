@@ -16,7 +16,6 @@ from binliquid.control_plane.enterprise_workspace import (
     make_membership_id,
 )
 
-
 NOW = datetime(2026, 6, 19, tzinfo=UTC)
 HASH = "a" * 64
 
