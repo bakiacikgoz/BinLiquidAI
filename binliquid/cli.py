@@ -2660,7 +2660,7 @@ def release_mainline_stack_verify(
         write_stack_graph_report(report, Path(output_root))
     _emit_payload(report.model_dump(mode="json", by_alias=True), json_output=json_output)
     if report.status == "blocked":
-        raise typer.Exit(code=4)
+        raise typer.Exit(code=3)
     if report.status == "conditional" and fail_on_conditional:
         raise typer.Exit(code=3)
 

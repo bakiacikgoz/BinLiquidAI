@@ -216,16 +216,16 @@ def _artifact_payload_status(path: Path) -> str:
         return "present"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (UnicodeDecodeError, json.JSONDecodeError):
         return "blocked"
     if not isinstance(payload, dict):
         return "present"
-    status = payload.get("status")
-    if isinstance(status, str):
-        return status
     design_partner_rc = payload.get("designPartnerRc")
     if isinstance(design_partner_rc, dict) and isinstance(design_partner_rc.get("status"), str):
         return str(design_partner_rc["status"])
+    status = payload.get("status")
+    if isinstance(status, str):
+        return status
     return "present"
 
 
@@ -298,7 +298,10 @@ def _write_report(path: Path, manifest: dict[str, object]) -> None:
 
 
 def _write_json(path: Path, payload: object) -> None:
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _write_text(path: Path, value: str) -> None:

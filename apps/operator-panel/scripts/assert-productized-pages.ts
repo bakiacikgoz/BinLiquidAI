@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import { routeGroups, routes } from '../src/routeRegistry';
 
@@ -16,7 +17,7 @@ type Manifest = {
   }>;
 };
 
-const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(SCRIPT_DIR, '..');
 const REPO_ROOT = findRepoRoot(APP_ROOT);
 const MANIFEST_PATH = path.join(REPO_ROOT, 'artifacts', 'operator-panel-ui', 'productized-pages', 'manifest.json');

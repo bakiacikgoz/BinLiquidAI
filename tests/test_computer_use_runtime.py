@@ -38,8 +38,11 @@ from binliquid.runtime.config import RuntimeConfig
 def _wait_until(predicate, timeout_s: float = 5.0) -> None:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
-        if predicate():
-            return
+        try:
+            if predicate():
+                return
+        except (PermissionError, json.JSONDecodeError):
+            pass
         time.sleep(0.05)
     raise AssertionError("timed out waiting for predicate")
 

@@ -11,7 +11,7 @@ test('AI Assistant model selection is visible and used before sending a preview 
   await expect(disabledSearch).toHaveAttribute('title', 'Assistant context search is not available yet');
 
   await page.getByLabel('Assistant provider').selectOption('ollama');
-  await page.getByLabel('Assistant model', { exact: true }).selectOption('qwen3.5:4b');
+  await page.getByLabel('Assistant model', { exact: true }).fill('qwen3.5:4b');
   await page.getByLabel('Assistant fallback provider').selectOption('transformers');
 
   await expect(page.getByLabel('Selected assistant model')).toContainText('ollama / qwen3.5:4b');

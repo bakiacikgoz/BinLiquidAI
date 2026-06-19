@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 type JsonObject = Record<string, unknown>;
 
-const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(SCRIPT_DIR, '..');
 const REPO_ROOT = findRepoRoot(APP_ROOT);
 const RESULTS_PATH = path.join(REPO_ROOT, 'artifacts', 'operator-panel-ui', 'e2e-json', 'results.json');
