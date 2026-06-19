@@ -148,6 +148,9 @@ class AgentMemoryPrincipalResolver:
         return request.actor_id or self.config.memory.workspace_authority.default_principal_id
 
     def _membership_roles(self, workspace_id: str, principal_id: str) -> tuple[str, ...] | None:
+        enterprise_roles = self._enterprise_membership_roles(workspace_id, principal_id)
+        if enterprise_roles is not None:
+            return enterprise_roles
         authority = self.workspace_authority
         if authority is None or not hasattr(authority, "store"):
             return None if self.config.memory.workspace_authority.enabled else ()
@@ -163,6 +166,33 @@ class AgentMemoryPrincipalResolver:
         if membership is None or membership.status != "active":
             return ()
         return tuple(membership.roles)
+
+    def _enterprise_membership_roles(
+        self,
+        workspace_id: str,
+        principal_id: str,
+    ) -> tuple[str, ...] | None:
+        try:
+            from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+
+            store = EnterpriseWorkspaceStore()
+            workspace = store.get_workspace(workspace_id)
+            principal = store.get_principal(principal_id)
+            if workspace is None and principal is None:
+                return None
+            if workspace is None or principal is None:
+                return ()
+            memberships = store.list_memberships(
+                workspace_id=workspace_id,
+                principal_id=principal_id,
+            )
+        except Exception:
+            return None
+        roles: list[str] = []
+        for membership in memberships:
+            if membership.status == "active":
+                roles.extend(membership.roles)
+        return tuple(sorted(set(roles)))
 
 
 def parse_memory_scope(value: str) -> ParsedMemoryScope:
