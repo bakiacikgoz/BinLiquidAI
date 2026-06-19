@@ -3140,6 +3140,206 @@ def enterprise_rbac_check_command(
         raise typer.Exit(code=3)
 
 
+@enterprise_enrollment_token_app.command("create")
+def enterprise_enrollment_token_create_command(
+    workspace_id: str = typer.Option(..., "--workspace-id", help="Workspace id"),
+    agent_id: str | None = typer.Option(None, "--agent-id", help="Intended agent id"),
+    device_label: str = typer.Option(..., "--device-label", help="Intended device label"),
+    capability: list[str] = typer.Option(..., "--capability", help="Allowed capability"),
+    ttl_minutes: int = typer.Option(15, "--ttl-minutes", help="Token TTL minutes"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.agent_enrollment import (
+        AgentEnrollmentTokenCreateRequest,
+        create_enrollment_token,
+    )
+    from binliquid.enterprise.identity import resolve_actor_context
+
+    config = RuntimeConfig.from_profile(profile)
+    actor = resolve_actor_context(config)
+    result = create_enrollment_token(
+        config=config,
+        actor=actor,
+        request=AgentEnrollmentTokenCreateRequest(
+            workspaceId=workspace_id,
+            intendedAgentId=agent_id,
+            intendedDeviceLabel=device_label,
+            allowedCapabilities=tuple(capability),
+            ttlMinutes=ttl_minutes,
+        ),
+        root_dir=root_dir,
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@enterprise_enrollment_token_app.command("revoke")
+def enterprise_enrollment_token_revoke_command(
+    token_id: str = typer.Option(..., "--token-id", help="Enrollment token id"),
+    reason: str = typer.Option(..., "--reason", help="Revocation reason"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.agent_enrollment import revoke_enrollment_token
+    from binliquid.enterprise.identity import resolve_actor_context
+
+    config = RuntimeConfig.from_profile(profile)
+    result = revoke_enrollment_token(
+        config=config,
+        actor=resolve_actor_context(config),
+        token_id=token_id,
+        reason=reason,
+        root_dir=root_dir,
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@enterprise_enrollment_token_app.command("list")
+def enterprise_enrollment_token_list_command(
+    workspace_id: str | None = typer.Option(None, "--workspace-id", help="Workspace id"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+
+    tokens = EnterpriseWorkspaceStore(root_dir).list_enrollment_tokens(workspace_id=workspace_id)
+    _emit_payload(
+        {
+            "schemaVersion": "agent-enrollment-token-list/v1",
+            "tokens": [token.model_dump(mode="json", by_alias=True) for token in tokens],
+        },
+        json_output=json_output,
+    )
+
+
+@enterprise_enrollment_request_app.command("create")
+def enterprise_enrollment_request_create_command(
+    token: str = typer.Option(..., "--token", help="Raw enrollment token"),
+    agent_id: str = typer.Option(..., "--agent-id", help="Agent id"),
+    agent_display_name: str = typer.Option(..., "--agent-display-name", help="Agent display name"),
+    device_label: str = typer.Option(..., "--device-label", help="Device label"),
+    platform: str = typer.Option("unknown", "--platform", help="Agent host platform"),
+    capability: list[str] = typer.Option(..., "--capability", help="Requested capability"),
+    output: Path | None = typer.Option(None, "--output", help="Request output path"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.agent_enrollment import create_enrollment_request_from_token
+
+    result = create_enrollment_request_from_token(
+        raw_token=token,
+        agent_id=agent_id,
+        agent_display_name=agent_display_name,
+        device_display_name=device_label,
+        platform=platform,
+        capabilities=capability,
+        output_path=output,
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@enterprise_enrollment_request_app.command("import")
+def enterprise_enrollment_request_import_command(
+    path: Path = typer.Option(..., "--path", help="Enrollment request path"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.agent_enrollment import (
+        AgentEnrollmentRequest,
+        import_enrollment_request,
+    )
+    from binliquid.enterprise.identity import resolve_actor_context
+
+    config = RuntimeConfig.from_profile(profile)
+    request = AgentEnrollmentRequest.model_validate_json(path.read_text(encoding="utf-8"))
+    result = import_enrollment_request(
+        config=config,
+        actor=resolve_actor_context(config),
+        request=request,
+        root_dir=root_dir,
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@enterprise_enrollment_app.command("approve")
+def enterprise_enrollment_approve_command(
+    request_id: str = typer.Option(..., "--request-id", help="Enrollment request id"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.agent_enrollment import approve_enrollment_request
+    from binliquid.enterprise.identity import resolve_actor_context
+
+    config = RuntimeConfig.from_profile(profile)
+    result = approve_enrollment_request(
+        config=config,
+        actor=resolve_actor_context(config),
+        request_id=request_id,
+        root_dir=root_dir,
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@enterprise_enrollment_app.command("reject")
+def enterprise_enrollment_reject_command(
+    request_id: str = typer.Option(..., "--request-id", help="Enrollment request id"),
+    reason: str = typer.Option(..., "--reason", help="Rejection reason"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.agent_enrollment import reject_enrollment_request
+    from binliquid.enterprise.identity import resolve_actor_context
+
+    config = RuntimeConfig.from_profile(profile)
+    result = reject_enrollment_request(
+        config=config,
+        actor=resolve_actor_context(config),
+        request_id=request_id,
+        reason=reason,
+        root_dir=root_dir,
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+
+
+@enterprise_enrollment_app.command("list")
+def enterprise_enrollment_list_command(
+    workspace_id: str | None = typer.Option(None, "--workspace-id", help="Workspace id"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+
+    store = EnterpriseWorkspaceStore(root_dir)
+    _emit_payload(
+        {
+            "schemaVersion": "agent-enrollment-list/v1",
+            "requests": [
+                request.model_dump(mode="json", by_alias=True)
+                for request in store.list_enrollment_requests(workspace_id=workspace_id)
+            ],
+            "enrolledAgents": [
+                agent.model_dump(mode="json", by_alias=True)
+                for agent in store.list_enrolled_agents(workspace_id=workspace_id)
+            ],
+        },
+        json_output=json_output,
+    )
+
+
 @control_plane_reports_app.command("manifest")
 def control_plane_reports_manifest(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
