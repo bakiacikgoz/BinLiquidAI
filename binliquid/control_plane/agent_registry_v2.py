@@ -41,6 +41,12 @@ def agent_registry_v2_item(record: AgentRecord) -> AgentRegistryV2Item:
         last_run_id=record.last_run_id,
         last_evidence_pack_id=record.last_evidence_pack_id,
         last_evidence_status=last_evidence_status(record),
+        workspace_id=_metadata_string_or_none(metadata, "workspace_id"),
+        principal_id=_metadata_string_or_none(metadata, "principal_id"),
+        device_id=_metadata_string_or_none(metadata, "device_id"),
+        enrollment_id=_metadata_string_or_none(metadata, "enrollment_id"),
+        enrollment_status=_metadata_string_or_none(metadata, "enrollment_status"),
+        workspace_binding_status=_workspace_binding_status(metadata),
         updated_at=record.updated_at,
     )
 
@@ -88,3 +94,15 @@ def _metadata_string(metadata: dict[str, object], key: str, default: str) -> str
 def _metadata_string_or_none(metadata: dict[str, object], key: str) -> str | None:
     value = metadata.get(key)
     return value if isinstance(value, str) and value.strip() else None
+
+
+def _workspace_binding_status(metadata: dict[str, object]) -> Literal["unbound", "bound", "blocked"]:
+    status = _metadata_string_or_none(metadata, "workspace_binding_status")
+    if status in {"unbound", "bound", "blocked"}:
+        return status
+    if _metadata_string_or_none(metadata, "workspace_id") and _metadata_string_or_none(
+        metadata,
+        "enrollment_id",
+    ):
+        return "bound"
+    return "unbound"

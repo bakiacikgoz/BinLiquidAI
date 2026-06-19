@@ -6,6 +6,14 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from binliquid.control_plane.agent_enrollment import EnrolledAgent
+from binliquid.control_plane.enterprise_workspace import (
+    EnterpriseDevice,
+    EnterprisePrincipal,
+    hash_identity_ref,
+    utc_now,
+)
+from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
 from binliquid.cli import app
 from binliquid.control_plane.external_contracts import (
     ExternalAgentActionV11,
@@ -118,6 +126,7 @@ def test_external_gateway_v1_1_cli_submit_and_replay(tmp_path: Path) -> None:
         load_agent_spec(REPO_ROOT / "examples/control_plane/agent_external_gateway.yaml"),
         actor="test",
     )
+    _bind_enrollment(registry=registry, root_dir=root_dir)
     request_path = REPO_ROOT / "examples/external_agents/v1_1/read_only_inspector.json"
 
     submit = runner.invoke(
@@ -171,6 +180,7 @@ def _gateway(tmp_path: Path) -> ExternalAgentGateway:
         load_agent_spec(REPO_ROOT / "examples/control_plane/agent_external_gateway.yaml"),
         actor="test",
     )
+    _bind_enrollment(registry=registry, root_dir=root_dir)
     return ExternalAgentGateway(config=config, registry=registry, root_dir=root_dir)
 
 
@@ -199,4 +209,63 @@ def _request(
         requestedBy="pilot-operator",
         riskHint=risk_hint,
         metadata=metadata or {"scenario": key},
+    )
+
+
+def _bind_enrollment(*, registry: AgentRegistry, root_dir: Path) -> None:
+    record = registry.get("external-agent")
+    registry.update_record(
+        record.model_copy(
+            update={
+                "spec": record.spec.model_copy(
+                    update={
+                        "metadata": {
+                            **record.spec.metadata,
+                            "workspace_id": "pilot-workspace",
+                            "principal_id": "principal-agent",
+                            "device_id": "device-host-01",
+                            "enrollment_id": "enr-test",
+                            "enrollment_status": "active",
+                        }
+                    }
+                )
+            }
+        )
+    )
+    store = EnterpriseWorkspaceStore(root_dir)
+    store.write_principal(
+        EnterprisePrincipal(
+            principalId="principal-agent",
+            principalType="external_agent",
+            displayName="External Agent",
+            status="active",
+            externalSubjectRefHash=hash_identity_ref("external-agent"),
+            issuerHash=hash_identity_ref("test"),
+            createdAtUtc=utc_now(),
+        )
+    )
+    store.write_device(
+        EnterpriseDevice(
+            deviceId="device-host-01",
+            workspaceId="pilot-workspace",
+            principalId="principal-agent",
+            displayName="Ops Host",
+            platform="linux",
+            status="active",
+            createdAtUtc=utc_now(),
+        )
+    )
+    store.write_enrolled_agent(
+        EnrolledAgent(
+            enrollmentId="enr-test",
+            workspaceId="pilot-workspace",
+            agentId="external-agent",
+            principalId="principal-agent",
+            deviceId="device-host-01",
+            tokenId="enrtok-test",
+            status="active",
+            capabilities=("read", "external_write"),
+            policyProfile="enterprise",
+            createdAtUtc=utc_now(),
+        )
     )

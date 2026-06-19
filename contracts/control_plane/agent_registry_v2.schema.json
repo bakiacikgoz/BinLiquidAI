@@ -29,6 +29,18 @@
           "title": "Agenttype",
           "type": "string"
         },
+        "deviceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deviceid"
+        },
         "displayName": {
           "title": "Displayname",
           "type": "string"
@@ -36,6 +48,30 @@
         "enabled": {
           "title": "Enabled",
           "type": "boolean"
+        },
+        "enrollmentId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enrollmentid"
+        },
+        "enrollmentStatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enrollmentstatus"
         },
         "lastEvidencePackId": {
           "anyOf": [
@@ -99,6 +135,18 @@
           "title": "Policypackid",
           "type": "string"
         },
+        "principalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Principalid"
+        },
         "readiness": {
           "title": "Readiness",
           "type": "string"
@@ -125,6 +173,28 @@
           "format": "date-time",
           "title": "Updatedat",
           "type": "string"
+        },
+        "workspaceBindingStatus": {
+          "default": "unbound",
+          "enum": [
+            "unbound",
+            "bound",
+            "blocked"
+          ],
+          "title": "Workspacebindingstatus",
+          "type": "string"
+        },
+        "workspaceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspaceid"
         }
       },
       "required": [

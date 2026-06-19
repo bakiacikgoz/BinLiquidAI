@@ -173,6 +173,20 @@ class ExternalAgentGateway:
             self._write_evidence(request=request, response=response, run_id=None)
             return response
 
+        enrollment_error = self._enrollment_error_for_record(record)
+        if enrollment_error is not None:
+            response = ExternalActionResponse(
+                request_id=request.request_id,
+                agent_id=request.agent_id,
+                status="denied",
+                reason_code=enrollment_error,
+                dry_run=request.dry_run,
+                evidence_ref=evidence_ref,
+                next_actions=["enterprise enrollment approve"],
+            )
+            self._write_evidence(request=request, response=response, run_id=None)
+            return response
+
         if not _redaction_summary_safe(request.payload_redaction_summary):
             response = ExternalActionResponse(
                 request_id=request.request_id,
@@ -335,6 +349,23 @@ class ExternalAgentGateway:
                 "generated_at": datetime.now(UTC).isoformat(),
             },
         )
+
+    def _enrollment_error_for_record(self, record: Any) -> str | None:
+        from binliquid.control_plane.agent_enrollment import (
+            EnterpriseEnrollmentError,
+            require_active_enrollment,
+        )
+
+        workspace_id = _metadata_string_or_none(record.spec.metadata, "workspace_id")
+        try:
+            require_active_enrollment(
+                agent_id=record.agent_id,
+                workspace_id=workspace_id,
+                root_dir=self.store.root_dir,
+            )
+        except EnterpriseEnrollmentError as exc:
+            return exc.error_code
+        return None
 
     def _read_v1_1_idempotency(self, idempotency_key: str) -> dict[str, Any] | None:
         safe_key = _safe_file_key(idempotency_key)
@@ -604,3 +635,8 @@ def _safe_file_key(value: str) -> str:
         char if char.isalnum() or char in {"-", "_", "."} else "-"
         for char in value
     )[:120]
+
+
+def _metadata_string_or_none(metadata: dict[str, object], key: str) -> str | None:
+    value = metadata.get(key)
+    return value if isinstance(value, str) and value.strip() else None

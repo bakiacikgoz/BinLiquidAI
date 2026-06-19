@@ -262,6 +262,12 @@ class AgentEnrollmentRequestCreateResult(StrictModel):
         return self
 
 
+class EnterpriseEnrollmentError(RuntimeError):
+    def __init__(self, error_code: str, message: str):
+        super().__init__(message)
+        self.error_code = error_code
+
+
 def create_enrollment_token(
     *,
     config: Any,
@@ -622,6 +628,31 @@ def reject_enrollment_request(
         requestId=request_id,
         evidenceRef=evidence_ref,
     )
+
+
+def require_active_enrollment(
+    *,
+    agent_id: str,
+    workspace_id: str | None = None,
+    root_dir: str | Path = ".binliquid/control-plane",
+) -> EnrolledAgent:
+    from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+
+    store = EnterpriseWorkspaceStore(root_dir)
+    enrollment = store.get_enrolled_agent_by_agent_id(agent_id, workspace_id=workspace_id)
+    if enrollment is None:
+        raise EnterpriseEnrollmentError("AGENT_NOT_ENROLLED", f"agent '{agent_id}' is not enrolled")
+    if enrollment.status == "revoked":
+        raise EnterpriseEnrollmentError("ENROLLMENT_REVOKED", "enrollment is revoked")
+    if enrollment.status != "active":
+        raise EnterpriseEnrollmentError("AGENT_NOT_ENROLLED", "enrollment is not active")
+    device = store.get_device(enrollment.device_id)
+    if device is not None and device.status in {"suspended", "revoked"}:
+        raise EnterpriseEnrollmentError("DEVICE_SUSPENDED", "device is not active")
+    principal = store.get_principal(enrollment.principal_id)
+    if principal is not None and principal.status in {"disabled", "revoked"}:
+        raise EnterpriseEnrollmentError("PRINCIPAL_REVOKED", "principal is not active")
+    return enrollment
 
 
 def _principal_id_for_actor(actor: Any) -> str:

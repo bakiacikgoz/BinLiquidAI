@@ -472,6 +472,15 @@ class AgentRegistryV2Item(StrictModel):
     last_evidence_status: Literal["missing", "pending", "valid", "invalid"] = Field(
         alias="lastEvidenceStatus"
     )
+    workspace_id: str | None = Field(default=None, alias="workspaceId")
+    principal_id: str | None = Field(default=None, alias="principalId")
+    device_id: str | None = Field(default=None, alias="deviceId")
+    enrollment_id: str | None = Field(default=None, alias="enrollmentId")
+    enrollment_status: str | None = Field(default=None, alias="enrollmentStatus")
+    workspace_binding_status: Literal["unbound", "bound", "blocked"] = Field(
+        default="unbound",
+        alias="workspaceBindingStatus",
+    )
     updated_at: datetime = Field(alias="updatedAt")
 
 
