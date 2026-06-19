@@ -26,7 +26,11 @@ def build_enterprise_workspace_snapshot(
     env: dict[str, str] | None = None,
 ) -> EnterpriseWorkspaceSnapshot:
     store = EnterpriseWorkspaceStore(root_dir)
-    identity_payload = describe_actor(config, env=env)
+    identity_payload = (
+        {"identity_enabled": False, "verified": False, "error_code": "IDENTITY_DISABLED"}
+        if not config.identity.enabled
+        else describe_actor(config, env=env)
+    )
     identity = EnterpriseIdentitySummary(
         enabled=bool(identity_payload.get("identity_enabled")),
         verified=bool(identity_payload.get("verified")),

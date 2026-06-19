@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from binliquid.control_plane.pilot_workflow_models import GovernedPilotWorkflowSnapshot
+from binliquid.control_plane.enterprise_workspace import EnterpriseWorkspaceSnapshot
 from binliquid.memory.models import MemoryAuthoritySnapshot, disabled_memory_authority_snapshot
 from binliquid.memory.runtime_policy_snapshot import MemoryPolicyEnforcementSnapshot
 from binliquid.memory.runtime_snapshot import MemoryRuntimeSnapshot, MemorySyncSnapshot
@@ -1532,6 +1533,10 @@ class ControlPlaneSnapshot(StrictModel):
     rc_release_decision: RcReleaseDecisionSnapshot = Field(
         default_factory=RcReleaseDecisionSnapshot,
         alias="rcReleaseDecision",
+    )
+    enterprise_workspace: EnterpriseWorkspaceSnapshot | None = Field(
+        default=None,
+        alias="enterpriseWorkspace",
     )
     memory_governance: MemoryAuthoritySnapshot = Field(
         default_factory=disabled_memory_authority_snapshot,
