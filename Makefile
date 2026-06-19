@@ -398,6 +398,9 @@ enterprise-workspace-onboarding-gate:
 enterprise-workspace-release-closure-gate:
 	uv run python scripts/run_enterprise_workspace_release_closure_gate.py --profile enterprise --json
 
+enterprise-workspace-pr-readiness-gate:
+	uv run python scripts/run_enterprise_workspace_pr_readiness_gate.py --profile enterprise --json
+
 governed-memory-v1-gate:
 	uv run pytest -q tests/test_memory_v3_governance.py tests/test_memory_cli_v3.py tests/test_control_plane_snapshot_memory_v3.py
 	uv run python scripts/generate_memory_contract_schemas.py

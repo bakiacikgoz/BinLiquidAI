@@ -1,0 +1,65 @@
+name: Enterprise Workspace Release Closure
+
+on:
+  pull_request:
+    paths:
+      - "binliquid/control_plane/**"
+      - "binliquid/enterprise/**"
+      - "binliquid/memory/**"
+      - "apps/operator-panel/**"
+      - "contracts/**"
+      - "scripts/**enterprise_workspace**"
+      - "docs/ENTERPRISE_WORKSPACE**"
+      - ".github/workflows/enterprise-workspace-release-closure.yml"
+      - "Makefile"
+  push:
+    branches:
+      - "codex/enterprise-workspace-onboarding-agent-enrollment-v1"
+
+jobs:
+  enterprise-workspace-release-closure:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.2
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync Python dependencies
+        run: uv sync --python 3.11 --extra dev
+
+      - name: Install Playwright Chromium
+        run: pnpm --dir apps/operator-panel exec playwright install chromium
+
+      - name: Enterprise workspace release closure gate
+        shell: pwsh
+        run: uv run python scripts/run_enterprise_workspace_release_closure_gate.py --profile enterprise --json
+
+      - name: Stable Tauri target-dir test
+        shell: pwsh
+        run: cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml --target-dir apps/operator-panel/src-tauri/target-codex-test
+
+      - name: Upload enterprise workspace closure artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-workspace-release-closure
+          path: artifacts/enterprise-workspace-release-closure/**
+          if-no-files-found: warn
