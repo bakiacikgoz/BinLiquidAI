@@ -25,4 +25,19 @@ describe('routeRegistry', () => {
       }
     }
   });
+
+  it('exposes enterprise workspace onboarding routes', () => {
+    const routeIds = routes.map((route) => route.routeId);
+
+    expect(routeIds).toEqual(
+      expect.arrayContaining([
+        'enterprise-workspace',
+        'enterprise-users',
+        'enterprise-roles',
+        'enterprise-enrollment',
+        'enterprise-fleet',
+        'enterprise-identity',
+      ]),
+    );
+  });
 });

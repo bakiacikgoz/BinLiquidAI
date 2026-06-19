@@ -12,6 +12,12 @@ export type RouteId =
   | 'assistant'
   | 'tasks'
   | 'system'
+  | 'enterprise-workspace'
+  | 'enterprise-users'
+  | 'enterprise-roles'
+  | 'enterprise-enrollment'
+  | 'enterprise-fleet'
+  | 'enterprise-identity'
   | 'memory-governance'
   | 'memory-authority'
   | 'memory-runtime'
@@ -81,6 +87,48 @@ export const routeGroups: RouteGroup[] = [
     title: 'SİSTEM',
     routes: [
       { id: 'system-health', routeId: 'system', label: 'Sistem Sağlığı', heading: 'System', icon: 'layers' },
+      {
+        id: 'enterprise-workspace',
+        routeId: 'enterprise-workspace',
+        label: 'Enterprise Workspace',
+        heading: 'Enterprise Workspace',
+        icon: 'shield',
+      },
+      {
+        id: 'enterprise-users',
+        routeId: 'enterprise-users',
+        label: 'Enterprise Users',
+        heading: 'Enterprise Users',
+        icon: 'users',
+      },
+      {
+        id: 'enterprise-roles',
+        routeId: 'enterprise-roles',
+        label: 'Enterprise Roles',
+        heading: 'Enterprise Roles',
+        icon: 'policy',
+      },
+      {
+        id: 'enterprise-enrollment',
+        routeId: 'enterprise-enrollment',
+        label: 'Agent Enrollment',
+        heading: 'Agent Enrollment',
+        icon: 'approval',
+      },
+      {
+        id: 'enterprise-fleet',
+        routeId: 'enterprise-fleet',
+        label: 'Agent Fleet',
+        heading: 'Agent Fleet',
+        icon: 'monitor',
+      },
+      {
+        id: 'enterprise-identity',
+        routeId: 'enterprise-identity',
+        label: 'Identity Health',
+        heading: 'Identity Health',
+        icon: 'health',
+      },
       {
         id: 'memory-governance',
         routeId: 'memory-governance',

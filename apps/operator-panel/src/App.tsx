@@ -125,6 +125,12 @@ import { asControlPlaneClaimMatrix } from './controlPlaneMappers';
 import { MemoryAuthorityView } from './memory-authority/MemoryAuthorityView';
 import { GovernedPilotWorkflowView } from './governed-pilot-workflow/GovernedPilotWorkflowView';
 import { DesignPartnerHandoffView } from './design-partner-handoff/DesignPartnerHandoffView';
+import { AgentEnrollmentView } from './enterprise-workspace/AgentEnrollmentView';
+import { AgentFleetView } from './enterprise-workspace/AgentFleetView';
+import { EnterpriseWorkspaceOverview } from './enterprise-workspace/EnterpriseWorkspaceOverview';
+import { IdentityHealthView } from './enterprise-workspace/IdentityHealthView';
+import { RolesPermissionsView } from './enterprise-workspace/RolesPermissionsView';
+import { UsersMembershipsView } from './enterprise-workspace/UsersMembershipsView';
 import { MainlineRcFreezeView } from './mainline-rc-freeze/MainlineRcFreezeView';
 import { RcGateEvidenceView } from './rc-gate-evidence/RcGateEvidenceView';
 import { ReleaseDecisionView } from './release-decision/ReleaseDecisionView';
@@ -1220,6 +1226,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const mainlineRcFreeze = controlPlaneSnapshot?.mainlineRcFreeze ?? null;
   const rcGateEvidence = controlPlaneSnapshot?.rcGateEvidence ?? null;
   const rcReleaseDecision = controlPlaneSnapshot?.rcReleaseDecision ?? null;
+  const enterpriseWorkspace = controlPlaneSnapshot?.enterpriseWorkspace ?? null;
   const selectedEvidencePack = evidencePacks[0] ?? null;
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
@@ -2532,6 +2539,30 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'memory-governance' ? (
           <MemoryGovernanceView snapshot={memoryGovernance} locale={locale} />
+        ) : null}
+
+        {activeView === 'enterprise-workspace' ? (
+          <EnterpriseWorkspaceOverview snapshot={enterpriseWorkspace} locale={locale} />
+        ) : null}
+
+        {activeView === 'enterprise-users' ? (
+          <UsersMembershipsView snapshot={enterpriseWorkspace} locale={locale} />
+        ) : null}
+
+        {activeView === 'enterprise-roles' ? (
+          <RolesPermissionsView snapshot={enterpriseWorkspace} locale={locale} />
+        ) : null}
+
+        {activeView === 'enterprise-enrollment' ? (
+          <AgentEnrollmentView snapshot={enterpriseWorkspace} locale={locale} />
+        ) : null}
+
+        {activeView === 'enterprise-fleet' ? (
+          <AgentFleetView snapshot={enterpriseWorkspace} locale={locale} />
+        ) : null}
+
+        {activeView === 'enterprise-identity' ? (
+          <IdentityHealthView snapshot={enterpriseWorkspace} locale={locale} />
         ) : null}
 
         {activeView === 'memory-runtime' ? (

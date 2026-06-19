@@ -1,3 +1,5 @@
+import type { EnterpriseWorkspaceSnapshot } from '../enterprise-workspace/enterpriseWorkspaceTypes';
+
 export type DataSourceMode = 'preview_fixture' | 'tauri_live' | 'cli_live' | 'stale_cache' | 'error';
 export type DataFreshness = 'fresh' | 'stale' | 'unknown';
 export type HealthStatus = 'healthy' | 'partial' | 'degraded' | 'blocked' | 'unknown';
@@ -53,6 +55,12 @@ export interface AgentSummary {
   agentType: 'internal' | 'external_stdio' | 'external_http' | 'computer_use_adapter';
   status: string;
   readiness: string;
+  workspaceId?: string | null;
+  principalId?: string | null;
+  deviceId?: string | null;
+  enrollmentId?: string | null;
+  enrollmentStatus?: string | null;
+  workspaceBindingStatus?: string | null;
   ownerTeam?: string | null;
   policyPackId?: string | null;
   riskProfile: 'read_only' | 'guarded' | 'restricted' | 'blocked';
@@ -694,6 +702,7 @@ export interface ControlPlaneSnapshot {
   mainlineRcFreeze?: MainlineRcFreezeSnapshot;
   rcGateEvidence?: RcGateEvidenceSnapshot;
   rcReleaseDecision?: RcReleaseDecisionSnapshot;
+  enterpriseWorkspace?: EnterpriseWorkspaceSnapshot | null;
   memoryGovernance?: MemoryAuthoritySnapshot;
   memoryRuntime?: MemoryRuntimeSnapshot;
   memorySync?: MemorySyncSnapshot;
