@@ -1,0 +1,90 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "deviceId": {
+      "title": "Deviceid",
+      "type": "string"
+    },
+    "displayName": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Displayname",
+      "type": "string"
+    },
+    "hostFingerprintHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hostfingerprinthash"
+    },
+    "lastSeenAtUtc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lastseenatutc"
+    },
+    "platform": {
+      "enum": [
+        "linux",
+        "macos",
+        "windows",
+        "unknown"
+      ],
+      "title": "Platform",
+      "type": "string"
+    },
+    "principalId": {
+      "title": "Principalid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "enterprise-device/v1",
+      "default": "enterprise-device/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "active",
+        "suspended",
+        "revoked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "deviceId",
+    "workspaceId",
+    "principalId",
+    "displayName",
+    "platform",
+    "status",
+    "createdAtUtc"
+  ],
+  "title": "EnterpriseDevice",
+  "type": "object"
+}

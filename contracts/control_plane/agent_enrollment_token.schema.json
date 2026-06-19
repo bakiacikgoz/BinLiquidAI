@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "EnrollmentMemoryScope": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "read",
+            "write",
+            "proposal_only",
+            "requires_approval"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "scope": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "mode"
+      ],
+      "title": "EnrollmentMemoryScope",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowedCapabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowedcapabilities",
+      "type": "array"
+    },
+    "allowedPrincipalType": {
+      "enum": [
+        "service_agent",
+        "external_agent"
+      ],
+      "title": "Allowedprincipaltype",
+      "type": "string"
+    },
+    "approvalRequired": {
+      "const": true,
+      "default": true,
+      "title": "Approvalrequired",
+      "type": "boolean"
+    },
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "createdByPrincipalId": {
+      "title": "Createdbyprincipalid",
+      "type": "string"
+    },
+    "expiresAtUtc": {
+      "format": "date-time",
+      "title": "Expiresatutc",
+      "type": "string"
+    },
+    "intendedAgentId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Intendedagentid"
+    },
+    "intendedDeviceLabel": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Intendeddevicelabel",
+      "type": "string"
+    },
+    "maxUses": {
+      "const": 1,
+      "default": 1,
+      "title": "Maxuses",
+      "type": "integer"
+    },
+    "memoryScopes": {
+      "items": {
+        "$ref": "#/$defs/EnrollmentMemoryScope"
+      },
+      "title": "Memoryscopes",
+      "type": "array"
+    },
+    "organizationId": {
+      "title": "Organizationid",
+      "type": "string"
+    },
+    "policyProfile": {
+      "minLength": 1,
+      "title": "Policyprofile",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "agent-enrollment-token/v1",
+      "default": "agent-enrollment-token/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "default": "active",
+      "enum": [
+        "active",
+        "used",
+        "revoked",
+        "expired"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tokenHash": {
+      "title": "Tokenhash",
+      "type": "string"
+    },
+    "tokenId": {
+      "title": "Tokenid",
+      "type": "string"
+    },
+    "useCount": {
+      "default": 0,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Usecount",
+      "type": "integer"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tokenId",
+    "tokenHash",
+    "organizationId",
+    "workspaceId",
+    "intendedDeviceLabel",
+    "allowedPrincipalType",
+    "allowedCapabilities",
+    "policyProfile",
+    "createdByPrincipalId",
+    "createdAtUtc",
+    "expiresAtUtc"
+  ],
+  "title": "AgentEnrollmentToken",
+  "type": "object"
+}

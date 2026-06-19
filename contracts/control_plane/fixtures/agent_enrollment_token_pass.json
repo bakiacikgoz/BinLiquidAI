@@ -1,0 +1,30 @@
+{
+  "token": {
+    "allowedCapabilities": [
+      "external_write",
+      "read"
+    ],
+    "allowedPrincipalType": "external_agent",
+    "approvalRequired": true,
+    "createdAtUtc": "2026-06-19T00:00:00Z",
+    "createdByPrincipalId": "principal-admin",
+    "expiresAtUtc": "2026-06-19T00:15:00Z",
+    "intendedAgentId": "ops-agent",
+    "intendedDeviceLabel": "ops-host-01",
+    "maxUses": 1,
+    "memoryScopes": [
+      {
+        "mode": "read",
+        "scope": "workspace"
+      }
+    ],
+    "organizationId": "local-org",
+    "policyProfile": "enterprise",
+    "schemaVersion": "agent-enrollment-token/v1",
+    "status": "active",
+    "tokenHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tokenId": "enrtok-test",
+    "useCount": 0,
+    "workspaceId": "pilot-workspace"
+  }
+}

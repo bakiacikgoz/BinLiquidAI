@@ -1,0 +1,89 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "title": "Agentid",
+      "type": "string"
+    },
+    "capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "deviceId": {
+      "title": "Deviceid",
+      "type": "string"
+    },
+    "enrollmentId": {
+      "title": "Enrollmentid",
+      "type": "string"
+    },
+    "lastSeenAtUtc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lastseenatutc"
+    },
+    "policyProfile": {
+      "minLength": 1,
+      "title": "Policyprofile",
+      "type": "string"
+    },
+    "principalId": {
+      "title": "Principalid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "enrolled-agent/v1",
+      "default": "enrolled-agent/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pending_approval",
+        "active",
+        "suspended",
+        "revoked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tokenId": {
+      "title": "Tokenid",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "enrollmentId",
+    "workspaceId",
+    "agentId",
+    "principalId",
+    "deviceId",
+    "tokenId",
+    "status",
+    "capabilities",
+    "policyProfile",
+    "createdAtUtc"
+  ],
+  "title": "EnrolledAgent",
+  "type": "object"
+}

@@ -1,0 +1,15 @@
+{
+  "allowed": false,
+  "permission": "agent.enrollment.create",
+  "permissions": [
+    "agent.read",
+    "audit.read",
+    "config.read",
+    "workspace.read",
+    "workspace.role.read"
+  ],
+  "reasonCode": "WORKSPACE_PERMISSION_DENIED",
+  "roles": [
+    "viewer"
+  ]
+}

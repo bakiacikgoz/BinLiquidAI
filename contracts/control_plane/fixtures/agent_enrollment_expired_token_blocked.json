@@ -1,0 +1,7 @@
+{
+  "blockingReasons": [
+    "TOKEN_EXPIRED"
+  ],
+  "schemaVersion": "agent-enrollment-import-result/v1",
+  "status": "blocked"
+}

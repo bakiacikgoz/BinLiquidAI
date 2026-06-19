@@ -1,0 +1,6 @@
+{
+  "agentId": "ops-agent",
+  "enrollmentId": "enr-test",
+  "status": "accepted",
+  "workspaceId": "pilot-workspace"
+}

@@ -1,0 +1,26 @@
+{
+  "organization": {
+    "createdAtUtc": "2026-06-19T00:00:00Z",
+    "createdByPrincipalId": "principal-admin",
+    "displayName": "Local Org",
+    "organizationId": "local-org",
+    "schemaVersion": "enterprise-organization/v1",
+    "status": "active",
+    "updatedAtUtc": "2026-06-19T00:00:00Z"
+  },
+  "workspace": {
+    "createdAtUtc": "2026-06-19T00:00:00Z",
+    "createdByPrincipalId": "principal-admin",
+    "defaultPolicyPackId": null,
+    "displayName": "Pilot Workspace",
+    "environment": "pilot",
+    "evidenceMode": "hash_only",
+    "memoryAuthorityMode": "local_authority",
+    "organizationId": "local-org",
+    "providerPolicyProfile": "enterprise",
+    "schemaVersion": "enterprise-workspace/v1",
+    "status": "active",
+    "updatedAtUtc": "2026-06-19T00:00:00Z",
+    "workspaceId": "pilot-workspace"
+  }
+}

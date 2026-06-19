@@ -1,0 +1,25 @@
+{
+  "expectedFailure": "RAW_TOKEN_FIELD_FORBIDDEN",
+  "token": {
+    "allowedCapabilities": [
+      "read"
+    ],
+    "allowedPrincipalType": "external_agent",
+    "approvalRequired": true,
+    "createdAtUtc": "2026-06-19T00:00:00Z",
+    "createdByPrincipalId": "principal-admin",
+    "expiresAtUtc": "2026-06-19T00:15:00Z",
+    "intendedDeviceLabel": "ops-host-01",
+    "maxUses": 1,
+    "memoryScopes": [],
+    "organizationId": "local-org",
+    "policyProfile": "enterprise",
+    "rawToken": "shown-once-token-test-value",
+    "schemaVersion": "agent-enrollment-token/v1",
+    "status": "active",
+    "tokenHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tokenId": "enrtok-test",
+    "useCount": 0,
+    "workspaceId": "pilot-workspace"
+  }
+}

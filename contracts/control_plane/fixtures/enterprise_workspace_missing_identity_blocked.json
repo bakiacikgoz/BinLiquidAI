@@ -1,0 +1,8 @@
+{
+  "blockingReasons": [
+    "IDENTITY_REQUIRED"
+  ],
+  "rawSecretsExposed": false,
+  "schemaVersion": "enterprise-workspace-bootstrap-result/v1",
+  "status": "blocked"
+}

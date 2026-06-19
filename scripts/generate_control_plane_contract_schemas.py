@@ -21,6 +21,21 @@ from binliquid.control_plane.external_contracts import (  # noqa: E402
     ExternalAgentRequestV11,
     ExternalAgentV11Result,
 )
+from binliquid.control_plane.agent_enrollment import (  # noqa: E402
+    AgentEnrollmentDecision,
+    AgentEnrollmentRequest,
+    AgentEnrollmentToken,
+    EnrolledAgent,
+)
+from binliquid.control_plane.enterprise_rbac import WorkspacePermissionDecision  # noqa: E402
+from binliquid.control_plane.enterprise_workspace import (  # noqa: E402
+    EnterpriseDevice,
+    EnterpriseOrganization,
+    EnterprisePrincipal,
+    EnterpriseWorkspace,
+    EnterpriseWorkspaceMembership,
+    EnterpriseWorkspaceSnapshot,
+)
 from binliquid.control_plane.field_evidence import (  # noqa: E402
     DesignPartnerFieldEvidenceSnapshot,
     DesignPartnerFieldPackManifest,
@@ -159,6 +174,17 @@ SCHEMAS = {
     "mainline_rc_freeze_snapshot": MainlineRcFreezeSnapshot,
     "rc_gate_evidence_snapshot": RcGateEvidenceSnapshot,
     "rc_release_decision_snapshot": RcReleaseDecisionSnapshot,
+    "enterprise_organization": EnterpriseOrganization,
+    "enterprise_workspace": EnterpriseWorkspace,
+    "enterprise_principal": EnterprisePrincipal,
+    "enterprise_membership": EnterpriseWorkspaceMembership,
+    "enterprise_device": EnterpriseDevice,
+    "agent_enrollment_token": AgentEnrollmentToken,
+    "agent_enrollment_request": AgentEnrollmentRequest,
+    "agent_enrollment_decision": AgentEnrollmentDecision,
+    "enrolled_agent": EnrolledAgent,
+    "enterprise_workspace_snapshot": EnterpriseWorkspaceSnapshot,
+    "workspace_permission_decision": WorkspacePermissionDecision,
 }
 
 OPERATOR_PANEL_SCHEMAS = {

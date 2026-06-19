@@ -1,0 +1,109 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "agentDisplayName": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Agentdisplayname",
+      "type": "string"
+    },
+    "agentId": {
+      "title": "Agentid",
+      "type": "string"
+    },
+    "capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "deviceDisplayName": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Devicedisplayname",
+      "type": "string"
+    },
+    "hostFingerprintHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hostfingerprinthash"
+    },
+    "idempotencyKey": {
+      "maxLength": 160,
+      "minLength": 8,
+      "title": "Idempotencykey",
+      "type": "string"
+    },
+    "platform": {
+      "enum": [
+        "linux",
+        "macos",
+        "windows",
+        "unknown"
+      ],
+      "title": "Platform",
+      "type": "string"
+    },
+    "requestId": {
+      "title": "Requestid",
+      "type": "string"
+    },
+    "requestedAtUtc": {
+      "format": "date-time",
+      "title": "Requestedatutc",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "agent-enrollment-request/v1",
+      "default": "agent-enrollment-request/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "default": "pending_approval",
+      "enum": [
+        "pending_approval",
+        "approved",
+        "rejected",
+        "expired"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tokenId": {
+      "title": "Tokenid",
+      "type": "string"
+    },
+    "tokenProofHash": {
+      "title": "Tokenproofhash",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requestId",
+    "tokenId",
+    "tokenProofHash",
+    "workspaceId",
+    "agentId",
+    "agentDisplayName",
+    "deviceDisplayName",
+    "platform",
+    "capabilities",
+    "requestedAtUtc",
+    "idempotencyKey"
+  ],
+  "title": "AgentEnrollmentRequest",
+  "type": "object"
+}

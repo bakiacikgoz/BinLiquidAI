@@ -1,0 +1,441 @@
+{
+  "$defs": {
+    "CanonicalRoleSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "risk": {
+          "title": "Risk",
+          "type": "string"
+        },
+        "roleId": {
+          "title": "Roleid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roleId",
+        "label",
+        "risk"
+      ],
+      "title": "CanonicalRoleSummary",
+      "type": "object"
+    },
+    "EnterpriseDeviceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "deviceId": {
+          "title": "Deviceid",
+          "type": "string"
+        },
+        "displayName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Displayname"
+        },
+        "platform": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Platform"
+        },
+        "principalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Principalid"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "workspaceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspaceid"
+        }
+      },
+      "required": [
+        "deviceId",
+        "status"
+      ],
+      "title": "EnterpriseDeviceSummary",
+      "type": "object"
+    },
+    "EnterpriseEnrollmentSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "default": 0,
+          "title": "Active",
+          "type": "integer"
+        },
+        "expiredTokens": {
+          "default": 0,
+          "title": "Expiredtokens",
+          "type": "integer"
+        },
+        "pendingApproval": {
+          "default": 0,
+          "title": "Pendingapproval",
+          "type": "integer"
+        },
+        "revoked": {
+          "default": 0,
+          "title": "Revoked",
+          "type": "integer"
+        }
+      },
+      "title": "EnterpriseEnrollmentSummary",
+      "type": "object"
+    },
+    "EnterpriseIdentitySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "actorId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actorid"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "errorCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Errorcode"
+        },
+        "verified": {
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "verified"
+      ],
+      "title": "EnterpriseIdentitySummary",
+      "type": "object"
+    },
+    "EnterpriseMembershipSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "membershipId": {
+          "title": "Membershipid",
+          "type": "string"
+        },
+        "principalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Principalid"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "status": {
+          "default": "active",
+          "title": "Status",
+          "type": "string"
+        },
+        "workspaceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspaceid"
+        }
+      },
+      "required": [
+        "membershipId"
+      ],
+      "title": "EnterpriseMembershipSummary",
+      "type": "object"
+    },
+    "EnterpriseOrganizationSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "title": "Displayname",
+          "type": "string"
+        },
+        "organizationId": {
+          "title": "Organizationid",
+          "type": "string"
+        },
+        "status": {
+          "default": "active",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "organizationId",
+        "displayName"
+      ],
+      "title": "EnterpriseOrganizationSummary",
+      "type": "object"
+    },
+    "EnterprisePrincipalSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "title": "Displayname",
+          "type": "string"
+        },
+        "principalId": {
+          "title": "Principalid",
+          "type": "string"
+        },
+        "principalType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Principaltype"
+        },
+        "status": {
+          "default": "active",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "principalId",
+        "displayName"
+      ],
+      "title": "EnterprisePrincipalSummary",
+      "type": "object"
+    },
+    "EnterpriseWorkspaceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "title": "Displayname",
+          "type": "string"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Environment"
+        },
+        "status": {
+          "default": "active",
+          "title": "Status",
+          "type": "string"
+        },
+        "workspaceId": {
+          "title": "Workspaceid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspaceId",
+        "displayName"
+      ],
+      "title": "EnterpriseWorkspaceSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "currentWorkspaceId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Currentworkspaceid"
+    },
+    "devices": {
+      "items": {
+        "$ref": "#/$defs/EnterpriseDeviceSummary"
+      },
+      "title": "Devices",
+      "type": "array"
+    },
+    "enrollments": {
+      "$ref": "#/$defs/EnterpriseEnrollmentSummary"
+    },
+    "generatedAtUtc": {
+      "format": "date-time",
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "identity": {
+      "$ref": "#/$defs/EnterpriseIdentitySummary"
+    },
+    "memberships": {
+      "items": {
+        "$ref": "#/$defs/EnterpriseMembershipSummary"
+      },
+      "title": "Memberships",
+      "type": "array"
+    },
+    "networkListenerEnabled": {
+      "const": false,
+      "default": false,
+      "title": "Networklistenerenabled",
+      "type": "boolean"
+    },
+    "organization": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EnterpriseOrganizationSummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "permissionMatrix": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Permissionmatrix",
+      "type": "object"
+    },
+    "principals": {
+      "items": {
+        "$ref": "#/$defs/EnterprisePrincipalSummary"
+      },
+      "title": "Principals",
+      "type": "array"
+    },
+    "rawSecretsExposed": {
+      "const": false,
+      "default": false,
+      "title": "Rawsecretsexposed",
+      "type": "boolean"
+    },
+    "roles": {
+      "items": {
+        "$ref": "#/$defs/CanonicalRoleSummary"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "enterprise-workspace-snapshot/v1",
+      "default": "enterprise-workspace-snapshot/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "setup_required",
+        "blocked",
+        "disabled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workspaces": {
+      "items": {
+        "$ref": "#/$defs/EnterpriseWorkspaceSummary"
+      },
+      "title": "Workspaces",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "identity"
+  ],
+  "title": "EnterpriseWorkspaceSnapshot",
+  "type": "object"
+}

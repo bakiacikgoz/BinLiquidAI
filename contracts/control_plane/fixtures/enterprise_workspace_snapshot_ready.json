@@ -1,0 +1,69 @@
+{
+  "blockingReasons": [],
+  "currentWorkspaceId": "pilot-workspace",
+  "devices": [
+    {
+      "deviceId": "device-host-01",
+      "displayName": "Ops Host 01",
+      "platform": "linux",
+      "principalId": "principal-device",
+      "status": "active",
+      "workspaceId": "pilot-workspace"
+    }
+  ],
+  "enrollments": {
+    "active": 1,
+    "expiredTokens": 0,
+    "pendingApproval": 0,
+    "revoked": 0
+  },
+  "generatedAtUtc": "2026-06-19T00:00:00Z",
+  "identity": {
+    "actorId": "principal-admin",
+    "enabled": true,
+    "verified": true
+  },
+  "memberships": [
+    {
+      "membershipId": "membership-test",
+      "principalId": "principal-admin",
+      "roles": [
+        "platform_admin"
+      ],
+      "status": "active",
+      "workspaceId": "pilot-workspace"
+    }
+  ],
+  "networkListenerEnabled": false,
+  "organization": {
+    "displayName": "Local Org",
+    "organizationId": "local-org",
+    "status": "active"
+  },
+  "permissionMatrix": {
+    "principal-admin": [
+      "agent.enrollment.create",
+      "workspace.read"
+    ]
+  },
+  "principals": [
+    {
+      "displayName": "Admin",
+      "principalId": "principal-admin",
+      "principalType": "human_user",
+      "status": "active"
+    }
+  ],
+  "rawSecretsExposed": false,
+  "roles": [],
+  "schemaVersion": "enterprise-workspace-snapshot/v1",
+  "status": "ready",
+  "workspaces": [
+    {
+      "displayName": "Pilot Workspace",
+      "environment": "pilot",
+      "status": "active",
+      "workspaceId": "pilot-workspace"
+    }
+  ]
+}

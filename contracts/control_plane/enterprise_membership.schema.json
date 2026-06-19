@@ -1,0 +1,72 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "expiresAtUtc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expiresatutc"
+    },
+    "grantedAtUtc": {
+      "format": "date-time",
+      "title": "Grantedatutc",
+      "type": "string"
+    },
+    "grantedByPrincipalId": {
+      "title": "Grantedbyprincipalid",
+      "type": "string"
+    },
+    "membershipId": {
+      "title": "Membershipid",
+      "type": "string"
+    },
+    "principalId": {
+      "title": "Principalid",
+      "type": "string"
+    },
+    "roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "enterprise-membership/v1",
+      "default": "enterprise-membership/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "active",
+        "suspended",
+        "revoked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workspaceId": {
+      "title": "Workspaceid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "membershipId",
+    "workspaceId",
+    "principalId",
+    "roles",
+    "status",
+    "grantedByPrincipalId",
+    "grantedAtUtc"
+  ],
+  "title": "EnterpriseWorkspaceMembership",
+  "type": "object"
+}

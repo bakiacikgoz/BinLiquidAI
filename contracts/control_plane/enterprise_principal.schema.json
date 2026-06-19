@@ -1,0 +1,93 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "createdAtUtc": {
+      "format": "date-time",
+      "title": "Createdatutc",
+      "type": "string"
+    },
+    "displayName": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Displayname",
+      "type": "string"
+    },
+    "externalSubjectRefHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Externalsubjectrefhash"
+    },
+    "issuerHash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Issuerhash"
+    },
+    "lastSeenAtUtc": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lastseenatutc"
+    },
+    "principalId": {
+      "title": "Principalid",
+      "type": "string"
+    },
+    "principalType": {
+      "enum": [
+        "human_user",
+        "service_agent",
+        "external_agent",
+        "device_host",
+        "break_glass"
+      ],
+      "title": "Principaltype",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "enterprise-principal/v1",
+      "default": "enterprise-principal/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "active",
+        "disabled",
+        "revoked",
+        "pending"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "principalId",
+    "principalType",
+    "displayName",
+    "status",
+    "createdAtUtc"
+  ],
+  "title": "EnterprisePrincipal",
+  "type": "object"
+}
