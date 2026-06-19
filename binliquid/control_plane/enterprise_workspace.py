@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -283,3 +284,139 @@ class EnterpriseWorkspaceSnapshot(StrictModel):
         if self.status == "blocked" and not self.blocking_reasons:
             raise ValueError("blocked snapshot requires blocking reasons")
         return self
+
+
+class EnterpriseWorkspaceBootstrapRequest(StrictModel):
+    organization_id: str = Field(alias="organizationId")
+    workspace_id: str = Field(alias="workspaceId")
+    display_name: str = Field(alias="displayName", min_length=1, max_length=160)
+    environment: Literal["dev", "staging", "production", "pilot"] = "pilot"
+    provider_policy_profile: str = Field(default="enterprise", alias="providerPolicyProfile")
+
+    @field_validator("organization_id", "workspace_id")
+    @classmethod
+    def _safe_ids(cls, value: str, info: Any) -> str:
+        return _validate_safe_id(value, str(info.field_name))
+
+
+class EnterpriseWorkspaceBootstrapResult(StrictModel):
+    schema_version: Literal["enterprise-workspace-bootstrap-result/v1"] = Field(
+        default="enterprise-workspace-bootstrap-result/v1",
+        alias="schemaVersion",
+    )
+    status: Literal["created", "unchanged", "blocked", "conflict"]
+    organization_id: str | None = Field(default=None, alias="organizationId")
+    workspace_id: str | None = Field(default=None, alias="workspaceId")
+    bootstrap_principal_id: str | None = Field(default=None, alias="bootstrapPrincipalId")
+    membership_id: str | None = Field(default=None, alias="membershipId")
+    evidence_ref: str | None = Field(default=None, alias="evidenceRef")
+    blocking_reasons: list[str] = Field(default_factory=list, alias="blockingReasons")
+    raw_secrets_exposed: Literal[False] = Field(default=False, alias="rawSecretsExposed")
+
+
+def build_bootstrap_principal_from_actor(actor: Any) -> EnterprisePrincipal:
+    actor_id = str(actor.actor_id)
+    return EnterprisePrincipal(
+        principalId=stable_id("principal", actor_id),
+        principalType="break_glass" if bool(getattr(actor, "is_break_glass", False)) else "human_user",
+        displayName=actor_id,
+        status="active",
+        externalSubjectRefHash=hash_identity_ref(str(actor.subject)),
+        issuerHash=hash_identity_ref(str(actor.issuer)),
+        createdAtUtc=utc_now(),
+        lastSeenAtUtc=utc_now(),
+    )
+
+
+def bootstrap_enterprise_workspace(
+    *,
+    config: Any,
+    request: EnterpriseWorkspaceBootstrapRequest,
+    root_dir: str | Path = ".binliquid/control-plane",
+    env: dict[str, str] | None = None,
+) -> EnterpriseWorkspaceBootstrapResult:
+    from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+    from binliquid.enterprise.identity import IdentityResolutionError, resolve_actor_context
+
+    try:
+        actor = resolve_actor_context(config, env=env)
+    except IdentityResolutionError as exc:
+        return EnterpriseWorkspaceBootstrapResult(
+            status="blocked",
+            blockingReasons=[exc.error_code],
+            rawSecretsExposed=False,
+        )
+
+    store = EnterpriseWorkspaceStore(root_dir)
+    now = utc_now()
+    principal = build_bootstrap_principal_from_actor(actor)
+    organization = EnterpriseOrganization(
+        organizationId=request.organization_id,
+        displayName=request.organization_id,
+        status="active",
+        createdByPrincipalId=principal.principal_id,
+        createdAtUtc=now,
+        updatedAtUtc=now,
+    )
+    workspace = EnterpriseWorkspace(
+        workspaceId=request.workspace_id,
+        organizationId=request.organization_id,
+        displayName=request.display_name,
+        environment=request.environment,
+        status="active",
+        defaultPolicyPackId=None,
+        memoryAuthorityMode="local_authority",
+        providerPolicyProfile=request.provider_policy_profile,
+        evidenceMode="hash_only",
+        createdByPrincipalId=principal.principal_id,
+        createdAtUtc=now,
+        updatedAtUtc=now,
+    )
+    membership_id = make_membership_id(request.workspace_id, principal.principal_id)
+    membership = EnterpriseWorkspaceMembership(
+        membershipId=membership_id,
+        workspaceId=request.workspace_id,
+        principalId=principal.principal_id,
+        roles=("platform_admin",),
+        status="active",
+        grantedByPrincipalId=principal.principal_id,
+        grantedAtUtc=now,
+    )
+
+    write_results = [
+        store.write_organization(organization),
+        store.write_workspace(workspace),
+        store.write_principal(principal),
+        store.write_membership(membership),
+    ]
+    if any(result.status == "conflict" for result in write_results):
+        return EnterpriseWorkspaceBootstrapResult(
+            status="conflict",
+            organizationId=request.organization_id,
+            workspaceId=request.workspace_id,
+            bootstrapPrincipalId=principal.principal_id,
+            membershipId=membership_id,
+            blockingReasons=["ENTERPRISE_WORKSPACE_CONFLICT"],
+        )
+
+    evidence_ref = store.write_evidence_event(
+        event_type="enterprise_workspace_bootstrap",
+        payload={
+            "organizationId": request.organization_id,
+            "workspaceId": request.workspace_id,
+            "principalId": principal.principal_id,
+            "membershipId": membership_id,
+            "actorIdHash": hash_identity_ref(str(actor.actor_id)),
+            "status": "created"
+            if any(result.status == "written" for result in write_results)
+            else "unchanged",
+        },
+    )
+    return EnterpriseWorkspaceBootstrapResult(
+        status="created" if any(result.status == "written" for result in write_results) else "unchanged",
+        organizationId=request.organization_id,
+        workspaceId=request.workspace_id,
+        bootstrapPrincipalId=principal.principal_id,
+        membershipId=membership_id,
+        evidenceRef=evidence_ref,
+    )

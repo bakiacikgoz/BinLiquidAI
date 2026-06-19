@@ -387,6 +387,13 @@ release_rc_freeze_app = typer.Typer(help="Mainline RC freeze commands")
 release_rc_app = typer.Typer(help="RC release reconciliation commands")
 release_decision_app = typer.Typer(help="RC release decision dossier commands")
 release_gates_app = typer.Typer(help="Cross-platform release gate evidence commands")
+enterprise_app = typer.Typer(help="Enterprise workspace commands")
+enterprise_workspace_app = typer.Typer(help="Enterprise workspace setup commands")
+enterprise_membership_app = typer.Typer(help="Enterprise workspace membership commands")
+enterprise_enrollment_app = typer.Typer(help="Enterprise agent enrollment commands")
+enterprise_enrollment_token_app = typer.Typer(help="Enterprise enrollment token commands")
+enterprise_enrollment_request_app = typer.Typer(help="Enterprise enrollment request commands")
+enterprise_rbac_app = typer.Typer(help="Enterprise workspace RBAC commands")
 auth_app = typer.Typer(help="Enterprise identity commands")
 security_app = typer.Typer(help="Enterprise security commands")
 keys_app = typer.Typer(help="Enterprise key management commands")
@@ -465,6 +472,13 @@ release_app.add_typer(release_rc_freeze_app, name="rc-freeze")
 release_app.add_typer(release_rc_app, name="rc")
 release_app.add_typer(release_decision_app, name="decision")
 release_app.add_typer(release_gates_app, name="gates")
+app.add_typer(enterprise_app, name="enterprise")
+enterprise_app.add_typer(enterprise_workspace_app, name="workspace")
+enterprise_app.add_typer(enterprise_membership_app, name="membership")
+enterprise_app.add_typer(enterprise_enrollment_app, name="enrollment")
+enterprise_enrollment_app.add_typer(enterprise_enrollment_token_app, name="token")
+enterprise_enrollment_app.add_typer(enterprise_enrollment_request_app, name="request")
+enterprise_app.add_typer(enterprise_rbac_app, name="rbac")
 app.add_typer(auth_app, name="auth")
 app.add_typer(security_app, name="security")
 app.add_typer(keys_app, name="keys")
@@ -3017,6 +3031,112 @@ def control_plane_rbac_check(
     )
     _emit_payload(decision.model_dump(mode="json", by_alias=True), json_output=json_output)
     if decision.status == "denied":
+        raise typer.Exit(code=3)
+
+
+@enterprise_workspace_app.command("bootstrap")
+def enterprise_workspace_bootstrap_command(
+    organization_id: str = typer.Option(..., "--organization-id", help="Organization id"),
+    workspace_id: str = typer.Option(..., "--workspace-id", help="Workspace id"),
+    display_name: str = typer.Option(..., "--display-name", help="Workspace display name"),
+    environment: str = typer.Option("pilot", "--environment", help="Workspace environment"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.enterprise_workspace import (
+        EnterpriseWorkspaceBootstrapRequest,
+        bootstrap_enterprise_workspace,
+    )
+
+    request = EnterpriseWorkspaceBootstrapRequest(
+        organizationId=organization_id,
+        workspaceId=workspace_id,
+        displayName=display_name,
+        environment=environment,
+        providerPolicyProfile=profile,
+    )
+    result = bootstrap_enterprise_workspace(
+        config=RuntimeConfig.from_profile(profile),
+        request=request,
+        root_dir=root_dir,
+    )
+    _emit_payload(result.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@enterprise_workspace_app.command("snapshot")
+def enterprise_workspace_snapshot_command(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.enterprise_workspace_snapshot import (
+        build_enterprise_workspace_snapshot,
+    )
+
+    snapshot = build_enterprise_workspace_snapshot(
+        config=RuntimeConfig.from_profile(profile),
+        root_dir=root_dir,
+    )
+    _emit_payload(snapshot.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@enterprise_workspace_app.command("list")
+def enterprise_workspace_list_command(
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+
+    store = EnterpriseWorkspaceStore(root_dir)
+    _emit_payload(
+        {
+            "schemaVersion": "enterprise-workspace-list/v1",
+            "workspaces": [
+                workspace.model_dump(mode="json", by_alias=True)
+                for workspace in store.list_workspaces()
+            ],
+        },
+        json_output=json_output,
+    )
+
+
+@enterprise_workspace_app.command("show")
+def enterprise_workspace_show_command(
+    workspace_id: str = typer.Option(..., "--workspace-id", help="Workspace id"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+
+    workspace = EnterpriseWorkspaceStore(root_dir).get_workspace(workspace_id)
+    if workspace is None:
+        _emit_payload(
+            {
+                "schemaVersion": "enterprise-workspace-show/v1",
+                "status": "missing",
+                "workspaceId": workspace_id,
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=3)
+    _emit_payload(workspace.model_dump(mode="json", by_alias=True), json_output=json_output)
+
+
+@enterprise_rbac_app.command("check")
+def enterprise_rbac_check_command(
+    permission: str = typer.Option(..., "--permission", help="Permission to check"),
+    role: list[str] | None = typer.Option(None, "--role", help="Role id to include"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    workspace_id: str = typer.Option("", "--workspace-id", help="Workspace id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    from binliquid.control_plane.enterprise_rbac import check_roles_for_permission
+
+    del profile, workspace_id
+    decision = check_roles_for_permission(role or ["viewer"], permission)
+    _emit_payload(decision.model_dump(mode="json", by_alias=True), json_output=json_output)
+    if not decision.allowed:
         raise typer.Exit(code=3)
 
 
