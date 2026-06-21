@@ -68,3 +68,14 @@ uv run binliquid security baseline --profile enterprise --json
 uv run binliquid metrics snapshot --profile enterprise --json
 uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
 ```
+# Product-Complete Deployment Gate
+
+Before claiming a self-hosted enterprise deployment is product-complete, run:
+
+```bash
+uv run python scripts/run_product_complete_closure_gate.py --profile enterprise --json
+```
+
+The gate writes JSON, Markdown, PR body, and no-ship register artifacts under
+`artifacts/product-complete-closure/`. Any `noShipBlockers` entry blocks the
+ready claim.

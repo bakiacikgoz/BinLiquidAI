@@ -181,6 +181,17 @@ uv run pytest -q
 uv run binliquid doctor --profile balanced
 ```
 
+Product-complete local closure:
+
+```bash
+uv run binliquid setup first-run --profile enterprise --mode local-enterprise --json
+uv run python scripts/run_product_complete_closure_gate.py --profile enterprise --json
+```
+
+See [Product-Complete Closure](docs/PRODUCT_COMPLETE_CLOSURE.md),
+[First-Run Setup](docs/FIRST_RUN_SETUP.md), and
+[AI Assistant Real Runtime Guide](docs/AI_ASSISTANT_REAL_RUNTIME_GUIDE.md).
+
 ### Windows developer quickstart
 
 ```powershell

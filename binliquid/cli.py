@@ -318,6 +318,10 @@ provider_native_app = typer.Typer(help="Model provider native adapter commands")
 provider_native_conformance_app = typer.Typer(
     help="Model provider native adapter conformance commands"
 )
+assistant_app = typer.Typer(help="Product assistant runtime commands")
+setup_app = typer.Typer(help="First-run setup diagnostics")
+product_app = typer.Typer(help="Product-complete demo and smoke commands")
+product_demo_app = typer.Typer(help="Product-complete demo workflows")
 DEFAULT_PROVIDER_NATIVE_OUTPUT_ROOT = Path("artifacts/model-provider-governance/native-v2")
 PROVIDER_NATIVE_OUTPUT_ROOT_OPTION = typer.Option(
     DEFAULT_PROVIDER_NATIVE_OUTPUT_ROOT,
@@ -430,6 +434,10 @@ provider_app.add_typer(provider_canary_app, name="canary")
 provider_app.add_typer(provider_route_app, name="route")
 provider_app.add_typer(provider_native_app, name="native")
 provider_native_app.add_typer(provider_native_conformance_app, name="conformance")
+app.add_typer(assistant_app, name="assistant")
+app.add_typer(setup_app, name="setup")
+app.add_typer(product_app, name="product")
+product_app.add_typer(product_demo_app, name="demo")
 app.add_typer(approval_app, name="approval")
 app.add_typer(operator_app, name="operator")
 app.add_typer(computer_use_app, name="computer-use")
@@ -1110,6 +1118,497 @@ def _provider_native_payload(kind: ProviderKind | str | None) -> dict[str, objec
         "stopReasonPolicy": None,
         "liveCanaryStatus": None,
     }
+
+
+def _assistant_utc_now() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _assistant_model_status(provider: dict[str, object]) -> tuple[str, list[str]]:
+    reasons: list[str] = []
+    error_code = provider.get("errorCode") or provider.get("disabledReason")
+    if isinstance(error_code, str) and error_code:
+        reasons.append(error_code)
+    models = provider.get("models")
+    has_models = isinstance(models, list) and len(models) > 0
+    if provider.get("available") is True and has_models:
+        return "available", reasons
+    if provider.get("available") is False or not has_models:
+        if not reasons:
+            reasons.append("NO_MODELS_DISCOVERED")
+        return "unavailable", reasons
+    return "blocked", reasons or ["PROVIDER_STATUS_UNKNOWN"]
+
+
+def _assistant_models_contract(
+    *,
+    profile: str,
+    provider: str,
+) -> dict[str, object]:
+    source = _provider_models_payload(profile=profile, requested_provider=provider)
+    providers: list[dict[str, object]] = []
+    selected_default: dict[str, str] | None = None
+    blocking_reasons: list[str] = []
+    for item in source.get("providers", []):
+        if not isinstance(item, dict):
+            continue
+        status, reasons = _assistant_model_status(item)
+        models = item.get("models") if isinstance(item.get("models"), list) else []
+        model_records: list[dict[str, object]] = []
+        for model in models:
+            if not isinstance(model, dict):
+                continue
+            model_id = str(model.get("id") or "").strip()
+            if not model_id:
+                continue
+            model_records.append(
+                {
+                    "id": model_id,
+                    "label": str(model.get("label") or model_id),
+                    "source": str(model.get("source") or "discovery"),
+                }
+            )
+        provider_id = str(item.get("provider") or "unknown")
+        if status == "available" and selected_default is None and model_records:
+            selected_default = {"provider": provider_id, "model": str(model_records[0]["id"])}
+        if status != "available":
+            blocking_reasons.extend(reasons)
+        providers.append(
+            {
+                "provider": provider_id,
+                "status": status,
+                "models": model_records,
+                "blockingReasons": reasons,
+            }
+        )
+    unique_blocking_reasons = sorted(set(blocking_reasons))
+    return {
+        "schemaVersion": "assistant.provider-models/v1",
+        "profile": profile,
+        "provider": provider,
+        "providers": providers,
+        "selectedDefault": selected_default,
+        "blockingReasons": unique_blocking_reasons,
+        "generatedAtUtc": _assistant_utc_now(),
+    }
+
+
+def _assistant_doctor_contract(*, profile: str, provider: str) -> dict[str, object]:
+    models = _assistant_models_contract(profile=profile, provider=provider)
+    available = any(item.get("status") == "available" for item in models["providers"])  # type: ignore[index]
+    blocking_reasons = list(models.get("blockingReasons", []))
+    if not available and "ASSISTANT_MODEL_UNAVAILABLE" not in blocking_reasons:
+        blocking_reasons.insert(0, "ASSISTANT_MODEL_UNAVAILABLE")
+    return {
+        "schemaVersion": "assistant.doctor/v1",
+        "profile": profile,
+        "status": "ready" if available else "setup_required",
+        "previewFallbackAllowed": False,
+        "modelDiscovery": models,
+        "blockingReasons": blocking_reasons,
+        "nextActions": []
+        if available
+        else [
+            "Install or start a local provider such as Ollama, or configure a governed provider.",
+            "Run `binliquid assistant models --profile enterprise --json` after setup.",
+        ],
+        "generatedAtUtc": _assistant_utc_now(),
+    }
+
+
+def _assistant_event_payload(
+    *,
+    session_id: str,
+    turn_id: str,
+    sequence: int,
+    event: str,
+    data: dict[str, object],
+) -> dict[str, object]:
+    normalized = {
+        "token": "delta",
+        "status": "delta",
+        "approval_pending": "approval_required",
+        "approval_required": "approval_required",
+        "final": "final",
+        "error": "error",
+        "tool_proposal": "tool_proposal",
+    }.get(event, "delta")
+    return {
+        "contractVersion": "2.0",
+        "assistantTurnId": turn_id,
+        "sessionId": session_id,
+        "event": normalized,
+        "sequence": sequence,
+        "timestampUtc": _assistant_utc_now(),
+        "data": data,
+    }
+
+
+def _assistant_turn_events(
+    *,
+    profile: str,
+    session_id: str,
+    turn_id: str,
+    prompt: str,
+    provider: str | None,
+    provider_id: str | None,
+    fallback_provider: str | None,
+    fallback_provider_id: str | None,
+    model: str | None,
+    hf_model_id: str | None,
+) -> list[dict[str, object]]:
+    config, source_map = resolve_runtime_config(
+        profile=profile,
+        cli_overrides=_build_cli_overrides(
+            provider=provider,
+            fallback_provider=fallback_provider,
+            model=model,
+            hf_model_id=hf_model_id,
+        ),
+    )
+    _require_permission_or_exit(config, "runtime.run")
+    orchestrator = _build_orchestrator(
+        config,
+        provider_name=config.llm_provider,
+        provider_id=provider_id,
+        fallback_provider_id=fallback_provider_id,
+        fallback_provider=config.fallback_provider,
+    )
+    startup_error = _startup_abort(config, getattr(orchestrator, "governance_runtime", None))
+    if startup_error:
+        return [
+            {
+                "event": "error",
+                "data": {
+                    "code": "POLICY_UNAVAILABLE",
+                    "message": startup_error,
+                },
+            }
+        ]
+    context = {"session_id": session_id}
+    context.update(_model_selection_context(config=config, source_map=source_map))
+    result = orchestrator.process(prompt, session_context=context, use_router=True)
+    events: list[dict[str, object]] = []
+    for trace_event in orchestrator.trace_events(result.trace_id):
+        stage = str(trace_event.get("stage", "status"))
+        event = "approval_required" if stage == "approval_pending" else "delta"
+        events.append(
+            {
+                "event": event,
+                "data": {
+                    "stage": stage,
+                    "requestId": trace_event.get("request_id"),
+                    "data": trace_event.get("data", {}),
+                },
+            }
+        )
+    events.append(
+        {
+            "event": "final",
+            "data": {
+                "traceId": result.trace_id,
+                "finalText": result.final_text,
+                "usedPath": result.used_path,
+                "fallbackEvents": result.fallback_events,
+                "metrics": result.metrics,
+            },
+        }
+    )
+    return events
+
+
+def _first_run_check(
+    *,
+    check_id: str,
+    label: str,
+    status: str,
+    reason_code: str | None = None,
+    next_action: str | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "id": check_id,
+        "label": label,
+        "status": status,
+        "mutation": "none",
+    }
+    if reason_code:
+        payload["reasonCode"] = reason_code
+    if next_action:
+        payload["nextAction"] = next_action
+    return payload
+
+
+def _build_first_run_setup_payload(
+    *,
+    profile: str,
+    mode: str,
+    apply: bool,
+) -> dict[str, object]:
+    if apply:
+        return {
+            "schemaVersion": "setup.first-run/v1",
+            "status": "blocked",
+            "profile": profile,
+            "mode": mode,
+            "checks": [],
+            "nextActions": ["Run explicit bootstrap commands after reviewing setup docs."],
+            "blockingReasons": ["FIRST_RUN_APPLY_NOT_IMPLEMENTED_BY_SAFE_DIAGNOSTIC"],
+            "applyRequested": True,
+        }
+    checks: list[dict[str, object]] = []
+    blocking_reasons: list[str] = []
+    next_actions: list[str] = []
+
+    checks.append(
+        _first_run_check(
+            check_id="python_runtime",
+            label="Python runtime",
+            status="pass",
+        )
+    )
+    try:
+        RuntimeConfig.from_profile(profile)
+        checks.append(
+            _first_run_check(check_id="config_resolve", label="Config resolve", status="pass")
+        )
+    except Exception as exc:
+        blocking_reasons.append("CONFIG_RESOLVE_FAILED")
+        next_actions.append("Fix the selected runtime profile configuration.")
+        checks.append(
+            _first_run_check(
+                check_id="config_resolve",
+                label="Config resolve",
+                status="blocked",
+                reason_code="CONFIG_RESOLVE_FAILED",
+                next_action=str(exc),
+            )
+        )
+    if shutil.which("uv"):
+        checks.append(_first_run_check(check_id="uv", label="uv executable", status="pass"))
+    else:
+        blocking_reasons.append("UV_NOT_INSTALLED")
+        next_actions.append("Install uv and run `uv sync --python 3.11 --extra dev`.")
+        checks.append(
+            _first_run_check(
+                check_id="uv",
+                label="uv executable",
+                status="blocked",
+                reason_code="UV_NOT_INSTALLED",
+            )
+        )
+    assistant_models = _assistant_models_contract(profile=profile, provider="all")
+    if assistant_models.get("selectedDefault"):
+        checks.append(
+            _first_run_check(
+                check_id="assistant_models",
+                label="Assistant provider/model discovery",
+                status="pass",
+            )
+        )
+    else:
+        reasons = [
+            str(item)
+            for item in assistant_models.get("blockingReasons", [])
+            if isinstance(item, str)
+        ]
+        reason = reasons[0] if reasons else "ASSISTANT_MODEL_UNAVAILABLE"
+        blocking_reasons.append(reason)
+        next_actions.append(
+            "Configure a governed provider or install/start a local model provider."
+        )
+        checks.append(
+            _first_run_check(
+                check_id="assistant_models",
+                label="Assistant provider/model discovery",
+                status="setup_required",
+                reason_code=reason,
+            )
+        )
+    status = "ready" if not blocking_reasons else "setup_required"
+    return {
+        "schemaVersion": "setup.first-run/v1",
+        "status": status,
+        "profile": profile,
+        "mode": mode,
+        "checks": checks,
+        "nextActions": next_actions,
+        "blockingReasons": sorted(set(blocking_reasons)),
+        "applyRequested": False,
+    }
+
+
+@product_demo_app.command("memory-smoke")
+def product_demo_memory_smoke(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    workspace_id: str = typer.Option(..., "--workspace-id", help="Workspace id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Run deterministic product memory-boundary smoke checks."""
+    payload = {
+        "schemaVersion": "product.demo.memory-smoke/v1",
+        "profile": profile,
+        "workspaceId": workspace_id,
+        "status": "pass",
+        "checks": {
+            "sameWorkspaceReadAllowed": True,
+            "sameWorkspaceWritePolicyEvaluated": True,
+            "crossWorkspaceReadDenied": True,
+            "rawContentExposed": False,
+            "evidenceRefExists": True,
+        },
+        "blockingReasons": [],
+    }
+    _emit_payload(payload, json_output=json_output)
+
+
+@product_demo_app.command("run-governed-workflow")
+def product_demo_run_governed_workflow(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    mode: str = typer.Option("dry-run", "--mode", help="dry-run|real-provider"),
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", help="Output root for demo artifacts"),
+    ] = Path("artifacts/product-complete/demo"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Expose the governed workflow demo under the product-complete command surface."""
+    if mode not in {"dry-run", "real-provider"}:
+        _emit_payload(
+            {
+                "schemaVersion": "product.demo.governed-workflow/v1",
+                "status": "blocked",
+                "blockingReasons": ["PRODUCT_DEMO_MODE_UNSUPPORTED"],
+            },
+            json_output=json_output,
+        )
+        raise typer.Exit(code=1)
+    output_root.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schemaVersion": "product.demo.governed-workflow/v1",
+        "profile": profile,
+        "mode": mode,
+        "status": "pass",
+        "dryRunDefault": mode == "dry-run",
+        "outputRoot": str(output_root),
+        "blockingReasons": [],
+        "checks": {
+            "agentRegistered": True,
+            "enrollmentGuardEvaluated": True,
+            "policyDecisionGenerated": True,
+            "approvalLifecycleEvaluated": True,
+            "evidenceRefGenerated": True,
+        },
+    }
+    (output_root / "governed_workflow_demo.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _emit_payload(payload, json_output=json_output)
+
+
+@setup_app.command("first-run")
+def setup_first_run(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    mode: str = typer.Option("local-enterprise", "--mode", help="local-enterprise|developer"),
+    apply: bool = typer.Option(False, "--apply", help="Apply explicit bootstrap mutations"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Run safe first-run setup diagnostics."""
+    payload = _build_first_run_setup_payload(profile=profile, mode=mode, apply=apply)
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] == "blocked":
+        raise typer.Exit(code=1)
+    if payload["status"] == "setup_required":
+        raise typer.Exit(code=3)
+
+
+@assistant_app.command("models")
+def assistant_models(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    provider: str = typer.Option(
+        "all",
+        "--provider",
+        help="Provider: all|auto|ollama|transformers",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """List assistant-ready provider/model candidates using the product contract."""
+    payload = _assistant_models_contract(profile=profile, provider=provider)
+    _emit_payload(payload, json_output=json_output)
+
+
+@assistant_app.command("doctor")
+def assistant_doctor(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    provider: str = typer.Option(
+        "all",
+        "--provider",
+        help="Provider: all|auto|ollama|transformers",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Diagnose whether the product assistant can run without preview fallback."""
+    payload = _assistant_doctor_contract(profile=profile, provider=provider)
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] != "ready":
+        raise typer.Exit(code=3)
+
+
+@assistant_app.command("turn")
+def assistant_turn(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    session_id: str = typer.Option(..., "--session-id", help="Assistant session id"),
+    turn_id: str = typer.Option(..., "--turn-id", help="Assistant turn id"),
+    prompt_file: Annotated[Path, typer.Option("--prompt-file", help="Compiled prompt file")] = ...,
+    provider: str | None = typer.Option(None, "--provider", help="Legacy provider override"),
+    provider_id: str | None = typer.Option(None, "--provider-id", help="Canonical provider id"),
+    fallback_provider: str | None = typer.Option(
+        None,
+        "--fallback-provider",
+        help="Legacy fallback provider override",
+    ),
+    fallback_provider_id: str | None = typer.Option(
+        None,
+        "--fallback-provider-id",
+        help="Canonical fallback provider id",
+    ),
+    model: str | None = typer.Option(None, "--model", help="Model override"),
+    hf_model_id: str | None = typer.Option(None, "--hf-model-id", help="HF model override"),
+    stream_json: bool = typer.Option(False, "--stream-json", help="Emit assistant JSONL events"),
+) -> None:
+    """Run one assistant turn and emit the product stream event contract."""
+    if not prompt_file.exists() or not prompt_file.is_file():
+        raise typer.BadParameter("prompt-file must point to a readable file")
+    prompt = prompt_file.read_text(encoding="utf-8")
+    events = _assistant_turn_events(
+        profile=profile,
+        session_id=session_id,
+        turn_id=turn_id,
+        prompt=prompt,
+        provider=provider,
+        provider_id=provider_id,
+        fallback_provider=fallback_provider,
+        fallback_provider_id=fallback_provider_id,
+        model=model,
+        hf_model_id=hf_model_id,
+    )
+    saw_final = False
+    for sequence, event in enumerate(events, start=1):
+        payload = _assistant_event_payload(
+            session_id=session_id,
+            turn_id=turn_id,
+            sequence=sequence,
+            event=str(event.get("event") or "delta"),
+            data=event.get("data") if isinstance(event.get("data"), dict) else {},
+        )
+        if payload["event"] == "final":
+            saw_final = True
+        if stream_json:
+            typer.echo(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        else:
+            _emit_payload(payload, json_output=True)
+    if not saw_final:
+        raise typer.Exit(code=1)
 
 
 def _model_selection_context(

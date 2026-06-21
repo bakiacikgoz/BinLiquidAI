@@ -13,6 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from binliquid.control_plane.agent_enrollment import EnrolledAgent
+from binliquid.control_plane.enterprise_workspace import utc_now
+from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
 from binliquid.control_plane.external_contracts import ExternalActionRequest
 from binliquid.control_plane.external_gateway import ExternalAgentGateway
 from binliquid.control_plane.registry import AgentRegistry, load_agent_spec
@@ -58,6 +61,7 @@ def main() -> None:
         load_agent_spec(REPO_ROOT / args.agent_spec),
         actor="smoke:external-gateway",
     )
+    _bind_active_enrollment(registry=registry, root_dir=root_dir)
     gateway = ExternalAgentGateway(config=config, registry=registry, root_dir=root_dir)
 
     cases: list[dict[str, Any]] = []
@@ -94,6 +98,42 @@ def main() -> None:
     print(json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True))
     if result["status"] != "pass":
         raise SystemExit(1)
+
+
+def _bind_active_enrollment(*, registry: AgentRegistry, root_dir: Path) -> None:
+    record = registry.get("external-agent")
+    registry.update_record(
+        record.model_copy(
+            update={
+                "spec": record.spec.model_copy(
+                    update={
+                        "metadata": {
+                            **record.spec.metadata,
+                            "workspace_id": "pilot-workspace",
+                            "principal_id": "principal-agent",
+                            "device_id": "device-host-01",
+                            "enrollment_id": "enr-test",
+                            "enrollment_status": "active",
+                        }
+                    }
+                )
+            }
+        )
+    )
+    EnterpriseWorkspaceStore(root_dir).write_enrolled_agent(
+        EnrolledAgent(
+            enrollmentId="enr-test",
+            workspaceId="pilot-workspace",
+            agentId="external-agent",
+            principalId="principal-agent",
+            deviceId="device-host-01",
+            tokenId="enrtok-test",
+            status="active",
+            capabilities=("read", "external_write"),
+            policyProfile="enterprise",
+            createdAtUtc=utc_now(),
+        )
+    )
 
 
 if __name__ == "__main__":

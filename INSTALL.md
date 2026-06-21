@@ -75,3 +75,15 @@ uv run binliquid security baseline --profile enterprise --json
 uv run binliquid auth whoami --profile enterprise --json
 uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
 ```
+# Product-Complete First Run
+
+After installing Python, `uv`, Node/Corepack/pnpm, and the Rust toolchain, run:
+
+```bash
+uv sync --python 3.11 --extra dev
+corepack pnpm --dir apps/operator-panel install --frozen-lockfile
+uv run binliquid setup first-run --profile enterprise --mode local-enterprise --json
+```
+
+The diagnostic command is non-destructive and reports setup-required reason
+codes instead of pretending the product is ready.

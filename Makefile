@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-gate provider-v1-1-closure-gate provider-native-adapter-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate design-partner-field-evidence-gate design-partner-handoff-gate mainline-rc-freeze-gate rc-evidence-orchestrator-gate rc-release-decision-gate enterprise-workspace-onboarding-gate enterprise-workspace-release-closure-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-runtime-policy-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate governed-pilot-workflow-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
+.PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-gate provider-v1-1-closure-gate provider-native-adapter-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate design-partner-field-evidence-gate design-partner-handoff-gate mainline-rc-freeze-gate rc-evidence-orchestrator-gate rc-release-decision-gate enterprise-workspace-onboarding-gate enterprise-workspace-release-closure-gate product-complete-scope-gate assistant-real-runtime-gate first-run-readiness-gate governed-agent-workflow-product-gate product-complete-closure-gate product-desktop-smoke-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-runtime-policy-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate governed-pilot-workflow-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
 
 bootstrap: bootstrap-macos
 
@@ -397,6 +397,25 @@ enterprise-workspace-onboarding-gate:
 
 enterprise-workspace-release-closure-gate:
 	uv run python scripts/run_enterprise_workspace_release_closure_gate.py --profile enterprise --json
+
+product-complete-scope-gate:
+	uv run python scripts/run_product_complete_scope_gate.py --json
+
+assistant-real-runtime-gate:
+	uv run python scripts/run_assistant_real_runtime_gate.py --profile enterprise --json
+
+first-run-readiness-gate:
+	uv run python scripts/run_first_run_readiness_gate.py --profile enterprise --json
+
+governed-agent-workflow-product-gate:
+	uv run python scripts/run_governed_agent_workflow_product_gate.py --profile enterprise --json
+
+product-complete-closure-gate:
+	uv run python scripts/run_product_complete_closure_gate.py --profile enterprise --json
+
+product-desktop-smoke-gate:
+	corepack pnpm --dir apps/operator-panel build
+	cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml --target-dir apps/operator-panel/src-tauri/target-codex-test
 
 enterprise-workspace-pr-readiness-gate:
 	uv run python scripts/run_enterprise_workspace_pr_readiness_gate.py --profile enterprise --expected-branch $$(git branch --show-current) --json
