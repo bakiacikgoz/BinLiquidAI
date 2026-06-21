@@ -28,8 +28,11 @@ REQUIRED_WORKFLOW_MARKERS = (
 
 ALLOWED_READINESS_ONLY_PATHS = (
     "scripts/run_enterprise_workspace_pr_readiness_gate.py",
+    "scripts/run_enterprise_workspace_remote_pr_ci_gate.py",
     "tests/test_enterprise_workspace_pr_readiness_gate.py",
+    "tests/test_enterprise_workspace_remote_pr_ci_gate.py",
     "docs/ENTERPRISE_WORKSPACE_PR_READINESS.md",
+    "docs/ENTERPRISE_WORKSPACE_REMOTE_PR_CI_CLOSURE.md",
     ".github/workflows/enterprise-workspace-release-closure.yml",
     "Makefile",
 )
@@ -697,7 +700,7 @@ def run_enterprise_workspace_pr_readiness_gate(
     base_pr_body_path = closure_root / "pr_body.md"
     branch = _git_text(["branch", "--show-current"], repo_root=repo_root)
     head = _git_text(["rev-parse", "HEAD"], repo_root=repo_root)
-    git_status = _git_text(["status", "--short"], repo_root=repo_root)
+    git_status = _git_text(["status", "--short", "--untracked-files=no"], repo_root=repo_root)
 
     check_results: list[GateCheckResult] = []
     blockers: list[str] = []

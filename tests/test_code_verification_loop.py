@@ -31,6 +31,45 @@ def test_verify_python_snippet_reports_syntax_error() -> None:
     assert result["failure_reason"] in {"SYNTAX_INVALID", "INDENTATION_ERROR"}
 
 
+def test_verify_python_snippet_collects_tests_with_python_module(monkeypatch) -> None:
+    commands: list[list[str]] = []
+
+    class FakeRunner:
+        def __init__(self, **_: Any) -> None:
+            pass
+
+        def run(self, command: list[str]) -> Any:
+            commands.append(command)
+
+            class Result:
+                exit_code = 0
+                stdout = ""
+                stderr = ""
+
+            return Result()
+
+    monkeypatch.setattr("binliquid.tools.code_verify.SandboxRunner", FakeRunner)
+
+    result = verify_python_snippet(
+        "def ok():\n    return 1\n",
+        run_lint=False,
+        run_test_collect=True,
+    )
+
+    assert result["tests_ok"] is True
+    assert [
+        "uv",
+        "run",
+        "--extra",
+        "dev",
+        "python",
+        "-m",
+        "pytest",
+        "--collect-only",
+        "-q",
+    ] in commands
+
+
 def test_code_expert_retries_and_recovers(monkeypatch) -> None:
     calls = {"count": 0}
 

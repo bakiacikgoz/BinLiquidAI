@@ -399,7 +399,10 @@ enterprise-workspace-release-closure-gate:
 	uv run python scripts/run_enterprise_workspace_release_closure_gate.py --profile enterprise --json
 
 enterprise-workspace-pr-readiness-gate:
-	uv run python scripts/run_enterprise_workspace_pr_readiness_gate.py --profile enterprise --json
+	uv run python scripts/run_enterprise_workspace_pr_readiness_gate.py --profile enterprise --expected-branch $$(git branch --show-current) --json
+
+enterprise-workspace-remote-pr-ci-gate:
+	uv run python scripts/run_enterprise_workspace_remote_pr_ci_gate.py --profile enterprise --branch $$(git branch --show-current) --json
 
 governed-memory-v1-gate:
 	uv run pytest -q tests/test_memory_v3_governance.py tests/test_memory_cli_v3.py tests/test_control_plane_snapshot_memory_v3.py

@@ -94,7 +94,9 @@ def verify_python_snippet(
             result["lint_ok"] = None
 
     if run_test_collect:
-        test_run = runner.run(["uv", "run", "pytest", "--collect-only", "-q"])
+        test_run = runner.run(
+            ["uv", "run", "--extra", "dev", "python", "-m", "pytest", "--collect-only", "-q"]
+        )
         if test_run.exit_code == 127:
             result["tests_ok"] = None
             result["details"]["tests_skipped"] = "uv not found"
@@ -112,7 +114,7 @@ def verify_python_snippet(
 
     if run_targeted_tests:
         args = targeted_test_args or ["-q", "-k", "not slow", "--maxfail=1"]
-        target_run = runner.run(["uv", "run", "pytest", *args])
+        target_run = runner.run(["uv", "run", "--extra", "dev", "python", "-m", "pytest", *args])
         result["stage_reached"] = 4
         result["details"]["targeted_tests_exit_code"] = target_run.exit_code
         if target_run.exit_code == 127:

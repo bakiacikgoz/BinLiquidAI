@@ -65,7 +65,10 @@ def _patch_git(monkeypatch, *, status: str = "", head: str = HEAD, diff: str = "
             return gate.DEFAULT_EXPECTED_BRANCH
         if args == ["rev-parse", "HEAD"]:
             return head
-        if args == ["status", "--short"]:
+        if args in (
+            ["status", "--short"],
+            ["status", "--short", "--untracked-files=no"],
+        ):
             return status
         if args[:2] == ["rev-list", "--count"]:
             return "1"
@@ -176,6 +179,58 @@ def test_dirty_tree_blocks(tmp_path: Path, monkeypatch) -> None:
     assert "DIRTY_WORKTREE" in report.no_ship_blockers
 
 
+def test_untracked_files_do_not_dirty_pr_readiness_gate(tmp_path: Path, monkeypatch) -> None:
+    _write_closure(tmp_path)
+    _write_workflow(tmp_path)
+
+    def fake_git_text(args: list[str], *, repo_root: Path = gate.REPO_ROOT) -> str:
+        if args == ["branch", "--show-current"]:
+            return gate.DEFAULT_EXPECTED_BRANCH
+        if args == ["rev-parse", "HEAD"]:
+            return HEAD
+        if args == ["status", "--short", "--untracked-files=no"]:
+            return ""
+        if args == ["status", "--short"]:
+            return "?? local-note.txt"
+        if args[:2] == ["rev-list", "--count"]:
+            return "1"
+        return ""
+
+    def fake_run_git(
+        args: list[str],
+        *,
+        repo_root: Path = gate.REPO_ROOT,
+        timeout: int = 60,
+    ):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        result = Result()
+        if args[:2] == ["rev-parse", "--verify"]:
+            result.stdout = "base"
+        if args and args[0] == "merge-tree":
+            result.stdout = "merged"
+        return result
+
+    monkeypatch.setattr(gate, "_git_text", fake_git_text)
+    monkeypatch.setattr(gate, "_run_git", fake_run_git)
+
+    report = gate.run_enterprise_workspace_pr_readiness_gate(
+        profile="enterprise",
+        closure_root=tmp_path / "closure",
+        output_root=tmp_path / "out",
+        expected_branch=gate.DEFAULT_EXPECTED_BRANCH,
+        base_ref="origin/main",
+        repo_root=tmp_path,
+        fetch_main=False,
+    )
+
+    assert report.status == "pass"
+    assert "DIRTY_WORKTREE" not in report.no_ship_blockers
+
+
 def test_head_mismatch_warns_for_readiness_commit(tmp_path: Path, monkeypatch) -> None:
     _write_closure(tmp_path, head=CLOSURE_HEAD)
     _write_workflow(tmp_path)
@@ -186,6 +241,34 @@ def test_head_mismatch_warns_for_readiness_commit(tmp_path: Path, monkeypatch) -
         "tests/test_enterprise_workspace_pr_readiness_gate.py\n"
         "docs/ENTERPRISE_WORKSPACE_PR_READINESS.md\n"
         ".github/workflows/enterprise-workspace-release-closure.yml\n"
+        "Makefile\n",
+    )
+
+    report = gate.run_enterprise_workspace_pr_readiness_gate(
+        profile="enterprise",
+        closure_root=tmp_path / "closure",
+        output_root=tmp_path / "out",
+        expected_branch=gate.DEFAULT_EXPECTED_BRANCH,
+        base_ref="origin/main",
+        repo_root=tmp_path,
+        fetch_main=False,
+    )
+
+    assert report.status == "pass"
+    assert report.warnings
+
+
+def test_head_mismatch_warns_for_remote_pr_ci_tooling_commit(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_closure(tmp_path, head=CLOSURE_HEAD)
+    _write_workflow(tmp_path)
+    _patch_git(
+        monkeypatch,
+        head=HEAD,
+        diff="scripts/run_enterprise_workspace_remote_pr_ci_gate.py\n"
+        "tests/test_enterprise_workspace_remote_pr_ci_gate.py\n"
+        "docs/ENTERPRISE_WORKSPACE_REMOTE_PR_CI_CLOSURE.md\n"
         "Makefile\n",
     )
 
