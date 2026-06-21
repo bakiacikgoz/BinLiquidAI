@@ -425,6 +425,7 @@ def collect_ci_checks(
     branch: str,
     pr_number: int | None = None,
     ci_fixture: Path | None = None,
+    head_sha: str | None = None,
     wait_ci: bool = False,
     timeout_seconds: int = 1800,
     skip_gh: bool = False,
@@ -434,6 +435,12 @@ def collect_ci_checks(
         payload = _load_json(ci_fixture)
         if isinstance(payload, dict):
             payload = payload.get("checks", [])
+        if head_sha:
+            payload = [
+                item
+                for item in payload
+                if not item.get("headSha") or item.get("headSha") == head_sha
+            ]
         return _summarize_ci([_normalize_check_payload(item) for item in payload])
     if skip_gh:
         return _summarize_ci([])
@@ -463,6 +470,8 @@ def collect_ci_checks(
         if runs.returncode != 0 or not runs.stdout.strip():
             return _summarize_ci([])
         payload = json.loads(runs.stdout)
+        if head_sha:
+            payload = [item for item in payload if item.get("headSha") == head_sha]
         return _summarize_ci(
             [
                 _normalize_check_payload(
@@ -696,6 +705,7 @@ def run_remote_pr_ci_gate(
         branch=branch,
         pr_number=pr_number,
         ci_fixture=ci_fixture,
+        head_sha=git_state.head_sha,
         wait_ci=wait_ci,
         timeout_seconds=ci_timeout_seconds,
         skip_gh=skip_gh,

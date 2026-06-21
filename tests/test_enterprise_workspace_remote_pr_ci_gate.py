@@ -208,6 +208,38 @@ def test_required_ci_failure_blocks(tmp_path: Path, monkeypatch) -> None:
     assert "CI_REQUIRED_CHECK_FAILED" in report.no_ship_blockers
 
 
+def test_ci_collection_filters_checks_to_current_head(tmp_path: Path) -> None:
+    _write_ci_fixture(
+        tmp_path / "checks.json",
+        [
+            {
+                "name": "old CI",
+                "state": "completed",
+                "conclusion": "failure",
+                "required": True,
+                "headSha": "d" * 40,
+            },
+            {
+                "name": "current CI",
+                "state": "completed",
+                "conclusion": "success",
+                "required": True,
+                "headSha": HEAD,
+            },
+        ],
+    )
+
+    ci = gate.collect_ci_checks(
+        branch=gate.DEFAULT_BRANCH,
+        ci_fixture=tmp_path / "checks.json",
+        head_sha=HEAD,
+        skip_gh=True,
+    )
+
+    assert ci.status == "pass"
+    assert [check.name for check in ci.checks] == ["current CI"]
+
+
 def test_required_ci_pending_is_conditional(tmp_path: Path, monkeypatch) -> None:
     _write_local_evidence(tmp_path)
     _write_pr_fixture(tmp_path / "pr.json")
