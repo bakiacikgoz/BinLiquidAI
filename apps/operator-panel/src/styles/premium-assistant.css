@@ -826,7 +826,7 @@
 
 .assistant-provider-registry {
   grid-column: 1 / -1;
-  display: grid;
+  display: none;
   gap: 5px;
   min-width: 0;
 }
@@ -2324,8 +2324,7 @@
 
   .assistant-surface {
     grid-template-rows: auto minmax(0, 1fr);
-    height: calc(100vh - 49px);
-    height: calc(100dvh - 49px);
+    height: 100%;
   }
 
   .assistant-surface-grid,
@@ -2396,7 +2395,7 @@
   .assistant-surface-approval .assistant-main-stage {
     padding-right: 22px;
     padding-left: 22px;
-    grid-template-rows: auto clamp(240px, 42vh, 420px) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .assistant-workbench-slot {
@@ -2412,7 +2411,7 @@
 
   .assistant-surface-transcript .assistant-transcript-shell,
   .assistant-surface-approval .assistant-transcript-shell {
-    min-height: clamp(240px, 42vh, 420px);
+    min-height: 0;
   }
 
   .assistant-welcome-copy h2 {
@@ -2472,12 +2471,31 @@
   .assistant-composer {
     width: 100%;
     bottom: 12px;
+    gap: 5px;
+    padding: 7px;
+  }
+
+  .assistant-composer textarea {
+    min-height: 38px;
+  }
+
+  .assistant-runtime-settings {
+    gap: 4px;
+  }
+
+  .assistant-runtime-settings input,
+  .assistant-runtime-settings select {
+    min-height: 29px;
+  }
+
+  .assistant-model-discovery-status button {
+    min-height: 25px;
   }
 
   .assistant-surface-transcript .assistant-main-stage,
   .assistant-surface-approval .assistant-main-stage {
     padding: 18px 16px 16px;
-    grid-template-rows: auto clamp(220px, 36vh, 340px) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .assistant-workbench-slot {
@@ -2499,7 +2517,7 @@
 
   .assistant-surface-transcript .assistant-transcript-shell,
   .assistant-surface-approval .assistant-transcript-shell {
-    min-height: clamp(220px, 36vh, 340px);
+    min-height: 0;
   }
 
   .assistant-surface-transcript .assistant-user-message,
@@ -2522,7 +2540,11 @@
   }
 
   .assistant-runtime-settings {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .assistant-model-discovery-status {
+    grid-column: 1 / -1;
   }
 
   .assistant-findings-panel dl div {

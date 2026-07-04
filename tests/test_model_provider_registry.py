@@ -30,6 +30,33 @@ def test_valid_example_registry_loads() -> None:
     assert registry.policy_for("openai-public").allowed_data_classes == ["public"]
 
 
+def test_env_can_activate_remote_provider_when_runtime_allows_remote() -> None:
+    registry = resolve_model_provider_registry(
+        config=RuntimeConfig(remote_providers_enabled=True),
+        profile="balanced",
+        provider_config_path=Path("config/providers.example.toml"),
+        env={"DEEPSEEK_API_KEY": "test-key"},
+    )
+
+    provider = registry.get("deepseek-public")
+    assert registry.remote_providers_enabled is True
+    assert provider is not None
+    assert provider.enabled is True
+
+
+def test_blank_env_secret_does_not_activate_remote_provider() -> None:
+    registry = resolve_model_provider_registry(
+        config=RuntimeConfig(remote_providers_enabled=True),
+        profile="balanced",
+        provider_config_path=Path("config/providers.example.toml"),
+        env={"DEEPSEEK_API_KEY": "  "},
+    )
+
+    provider = registry.get("deepseek-public")
+    assert provider is not None
+    assert provider.enabled is False
+
+
 def test_inline_secret_is_rejected(tmp_path: Path) -> None:
     path = tmp_path / "providers.toml"
     path.write_text(

@@ -616,6 +616,7 @@ def _build_orchestrator(
     shadow_router_enabled: bool | None = None,
     provider_name: str | None = None,
     provider_id: str | None = None,
+    provider_model: str | None = None,
     fallback_provider_id: str | None = None,
     fallback_provider: str | None = None,
 ) -> Orchestrator:
@@ -634,7 +635,7 @@ def _build_orchestrator(
         answer_llm = ProviderGovernanceLLM(
             registry=registry,
             provider_id=provider_id,
-            model=provider_record.default_model,
+            model=provider_model or provider_record.default_model,
             envelope_writer=ProviderCallEnvelopeWriter(),
             fallback_provider_id=fallback_provider_id,
         )
@@ -1271,6 +1272,7 @@ def _assistant_turn_events(
         config,
         provider_name=config.llm_provider,
         provider_id=provider_id,
+        provider_model=model,
         fallback_provider_id=fallback_provider_id,
         fallback_provider=config.fallback_provider,
     )

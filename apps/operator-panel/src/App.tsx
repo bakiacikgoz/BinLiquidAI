@@ -3329,6 +3329,77 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                   </label>
                 </div>
               </article>
+
+              <article className="operator-work-card">
+                <h3>{locale === 'tr' ? 'AI runtime' : 'AI runtime'}</h3>
+                <div className="operator-setting-list">
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{locale === 'tr' ? 'Asistan sağlayıcısı' : 'Assistant provider'}</span>
+                      <small>{locale === 'tr' ? 'Profil, yerel Ollama veya remote sağlayıcı.' : 'Profile, local Ollama, or remote provider.'}</small>
+                    </div>
+                    <select
+                      aria-label={locale === 'tr' ? 'Asistan sağlayıcısı' : 'Assistant provider'}
+                      value={settings.assistantProvider}
+                      onChange={(event) => updateSettings({ assistantProvider: event.target.value })}
+                    >
+                      <option value="">{locale === 'tr' ? 'Profil varsayılanı' : 'Use profile default'}</option>
+                      <option value="local-ollama">Ollama local</option>
+                      <option value="openai-public">OpenAI</option>
+                      <option value="deepseek-public">DeepSeek</option>
+                    </select>
+                  </label>
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{locale === 'tr' ? 'Varsayılan model' : 'Default model'}</span>
+                      <small>{locale === 'tr' ? 'Boş bırakılırsa profil seçimi kullanılır.' : 'Leave blank to use the profile selection.'}</small>
+                    </div>
+                    <input
+                      aria-label={locale === 'tr' ? 'Varsayılan model' : 'Default model'}
+                      value={settings.assistantModel}
+                      onChange={(event) => updateSettings({ assistantModel: event.target.value })}
+                      placeholder={
+                        settings.assistantProvider === 'deepseek-public'
+                          ? 'deepseek-v4-flash'
+                          : settings.assistantProvider === 'openai-public'
+                            ? 'gpt-5.1'
+                            : 'qwen3.5:4b'
+                      }
+                      spellCheck={false}
+                    />
+                  </label>
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>OpenAI API key</span>
+                      <small>{locale === 'tr' ? 'Sadece local bridge env içine aktarılır.' : 'Passed only into the local bridge environment.'}</small>
+                    </div>
+                    <input
+                      aria-label="OpenAI API key"
+                      type="password"
+                      value={settings.assistantOpenAiApiKey}
+                      onChange={(event) => updateSettings({ assistantOpenAiApiKey: event.target.value })}
+                      placeholder="sk-..."
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </label>
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>DeepSeek API key</span>
+                      <small>{locale === 'tr' ? 'DeepSeek provider girilen key ile etkinleşir.' : 'The DeepSeek provider is enabled when this key is set.'}</small>
+                    </div>
+                    <input
+                      aria-label="DeepSeek API key"
+                      type="password"
+                      value={settings.assistantDeepSeekApiKey}
+                      onChange={(event) => updateSettings({ assistantDeepSeekApiKey: event.target.value })}
+                      placeholder="sk-..."
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </label>
+                </div>
+              </article>
             </div>
           </OperatorPageShell>
         ) : null}

@@ -47,8 +47,18 @@ export function useAssistantModels({
         bundledPythonPath: settings.bundledPythonPath,
         profile: settings.profile,
         rootDir: settings.rootDir,
+        assistantOpenAiApiKey: settings.assistantOpenAiApiKey ? 'set' : '',
+        assistantDeepSeekApiKey: settings.assistantDeepSeekApiKey ? 'set' : '',
       }),
-    [settings.bundledPythonPath, settings.cliPath, settings.mode, settings.profile, settings.rootDir],
+    [
+      settings.assistantDeepSeekApiKey,
+      settings.assistantOpenAiApiKey,
+      settings.bundledPythonPath,
+      settings.cliPath,
+      settings.mode,
+      settings.profile,
+      settings.rootDir,
+    ],
   );
 
   useEffect(() => {

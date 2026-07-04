@@ -41,6 +41,9 @@ aegis = "binliquid.cli:app"
 dev-mode-exact = true
 packages = ["binliquid", "benchmarks", "research", "scripts"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"config" = "config"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

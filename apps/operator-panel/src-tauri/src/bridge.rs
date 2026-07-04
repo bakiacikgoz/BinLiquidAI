@@ -1663,6 +1663,7 @@ pub async fn bridge_assistant_start_turn(
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
     configure_cli_env(&mut command, &config, &resolved);
+    configure_cli_workdir(&mut command);
 
     let mut child = match command.spawn() {
         Ok(value) => value,
@@ -2486,10 +2487,88 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
 
     command.env("PYTHONNOUSERSITE", "1");
     command.env("PYTHONDONTWRITEBYTECODE", "1");
+    if let Some(config_dir) = bundled_config_dir(resolved) {
+        command.env("BINLIQUID_CONFIG_ROOT", &config_dir);
+        let provider_registry = config_dir.join("providers.toml");
+        let provider_registry_example = config_dir.join("providers.example.toml");
+        if provider_registry.exists() {
+            command.env("BINLIQUID_PROVIDER_REGISTRY_PATH", provider_registry);
+        } else if provider_registry_example.exists() {
+            command.env(
+                "BINLIQUID_PROVIDER_REGISTRY_PATH",
+                provider_registry_example,
+            );
+        }
+    }
 
     for (key, value) in &config.env {
-        if key.starts_with("BINLIQUID_") {
+        if is_allowed_cli_env_key(key) && !value.trim().is_empty() {
             command.env(key, value);
+        }
+    }
+}
+
+fn is_allowed_cli_env_key(key: &str) -> bool {
+    key.starts_with("BINLIQUID_")
+        || matches!(
+            key,
+            "OPENAI_API_KEY" | "DEEPSEEK_API_KEY" | "ANTHROPIC_API_KEY" | "COMPANY_LLM_API_KEY"
+        )
+}
+
+fn bundled_runtime_root(resolved: &ResolvedCli) -> Option<PathBuf> {
+    if resolved.mode != CoreMode::Bundled {
+        return None;
+    }
+    Path::new(&resolved.program)
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+}
+
+fn bundled_config_dir(resolved: &ResolvedCli) -> Option<PathBuf> {
+    let config_dir = bundled_runtime_root(resolved)?.join("config");
+    if config_dir.exists() {
+        Some(config_dir)
+    } else {
+        None
+    }
+}
+
+fn default_cli_workdir() -> Option<PathBuf> {
+    if cfg!(target_os = "macos") {
+        let home = std::env::var_os("HOME")?;
+        return Some(
+            PathBuf::from(home)
+                .join("Library")
+                .join("Application Support")
+                .join("com.aegisos.operatorpanel")
+                .join("runtime"),
+        );
+    }
+    if cfg!(windows) {
+        if let Some(base) = std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("APPDATA"))
+        {
+            return Some(
+                PathBuf::from(base)
+                    .join("AegisOS Operator Panel")
+                    .join("runtime"),
+            );
+        }
+    }
+    let base = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share"))
+        })?;
+    Some(base.join("aegisos-operator-panel").join("runtime"))
+}
+
+fn configure_cli_workdir(command: &mut Command) {
+    if let Some(workdir) = default_cli_workdir() {
+        if fs::create_dir_all(&workdir).is_ok() {
+            command.current_dir(workdir);
         }
     }
 }
@@ -2544,6 +2623,7 @@ async fn run_cli_raw_with_resource_dir(
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
     configure_cli_env(&mut command, &config, &resolved);
+    configure_cli_workdir(&mut command);
 
     let cmdline = format_command(&resolved.program, &resolved.prefix_args, &args);
     let timeout_ms = config.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS);
@@ -2605,6 +2685,7 @@ async fn spawn_cli_background(
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
     configure_cli_env(&mut command, &config, &resolved);
+    configure_cli_workdir(&mut command);
 
     let child = command.spawn().map_err(|error| {
         let code = if error.kind() == std::io::ErrorKind::NotFound {

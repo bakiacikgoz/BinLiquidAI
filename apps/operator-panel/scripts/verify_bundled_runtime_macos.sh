@@ -20,8 +20,16 @@ fi
 
 test -f "${MANIFEST}"
 test -x "${RUNTIME_PYTHON}"
+test -f "${RUNTIME_DIR}/config/balanced.toml"
+test -f "${RUNTIME_DIR}/config/providers.example.toml"
 
 "${RUNTIME_PYTHON}" -m binliquid --version >/dev/null
+(
+  cd /
+  BINLIQUID_CONFIG_ROOT="${RUNTIME_DIR}/config" \
+    BINLIQUID_PROVIDER_REGISTRY_PATH="${RUNTIME_DIR}/config/providers.example.toml" \
+    "${RUNTIME_PYTHON}" -m binliquid operator capabilities --json >/dev/null
+)
 file "${RUNTIME_PYTHON}"
 
 grep -q "^platform=macos$" "${MANIFEST}"

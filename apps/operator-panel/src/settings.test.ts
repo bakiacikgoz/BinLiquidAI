@@ -94,6 +94,26 @@ describe('assistant runtime settings', () => {
         assistantFallbackProvider: '',
         assistantModel: '',
         assistantHfModelId: '',
+        assistantOpenAiApiKey: '',
+        assistantDeepSeekApiKey: '',
+      }),
+    );
+  });
+
+  it('preserves assistant API keys from stored settings', () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        assistantOpenAiApiKey: 'sk-openai',
+        assistantDeepSeekApiKey: 'sk-deepseek',
+      }),
+    );
+
+    expect(loadSettings()).toEqual(
+      expect.objectContaining({
+        assistantOpenAiApiKey: 'sk-openai',
+        assistantDeepSeekApiKey: 'sk-deepseek',
       }),
     );
   });

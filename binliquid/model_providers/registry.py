@@ -42,7 +42,7 @@ def resolve_model_provider_registry(
 
     settings = payload.get("settings", {})
     if isinstance(settings, Mapping) and "remote_providers_enabled" in settings:
-        remote_enabled = bool(settings["remote_providers_enabled"])
+        remote_enabled = remote_enabled or bool(settings["remote_providers_enabled"])
 
     raw_providers = payload.get("providers", {})
     if raw_providers and not isinstance(raw_providers, Mapping):
@@ -56,7 +56,7 @@ def resolve_model_provider_registry(
         except ValidationError as exc:
             raise InvalidProviderConfig(str(exc)) from exc
         providers = [item for item in providers if item.provider_id != record.provider_id]
-        providers.append(record)
+        providers.append(_apply_env_activation(record, remote_enabled=remote_enabled, env=env or os.environ))
 
     raw_policies = payload.get("provider_policies", {})
     if raw_policies and not isinstance(raw_policies, Mapping):
@@ -175,3 +175,16 @@ def _mark_missing_secret_warnings(
     for provider in providers:
         if provider.api_key_env and provider.api_key_env in env:
             continue
+
+
+def _apply_env_activation(
+    provider: ModelProviderRecord,
+    *,
+    remote_enabled: bool,
+    env: Mapping[str, str],
+) -> ModelProviderRecord:
+    if not remote_enabled or provider.enabled or not provider.api_key_env:
+        return provider
+    if not str(env.get(provider.api_key_env, "")).strip():
+        return provider
+    return provider.model_copy(update={"enabled": True})

@@ -203,6 +203,10 @@ export class BridgeError extends Error {
 }
 
 function toBridgeConfig(settings: PanelSettings, timeoutMs = 15000): BridgeConfig {
+  const openAiApiKey = settings.assistantOpenAiApiKey.trim();
+  const deepSeekApiKey = settings.assistantDeepSeekApiKey.trim();
+  const remoteProvidersEnabled = Boolean(openAiApiKey || deepSeekApiKey);
+
   return {
     mode: settings.mode,
     cliPath: settings.cliPath.trim() || undefined,
@@ -212,6 +216,9 @@ function toBridgeConfig(settings: PanelSettings, timeoutMs = 15000): BridgeConfi
     env: {
       BINLIQUID_PROFILE_NAME: settings.profile,
       BINLIQUID_TEAM_ARTIFACT_DIR: settings.rootDir,
+      ...(remoteProvidersEnabled ? { BINLIQUID_REMOTE_PROVIDERS_ENABLED: 'true' } : {}),
+      ...(openAiApiKey ? { OPENAI_API_KEY: openAiApiKey } : {}),
+      ...(deepSeekApiKey ? { DEEPSEEK_API_KEY: deepSeekApiKey } : {}),
     },
     timeoutMs,
   };

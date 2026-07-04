@@ -66,6 +66,38 @@ describe('bridge tauri contract', () => {
     );
   });
 
+  it('passes assistant API keys and remote provider flag through bridge config env', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      contractVersion: 'operator-panel.assistant-provider-models/v4',
+      profile: 'balanced',
+      provider: 'all',
+      generatedAtUtc: '2026-06-07T00:00:00.000Z',
+      providers: [],
+    });
+
+    await bridge.listAssistantModels(
+      {
+        ...DEFAULT_SETTINGS,
+        assistantOpenAiApiKey: 'sk-openai',
+        assistantDeepSeekApiKey: 'sk-deepseek',
+      },
+      { profile: 'balanced', provider: 'all' },
+    );
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_assistant_provider_models',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          env: expect.objectContaining({
+            BINLIQUID_REMOTE_PROVIDERS_ENABLED: 'true',
+            OPENAI_API_KEY: 'sk-openai',
+            DEEPSEEK_API_KEY: 'sk-deepseek',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('passes assistant provider and model options to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
       contractVersion: '2.0',

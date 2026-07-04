@@ -112,6 +112,27 @@ describe('useAssistantModels', () => {
     });
   });
 
+  it('refreshes discovery when assistant API key availability changes', async () => {
+    bridgeMocks.listAssistantModels.mockResolvedValue(providerModels([]));
+
+    const { rerender } = renderHook(
+      ({ settings }) => useAssistantModels({ settings, profile: 'balanced', provider: 'local-ollama' }),
+      {
+        initialProps: {
+          settings: { ...DEFAULT_SETTINGS },
+        },
+      },
+    );
+
+    await waitFor(() => expect(bridgeMocks.listAssistantModels).toHaveBeenCalledTimes(1));
+
+    rerender({
+      settings: { ...DEFAULT_SETTINGS, assistantDeepSeekApiKey: 'sk-deepseek' },
+    });
+
+    await waitFor(() => expect(bridgeMocks.listAssistantModels).toHaveBeenCalledTimes(2));
+  });
+
   it('treats malformed provider discovery payloads as errors', async () => {
     bridgeMocks.listAssistantModels.mockResolvedValue({ providers: null });
 

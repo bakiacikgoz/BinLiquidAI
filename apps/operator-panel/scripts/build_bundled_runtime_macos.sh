@@ -58,6 +58,7 @@ mkdir -p "${RUNTIME_DIR}"
 "${PYTHON_BIN}" -m venv "${RUNTIME_DIR}/python"
 "${RUNTIME_DIR}/python/bin/pip" install --upgrade pip wheel
 "${RUNTIME_DIR}/python/bin/pip" install "${WHEEL_PATH}"
+cp -R "${REPO_ROOT}/config" "${RUNTIME_DIR}/config"
 
 if [[ ! -x "${RUNTIME_PYTHON}" ]]; then
   echo "[runtime] invalid runtime: expected executable ${RUNTIME_PYTHON}" >&2
@@ -68,6 +69,16 @@ fi
 if ! "${RUNTIME_PYTHON}" -m binliquid --version >/dev/null; then
   echo "[runtime] runtime validation failed: ${RUNTIME_PYTHON} -m binliquid --version" >&2
   exit 6
+fi
+
+if ! (
+  cd /
+  BINLIQUID_CONFIG_ROOT="${RUNTIME_DIR}/config" \
+    BINLIQUID_PROVIDER_REGISTRY_PATH="${RUNTIME_DIR}/config/providers.example.toml" \
+    "${RUNTIME_PYTHON}" -m binliquid operator capabilities --json >/dev/null
+); then
+  echo "[runtime] runtime validation failed: bundled operator capabilities from neutral cwd" >&2
+  exit 9
 fi
 
 BINLIQUID_VERSION="$("${RUNTIME_PYTHON}" -m binliquid --version)"

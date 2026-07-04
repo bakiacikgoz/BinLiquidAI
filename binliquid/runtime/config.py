@@ -969,7 +969,7 @@ def resolve_runtime_config(
     base = RuntimeConfig().model_dump(mode="python")
     source_map = _build_default_source_map(base)
 
-    profile_payload = _load_profile_payload(profile=profile, root_dir=root_dir)
+    profile_payload = _load_profile_payload(profile=profile, root_dir=root_dir, env=env)
     _deep_merge(base, profile_payload, source="profile", source_map=source_map)
 
     env_payload = _build_env_payload(env=env, env_prefix=str(base.get("env_prefix", "BINLIQUID")))
@@ -992,9 +992,22 @@ def redact_config_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     return redacted
 
 
-def _load_profile_payload(*, profile: str, root_dir: Path | None) -> dict[str, Any]:
-    base_dir = root_dir or Path(__file__).resolve().parents[2]
-    config_path = base_dir / "config" / f"{profile}.toml"
+def _load_profile_payload(
+    *,
+    profile: str,
+    root_dir: Path | None,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    values = env or os.environ
+    config_root = str(values.get("BINLIQUID_CONFIG_ROOT") or "").strip()
+    if root_dir is not None:
+        config_dir = root_dir / "config"
+    elif config_root:
+        configured = Path(config_root)
+        config_dir = configured if (configured / f"{profile}.toml").exists() else configured / "config"
+    else:
+        config_dir = Path(__file__).resolve().parents[2] / "config"
+    config_path = config_dir / f"{profile}.toml"
     with config_path.open("rb") as file_obj:
         data = tomllib.load(file_obj)
 

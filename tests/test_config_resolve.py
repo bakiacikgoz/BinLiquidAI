@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 from binliquid.runtime.config import redact_config_payload, resolve_runtime_config
 
 
@@ -42,6 +45,23 @@ def test_resolve_runtime_config_is_deterministic() -> None:
     first, _ = resolve_runtime_config(profile="balanced", env=env)
     second, _ = resolve_runtime_config(profile="balanced", env=env)
     assert first.model_dump(mode="python") == second.model_dump(mode="python")
+
+
+def test_resolve_runtime_config_uses_explicit_config_root(tmp_path: Path) -> None:
+    config_dir = tmp_path / "config"
+    shutil.copytree(Path("config"), config_dir)
+
+    cfg, source_map = resolve_runtime_config(
+        profile="balanced",
+        env={
+            "BINLIQUID_CONFIG_ROOT": str(config_dir),
+            "BINLIQUID_REMOTE_PROVIDERS_ENABLED": "true",
+        },
+    )
+
+    assert cfg.profile_name == "balanced"
+    assert cfg.remote_providers_enabled is True
+    assert source_map["remote_providers_enabled"] == "env"
 
 
 def test_redact_config_payload_masks_sensitive_keys() -> None:

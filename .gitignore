@@ -20,5 +20,6 @@ apps/**/src-tauri/target/
 apps/**/src-tauri/target-*/
 apps/**/src-tauri/gen/
 apps/**/src-tauri/resources/binliquid-runtime/python/
+apps/**/src-tauri/resources/binliquid-runtime/config/
 apps/**/src-tauri/resources/binliquid-runtime/RUNTIME_MANIFEST.txt
 apps/**/src-tauri/resources/binliquid-runtime/*.json
