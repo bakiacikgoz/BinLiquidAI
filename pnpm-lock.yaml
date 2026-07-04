@@ -6,6 +6,8 @@ settings:
 
 importers:
 
+  .: {}
+
   apps/operator-panel:
     dependencies:
       '@tauri-apps/api':
