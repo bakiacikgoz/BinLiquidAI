@@ -6,12 +6,14 @@ import { useAssistantSession, type AssistantContextSnapshot } from './useAssista
 
 const bridgeMocks = vi.hoisted(() => ({
   startAssistantTurn: vi.fn(),
+  cancelAssistantTurn: vi.fn(),
   listenAssistantEvents: vi.fn(),
   isBridgePreviewMode: vi.fn(),
 }));
 
 vi.mock('../bridge', () => ({
   startAssistantTurn: bridgeMocks.startAssistantTurn,
+  cancelAssistantTurn: bridgeMocks.cancelAssistantTurn,
   listenAssistantEvents: bridgeMocks.listenAssistantEvents,
   isBridgePreviewMode: bridgeMocks.isBridgePreviewMode,
 }));
@@ -35,6 +37,13 @@ describe('useAssistantSession runtime metadata', () => {
       status: 'started',
     });
     bridgeMocks.listenAssistantEvents.mockResolvedValue(() => undefined);
+    bridgeMocks.cancelAssistantTurn.mockResolvedValue({
+      contractVersion: '2.0',
+      assistantTurnId: 'turn-test',
+      sessionId: 'session-test',
+      processId: null,
+      status: 'cancelled',
+    });
     bridgeMocks.isBridgePreviewMode.mockReturnValue(false);
     vi.clearAllMocks();
   });
@@ -97,5 +106,23 @@ describe('useAssistantSession runtime metadata', () => {
     await waitFor(() => expect(result.current.state.status).toBe('completed'));
     expect(result.current.state.turns[0]?.assistantMessage.text).toContain('approval gate');
     expect(result.current.state.turns[0]?.completedAtUtc).toBeTruthy();
+  });
+
+  it('cancels the active assistant turn without surfacing an error', async () => {
+    const { result } = renderHook(() => useAssistantSession({ ...DEFAULT_SETTINGS }, () => emptyContext));
+
+    await act(async () => {
+      await result.current.actions.send('Start a long response.');
+    });
+
+    await waitFor(() => expect(result.current.state.status).toBe('starting'));
+
+    await act(async () => {
+      await result.current.actions.cancel();
+    });
+
+    await waitFor(() => expect(result.current.state.status).toBe('cancelled'));
+    expect(bridgeMocks.cancelAssistantTurn).toHaveBeenCalledWith(expect.any(Object), expect.stringMatching(/^assistant-turn-/));
+    expect(result.current.state.error).toBeNull();
   });
 });

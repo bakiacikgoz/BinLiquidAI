@@ -148,4 +148,30 @@ describe('AssistantComposer runtime controls', () => {
       }),
     );
   });
+
+  it('keeps the stop action available while a turn is running', async () => {
+    const onSend = vi.fn();
+    const onCancel = vi.fn();
+    const { user } = renderOperatorPanel(
+      <AssistantComposer
+        label="Message"
+        placeholder="Ask about systems"
+        sendLabel="Send"
+        disabled
+        runtimeSettings={DEFAULT_ASSISTANT_RUNTIME_SETTINGS}
+        onRuntimeSettingsChange={vi.fn()}
+        onSend={onSend}
+        onCancel={onCancel}
+      />,
+    );
+
+    const stopButton = screen.getByRole('button', { name: 'Stop' });
+
+    expect(stopButton).toBeEnabled();
+
+    await user.click(stopButton);
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onSend).not.toHaveBeenCalled();
+  });
 });

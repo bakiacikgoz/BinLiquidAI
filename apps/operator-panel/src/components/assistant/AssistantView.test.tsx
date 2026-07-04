@@ -45,6 +45,7 @@ const requiredActionProps = {
   onReject: () => undefined,
   onExecute: () => undefined,
   onRegenerate: () => undefined,
+  onCancel: () => undefined,
 };
 
 describe('AssistantView', () => {

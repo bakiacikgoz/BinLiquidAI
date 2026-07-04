@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  cancelAssistantTurn,
   decideApproval,
   executeApproval,
   exportRunArtifacts,
@@ -88,6 +89,15 @@ describe('bridge preview fallback', () => {
     expect(payload.assistantTurnId).toBe('turn-preview');
     expect(payload.sessionId).toBe('session-preview');
     expect(payload.processId).toBeNull();
+  });
+
+  it('returns preview assistant cancel payloads without a bridge process', async () => {
+    const payload = await cancelAssistantTurn({ ...DEFAULT_SETTINGS }, 'turn-preview');
+
+    expect(payload.contractVersion).toBe('2.0');
+    expect(payload.assistantTurnId).toBe('turn-preview');
+    expect(payload.processId).toBeNull();
+    expect(payload.status).toBe('cancelled');
   });
 
   it('returns filtered preview assistant provider models', async () => {

@@ -29,6 +29,14 @@ const bridgeActions: Partial<Record<RouteId, RouteCapability['primaryActions']>>
       requiredPermission: 'runtime.run',
       noShipIfInert: true,
     },
+    {
+      actionId: 'assistant.cancel_turn',
+      label: 'Stop',
+      state: 'working',
+      bridgeCommand: 'bridge_assistant_cancel_turn',
+      requiredPermission: 'runtime.run',
+      noShipIfInert: true,
+    },
   ],
   agents: [
     {

@@ -280,12 +280,31 @@
   margin: 0 auto;
 }
 
+.premium-shell .operator-page {
+  gap: 14px;
+}
+
+.premium-shell .operator-page-with-context {
+  max-width: 1220px;
+}
+
 .premium-shell .workspace-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 16px;
   margin: 2px 0 -2px;
+}
+
+.premium-shell .operator-page-header {
+  padding-bottom: 2px;
+}
+
+.premium-shell .operator-page-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
 .premium-shell .workspace-kicker {
@@ -326,6 +345,191 @@
 
 .premium-shell .workspace-actions {
   justify-content: flex-end;
+}
+
+.premium-shell .operator-page-actions {
+  max-width: 520px;
+}
+
+.premium-shell .operator-decision-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+}
+
+.premium-shell .operator-decision-item {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--line-strong);
+}
+
+.premium-shell .operator-decision-item span {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.premium-shell .operator-decision-item strong {
+  min-width: 0;
+  color: var(--fg-primary);
+  font-size: 14px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.premium-shell .operator-decision-item p {
+  margin: 0;
+  color: var(--fg-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.premium-shell .operator-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.premium-shell .operator-metric-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  min-height: 82px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+}
+
+.premium-shell .operator-metric-card span {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.premium-shell .operator-metric-card strong {
+  min-width: 0;
+  color: var(--fg-primary);
+  font-size: 19px;
+  font-weight: 740;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.premium-shell .operator-metric-card small {
+  min-width: 0;
+  color: var(--fg-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.premium-shell .operator-page-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+
+.premium-shell .operator-page-layout-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.premium-shell .operator-page-main,
+.premium-shell .operator-page-context {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.premium-shell .operator-page-context {
+  position: sticky;
+  top: 84px;
+}
+
+.premium-shell .operator-context-card,
+.premium-shell .operator-work-card {
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+}
+
+.premium-shell .operator-context-card h3,
+.premium-shell .operator-work-card h3 {
+  margin: 0 0 12px;
+  color: var(--fg-primary);
+  font-size: 13px;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.premium-shell .operator-master-detail {
+  display: grid;
+  grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.premium-shell .operator-master-detail > .page-card,
+.premium-shell .operator-master-detail > .operator-work-card {
+  min-width: 0;
+}
+
+.premium-shell .operator-setting-list {
+  display: grid;
+  gap: 10px;
+}
+
+.premium-shell .operator-setting-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.premium-shell .operator-setting-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.premium-shell .operator-setting-row > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.premium-shell .operator-setting-row span {
+  color: var(--fg-primary);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.premium-shell .operator-setting-row small {
+  color: var(--fg-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.premium-shell .operator-setting-row input,
+.premium-shell .operator-setting-row select {
+  min-width: 0;
 }
 
 .premium-shell .section-grid {
@@ -980,14 +1184,23 @@
   .premium-shell .metric-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .premium-shell .operator-metric-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
   .premium-shell .workspace-header,
+  .premium-shell .operator-page-layout,
+  .premium-shell .operator-master-detail,
   .premium-shell .section-grid.two-up,
   .premium-shell .approval-grid,
   .premium-shell .runs-grid,
   .premium-shell .metric-grid,
+  .premium-shell .operator-decision-strip,
+  .premium-shell .operator-metric-strip,
+  .premium-shell .operator-setting-row,
   .premium-shell .form-grid,
   .premium-shell .compact-grid {
     grid-template-columns: 1fr;
@@ -995,5 +1208,9 @@
 
   .premium-shell .workspace-actions {
     justify-content: flex-start;
+  }
+
+  .premium-shell .operator-page-context {
+    position: static;
   }
 }

@@ -112,6 +112,25 @@ describe('bridge tauri contract', () => {
     );
   });
 
+  it('passes assistant cancel requests to the Tauri command', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      contractVersion: '2.0',
+      assistantTurnId: 'turn-tauri',
+      sessionId: 'session-tauri',
+      processId: 42,
+      status: 'cancelled',
+    });
+
+    await bridge.cancelAssistantTurn({ ...DEFAULT_SETTINGS }, 'turn-tauri');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'bridge_assistant_cancel_turn',
+      expect.objectContaining({
+        assistantTurnId: 'turn-tauri',
+      }),
+    );
+  });
+
   it('passes assistant model discovery requests to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
       contractVersion: 'operator-panel.assistant-provider-models/v2',

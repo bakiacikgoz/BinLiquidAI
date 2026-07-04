@@ -3,6 +3,7 @@ mod bridge;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(bridge::AssistantProcessRegistry::default())
         .plugin(tauri_plugin_log::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             bridge::bridge_handshake,
@@ -51,6 +52,7 @@ pub fn run() {
             bridge::bridge_ga_readiness,
             bridge::bridge_qualification_run,
             bridge::bridge_assistant_start_turn,
+            bridge::bridge_assistant_cancel_turn,
             bridge::bridge_read_artifact,
             bridge::bridge_tail_events,
         ])

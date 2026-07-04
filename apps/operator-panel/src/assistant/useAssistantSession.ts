@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  cancelAssistantTurn,
   isBridgePreviewMode,
   listenAssistantEvents,
   startAssistantTurn,
@@ -45,6 +46,7 @@ export type AssistantSessionActions = {
   ) => Promise<void>;
   newChat: () => void;
   regenerate: (turnId: string, runtimeSettings?: AssistantRuntimeSettings) => Promise<void>;
+  cancel: () => Promise<void>;
   applyEvent: (event: AssistantStreamEvent) => void;
   markApprovalDetailLoaded: (approvalId: string, detail: unknown) => void;
   appendSystemMessage: (message: string) => void;
@@ -240,6 +242,26 @@ export function useAssistantSession(
     [send],
   );
 
+  const cancel = useCallback(async () => {
+    const active = stateRef.current.turns.find((turn) => turn.id === stateRef.current.activeTurnId);
+    if (!active || !['starting', 'streaming'].includes(active.status)) {
+      return;
+    }
+    await cancelAssistantTurn(settings, active.id);
+    clearTurnTimeout(active.id);
+    applyEvent({
+      contractVersion: '2.0',
+      assistantTurnId: active.id,
+      sessionId: stateRef.current.sessionId,
+      event: 'cancelled',
+      sequence: 9_000_000_000,
+      timestampUtc: new Date().toISOString(),
+      data: {
+        message: 'Assistant turn cancelled by operator.',
+      },
+    });
+  }, [applyEvent, clearTurnTimeout, settings]);
+
   const markApprovalDetailLoaded = useCallback((approvalId: string, detail: unknown) => {
     setState((previous) => ({
       ...previous,
@@ -300,6 +322,7 @@ export function useAssistantSession(
       send,
       newChat,
       regenerate,
+      cancel,
       applyEvent,
       markApprovalDetailLoaded,
       appendSystemMessage,

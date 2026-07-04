@@ -92,6 +92,7 @@ import type { SessionEventFilter, SessionEventItem } from './components/mission/
 import { ComputerUseOperationsCard } from './components/mission/ComputerUseOperationsCard';
 import { ComputerUseBlockerChecklist } from './components/mission/ComputerUseBlockerChecklist';
 import { AssistantView, type AssistantViewCopy } from './components/assistant/AssistantView';
+import { AssistantWorkbench } from './components/assistant/AssistantWorkbench';
 import {
   AssistantRightRail,
   type AssistantComplianceSummary,
@@ -107,6 +108,8 @@ import { ExecutionSurfacesView } from './components/control-plane/ExecutionSurfa
 import { PolicySimulationView } from './components/control-plane/PolicySimulationView';
 import { OperationCommandList } from './components/control-plane/OperationCommandCard';
 import { RawInspector } from './components/control-plane/RawInspector';
+import { OperatorPageShell } from './components/operator-page/OperatorPage';
+import { operatorToneFromStatus } from './components/operator-page/operatorPageUtils';
 import {
   AlertsPage,
   LogsPage,
@@ -1500,6 +1503,22 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         readString(asRecord(value), 'summary') ||
         selectedRunId,
     }));
+  const assistantWorkbenchArtifacts = Object.entries(artifactsByName)
+    .slice(0, 5)
+    .map(([name, value]) => {
+      const record = asRecord(value);
+      const payload = 'payload' in record ? record.payload : value;
+      return {
+        name,
+        summary:
+          readString(asRecord(payload), 'status') ||
+          readString(asRecord(payload), 'stage') ||
+          readString(asRecord(payload), 'summary') ||
+          readString(record, 'status') ||
+          selectedRunId,
+        value: payload,
+      };
+    });
   const computerUseLiveActionBlocked = isComputerUseRun && !computerUseLiveEnabled;
   const canResumeFromQuickAction =
     !computerUseLiveActionBlocked &&
@@ -1515,9 +1534,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     ? 'Seçili çalıştırma yok.'
     : !isComputerUseRun
       ? 'İptal yalnızca aktif computer-use oturumlarında kullanılabilir.'
+      : computerUseLiveActionBlocked
+        ? computerUseDisabledReason
       : !workspaceSnapshot.runtimeState.canStop
         ? 'Runtime bu durumda durdurma kabul etmiyor.'
         : '';
+  function openRunTerminalView() {
+    setActiveView('runs');
+    setRunTab('stream');
+  }
   const assistantSession = useAssistantSession(settings, () => ({
     selectedRunId,
     selectedRunStatus: runStatus,
@@ -1615,6 +1640,16 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
+  async function onCancelAssistantTurn() {
+    try {
+      await assistantSession.actions.cancel();
+      pushToast('ok', locale === 'tr' ? 'Asistan yanıtı durduruldu' : 'Assistant response stopped');
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      pushToast('error', parsed ? `${parsed.code}: ${parsed.message}` : locale === 'tr' ? 'İşlem tamamlanamadı' : 'Operation failed');
+    }
+  }
+
   const assistantRightRail = (
     <AssistantRightRail
       state={assistantSession.state}
@@ -1636,6 +1671,20 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       onViewRuns={() => setActiveView('runs')}
     />
   );
+  const assistantWorkbench =
+    assistantSession.state.turns.length > 0 ? (
+      <AssistantWorkbench
+        state={assistantSession.state}
+        artifacts={assistantWorkbenchArtifacts}
+        selectedArtifactName={selectedArtifactName}
+        locale={locale}
+        onSelectArtifact={setSelectedArtifactName}
+        onViewRuns={() => {
+          setRunTab('artifacts');
+          setActiveView('runs');
+        }}
+      />
+    ) : null;
 
   return (
     <AppShell
@@ -1673,8 +1722,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             pendingApprovals={pendingApprovalSummaries}
             resumeDisabled={!canResumeFromQuickAction}
             resumeDisabledReason={resumeDisabledReason}
-            terminalDisabled
-            terminalDisabledReason="Terminal entegrasyonu bu sürümde bağlı değil."
             exportDisabled={!selectedRunId}
             exportDisabledReason={!selectedRunId ? 'Seçili çalıştırma yok.' : ''}
             cancelDisabled={cancelDisabled}
@@ -1693,9 +1740,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 void onResumeRun();
               }
             }}
-            onOpenTerminal={() => {
-              pushToast('error', 'Terminal entegrasyonu bu sürümde bağlı değil.');
-            }}
+            onOpenTerminal={openRunTerminalView}
             onExport={() => void onExportArtifacts()}
             onCancel={() => void onControlSession('stop')}
             onViewDetails={() => setActiveView('runs')}
@@ -1733,28 +1778,89 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         {activeView === 'policy' ? <PolicySimulationView simulation={controlPlanePolicy} locale={locale} /> : null}
 
         {activeView === 'evidence' ? (
-          <section className="workspace" data-testid="page-primary-region">
-            <div className="workspace-header">
-              <div>
-                <p className="workspace-kicker">{locale === 'tr' ? 'Kanıt' : 'Evidence'}</p>
-                <h2>{locale === 'tr' ? 'İmzalı Kanıtlar' : 'Signed Evidence'}</h2>
-                <p className="workspace-lead">
-                  {locale === 'tr'
-                    ? 'Manifest bütünlüğü, replay doğrulaması ve yayın sınırları.'
-                    : 'Manifest integrity, replay verification and release boundaries.'}
-                </p>
-              </div>
-              <div className="workspace-actions">
-                <button
-                  className="ghost-btn"
-                  type="button"
-                  onClick={() => void refreshControlPlane()}
-                >
-                  {locale === 'tr' ? 'Claim kayıtlarını yenile' : 'Refresh claims'}
-                </button>
-              </div>
-            </div>
-            <div className="section-grid two-up">
+          <OperatorPageShell
+            kicker={locale === 'tr' ? 'Kanıt' : 'Evidence'}
+            title={locale === 'tr' ? 'İmzalı Kanıtlar' : 'Signed Evidence'}
+            lead={
+              locale === 'tr'
+                ? 'Manifest bütünlüğü, replay doğrulaması ve yayın sınırları.'
+                : 'Manifest integrity, replay verification and release boundaries.'
+            }
+            status={selectedEvidenceManifestPath ? (evidencePacks[0]?.signatureStatus ?? 'ready') : 'missing manifest'}
+            actions={[
+              {
+                label: locale === 'tr' ? 'Claim kayıtlarını yenile' : 'Refresh claims',
+                onClick: () => void refreshControlPlane(),
+              },
+              {
+                label: locale === 'tr' ? 'Son evidence packi doğrula' : 'Verify latest evidence',
+                onClick: () => void onVerifyEvidencePack(),
+                disabled: !selectedEvidenceManifestPath,
+                title: selectedEvidenceManifestPath
+                  ? undefined
+                  : locale === 'tr'
+                    ? 'Doğrulanacak evidence manifest yok.'
+                    : 'No evidence manifest is available to verify.',
+                variant: 'primary',
+              },
+            ]}
+            decisionItems={[
+              {
+                label: locale === 'tr' ? 'Mevcut durum' : 'Current state',
+                value: selectedEvidenceManifestPath
+                  ? locale === 'tr'
+                    ? 'Manifest hazır'
+                    : 'Manifest ready'
+                  : 'missing',
+                detail: selectedEvidenceManifestPath
+                  ? selectedEvidenceManifestPath
+                  : locale === 'tr'
+                    ? 'Önce evidence manifest üretilmeli.'
+                    : 'Generate an evidence manifest first.',
+                tone: selectedEvidenceManifestPath ? 'success' : 'error',
+              },
+              {
+                label: locale === 'tr' ? 'Neden önemli' : 'Why it matters',
+                value: evidencePacks[0]?.claimGuardStatus ?? 'claim guard',
+                detail: locale === 'tr'
+                  ? 'Release ve ready claimleri bu kanıta dayanır.'
+                  : 'Release and ready claims depend on this evidence.',
+              },
+              {
+                label: locale === 'tr' ? 'Sıradaki aksiyon' : 'Next action',
+                value: selectedEvidenceManifestPath
+                  ? locale === 'tr'
+                    ? 'Doğrula'
+                    : 'Verify'
+                  : locale === 'tr'
+                    ? 'Manifest üret'
+                    : 'Generate manifest',
+                detail: locale === 'tr'
+                  ? 'Ham JSON sadece gerektiğinde detayda kalır.'
+                  : 'Raw JSON stays in details unless needed.',
+                tone: selectedEvidenceManifestPath ? 'info' : 'warning',
+              },
+            ]}
+            metrics={[
+              {
+                label: locale === 'tr' ? 'Packler' : 'Packs',
+                value: evidencePacks.length,
+                detail: evidencePacks[0]?.runId ?? (locale === 'tr' ? 'run bağlı değil' : 'no run linked'),
+              },
+              {
+                label: locale === 'tr' ? 'İmza' : 'Signature',
+                value: evidencePacks[0]?.signatureStatus ?? 'missing',
+                detail: locale === 'tr' ? 'kurumsal kanıt' : 'enterprise evidence',
+              },
+              {
+                label: locale === 'tr' ? 'Replay' : 'Replay',
+                value: evidencePacks[0]?.replayStatus ?? 'not_available',
+                detail: locale === 'tr' ? 'bütünlük kanıtı' : 'integrity proof',
+              },
+            ]}
+            context={<ClaimBoundaryBanner claims={controlPlaneClaims} locale={locale} />}
+          >
+            <div className="section-grid">
               <EvidencePackView
                 evidencePacks={evidencePacks}
                 verifyResult={controlPlaneEvidenceVerifyResult}
@@ -1769,9 +1875,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 locale={locale}
                 onVerify={() => void onVerifyEvidencePack()}
               />
-              <ClaimBoundaryBanner claims={controlPlaneClaims} locale={locale} />
             </div>
-          </section>
+          </OperatorPageShell>
         ) : null}
 
         {activeView === 'surfaces' ? (
@@ -1833,6 +1938,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             approvalDisabledReason={approvalDisabledReason}
             debugRawEnabled={settings.debugRaw}
             rightRail={assistantRightRail}
+            workbench={assistantWorkbench}
             runtimeSettings={assistantRuntimeSettings}
             modelDiscovery={assistantModels}
             locale={locale}
@@ -1846,6 +1952,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}
             onExecute={(approvalId) => void onExecuteAssistantApproval(approvalId)}
             onRegenerate={(turnId) => void assistantSession.actions.regenerate(turnId, assistantRuntimeSettings)}
+            onCancel={() => void onCancelAssistantTurn()}
+            onOpenTerminal={openRunTerminalView}
           />
         ) : null}
 
@@ -2124,51 +2232,79 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'approvals' ? (
-          <section className="workspace" data-testid="page-primary-region">
-            <div className="workspace-header">
-              <div>
-                <p className="workspace-kicker">{t.approvalsKicker}</p>
-                <h2>{t.approvals}</h2>
-                <p className="workspace-lead">{t.approvalsLead}</p>
-              </div>
-              <div className="workspace-actions">
-                <button className="ghost-btn" type="button" onClick={() => void refreshApprovals()}>
-                  {t.refresh}
-                </button>
-                <button
-                  className="action-btn"
-                  type="button"
-                  disabled={!canMutate || !selectedApprovalId}
-                  title={selectedApprovalActionDisabledReason || undefined}
-                  data-disabled-reason={selectedApprovalActionDisabledReason || undefined}
-                  onClick={() => void onDecideApproval(true)}
-                >
-                  {t.approve}
-                </button>
-                <button
-                  className="ghost-btn"
-                  type="button"
-                  disabled={!canMutate || !selectedApprovalId}
-                  title={selectedApprovalActionDisabledReason || undefined}
-                  data-disabled-reason={selectedApprovalActionDisabledReason || undefined}
-                  onClick={() => void onDecideApproval(false)}
-                >
-                  {t.reject}
-                </button>
-                <button
-                  className="action-btn action-danger"
-                  type="button"
-                  disabled={!canMutate || !selectedApprovalId}
-                  title={selectedApprovalActionDisabledReason || undefined}
-                  data-disabled-reason={selectedApprovalActionDisabledReason || undefined}
-                  onClick={() => void onExecuteApproval()}
-                >
-                  {t.execute}
-                </button>
-              </div>
-            </div>
-
-            <div className="section-grid approval-grid">
+          <OperatorPageShell
+            kicker={t.approvalsKicker}
+            title={t.approvals}
+            lead={t.approvalsLead}
+            status={selectedApprovalId ? readString(asRecord(selectedApproval), 'status', 'selected') : 'no selection'}
+            actions={[
+              { label: t.refresh, onClick: () => void refreshApprovals() },
+              {
+                label: t.approve,
+                onClick: () => void onDecideApproval(true),
+                disabled: !canMutate || !selectedApprovalId,
+                title: selectedApprovalActionDisabledReason || undefined,
+                variant: 'primary',
+              },
+              {
+                label: t.reject,
+                onClick: () => void onDecideApproval(false),
+                disabled: !canMutate || !selectedApprovalId,
+                title: selectedApprovalActionDisabledReason || undefined,
+              },
+              {
+                label: t.execute,
+                onClick: () => void onExecuteApproval(),
+                disabled: !canMutate || !selectedApprovalId,
+                title: selectedApprovalActionDisabledReason || undefined,
+                variant: 'danger',
+              },
+            ]}
+            decisionItems={[
+              {
+                label: locale === 'tr' ? 'Mevcut seçim' : 'Current selection',
+                value: selectedApprovalId || (locale === 'tr' ? 'Seçim yok' : 'No selection'),
+                detail: selectedApprovalId
+                  ? readString(asRecord(selectedApproval), 'target_kind', '-')
+                  : locale === 'tr'
+                    ? 'Önce kuyruktan bir onay seçin.'
+                    : 'Select an approval from the queue first.',
+                tone: selectedApprovalId ? 'info' : 'warning',
+              },
+              {
+                label: locale === 'tr' ? 'Mutasyon kapısı' : 'Mutation gate',
+                value: canMutate ? (locale === 'tr' ? 'Hazır' : 'Ready') : (locale === 'tr' ? 'Blokeli' : 'Blocked'),
+                detail: selectedApprovalActionDisabledReason || (locale === 'tr' ? 'Operatör kimliği geçerli.' : 'Operator identity is valid.'),
+                tone: canMutate ? 'success' : 'error',
+              },
+              {
+                label: locale === 'tr' ? 'Sıradaki aksiyon' : 'Next action',
+                value: selectedApprovalId ? t.approve : t.pendingApprovals,
+                detail: locale === 'tr'
+                  ? 'Reject ve Execute aynı seçili onay bağlamını kullanır.'
+                  : 'Reject and Execute use the same selected approval context.',
+                tone: selectedApprovalId ? 'info' : 'warning',
+              },
+            ]}
+            metrics={[
+              {
+                label: t.pendingApprovals,
+                value: pendingApprovals.length,
+                detail: locale === 'tr' ? 'operatör kuyruğu' : 'operator queue',
+              },
+              {
+                label: t.operatorId,
+                value: settings.operatorId.trim() || (locale === 'tr' ? 'eksik' : 'missing'),
+                detail: locale === 'tr' ? 'mutasyonlar için gerekli' : 'required for mutations',
+              },
+              {
+                label: t.status,
+                value: selectedApprovalId ? readString(asRecord(selectedApproval), 'status', '-') : '-',
+                detail: selectedApprovalId ?? (locale === 'tr' ? 'seçim yok' : 'no selection'),
+              },
+            ]}
+          >
+            <div className="operator-master-detail">
               <article className="page-card">
                 <h3>{t.pendingApprovals}</h3>
                 <div className="list-scroll">
@@ -2204,47 +2340,71 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 )}
               </article>
             </div>
-          </section>
+          </OperatorPageShell>
         ) : null}
 
         {activeView === 'runs' ? (
-          <section className="workspace" data-testid="page-primary-region">
-            <div className="workspace-header">
-              <div>
-                <p className="workspace-kicker">{t.runsKicker}</p>
-                <h2>{t.runs}</h2>
-                <p className="workspace-lead">{t.runsLead}</p>
-              </div>
-              <div className="workspace-actions">
-                <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
-                  {t.refreshRuns}
-                </button>
-                <button
-                  className="ghost-btn"
-                  type="button"
-                  disabled={!selectedRunId}
-                  title={selectedRunActionDisabledReason || undefined}
-                  data-disabled-reason={selectedRunActionDisabledReason || undefined}
-                  onClick={() => void loadRunContext(selectedRunId)}
-                >
-                  {t.refreshContext}
-                </button>
-                <button
-                  className="action-btn"
-                  type="button"
-                  disabled={!selectedRunId}
-                  title={selectedRunActionDisabledReason || undefined}
-                  data-disabled-reason={selectedRunActionDisabledReason || undefined}
-                  onClick={() => void onExportArtifacts()}
-                >
-                  {t.export}
-                </button>
-              </div>
-            </div>
+          <OperatorPageShell
+            kicker={t.runsKicker}
+            title={t.runs}
+            lead={t.runsLead}
+            status={selectedRunId ? missionStatusCode : 'no selection'}
+            statusTone={operatorToneFromStatus(selectedRunId ? missionStatusCode : 'missing')}
+            actions={[
+              { label: t.refreshRuns, onClick: () => void refreshRuns() },
+              {
+                label: t.refreshContext,
+                onClick: () => void loadRunContext(selectedRunId),
+                disabled: !selectedRunId,
+                title: selectedRunActionDisabledReason || undefined,
+              },
+              {
+                label: t.export,
+                onClick: () => void onExportArtifacts(),
+                disabled: !selectedRunId,
+                title: selectedRunActionDisabledReason || undefined,
+                variant: 'primary',
+              },
+            ]}
+            decisionItems={[
+              {
+                label: locale === 'tr' ? 'Seçili run' : 'Selected run',
+                value: selectedRunId || (locale === 'tr' ? 'Seçim yok' : 'No selection'),
+                detail: selectedRunId
+                  ? readString(asRecord(asRecord(runStatus).job), 'request', workspaceSnapshot.objective || '-')
+                  : locale === 'tr'
+                    ? 'Listeden bir run seçin.'
+                    : 'Choose a run from the list.',
+                tone: selectedRunId ? 'info' : 'warning',
+              },
+              {
+                label: locale === 'tr' ? 'Durum' : 'Status',
+                value: selectedRunId ? missionStatusCode : '-',
+                detail: missionStatusError || (locale === 'tr' ? 'Run context seçime göre yüklenir.' : 'Run context follows the selection.'),
+              },
+              {
+                label: locale === 'tr' ? 'Sıradaki aksiyon' : 'Next action',
+                value: selectedRunId ? t.export : t.recentRuns,
+                detail: selectedRunId
+                  ? locale === 'tr'
+                    ? 'Artifact, replay ve stream tabları aynı run bağlamını kullanır.'
+                    : 'Artifact, replay, and stream tabs use the same run context.'
+                  : locale === 'tr'
+                    ? 'Önce run seçin.'
+                    : 'Select a run first.',
+                tone: selectedRunId ? 'info' : 'warning',
+              },
+            ]}
+            metrics={[
+              { label: t.recentRuns, value: runItems.length, detail: locale === 'tr' ? 'yüklenen kayıt' : 'loaded records' },
+              { label: t.stream, value: events.length, detail: eventsWarning || (locale === 'tr' ? 'event tail' : 'event tail') },
+              { label: t.artifacts, value: ARTIFACT_NAMES.length, detail: selectedArtifactName },
+            ]}
+          >
 
             {driftEvents.length > 0 ? <div className="warning-banner">{t.driftWarning}</div> : null}
 
-            <div className="section-grid runs-grid">
+            <div className="operator-master-detail">
               <article className="page-card">
                 <h3>{t.recentRuns}</h3>
                 <div className="list-scroll">
@@ -2406,7 +2566,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 ) : null}
               </article>
             </div>
-          </section>
+          </OperatorPageShell>
         ) : null}
 
         {activeView === 'system' ? (
@@ -3015,46 +3175,98 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         ) : null}
 
         {activeView === 'settings' ? (
-          <section className="workspace" data-testid="page-primary-region">
-            <div className="workspace-header">
-              <div>
-                <p className="workspace-kicker">{t.settingsKicker}</p>
-                <h2>{t.settings}</h2>
-                <p className="workspace-lead">{t.settingsLead}</p>
-              </div>
-            </div>
-
+          <OperatorPageShell
+            kicker={t.settingsKicker}
+            title={t.settings}
+            lead={t.settingsLead}
+            status={settings.operatorId.trim() ? (locale === 'tr' ? 'hazır' : 'ready') : (locale === 'tr' ? 'operator id eksik' : 'operator id missing')}
+            actions={[
+              {
+                label: t.save,
+                onClick: () => {
+                  saveSettings(settings);
+                  pushToast('ok', t.saved);
+                },
+                variant: 'primary',
+              },
+            ]}
+            decisionItems={[
+              {
+                label: locale === 'tr' ? 'Runtime kapısı' : 'Runtime gate',
+                value: settings.operatorId.trim() ? settings.mode : 'blocked',
+                detail: settings.operatorId.trim()
+                  ? locale === 'tr'
+                    ? 'Mutasyonlar operator id ile imzalanabilir.'
+                    : 'Mutations can be signed with the operator id.'
+                  : t.setOperatorId,
+                tone: settings.operatorId.trim() ? 'success' : 'error',
+              },
+              {
+                label: locale === 'tr' ? 'Arayüz' : 'Interface',
+                value: settings.locale,
+                detail: locale === 'tr' ? 'Dil ve ham payload tercihleri burada tutulur.' : 'Locale and raw payload preferences live here.',
+              },
+              {
+                label: locale === 'tr' ? 'Kaydetme' : 'Save behavior',
+                value: locale === 'tr' ? 'Yerel' : 'Local',
+                detail: locale === 'tr' ? 'Ayarlar tarayıcı depolamasına yazılır.' : 'Settings are written to browser storage.',
+                tone: 'info',
+              },
+            ]}
+            metrics={[
+              { label: t.operatorId, value: settings.operatorId.trim() || '-', detail: locale === 'tr' ? 'mutasyon kimliği' : 'mutation identity' },
+              { label: t.profile, value: settings.profile, detail: locale === 'tr' ? 'runtime profili' : 'runtime profile' },
+              { label: t.mode, value: settings.mode, detail: settings.rootDir },
+            ]}
+          >
             <div className="section-grid two-up">
-              <article className="page-card">
+              <article className="operator-work-card">
                 <h3>{t.runtimeSection}</h3>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>{t.operatorId}</span>
+                <div className="operator-setting-list">
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.operatorId}</span>
+                      <small>{locale === 'tr' ? 'Onay ve execute işlemleri için zorunlu.' : 'Required for approval and execute actions.'}</small>
+                    </div>
                     <input
+                      aria-label={t.operatorId}
                       value={settings.operatorId}
                       onChange={(event) => updateSettings({ operatorId: event.target.value })}
                       placeholder={t.operatorIdPlaceholder}
                     />
                   </label>
-                  <label className="field">
-                    <span>{t.rootDir}</span>
-                    <input value={settings.rootDir} onChange={(event) => updateSettings({ rootDir: event.target.value })} />
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.rootDir}</span>
+                      <small>{locale === 'tr' ? 'Run ve artifact bağlamının kökü.' : 'Root for run and artifact context.'}</small>
+                    </div>
+                    <input aria-label={t.rootDir} value={settings.rootDir} onChange={(event) => updateSettings({ rootDir: event.target.value })} />
                   </label>
-                  <label className="field">
-                    <span>{t.mode}</span>
-                    <select value={settings.mode} onChange={(event) => updateSettings({ mode: event.target.value as PanelSettings['mode'] })}>
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.mode}</span>
+                      <small>{locale === 'tr' ? 'CLI runtime çözümleme modu.' : 'CLI runtime resolution mode.'}</small>
+                    </div>
+                    <select aria-label={t.mode} value={settings.mode} onChange={(event) => updateSettings({ mode: event.target.value as PanelSettings['mode'] })}>
                       <option value="auto">auto</option>
                       <option value="external">external</option>
                       <option value="bundled">bundled</option>
                     </select>
                   </label>
-                  <label className="field">
-                    <span>{t.cliPath}</span>
-                    <input value={settings.cliPath} onChange={(event) => updateSettings({ cliPath: event.target.value })} />
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.cliPath}</span>
+                      <small>{locale === 'tr' ? 'External modda tercih edilen CLI yolu.' : 'Preferred CLI path for external mode.'}</small>
+                    </div>
+                    <input aria-label={t.cliPath} value={settings.cliPath} onChange={(event) => updateSettings({ cliPath: event.target.value })} />
                   </label>
-                  <label className="field field-span">
-                    <span>{t.bundledPythonPath}</span>
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.bundledPythonPath}</span>
+                      <small>{locale === 'tr' ? 'Bundled runtime için Python yolu.' : 'Python path for bundled runtime.'}</small>
+                    </div>
                     <input
+                      aria-label={t.bundledPythonPath}
                       value={settings.bundledPythonPath}
                       onChange={(event) => updateSettings({ bundledPythonPath: event.target.value })}
                     />
@@ -3062,20 +3274,27 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </div>
               </article>
 
-              <article className="page-card">
+              <article className="operator-work-card">
                 <h3>{t.interfaceSection}</h3>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>{t.locale}</span>
-                    <select value={settings.locale} onChange={(event) => updateSettings({ locale: event.target.value as LocaleMode })}>
+                <div className="operator-setting-list">
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.locale}</span>
+                      <small>{locale === 'tr' ? 'Uygulama dili otomatik veya manuel seçilir.' : 'Choose automatic or fixed app language.'}</small>
+                    </div>
+                    <select aria-label={t.locale} value={settings.locale} onChange={(event) => updateSettings({ locale: event.target.value as LocaleMode })}>
                       <option value="auto">auto</option>
                       <option value="en">English</option>
                       <option value="tr">Türkçe</option>
                     </select>
                   </label>
-                  <label className="field">
-                    <span>{t.updaterMode}</span>
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.updaterMode}</span>
+                      <small>{locale === 'tr' ? 'Güncelleme kontrol davranışı.' : 'Update checking behavior.'}</small>
+                    </div>
                     <select
+                      aria-label={t.updaterMode}
                       value={settings.updaterMode}
                       onChange={(event) => updateSettings({ updaterMode: event.target.value as PanelSettings['updaterMode'] })}
                     >
@@ -3084,38 +3303,34 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                       <option value="auto">auto</option>
                     </select>
                   </label>
-                  <label className="field field-inline">
-                    <span>{t.remoteTelemetry}</span>
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.remoteTelemetry}</span>
+                      <small>{locale === 'tr' ? 'Remote telemetry gönderimini kontrol eder.' : 'Controls remote telemetry submission.'}</small>
+                    </div>
                     <input
+                      aria-label={t.remoteTelemetry}
                       type="checkbox"
                       checked={settings.remoteTelemetry}
                       onChange={(event) => updateSettings({ remoteTelemetry: event.target.checked })}
                     />
                   </label>
-                  <label className="field field-inline">
-                    <span>{t.debugRaw}</span>
+                  <label className="operator-setting-row">
+                    <div>
+                      <span>{t.debugRaw}</span>
+                      <small>{locale === 'tr' ? 'Ham JSON görünümü için ayrıca onay ister.' : 'Requires confirmation before raw JSON disclosure.'}</small>
+                    </div>
                     <input
+                      aria-label={t.debugRaw}
                       type="checkbox"
                       checked={settings.debugRaw}
                       onChange={(event) => updateSettings({ debugRaw: event.target.checked })}
                     />
                   </label>
                 </div>
-                <div className="stack-actions">
-                  <button
-                    className="action-btn"
-                    type="button"
-                    onClick={() => {
-                      saveSettings(settings);
-                      pushToast('ok', t.saved);
-                    }}
-                  >
-                    {t.save}
-                  </button>
-                </div>
               </article>
             </div>
-          </section>
+          </OperatorPageShell>
         ) : null}
 
         {activeView === 'logs' ? <LogsPage events={events} runItems={runItems} snapshot={controlPlaneSnapshot} locale={locale} /> : null}

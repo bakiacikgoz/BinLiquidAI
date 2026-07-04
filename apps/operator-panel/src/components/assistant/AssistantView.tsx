@@ -1,10 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import type { AssistantComposerControls } from '../../assistant/assistantTypes';
 import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
 import type { AssistantRuntimeSettings } from '../../settings';
-import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
+import { assistantUiText, type UiLocale } from '../../i18n';
 import { Card } from '../primitives/Card';
 import { Icon } from '../primitives/Icon';
 import { AssistantComposer } from './AssistantComposer';
@@ -40,6 +40,7 @@ export function AssistantView({
   copy,
   state,
   rightRail = null,
+  workbench = null,
   approvalDisabled = true,
   approvalDisabledReason = '',
   debugRawEnabled = false,
@@ -54,10 +55,13 @@ export function AssistantView({
   onReject,
   onExecute,
   onRegenerate,
+  onCancel,
+  onOpenTerminal,
 }: {
   copy: AssistantViewCopy;
   state: AssistantSessionState;
   rightRail?: ReactNode;
+  workbench?: ReactNode;
   approvalDisabled?: boolean;
   approvalDisabledReason?: string;
   debugRawEnabled?: boolean;
@@ -76,12 +80,68 @@ export function AssistantView({
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
+  onCancel: () => void;
+  onOpenTerminal?: () => void;
 }) {
   const [contextRailOpen, setContextRailOpen] = useState(false);
+  const [assistantSearchQuery, setAssistantSearchQuery] = useState('');
+  const [assistantNotificationsOpen, setAssistantNotificationsOpen] = useState(false);
   const text = assistantUiText[locale];
   const currentTurnRunning = state.status === 'starting' || state.status === 'streaming';
   const surfaceState =
     state.status === 'awaiting_approval' ? 'approval' : state.turns.length > 0 ? 'transcript' : 'welcome';
+  const normalizedSearchQuery = assistantSearchQuery.trim().toLowerCase();
+  const searchResults = useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return [];
+    }
+    return state.turns
+      .flatMap((turn) => [
+        {
+          id: `${turn.id}-user`,
+          label: locale === 'tr' ? 'Kullanıcı mesajı' : 'User message',
+          text: turn.userMessage.text,
+        },
+        {
+          id: `${turn.id}-assistant`,
+          label: locale === 'tr' ? 'Asistan yanıtı' : 'Assistant response',
+          text: turn.assistantMessage.text,
+        },
+      ])
+      .filter((item) => item.text.toLowerCase().includes(normalizedSearchQuery))
+      .slice(0, 5);
+  }, [locale, normalizedSearchQuery, state.turns]);
+  const assistantNotifications = useMemo(() => {
+    const latestTurn = state.turns.at(-1);
+    return [
+      {
+        id: 'assistant-status',
+        title: locale === 'tr' ? 'Asistan durumu' : 'Assistant status',
+        body: state.status,
+      },
+      latestTurn
+        ? {
+            id: 'assistant-latest-turn',
+            title: locale === 'tr' ? 'Son yanıt' : 'Latest response',
+            body: latestTurn.status,
+          }
+        : null,
+      state.pendingApprovalId
+        ? {
+            id: 'assistant-approval',
+            title: locale === 'tr' ? 'Onay bekliyor' : 'Approval pending',
+            body: state.pendingApprovalId,
+          }
+        : null,
+      state.selectedRunIds.length > 0
+        ? {
+            id: 'assistant-run-context',
+            title: locale === 'tr' ? 'Run bağlamı' : 'Run context',
+            body: state.selectedRunIds[0],
+          }
+        : null,
+    ].filter((item): item is { id: string; title: string; body: string } => Boolean(item));
+  }, [locale, state.pendingApprovalId, state.selectedRunIds, state.status, state.turns]);
 
   return (
     <section
@@ -109,35 +169,60 @@ export function AssistantView({
           </div>
         </div>
         <div className="assistant-top-actions">
-          <label className="assistant-search">
-            <Icon name="logs" />
-            <input
-            aria-label={text.search}
-              placeholder={text.search}
-              disabled
-              title={translateAssistantText('Assistant context search is not available yet', locale)}
-              data-disabled-reason={translateAssistantText('Assistant context search is not available yet', locale)}
-            />
-            <kbd>⌘K</kbd>
-          </label>
-          <button
-            type="button"
-            aria-label={text.terminal}
-            disabled
-            title={translateAssistantText('Terminal access is not available in assistant preview', locale)}
-          >
-            <Icon name="terminal" />
-          </button>
-          <button
-            type="button"
-            aria-label={text.notifications}
-            className="assistant-notification-button"
-            disabled
-            title={translateAssistantText('Assistant notifications are not available in this context', locale)}
-          >
-            <Icon name="bell" />
-            <span aria-hidden="true" />
-          </button>
+          <div className="assistant-search-wrap">
+            <label className="assistant-search">
+              <Icon name="logs" />
+              <input
+                aria-label={text.search}
+                placeholder={text.search}
+                value={assistantSearchQuery}
+                onChange={(event) => setAssistantSearchQuery(event.target.value)}
+              />
+              <kbd>{normalizedSearchQuery ? searchResults.length : '⌘K'}</kbd>
+            </label>
+            {normalizedSearchQuery ? (
+              <div className="assistant-search-results" role="status" aria-label={text.search}>
+                {searchResults.length > 0 ? (
+                  searchResults.map((result) => (
+                    <article key={result.id}>
+                      <span>{result.label}</span>
+                      <p>{result.text}</p>
+                    </article>
+                  ))
+                ) : (
+                  <p>{locale === 'tr' ? 'Eşleşme yok' : 'No matches'}</p>
+                )}
+              </div>
+            ) : null}
+          </div>
+          {onOpenTerminal ? (
+            <button type="button" aria-label={text.terminal} title={text.terminal} onClick={onOpenTerminal}>
+              <Icon name="terminal" />
+            </button>
+          ) : null}
+          <div className="assistant-action-popover">
+            <button
+              type="button"
+              aria-label={text.notifications}
+              aria-expanded={assistantNotificationsOpen}
+              className="assistant-notification-button"
+              title={text.notifications}
+              onClick={() => setAssistantNotificationsOpen((value) => !value)}
+            >
+              <Icon name="bell" />
+              <span aria-hidden="true" />
+            </button>
+            {assistantNotificationsOpen ? (
+              <div className="assistant-notification-popover" role="status" aria-label={text.notifications}>
+                {assistantNotifications.map((item) => (
+                  <article key={item.id}>
+                    <span>{item.title}</span>
+                    <p>{item.body}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </div>
           {rightRail ? (
             <button
               type="button"
@@ -153,7 +238,7 @@ export function AssistantView({
         </div>
       </header>
 
-      <div className="assistant-surface-grid">
+      <div className={workbench ? 'assistant-surface-grid assistant-surface-grid-workbench' : 'assistant-surface-grid'}>
         <div className="assistant-main-stage">
           {state.turns.length > 0 ? (
             <header className="assistant-session-header">
@@ -234,8 +319,11 @@ export function AssistantView({
             locale={locale}
             onRuntimeSettingsChange={onRuntimeSettingsChange}
             onSend={onSend}
+            onCancel={currentTurnRunning ? onCancel : undefined}
           />
         </div>
+
+        {workbench ? <div className="assistant-workbench-slot">{workbench}</div> : null}
 
         {rightRail ? (
           <>

@@ -42,28 +42,32 @@ function renderRail(overrides: Partial<Parameters<typeof RightRail>[0]> = {}) {
 describe('RightRail interactions', () => {
   it('calls enabled quick actions', async () => {
     const onRefreshContext = vi.fn();
+    const onOpenTerminal = vi.fn();
     const onExport = vi.fn();
-    const { user } = renderRail({ onRefreshContext, onExport });
+    const { user } = renderRail({ onRefreshContext, onOpenTerminal, onExport });
 
     await user.click(screen.getByRole('button', { name: /Bağlamı Yenile/i }));
+    await user.click(screen.getByRole('button', { name: /Terminal Aç/i }));
     await user.click(screen.getByRole('button', { name: /Logları Dışa Aktar/i }));
 
     expect(onRefreshContext).toHaveBeenCalledTimes(1);
+    expect(onOpenTerminal).toHaveBeenCalledTimes(1);
     expect(onExport).toHaveBeenCalledTimes(1);
   });
 
   it('keeps disabled quick actions inert and explains why', async () => {
-    const onOpenTerminal = vi.fn();
+    const onCancel = vi.fn();
     const { user } = renderRail({
-      terminalDisabled: true,
-      terminalDisabledReason: 'Terminal unavailable.',
-      onOpenTerminal,
+      cancelDisabled: true,
+      cancelDisabledReason: 'Cancel unavailable.',
+      onCancel,
     });
-    const terminal = screen.getByRole('button', { name: /Terminal Aç/i });
+    const cancel = screen.getByRole('button', { name: /Çalıştırmayı İptal Et/i });
 
-    expect(terminal).toBeDisabled();
-    expect(terminal).toHaveAttribute('title', 'Terminal unavailable.');
-    await user.click(terminal);
-    expect(onOpenTerminal).not.toHaveBeenCalled();
+    expect(cancel).toBeDisabled();
+    expect(cancel).toHaveAttribute('title', 'Cancel unavailable.');
+    expect(cancel).toHaveAttribute('data-disabled-reason', 'Cancel unavailable.');
+    await user.click(cancel);
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });

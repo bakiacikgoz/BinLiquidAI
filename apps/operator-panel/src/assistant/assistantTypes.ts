@@ -18,7 +18,8 @@ export type AssistantStreamEventType =
   | 'audit_artifact'
   | 'final'
   | 'warning'
-  | 'error';
+  | 'error'
+  | 'cancelled';
 
 export interface AssistantStartTurnOptions {
   assistantTurnId: string;
@@ -60,6 +61,14 @@ export interface AssistantStartTurnResponse {
   sessionId: string;
   processId: number | null;
   status: 'started';
+}
+
+export interface AssistantCancelTurnResponse {
+  contractVersion: string;
+  assistantTurnId: string;
+  sessionId: string;
+  processId: number | null;
+  status: 'cancelled';
 }
 
 export interface AssistantStreamEvent {

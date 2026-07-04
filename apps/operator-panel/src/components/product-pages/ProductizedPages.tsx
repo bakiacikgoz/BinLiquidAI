@@ -13,6 +13,8 @@ import {
 } from '../../control-plane/mappers/governance';
 import type { ControlPlaneSnapshot } from '../../control-plane/types';
 import type { UiLocale } from '../../i18n';
+import { OperatorPageShell } from '../operator-page/OperatorPage';
+import { operatorToneFromStatus } from '../operator-page/operatorPageUtils';
 import { CodeToken, ReasonChip, StatusBadge } from '../primitives/Token';
 
 type ProductPageProps = {
@@ -148,6 +150,7 @@ function ProductPageShell({
   metrics,
   rows,
   primaryQueueLabel,
+  locale = 'en',
   children,
 }: {
   kicker: string;
@@ -156,38 +159,75 @@ function ProductPageShell({
   metrics: ProductPageMetric[];
   rows: ProductPageRow[];
   primaryQueueLabel: string;
+  locale?: UiLocale;
   children?: React.ReactNode;
 }) {
+  const firstRow = rows[0];
+  const status = firstRow?.status ?? String(metrics[0]?.value ?? 'unknown');
+  const blockedCount = rows.filter((row) => operatorToneFromStatus(row.status) === 'error').length;
+  const label = locale === 'tr'
+    ? {
+        currentState: 'Mevcut durum',
+        whyItMatters: 'Neden önemli',
+        nextAction: 'Sıradaki aksiyon',
+        reviewQueue: 'Kuyruğu incele',
+        clear: 'Kritik blocker yok',
+        blocked: `${blockedCount} kayıt aksiyon istiyor`,
+        inspect: 'İlk kaydı aç ve bağlamı doğrula',
+        empty: 'Veri kaynağını yenile',
+      }
+    : {
+        currentState: 'Current state',
+        whyItMatters: 'Why it matters',
+        nextAction: 'Next action',
+        reviewQueue: 'Review queue',
+        clear: 'No critical blocker',
+        blocked: `${blockedCount} records need action`,
+        inspect: 'Open the first record and verify context',
+        empty: 'Refresh the data source',
+      };
+
   return (
-    <section className="workspace" data-testid="page-primary-region">
-      <div className="workspace-header">
-        <div>
-          <p className="workspace-kicker">{kicker}</p>
-          <h2>{title}</h2>
-          <p className="workspace-lead">{lead}</p>
+    <OperatorPageShell
+      kicker={kicker}
+      title={title}
+      lead={lead}
+      status={status}
+      decisionItems={[
+        {
+          label: label.currentState,
+          value: status,
+          detail: firstRow?.title ?? label.empty,
+        },
+        {
+          label: label.whyItMatters,
+          value: blockedCount > 0 ? label.blocked : label.clear,
+          detail: metrics[0]?.detail,
+          tone: blockedCount > 0 ? 'error' : 'success',
+        },
+        {
+          label: label.nextAction,
+          value: rows.length > 0 ? label.reviewQueue : label.empty,
+          detail: rows.length > 0 ? label.inspect : undefined,
+          tone: rows.length > 0 ? 'info' : 'warning',
+        },
+      ]}
+      metrics={metrics.slice(0, 4).map((metric) => ({
+        label: metric.label,
+        value: metric.value,
+        detail: metric.detail,
+      }))}
+      context={children}
+    >
+      <article className="operator-work-card">
+        <h3>{primaryQueueLabel}</h3>
+        <div className="run-list">
+          {rows.map((row) => (
+            <ProductQueueRow key={row.id} row={row} />
+          ))}
         </div>
-      </div>
-      <div className="metric-grid">
-        {metrics.map((metric) => (
-          <article className="metric-card" key={metric.label}>
-            <h3>{metric.label}</h3>
-            <p className="metric">{metric.value}</p>
-            <small>{metric.detail}</small>
-          </article>
-        ))}
-      </div>
-      <div className="section-grid two-up">
-        <article className="page-card">
-          <h3>{primaryQueueLabel}</h3>
-          <div className="run-list">
-            {rows.map((row) => (
-              <ProductQueueRow key={row.id} row={row} />
-            ))}
-          </div>
-        </article>
-        {children}
-      </div>
-    </section>
+      </article>
+    </OperatorPageShell>
   );
 }
 
@@ -266,6 +306,7 @@ export function LogsPage({ events = [], runItems = [], snapshot, locale = 'en' }
       metrics={model.metrics}
       rows={model.rows}
       primaryQueueLabel={copy.primaryQueue}
+      locale={locale}
     >
       <article className="page-card">
         <h3>{copy.sideCardTitle}</h3>
@@ -299,6 +340,7 @@ export function ReportsPage({ operationOutputs = {}, claims, snapshot, locale = 
       metrics={model.metrics}
       rows={model.rows}
       primaryQueueLabel={copy.primaryQueue}
+      locale={locale}
     >
       <article className="page-card">
         <h3>{copy.sideCardTitle}</h3>
@@ -332,6 +374,7 @@ export function AlertsPage({ driftEvents = [], pendingApprovals = [], claims, sn
       metrics={model.metrics}
       rows={model.rows}
       primaryQueueLabel={copy.primaryQueue}
+      locale={locale}
     >
       <article className="page-card">
         <h3>{copy.sideCardTitle}</h3>
@@ -361,6 +404,7 @@ export function PlansPage({ profile = 'balanced', snapshot, locale = 'en' }: Pro
       metrics={model.metrics}
       rows={model.rows}
       primaryQueueLabel={copy.primaryQueue}
+      locale={locale}
     >
       <article className="page-card">
         <h3>{copy.sideCardTitle}</h3>
@@ -381,6 +425,7 @@ export function UsersPage({ operatorId = '', profile = 'balanced', snapshot, loc
       metrics={model.metrics}
       rows={model.rows}
       primaryQueueLabel={copy.primaryQueue}
+      locale={locale}
     >
       <article className="page-card">
         <h3>{copy.sideCardTitle}</h3>
@@ -410,6 +455,7 @@ export function RolesPage({ profile = 'balanced', snapshot, locale = 'en' }: Pro
       metrics={model.metrics}
       rows={model.rows}
       primaryQueueLabel={copy.primaryQueue}
+      locale={locale}
     >
       <article className="page-card">
         <h3>{copy.sideCardTitle}</h3>
@@ -439,6 +485,7 @@ export function PolicyPacksPage({ claims, snapshot, locale = 'en' }: ProductPage
       metrics={model.metrics}
       rows={model.rows}
       primaryQueueLabel={copy.primaryQueue}
+      locale={locale}
     >
       <article className="page-card">
         <h3>{copy.sideCardTitle}</h3>

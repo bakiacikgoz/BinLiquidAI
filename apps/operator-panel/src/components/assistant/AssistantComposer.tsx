@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   validateAssistantRuntimeSettings,
@@ -34,6 +34,7 @@ export function AssistantComposer({
   locale = 'en',
   onRuntimeSettingsChange,
   onSend,
+  onCancel,
 }: {
   label: string;
   placeholder: string;
@@ -50,8 +51,10 @@ export function AssistantComposer({
     runtimeSettings: AssistantRuntimeSettings,
     controls: AssistantComposerControls,
   ) => void;
+  onCancel?: () => void;
 }) {
   const text = assistantUiText[locale];
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const contextOptions: Array<{ kind: AssistantContextAttachmentKind; label: string }> = [
     { kind: 'active_run', label: text.activeRun },
     { kind: 'event_tail', label: text.recentEvents },
@@ -76,8 +79,23 @@ export function AssistantComposer({
     setDraft(initialValue);
   }, [initialValue]);
 
+  const resizeDraft = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    resizeDraft();
+  }, [draft, resizeDraft]);
+
   const validationMessage = validateAssistantRuntimeSettings(runtimeSettings);
   const canSend = draft.trim().length > 0 && !disabled && !validationMessage;
+  const canCancel = disabled && Boolean(onCancel);
+  const cancelLabel = locale === 'tr' ? 'Durdur' : 'Stop';
   const visibleStatusLabel = statusLabel && statusLabel !== 'idle' ? statusLabel : '';
   const selectedRuntimeLabel = runtimeDisplayLabel(runtimeSettings, locale);
   const controls: AssistantComposerControls = {
@@ -91,6 +109,9 @@ export function AssistantComposer({
       : draft.trim().length === 0
         ? translateAssistantText('Enter a message to send.', locale)
         : undefined);
+  const composerDisabledReason = disabled
+    ? translateAssistantText('Assistant is currently processing a turn.', locale)
+    : undefined;
 
   const toggleContext = (kind: AssistantContextAttachmentKind) => {
     setContextAttachmentKinds((previous) =>
@@ -123,11 +144,20 @@ export function AssistantComposer({
         {label}
       </label>
       <textarea
+        ref={textareaRef}
         id="assistant-message"
         placeholder={placeholder}
         rows={3}
         value={draft}
-        onChange={(event) => setDraft(event.target.value)}
+        disabled={disabled}
+        title={composerDisabledReason}
+        data-disabled-reason={composerDisabledReason}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          if (typeof window !== 'undefined') {
+            window.requestAnimationFrame(resizeDraft);
+          }
+        }}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
             return;
@@ -194,14 +224,15 @@ export function AssistantComposer({
             <strong>{selectedRuntimeLabel}</strong>
           </span>
           <Button
-            type="submit"
-            icon={<Icon name="arrow-up" />}
+            type={canCancel ? 'button' : 'submit'}
+            icon={<Icon name={canCancel ? 'close' : 'arrow-up'} />}
             variant="primary"
-            disabled={!canSend}
-            title={sendDisabledReason}
-            data-disabled-reason={sendDisabledReason}
+            disabled={canCancel ? false : !canSend}
+            title={canCancel ? cancelLabel : sendDisabledReason}
+            data-disabled-reason={canCancel ? undefined : sendDisabledReason}
+            onClick={canCancel ? onCancel : undefined}
           >
-            <span className="assistant-send-label">{sendLabel}</span>
+            <span className="assistant-send-label">{canCancel ? cancelLabel : sendLabel}</span>
           </Button>
         </div>
       </div>

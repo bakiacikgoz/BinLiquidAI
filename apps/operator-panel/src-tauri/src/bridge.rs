@@ -8,6 +8,7 @@ use std::process::Stdio;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader as TokioBufReader};
+use tokio::sync::Mutex;
 use tokio::process::Command;
 use tokio::process::{ChildStderr, ChildStdout};
 
@@ -42,6 +43,17 @@ pub struct BridgeResult<T: Serialize> {
     ok: bool,
     data: Option<T>,
     error: Option<BridgeError>,
+}
+
+#[derive(Debug, Clone)]
+struct AssistantProcessRef {
+    process_id: u32,
+    session_id: String,
+}
+
+#[derive(Default)]
+pub struct AssistantProcessRegistry {
+    turns: Mutex<HashMap<String, AssistantProcessRef>>,
 }
 
 impl<T: Serialize> BridgeResult<T> {
@@ -1667,6 +1679,19 @@ pub async fn bridge_assistant_start_turn(
     };
 
     let process_id = child.id();
+    if let Some(process_id) = process_id {
+        app.state::<AssistantProcessRegistry>()
+            .turns
+            .lock()
+            .await
+            .insert(
+                assistant_turn_id.clone(),
+                AssistantProcessRef {
+                    process_id,
+                    session_id: session_id.clone(),
+                },
+            );
+    }
     let stdout = match child.stdout.take() {
         Some(value) => value,
         None => {
@@ -1697,6 +1722,15 @@ pub async fn bridge_assistant_start_turn(
         let observed_events = match stream_result {
             Ok(count) => count,
             Err(error) => {
+                if !task_app
+                    .state::<AssistantProcessRegistry>()
+                    .turns
+                    .lock()
+                    .await
+                    .contains_key(&task_turn_id)
+                {
+                    return;
+                }
                 let _ = emit_assistant_error(&task_app, &task_turn_id, &task_session_id, 1, &error);
                 1
             }
@@ -1706,6 +1740,15 @@ pub async fn bridge_assistant_start_turn(
         match child.wait().await {
             Ok(status) if status.success() => {}
             Ok(status) => {
+                if !task_app
+                    .state::<AssistantProcessRegistry>()
+                    .turns
+                    .lock()
+                    .await
+                    .contains_key(&task_turn_id)
+                {
+                    return;
+                }
                 let error = BridgeError::new(
                     "CLI_FAILED",
                     format!("Assistant command exited with status {status}."),
@@ -1722,6 +1765,15 @@ pub async fn bridge_assistant_start_turn(
                 );
             }
             Err(error) => {
+                if !task_app
+                    .state::<AssistantProcessRegistry>()
+                    .turns
+                    .lock()
+                    .await
+                    .contains_key(&task_turn_id)
+                {
+                    return;
+                }
                 let error = BridgeError::new(
                     "CLI_FAILED",
                     format!("Failed to wait for assistant process: {error}"),
@@ -1738,6 +1790,12 @@ pub async fn bridge_assistant_start_turn(
                 );
             }
         }
+        task_app
+            .state::<AssistantProcessRegistry>()
+            .turns
+            .lock()
+            .await
+            .remove(&task_turn_id);
     });
 
     BridgeResult::ok(AssistantStartTurnPayload {
@@ -1746,6 +1804,68 @@ pub async fn bridge_assistant_start_turn(
         session_id,
         process_id,
         status: "started".to_string(),
+    })
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantCancelTurnPayload {
+    contract_version: String,
+    assistant_turn_id: String,
+    session_id: String,
+    process_id: u32,
+    status: String,
+}
+
+#[tauri::command]
+pub async fn bridge_assistant_cancel_turn(
+    app: tauri::AppHandle,
+    assistant_turn_id: String,
+) -> BridgeResult<AssistantCancelTurnPayload> {
+    let assistant_turn_id = match normalize_assistant_turn_id(&assistant_turn_id) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let process_ref = app
+        .state::<AssistantProcessRegistry>()
+        .turns
+        .lock()
+        .await
+        .remove(&assistant_turn_id);
+    let Some(process_ref) = process_ref else {
+        return BridgeResult::err(BridgeError::new(
+            "ASSISTANT_TURN_NOT_RUNNING",
+            "Assistant turn is not running or has already completed.",
+            "",
+            "assistant cancel",
+            false,
+        ));
+    };
+
+    if let Err(error) = terminate_process(process_ref.process_id).await {
+        return BridgeResult::err(error);
+    }
+
+    let payload = assistant_event_payload(
+        &assistant_turn_id,
+        &process_ref.session_id,
+        "cancelled",
+        9_000_000_000,
+        json!({
+            "message": "Assistant turn cancelled by operator.",
+            "processId": process_ref.process_id,
+        }),
+    );
+    if let Err(error) = emit_assistant_payload(&app, &payload) {
+        return BridgeResult::err(error);
+    }
+
+    BridgeResult::ok(AssistantCancelTurnPayload {
+        contract_version: CONTRACT_VERSION.to_string(),
+        assistant_turn_id,
+        session_id: process_ref.session_id,
+        process_id: process_ref.process_id,
+        status: "cancelled".to_string(),
     })
 }
 
@@ -1950,7 +2070,8 @@ fn parse_assistant_json_line(
 fn normalize_assistant_event_name(value: &str) -> &str {
     match value {
         "status" | "token" | "router_decision" | "policy_decision" | "approval_pending"
-        | "expert_start" | "expert_end" | "audit_artifact" | "final" | "warning" | "error" => value,
+        | "expert_start" | "expert_end" | "audit_artifact" | "final" | "warning" | "error"
+        | "cancelled" => value,
         _ => "status",
     }
 }
@@ -2003,6 +2124,15 @@ async fn stream_assistant_stdout(
     }
 
     if !final_seen {
+        if !app
+            .state::<AssistantProcessRegistry>()
+            .turns
+            .lock()
+            .await
+            .contains_key(&assistant_turn_id)
+        {
+            return Ok(sequence);
+        }
         let error = BridgeError::new(
             "PARSE_FAILED",
             "Assistant stream ended before a final event.",
@@ -2015,6 +2145,48 @@ async fn stream_assistant_stdout(
     }
 
     Ok(sequence)
+}
+
+async fn terminate_process(process_id: u32) -> Result<(), BridgeError> {
+    #[cfg(unix)]
+    let mut command = {
+        let mut command = Command::new("kill");
+        command.arg("-TERM").arg(process_id.to_string());
+        command
+    };
+
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = Command::new("taskkill");
+        command
+            .arg("/PID")
+            .arg(process_id.to_string())
+            .arg("/T")
+            .arg("/F");
+        command
+    };
+
+    let status = command.status().await.map_err(|error| {
+        BridgeError::new(
+            "ASSISTANT_CANCEL_FAILED",
+            format!("Failed to cancel assistant process: {error}"),
+            "",
+            format!("assistant cancel {process_id}"),
+            true,
+        )
+    })?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(BridgeError::new(
+            "ASSISTANT_CANCEL_FAILED",
+            format!("Assistant cancel command exited with status {status}."),
+            "",
+            format!("assistant cancel {process_id}"),
+            true,
+        ))
+    }
 }
 
 async fn read_assistant_stderr_preview(stderr: Option<ChildStderr>) -> String {

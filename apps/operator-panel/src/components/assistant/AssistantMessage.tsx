@@ -1,3 +1,5 @@
+import { useState, type ReactNode } from 'react';
+
 import type { AssistantTurn } from '../../assistant/assistantTypes';
 import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import { Card } from '../primitives/Card';
@@ -7,12 +9,267 @@ import { AssistantApprovalCard } from './AssistantApprovalCard';
 import { AssistantRunReferences } from './AssistantRunReferences';
 import { AssistantRunningState } from './AssistantRunningState';
 
+type MarkdownBlock =
+  | { type: 'code'; code: string; language: string }
+  | { type: 'heading'; depth: 2 | 3 | 4; text: string }
+  | { type: 'list'; ordered: boolean; items: string[] }
+  | { type: 'table'; rows: string[][] }
+  | { type: 'paragraph'; text: string };
+
+const COLLAPSED_USER_MESSAGE_CHARS = 560;
+const COLLAPSED_USER_MESSAGE_LINES = 8;
+
 function formatClock(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return '';
   }
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function isTableDivider(line: string): boolean {
+  return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+}
+
+function parseTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim());
+}
+
+function parseMarkdownBlocks(source: string): MarkdownBlock[] {
+  const lines = source.replace(/\r\n/g, '\n').split('\n');
+  const blocks: MarkdownBlock[] = [];
+  let paragraph: string[] = [];
+  let index = 0;
+
+  const flushParagraph = () => {
+    const text = paragraph.join(' ').trim();
+    if (text) {
+      blocks.push({ type: 'paragraph', text });
+    }
+    paragraph = [];
+  };
+
+  while (index < lines.length) {
+    const line = lines[index] ?? '';
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph();
+      index += 1;
+      continue;
+    }
+
+    const fence = trimmed.match(/^```([\w.+-]*)\s*$/);
+    if (fence) {
+      flushParagraph();
+      const code: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+        code.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) {
+        index += 1;
+      }
+      blocks.push({ type: 'code', code: code.join('\n'), language: fence[1] ?? '' });
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{2,4})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      blocks.push({
+        type: 'heading',
+        depth: Math.min(heading[1].length, 4) as 2 | 3 | 4,
+        text: heading[2],
+      });
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.includes('|') && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
+      flushParagraph();
+      const rows = [parseTableRow(trimmed)];
+      index += 2;
+      while (index < lines.length && lines[index].trim().includes('|')) {
+        rows.push(parseTableRow(lines[index]));
+        index += 1;
+      }
+      blocks.push({ type: 'table', rows });
+      continue;
+    }
+
+    const listMatch = trimmed.match(/^([-*]|\d+[.)])\s+(.+)$/);
+    if (listMatch) {
+      flushParagraph();
+      const ordered = /^\d+[.)]$/.test(listMatch[1]);
+      const items = [listMatch[2]];
+      index += 1;
+      while (index < lines.length) {
+        const next = lines[index].trim();
+        const nextMatch = next.match(/^([-*]|\d+[.)])\s+(.+)$/);
+        if (!nextMatch || /^\d+[.)]$/.test(nextMatch[1]) !== ordered) {
+          break;
+        }
+        items.push(nextMatch[2]);
+        index += 1;
+      }
+      blocks.push({ type: 'list', ordered, items });
+      continue;
+    }
+
+    paragraph.push(trimmed);
+    index += 1;
+  }
+
+  flushParagraph();
+  return blocks;
+}
+
+function isSafeHref(value: string): boolean {
+  return /^(https?:|mailto:)/i.test(value);
+}
+
+function renderInlineMarkdown(source: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(source)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(source.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    const key = `${keyPrefix}-${match.index}`;
+    if (token.startsWith('`')) {
+      nodes.push(<code key={key}>{token.slice(1, -1)}</code>);
+    } else if (token.startsWith('**')) {
+      nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>);
+    } else {
+      const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      const href = link?.[2]?.trim() ?? '';
+      nodes.push(
+        isSafeHref(href) ? (
+          <a key={key} href={href} target="_blank" rel="noreferrer">
+            {link?.[1] ?? href}
+          </a>
+        ) : (
+          <span key={key}>{link?.[1] ?? token}</span>
+        ),
+      );
+    }
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < source.length) {
+    nodes.push(source.slice(lastIndex));
+  }
+  return nodes;
+}
+
+function CodeBlock({ code, language }: { code: string; language: string }) {
+  const copyCode = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      void navigator.clipboard.writeText(code);
+    }
+  };
+
+  return (
+    <div className="assistant-code-block">
+      <div>
+        <span>{language || 'text'}</span>
+        <button type="button" onClick={copyCode}>
+          Copy
+        </button>
+      </div>
+      <pre>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function MarkdownAnswer({ text }: { text: string }) {
+  const blocks = parseMarkdownBlocks(text);
+  return (
+    <div className="assistant-answer assistant-markdown">
+      {blocks.map((block, index) => {
+        const key = `${block.type}-${index}`;
+        if (block.type === 'code') {
+          return <CodeBlock key={key} code={block.code} language={block.language} />;
+        }
+        if (block.type === 'heading') {
+          const Heading = `h${block.depth}` as 'h2' | 'h3' | 'h4';
+          return <Heading key={key}>{renderInlineMarkdown(block.text, key)}</Heading>;
+        }
+        if (block.type === 'list') {
+          const List = block.ordered ? 'ol' : 'ul';
+          return (
+            <List key={key}>
+              {block.items.map((item, itemIndex) => (
+                <li key={`${key}-${itemIndex}`}>{renderInlineMarkdown(item, `${key}-${itemIndex}`)}</li>
+              ))}
+            </List>
+          );
+        }
+        if (block.type === 'table') {
+          const [head = [], ...body] = block.rows;
+          return (
+            <div className="assistant-table-scroll" key={key}>
+              <table>
+                <thead>
+                  <tr>
+                    {head.map((cell, cellIndex) => (
+                      <th key={`${key}-h-${cellIndex}`}>{renderInlineMarkdown(cell, `${key}-h-${cellIndex}`)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {body.map((row, rowIndex) => (
+                    <tr key={`${key}-r-${rowIndex}`}>
+                      {row.map((cell, cellIndex) => (
+                        <td key={`${key}-r-${rowIndex}-${cellIndex}`}>
+                          {renderInlineMarkdown(cell, `${key}-r-${rowIndex}-${cellIndex}`)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+        return <p key={key}>{renderInlineMarkdown(block.text, key)}</p>;
+      })}
+    </div>
+  );
+}
+
+function UserMessageText({ text, locale }: { text: string; locale: UiLocale }) {
+  const [expanded, setExpanded] = useState(false);
+  const lines = text.split('\n');
+  const shouldCollapse = text.length > COLLAPSED_USER_MESSAGE_CHARS || lines.length > COLLAPSED_USER_MESSAGE_LINES;
+  const visibleText =
+    shouldCollapse && !expanded
+      ? `${lines.slice(0, COLLAPSED_USER_MESSAGE_LINES).join('\n').slice(0, COLLAPSED_USER_MESSAGE_CHARS).trimEnd()}...`
+      : text;
+
+  return (
+    <div className={shouldCollapse && !expanded ? 'assistant-user-text assistant-user-text-collapsed' : 'assistant-user-text'}>
+      <p>{visibleText}</p>
+      {shouldCollapse ? (
+        <button type="button" onClick={() => setExpanded((value) => !value)}>
+          {expanded ? (locale === 'tr' ? 'Kısalt' : 'Collapse') : locale === 'tr' ? 'Devamını göster' : 'Show more'}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 export function AssistantMessage({
@@ -64,7 +321,7 @@ export function AssistantMessage({
       <Card className="assistant-user-message">
         <div>
           <time className="assistant-user-time">{formatClock(turn.userMessage.createdAtUtc)}</time>
-          <p>{turn.userMessage.text}</p>
+          <UserMessageText text={turn.userMessage.text} locale={locale} />
         </div>
       </Card>
       <Card className="assistant-assistant-message">
@@ -79,7 +336,7 @@ export function AssistantMessage({
           completedAtUtc={turn.completedAtUtc}
           locale={locale}
         />
-        {message.text ? <p className="assistant-answer">{translateAssistantText(message.text, locale)}</p> : null}
+        {message.text ? <MarkdownAnswer text={translateAssistantText(message.text, locale)} /> : null}
         {message.warning ? <p className="assistant-warning-text">{translateAssistantText(message.warning, locale)}</p> : null}
         {message.error ? (
           <div className="assistant-error-card">

@@ -63,8 +63,6 @@ export function RightRail({
   pendingApprovals,
   resumeDisabled = false,
   resumeDisabledReason = '',
-  terminalDisabled = false,
-  terminalDisabledReason = '',
   exportDisabled = false,
   exportDisabledReason = '',
   cancelDisabled = false,
@@ -89,8 +87,6 @@ export function RightRail({
   pendingApprovals: PendingApprovalSummary[];
   resumeDisabled?: boolean;
   resumeDisabledReason?: string;
-  terminalDisabled?: boolean;
-  terminalDisabledReason?: string;
   exportDisabled?: boolean;
   exportDisabledReason?: string;
   cancelDisabled?: boolean;
@@ -209,24 +205,20 @@ export function RightRail({
           disabled={resumeDisabled}
           icon={<Icon name="play" />}
           title={resumeDisabledReason || undefined}
+          data-disabled-reason={resumeDisabled ? resumeDisabledReason || 'Resume is not available for this run.' : undefined}
           variant="ghost"
           onClick={onResume}
         >
           Çalıştırmayı Devam Ettir
         </Button>
-        <Button
-          disabled={terminalDisabled}
-          icon={<Icon name="terminal" />}
-          title={terminalDisabledReason || undefined}
-          variant="ghost"
-          onClick={onOpenTerminal}
-        >
+        <Button icon={<Icon name="terminal" />} variant="ghost" onClick={onOpenTerminal}>
           Terminal Aç
         </Button>
         <Button
           disabled={exportDisabled}
           icon={<Icon name="download" />}
           title={exportDisabledReason || undefined}
+          data-disabled-reason={exportDisabled ? exportDisabledReason || 'Export requires a selected run.' : undefined}
           variant="ghost"
           onClick={onExport}
         >
@@ -236,6 +228,7 @@ export function RightRail({
           disabled={cancelDisabled}
           icon={<Icon name="reject" />}
           title={cancelDisabledReason || undefined}
+          data-disabled-reason={cancelDisabled ? cancelDisabledReason || 'Cancel is not available for this run.' : undefined}
           variant="danger"
           onClick={onCancel}
         >

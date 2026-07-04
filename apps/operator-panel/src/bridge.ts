@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 
 import { previewAssistantProviderModels, previewAssistantStartTurn } from './assistant/assistantFixtures';
 import type {
+  AssistantCancelTurnResponse,
   AssistantStartTurnOptions,
   AssistantStartTurnResponse,
   AssistantStreamEvent,
@@ -961,6 +962,24 @@ export async function startAssistantTurn(
     fallbackProviderId: options.fallbackProviderId,
     model: options.model,
     hfModelId: options.hfModelId,
+  });
+}
+
+export async function cancelAssistantTurn(
+  _settings: PanelSettings,
+  assistantTurnId: string,
+): Promise<AssistantCancelTurnResponse> {
+  if (isBridgePreviewMode()) {
+    return {
+      contractVersion: '2.0',
+      assistantTurnId,
+      sessionId: 'preview-session',
+      processId: null,
+      status: 'cancelled',
+    };
+  }
+  return callBridge('bridge_assistant_cancel_turn', {
+    assistantTurnId,
   });
 }
 

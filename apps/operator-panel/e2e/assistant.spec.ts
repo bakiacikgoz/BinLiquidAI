@@ -6,9 +6,9 @@ test('AI Assistant model selection is visible and used before sending a preview 
   const consoleHealth = await gotoOperatorPanel(page, { operatorId: 'qa-operator' });
   await openPrimaryView(page, 'AI Assistant', 'Welcome to AegisOS Assistant');
 
-  const disabledSearch = page.getByRole('textbox', { name: 'Search' });
-  await expect(disabledSearch).toBeDisabled();
-  await expect(disabledSearch).toHaveAttribute('title', 'Assistant context search is not available yet');
+  await expect(page.getByRole('textbox', { name: 'Search' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Terminal' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Notifications' })).toBeEnabled();
 
   await page.getByLabel('Assistant provider').selectOption('ollama');
   await page.getByLabel('Assistant model', { exact: true }).fill('qwen3.5:4b');
@@ -31,6 +31,14 @@ test('AI Assistant model selection is visible and used before sending a preview 
   await page.getByLabel('Message').press('Enter');
 
   await expect(page.getByText('Summarize the active run safely.')).toBeVisible();
+  await expect(page.getByText('The selected run is blocked by an approval gate.')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Search' }).fill('approval');
+  await expect(page.getByRole('status', { name: 'Search' }).getByText('Assistant response')).toBeVisible();
+  await page.getByRole('button', { name: 'Notifications' }).click();
+  await expect(page.getByRole('status', { name: 'Notifications' }).getByText('Assistant status')).toBeVisible();
+  await page.getByRole('button', { name: 'Terminal' }).click();
+  await expect(page.getByRole('heading', { name: 'Runs', exact: true, level: 2 })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Ana navigasyon' }).getByRole('button', { name: 'AI Assistant' }).click();
   await expect(page.getByText('The selected run is blocked by an approval gate.')).toBeVisible();
   await expect
     .poll(async () => {

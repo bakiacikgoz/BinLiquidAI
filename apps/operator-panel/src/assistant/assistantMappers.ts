@@ -135,6 +135,7 @@ function normalizeEventName(value: unknown): AssistantStreamEventType {
     'final',
     'warning',
     'error',
+    'cancelled',
   ];
   return allowed.includes(raw as AssistantStreamEventType) ? (raw as AssistantStreamEventType) : 'status';
 }
@@ -307,6 +308,18 @@ export function mapCliAssistantEvent(
       turn.completedAtUtc = event.timestampUtc;
       turn.assistantMessage.error = error;
       return { ...previous, turns, status: 'failed', activeTurnId: null, error };
+    }
+    case 'cancelled': {
+      turn.status = 'cancelled';
+      turn.completedAtUtc = event.timestampUtc;
+      turn.assistantMessage.warning = readString(data, 'message', 'Assistant turn cancelled.');
+      appendTimeline(turn, event, {
+        tone: 'warning',
+        title: 'Cancelled',
+        subtitle: turn.assistantMessage.warning,
+        timestampUtc: event.timestampUtc,
+      });
+      return { ...previous, turns, status: 'cancelled', activeTurnId: null, error: null };
     }
     default: {
       const exhaustive: never = event.event;

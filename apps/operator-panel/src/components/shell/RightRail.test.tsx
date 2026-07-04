@@ -46,7 +46,7 @@ describe('RightRail', () => {
     expect(html).not.toContain('27%');
   });
 
-  it('renders progress bars only for real metric values and disables unavailable quick actions', () => {
+  it('renders progress bars only for real metric values and explains unavailable quick actions', () => {
     const html = renderToStaticMarkup(
       <RightRail
         notifications={[]}
@@ -58,8 +58,8 @@ describe('RightRail', () => {
         duration="-"
         systemHealth={{ ...emptyHealth, memoryUsagePct: 55 }}
         pendingApprovals={[{ id: 'apr_1', title: 'device_action', subtitle: 'run_1', time: '-' }]}
-        terminalDisabled
-        terminalDisabledReason="Terminal yok"
+        resumeDisabled
+        resumeDisabledReason="Resume unavailable"
         cancelDisabled
         cancelDisabledReason="Durdurulamaz"
         onDismissNotification={noop}
@@ -74,8 +74,10 @@ describe('RightRail', () => {
     );
 
     expect(html).toContain('aria-valuenow="55"');
-    expect(html).toContain('Terminal yok');
+    expect(html).toContain('Terminal Aç');
+    expect(html).toContain('Resume unavailable');
     expect(html).toContain('Durdurulamaz');
+    expect(html).toContain('data-disabled-reason="Resume unavailable"');
     expect(html).toContain('disabled=""');
   });
 });

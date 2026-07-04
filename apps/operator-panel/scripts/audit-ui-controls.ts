@@ -485,6 +485,9 @@ function inferEffectEvidence(
   if (/\bnavigator\.clipboard\b/.test(source)) {
     evidence.push('clipboard-write');
   }
+  if (/\bscroll(To|IntoView)[A-Za-z0-9_]*\b|\bscrollTop\b/.test(source)) {
+    evidence.push('scroll-position');
+  }
   if (/^on[A-Z]/.test(handlerName ?? '') || /\bon[A-Z][A-Za-z0-9_]*\b/.test(source)) {
     evidence.push('required-callback-prop');
   }

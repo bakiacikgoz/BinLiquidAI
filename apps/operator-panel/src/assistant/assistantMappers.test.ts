@@ -105,4 +105,24 @@ describe('assistant mappers', () => {
     expect(warned.status).toBe('starting');
     expect(warned.turns[0].assistantMessage.warning).toBe('ignored malformed stdout line');
   });
+
+  it('maps cancelled events into a non-error terminal state', () => {
+    const cancelled = mapCliAssistantEvent(
+      {
+        contractVersion: '2.0',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'cancelled',
+        sequence: 1,
+        timestampUtc: '2026-03-08T09:00:05Z',
+        data: { message: 'Assistant turn cancelled by operator.' },
+      },
+      started(),
+    );
+
+    expect(cancelled.status).toBe('cancelled');
+    expect(cancelled.activeTurnId).toBeNull();
+    expect(cancelled.error).toBeNull();
+    expect(cancelled.turns[0].status).toBe('cancelled');
+  });
 });
