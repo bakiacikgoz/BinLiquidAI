@@ -96,8 +96,7 @@
 .assistant-command-preview,
 .assistant-approval-body,
 .assistant-approval-actions,
-.assistant-reference-row,
-.assistant-activity-row {
+.assistant-reference-row {
   display: flex;
   align-items: center;
 }
@@ -1690,58 +1689,6 @@
     background: none;
     color: color-mix(in srgb, var(--assistant-text) 46%, transparent);
   }
-}
-
-.assistant-activity-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.assistant-surface-transcript .assistant-activity-list,
-.assistant-surface-approval .assistant-activity-list {
-  display: grid;
-  justify-items: start;
-  gap: 6px;
-}
-
-.assistant-activity-row {
-  gap: 8px;
-  padding: 7px 9px;
-  border: 1px solid var(--assistant-line);
-  border-radius: 8px;
-  background: var(--assistant-panel-soft);
-}
-
-.assistant-surface-transcript .assistant-activity-row,
-.assistant-surface-approval .assistant-activity-row {
-  display: inline-flex;
-  width: fit-content;
-  max-width: min(100%, 420px);
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--assistant-panel-soft) 58%, transparent);
-}
-
-.assistant-activity-row span {
-  display: grid;
-  gap: 2px;
-}
-
-.assistant-activity-row strong {
-  color: var(--assistant-text);
-  font-size: 12px;
-}
-
-.assistant-activity-row em {
-  color: var(--assistant-muted);
-  font-size: 11px;
-  font-style: normal;
-}
-
-.assistant-surface-transcript .assistant-activity-row em,
-.assistant-surface-approval .assistant-activity-row em {
-  display: none;
 }
 
 .assistant-findings-panel {

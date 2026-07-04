@@ -331,10 +331,8 @@ export function AssistantMessage({
           </span>
         <AssistantRunningState
           status={turn.status}
-          timeline={message.timeline}
           startedAtUtc={turn.startedAtUtc}
           completedAtUtc={turn.completedAtUtc}
-          locale={locale}
         />
         {message.text ? <MarkdownAnswer text={translateAssistantText(message.text, locale)} /> : null}
         {message.warning ? <p className="assistant-warning-text">{translateAssistantText(message.warning, locale)}</p> : null}

@@ -50,7 +50,6 @@ export function AssistantTranscript({
             turn.status,
             turn.userMessage.text.length,
             turn.assistantMessage.text.length,
-            turn.assistantMessage.timeline.length,
             turn.assistantMessage.referencedRuns.length,
             turn.assistantMessage.referencedArtifacts.length,
             turn.assistantMessage.warning ?? '',

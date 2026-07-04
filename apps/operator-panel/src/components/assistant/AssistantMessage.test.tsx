@@ -92,4 +92,32 @@ describe('AssistantMessage', () => {
 
     expect(screen.getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
   });
+
+  it('does not render operational timeline chips in the chat message', () => {
+    const turn = turnWithText('Write a function.', 'Here is the function.');
+    turn.assistantMessage.timeline = [
+      {
+        id: 'event-1',
+        tone: 'warning',
+        title: 'policy decision',
+        subtitle: 'Approval required',
+        timestampUtc: '2026-03-08T09:20:01Z',
+      },
+      {
+        id: 'event-2',
+        tone: 'info',
+        title: 'Status',
+        subtitle: 'Streaming response',
+        timestampUtc: '2026-03-08T09:20:02Z',
+      },
+    ];
+
+    renderMessage(turn);
+
+    expect(screen.getByText('Here is the function.')).toBeInTheDocument();
+    expect(screen.queryByText('policy decision')).not.toBeInTheDocument();
+    expect(screen.queryByText('Approval required')).not.toBeInTheDocument();
+    expect(screen.queryByText('Status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Streaming response')).not.toBeInTheDocument();
+  });
 });
