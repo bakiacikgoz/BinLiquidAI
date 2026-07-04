@@ -1,9 +1,4 @@
 {
   "name": "binliquid-workspace",
-  "private": true,
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  }
+  "private": true
 }

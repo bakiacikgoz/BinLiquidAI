@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import tomllib
 from pathlib import Path
 
@@ -19,7 +18,5 @@ def test_scripts_are_packaged_for_ci_imports() -> None:
 
 def test_operator_panel_workspace_approves_esbuild_build_scripts() -> None:
     workspace = yaml.safe_load((ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8"))
-    package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-    assert "esbuild" in workspace.get("onlyBuiltDependencies", [])
-    assert "esbuild" in package.get("pnpm", {}).get("onlyBuiltDependencies", [])
+    assert workspace.get("allowBuilds", {}).get("esbuild") is True
