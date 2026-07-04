@@ -41,6 +41,8 @@ export function AssistantView({
   state,
   rightRail = null,
   workbench = null,
+  workbenchAvailable = false,
+  workbenchOpen = false,
   approvalDisabled = true,
   approvalDisabledReason = '',
   debugRawEnabled = false,
@@ -50,6 +52,7 @@ export function AssistantView({
   onRuntimeSettingsChange,
   onSend,
   onNewChat,
+  onToggleWorkbench,
   onReviewApproval,
   onApprove,
   onReject,
@@ -62,6 +65,8 @@ export function AssistantView({
   state: AssistantSessionState;
   rightRail?: ReactNode;
   workbench?: ReactNode;
+  workbenchAvailable?: boolean;
+  workbenchOpen?: boolean;
   approvalDisabled?: boolean;
   approvalDisabledReason?: string;
   debugRawEnabled?: boolean;
@@ -75,6 +80,7 @@ export function AssistantView({
     controls: AssistantComposerControls,
   ) => void;
   onNewChat: () => void;
+  onToggleWorkbench?: () => void;
   onReviewApproval: (approvalId: string) => void;
   onApprove: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
@@ -195,6 +201,26 @@ export function AssistantView({
               </div>
             ) : null}
           </div>
+          {workbenchAvailable && onToggleWorkbench ? (
+            <button
+              type="button"
+              aria-label={
+                workbenchOpen
+                  ? locale === 'tr'
+                    ? 'Çalışma alanını kapat'
+                    : 'Close workbench'
+                  : locale === 'tr'
+                    ? 'Çalışma alanını aç'
+                    : 'Open workbench'
+              }
+              aria-expanded={workbenchOpen}
+              className={workbenchOpen ? 'assistant-context-toggle assistant-toggle-active' : 'assistant-context-toggle'}
+              title={locale === 'tr' ? 'Çalışma alanı' : 'Workbench'}
+              onClick={onToggleWorkbench}
+            >
+              <Icon name="grid" />
+            </button>
+          ) : null}
           {onOpenTerminal ? (
             <button type="button" aria-label={text.terminal} title={text.terminal} onClick={onOpenTerminal}>
               <Icon name="terminal" />

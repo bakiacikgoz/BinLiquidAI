@@ -962,6 +962,7 @@ export async function startAssistantTurn(
     config: toBridgeConfig(settings, 120000),
     assistantTurnId: options.assistantTurnId,
     sessionId: options.sessionId,
+    userMessage: options.userMessage,
     compiledPrompt: options.compiledPrompt,
     provider: options.provider,
     providerId: options.providerId,

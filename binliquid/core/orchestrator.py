@@ -1335,7 +1335,6 @@ class Orchestrator:
         total_elapsed = int((time.perf_counter() - started_total) * 1000)
         final_text = (
             "Bu istek operator onayı gerektiriyor.\n"
-            f"İstek özeti: {user_input}\n"
             f"Approval ID: {approval_id or 'unknown'}"
         )
         run_model_metadata = self._resolve_run_model_metadata(

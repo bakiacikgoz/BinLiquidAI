@@ -133,6 +133,7 @@ describe('bridge tauri contract', () => {
         }),
         assistantTurnId: 'turn-tauri',
         sessionId: 'session-tauri',
+        userMessage: 'hello',
         compiledPrompt: 'compiled prompt',
         provider: 'auto',
         providerId: 'company-internal',

@@ -401,6 +401,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportPath, setExportPath] = useState('');
   const [exportSubmitting, setExportSubmitting] = useState(false);
+  const [assistantWorkbenchOpen, setAssistantWorkbenchOpen] = useState(false);
 
   const [events, setEvents] = useState<unknown[]>([]);
   const [eventsCursor, setEventsCursor] = useState(0);
@@ -1671,8 +1672,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       onViewRuns={() => setActiveView('runs')}
     />
   );
+  const assistantWorkbenchAvailable = assistantSession.state.turns.length > 0;
   const assistantWorkbench =
-    assistantSession.state.turns.length > 0 ? (
+    assistantWorkbenchAvailable && assistantWorkbenchOpen ? (
       <AssistantWorkbench
         state={assistantSession.state}
         artifacts={assistantWorkbenchArtifacts}
@@ -1939,6 +1941,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             debugRawEnabled={settings.debugRaw}
             rightRail={assistantRightRail}
             workbench={assistantWorkbench}
+            workbenchAvailable={assistantWorkbenchAvailable}
+            workbenchOpen={assistantWorkbenchOpen}
             runtimeSettings={assistantRuntimeSettings}
             modelDiscovery={assistantModels}
             locale={locale}
@@ -1946,7 +1950,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onSend={(message, runtimeSettings, controls) =>
               void assistantSession.actions.send(message, runtimeSettings, controls)
             }
-            onNewChat={assistantSession.actions.newChat}
+            onNewChat={() => {
+              setAssistantWorkbenchOpen(false);
+              assistantSession.actions.newChat();
+            }}
+            onToggleWorkbench={() => setAssistantWorkbenchOpen((value) => !value)}
             onReviewApproval={onReviewAssistantApproval}
             onApprove={(approvalId) => void onDecideAssistantApproval(approvalId, true)}
             onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}

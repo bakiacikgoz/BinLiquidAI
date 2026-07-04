@@ -1575,6 +1575,7 @@ pub async fn bridge_assistant_start_turn(
     config: BridgeConfig,
     assistant_turn_id: String,
     session_id: String,
+    user_message: String,
     compiled_prompt: String,
     provider: Option<String>,
     provider_id: Option<String>,
@@ -1591,11 +1592,22 @@ pub async fn bridge_assistant_start_turn(
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
-    let compiled_prompt =
-        match normalize_assistant_prompt(&compiled_prompt, DEFAULT_ASSISTANT_PROMPT_MAX_CHARS) {
-            Ok(value) => value,
-            Err(error) => return BridgeResult::err(error),
-        };
+    let user_message = match normalize_assistant_prompt(
+        &user_message,
+        DEFAULT_ASSISTANT_PROMPT_MAX_CHARS,
+        "user_message",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let _compiled_prompt = match normalize_assistant_prompt(
+        &compiled_prompt,
+        DEFAULT_ASSISTANT_PROMPT_MAX_CHARS,
+        "compiled_prompt",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
     let provider =
         match normalize_optional_cli_token(provider.as_deref(), "provider", "assistant start") {
             Ok(value) => value,
@@ -1645,7 +1657,7 @@ pub async fn bridge_assistant_start_turn(
     };
     let args = build_assistant_chat_args(
         &config,
-        &compiled_prompt,
+        &user_message,
         &session_id,
         provider.as_deref(),
         provider_id.as_deref(),
@@ -1941,12 +1953,16 @@ fn normalize_assistant_id(value: &str, field: &str) -> Result<String, BridgeErro
     ))
 }
 
-fn normalize_assistant_prompt(value: &str, max_chars: usize) -> Result<String, BridgeError> {
+fn normalize_assistant_prompt(
+    value: &str,
+    max_chars: usize,
+    field: &str,
+) -> Result<String, BridgeError> {
     let normalized = value.trim();
     if normalized.is_empty() {
         return Err(BridgeError::new(
             "INVALID_INPUT",
-            "compiled_prompt is required",
+            format!("{field} is required"),
             "",
             "assistant prompt validation",
             false,
@@ -1955,7 +1971,7 @@ fn normalize_assistant_prompt(value: &str, max_chars: usize) -> Result<String, B
     if normalized.chars().count() > max_chars {
         return Err(BridgeError::new(
             "INVALID_INPUT",
-            format!("compiled_prompt exceeds {max_chars} characters"),
+            format!("{field} exceeds {max_chars} characters"),
             "",
             "assistant prompt validation",
             false,
@@ -1966,7 +1982,7 @@ fn normalize_assistant_prompt(value: &str, max_chars: usize) -> Result<String, B
 
 fn build_assistant_chat_args(
     config: &BridgeConfig,
-    compiled_prompt: &str,
+    user_message: &str,
     session_id: &str,
     provider: Option<&str>,
     provider_id: Option<&str>,
@@ -1980,7 +1996,7 @@ fn build_assistant_chat_args(
         "--profile".to_string(),
         config.profile(),
         "--once".to_string(),
-        compiled_prompt.to_string(),
+        user_message.to_string(),
         "--stdio-json".to_string(),
         "--stream".to_string(),
         "--session-id".to_string(),
@@ -2001,7 +2017,7 @@ fn format_assistant_command_preview(program: &str, prefix: &[String], args: &[St
         .enumerate()
         .map(|(index, value)| {
             if index > 0 && args[index - 1] == "--once" {
-                "[compiled_prompt]".to_string()
+                "[user_message]".to_string()
             } else {
                 value.clone()
             }
@@ -3224,9 +3240,9 @@ mod tests {
 
     #[test]
     fn normalize_assistant_prompt_rejects_empty_and_too_large() {
-        assert!(normalize_assistant_prompt("hello", 10).is_ok());
-        assert!(normalize_assistant_prompt(" ", 10).is_err());
-        assert!(normalize_assistant_prompt("12345678901", 10).is_err());
+        assert!(normalize_assistant_prompt("hello", 10, "user_message").is_ok());
+        assert!(normalize_assistant_prompt(" ", 10, "user_message").is_err());
+        assert!(normalize_assistant_prompt("12345678901", 10, "user_message").is_err());
     }
 
     #[test]
@@ -3310,7 +3326,7 @@ mod tests {
         };
         let args = build_assistant_chat_args(
             &config,
-            "compiled prompt",
+            "Benim için bir standart sapma fonksiyonu yazar mısın?",
             "session-1",
             Some("ollama"),
             Some("local-ollama"),
@@ -3320,9 +3336,8 @@ mod tests {
             Some("Qwen/Qwen2.5"),
         );
 
-        assert!(args
-            .windows(2)
-            .any(|pair| pair[0] == "--once" && pair[1] == "compiled prompt"));
+        assert!(args.windows(2).any(|pair| pair[0] == "--once"
+            && pair[1] == "Benim için bir standart sapma fonksiyonu yazar mısın?"));
         assert!(args.contains(&"--stdio-json".to_string()));
         assert!(args.contains(&"--stream".to_string()));
         assert!(args
@@ -3349,7 +3364,7 @@ mod tests {
     }
 
     #[test]
-    fn assistant_command_preview_redacts_compiled_prompt() {
+    fn assistant_command_preview_redacts_user_message() {
         let preview = format_assistant_command_preview(
             "binliquid",
             &[],
@@ -3361,7 +3376,7 @@ mod tests {
             ],
         );
 
-        assert!(preview.contains("[compiled_prompt]"));
+        assert!(preview.contains("[user_message]"));
         assert!(!preview.contains("secret prompt body"));
     }
 

@@ -347,6 +347,8 @@ def test_governance_pending_uses_governance_run_id_without_name_error() -> None:
     assert result.used_path == "governance_pending"
     assert governance.finalize_calls == ["task-run-1"]
     assert result.metrics["approval_id"] == "approval-1"
+    assert "needs approval" not in result.final_text
+    assert "Approval ID: approval-1" in result.final_text
 
 
 def test_governance_blocked_uses_governance_run_id_without_name_error() -> None:
