@@ -37,13 +37,15 @@ export const DEFAULT_ASSISTANT_RUNTIME_SETTINGS: AssistantRuntimeSettings = {
   assistantHfModelId: '',
 };
 
+export const DEFAULT_OPERATOR_ID = 'local-operator';
+
 export const DEFAULT_SETTINGS: PanelSettings = {
   mode: 'auto',
   cliPath: '',
   bundledPythonPath: '',
   profile: 'balanced',
   rootDir: '.binliquid/team/jobs',
-  operatorId: '',
+  operatorId: DEFAULT_OPERATOR_ID,
   locale: 'auto',
   remoteTelemetry: false,
   updaterMode: 'off',
@@ -56,6 +58,13 @@ const MODEL_TOKEN_PATTERN = /^[A-Za-z0-9._:/@+-]+$/;
 
 function cleanRuntimeValue(value: string): string {
   return value.trim();
+}
+
+function normalizeStoredOperatorId(value: unknown): string {
+  if (typeof value !== 'string') {
+    return DEFAULT_OPERATOR_ID;
+  }
+  return value.trim() ? value : DEFAULT_OPERATOR_ID;
 }
 
 export function getAssistantRuntimeSettings(settings: PanelSettings): AssistantRuntimeSettings {
@@ -119,6 +128,7 @@ export function loadSettings(): PanelSettings {
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
+      operatorId: normalizeStoredOperatorId(parsed.operatorId),
       assistantProvider: typeof parsed.assistantProvider === 'string' ? parsed.assistantProvider : '',
       assistantFallbackProvider:
         typeof parsed.assistantFallbackProvider === 'string' ? parsed.assistantFallbackProvider : '',

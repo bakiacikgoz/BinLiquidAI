@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_OPERATOR_ID,
   DEFAULT_SETTINGS,
   SETTINGS_KEY,
   assistantRuntimeOptionsFromSettings,
@@ -23,6 +24,49 @@ describe('operator id validation', () => {
     expect(isOperatorIdValid('ab')).toBe(false);
     expect(isOperatorIdValid('bad value')).toBe(false);
     expect(isOperatorIdValid('bad*id')).toBe(false);
+  });
+
+  it('ships with a valid local operator id for first-run use', () => {
+    expect(DEFAULT_SETTINGS.operatorId).toBe(DEFAULT_OPERATOR_ID);
+    expect(isOperatorIdValid(DEFAULT_SETTINGS.operatorId)).toBe(true);
+  });
+
+  it('migrates missing or blank legacy operator id settings to the local default', () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        mode: 'auto',
+        profile: 'balanced',
+        rootDir: '.binliquid/team/jobs',
+        operatorId: '',
+      }),
+    );
+
+    expect(loadSettings().operatorId).toBe(DEFAULT_OPERATOR_ID);
+
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        mode: 'auto',
+        profile: 'balanced',
+        rootDir: '.binliquid/team/jobs',
+      }),
+    );
+
+    expect(loadSettings().operatorId).toBe(DEFAULT_OPERATOR_ID);
+  });
+
+  it('preserves invalid explicit operator ids so the mutation gate can fail closed', () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        ...DEFAULT_SETTINGS,
+        operatorId: 'ab',
+      }),
+    );
+
+    expect(loadSettings().operatorId).toBe('ab');
+    expect(isOperatorIdValid(loadSettings().operatorId)).toBe(false);
   });
 });
 

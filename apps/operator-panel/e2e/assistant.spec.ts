@@ -48,7 +48,7 @@ test('AI Assistant model selection is visible and used before sending a preview 
         const turns = Array.from(document.querySelectorAll('.assistant-turn'));
         const lastTurn = turns.at(-1);
         if (!transcript || !composer || !lastTurn) {
-          return { composerOverlapsTranscript: true, lastTurnStartsBehindComposer: true, forcedToBottom: true };
+          return { composerOverlapsTranscript: true, latestContentHiddenBehindComposer: true, followsLatest: false };
         }
         const transcriptRect = transcript.getBoundingClientRect();
         const composerRect = composer.getBoundingClientRect();
@@ -56,13 +56,13 @@ test('AI Assistant model selection is visible and used before sending a preview 
         const maxScrollTop = Math.max(0, transcript.scrollHeight - transcript.clientHeight);
         return {
           composerOverlapsTranscript: composerRect.top < transcriptRect.bottom - 1,
-          lastTurnStartsBehindComposer:
-            lastTurnRect.top < transcriptRect.top - 1 || lastTurnRect.top >= composerRect.top - 1,
-          forcedToBottom: maxScrollTop > 24 && transcript.scrollTop >= maxScrollTop - 8,
+          latestContentHiddenBehindComposer:
+            lastTurnRect.bottom > transcriptRect.bottom + 1 || lastTurnRect.bottom > composerRect.top + 1,
+          followsLatest: maxScrollTop <= 24 || transcript.scrollTop >= maxScrollTop - 8,
         };
       });
     })
-    .toEqual({ composerOverlapsTranscript: false, lastTurnStartsBehindComposer: false, forcedToBottom: false });
+    .toEqual({ composerOverlapsTranscript: false, latestContentHiddenBehindComposer: false, followsLatest: true });
   await expect(page.getByLabel('Selected assistant model')).toContainText('ollama / qwen3.5:4b');
   consoleHealth.assertNoCriticalErrors();
 });

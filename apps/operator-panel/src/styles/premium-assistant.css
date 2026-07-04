@@ -3,6 +3,8 @@
 }
 
 .shell-assistant-mode .premium-main-panel.main-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   padding: 0;
   background: var(--assistant-bg);
@@ -62,8 +64,9 @@
 .assistant-surface {
   display: grid;
   grid-template-rows: 68px minmax(0, 1fr);
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   color: var(--assistant-text);
   background: linear-gradient(180deg, var(--assistant-bg) 0%, var(--assistant-bg-2) 100%);
 }
@@ -307,6 +310,7 @@
 .assistant-surface-grid {
   display: grid;
   grid-template-columns: minmax(620px, 1fr) 330px;
+  height: 100%;
   min-height: 0;
 }
 
@@ -318,6 +322,7 @@
   position: relative;
   overflow: auto;
   min-width: 0;
+  min-height: 0;
   padding: 0 28px 20px;
   border-right: 1px solid var(--assistant-line);
   background: var(--assistant-bg);
@@ -2313,9 +2318,14 @@
     display: grid;
   }
 
+  .shell-assistant-mode .premium-main-panel.main-panel {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
   .assistant-surface {
     grid-template-rows: auto minmax(0, 1fr);
-    min-height: calc(100vh - 49px);
+    height: calc(100vh - 49px);
+    height: calc(100dvh - 49px);
   }
 
   .assistant-surface-grid,

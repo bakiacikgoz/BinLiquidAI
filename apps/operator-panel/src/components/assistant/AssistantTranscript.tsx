@@ -38,7 +38,6 @@ export function AssistantTranscript({
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const isAtLatestRef = useRef(true);
   const previousLastTurnIdRef = useRef('');
-  const preserveLatestTurnStartRef = useRef(false);
   const userNavigatedTranscriptRef = useRef(false);
   const [isAtLatest, setIsAtLatest] = useState(true);
   const lastTurnId = turns.at(-1)?.id ?? '';
@@ -70,19 +69,12 @@ export function AssistantTranscript({
       return;
     }
     const next = bottomGap(transcript) <= LATEST_THRESHOLD_PX;
-    if (preserveLatestTurnStartRef.current && next) {
-      userNavigatedTranscriptRef.current = true;
-      isAtLatestRef.current = false;
-      setIsAtLatest(false);
-      return;
-    }
     if (!next && !userNavigatedTranscriptRef.current) {
       isAtLatestRef.current = true;
       setIsAtLatest(true);
       return;
     }
     if (next) {
-      preserveLatestTurnStartRef.current = false;
       userNavigatedTranscriptRef.current = false;
     }
     isAtLatestRef.current = next;
@@ -95,26 +87,9 @@ export function AssistantTranscript({
       return;
     }
     transcript.scrollTo({ top: transcript.scrollHeight, behavior });
-    preserveLatestTurnStartRef.current = false;
     userNavigatedTranscriptRef.current = false;
     isAtLatestRef.current = true;
     setIsAtLatest(true);
-  }, []);
-
-  const focusLatestTurnStart = useCallback((behavior: ScrollBehavior = 'auto') => {
-    const transcript = transcriptRef.current;
-    const lastTurn = transcript?.querySelector<HTMLElement>('[data-assistant-turn="true"]:last-child');
-    if (!transcript || !lastTurn) {
-      return;
-    }
-    const transcriptTop = transcript.getBoundingClientRect().top;
-    const lastTurnTop = lastTurn.getBoundingClientRect().top;
-    const nextScrollTop = Math.max(0, transcript.scrollTop + lastTurnTop - transcriptTop - 8);
-    transcript.scrollTo({ top: nextScrollTop, behavior });
-    preserveLatestTurnStartRef.current = true;
-    userNavigatedTranscriptRef.current = true;
-    isAtLatestRef.current = false;
-    setIsAtLatest(false);
   }, []);
 
   useEffect(() => {
@@ -147,7 +122,11 @@ export function AssistantTranscript({
       return;
     }
     if (lastTurnChanged) {
-      focusLatestTurnStart();
+      if (userNavigatedTranscriptRef.current && !isAtLatestRef.current) {
+        updateLatestState();
+        return;
+      }
+      scrollToLatest('auto');
       return;
     }
     if (isAtLatestRef.current) {
@@ -155,7 +134,7 @@ export function AssistantTranscript({
       return;
     }
     updateLatestState();
-  }, [focusLatestTurnStart, lastTurnId, scrollToLatest, transcriptContentKey, updateLatestState]);
+  }, [lastTurnId, scrollToLatest, transcriptContentKey, updateLatestState]);
 
   useEffect(() => {
     const transcript = transcriptRef.current;

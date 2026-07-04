@@ -175,11 +175,11 @@ describe('App integration flows', () => {
     expect(await screen.findByText('Onay akışı tamamlandı')).toBeInTheDocument();
   });
 
-  it('disables approval mutations without operator id and approves with explicit confirmation when configured', async () => {
-    const emptyOperator = renderApp();
-    await openView(emptyOperator.user, 'Onaylar');
+  it('disables approval mutations with an invalid operator id and approves with explicit confirmation when configured', async () => {
+    const invalidOperator = renderApp({ operatorId: 'ab' });
+    await openView(invalidOperator.user, 'Onaylar');
     expect(await screen.findByRole('button', { name: 'Approve' })).toBeDisabled();
-    emptyOperator.unmount();
+    invalidOperator.unmount();
 
     const { user } = renderApp({ operatorId: 'qa-operator' });
     await openView(user, 'Onaylar');

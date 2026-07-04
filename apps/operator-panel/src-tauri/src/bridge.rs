@@ -8,9 +8,9 @@ use std::process::Stdio;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader as TokioBufReader};
-use tokio::sync::Mutex;
 use tokio::process::Command;
 use tokio::process::{ChildStderr, ChildStdout};
+use tokio::sync::Mutex;
 
 const CONTRACT_VERSION: &str = "2.0";
 const DEFAULT_TIMEOUT_MS: u64 = 15_000;
@@ -1136,14 +1136,16 @@ pub async fn bridge_assistant_provider_models(
     provider: Option<String>,
     refresh: Option<bool>,
 ) -> BridgeResult<Value> {
-    let profile = match normalize_optional_cli_token(profile.as_deref(), "profile", "provider models") {
-        Ok(value) => value.unwrap_or_else(|| config.profile()),
-        Err(error) => return BridgeResult::err(error),
-    };
-    let provider = match normalize_optional_cli_token(provider.as_deref(), "provider", "provider models") {
-        Ok(value) => value,
-        Err(error) => return BridgeResult::err(error),
-    };
+    let profile =
+        match normalize_optional_cli_token(profile.as_deref(), "profile", "provider models") {
+            Ok(value) => value.unwrap_or_else(|| config.profile()),
+            Err(error) => return BridgeResult::err(error),
+        };
+    let provider =
+        match normalize_optional_cli_token(provider.as_deref(), "provider", "provider models") {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
 
     let mut args = vec![
         "provider".to_string(),
@@ -1627,12 +1629,14 @@ pub async fn bridge_assistant_start_turn(
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
-    let hf_model_id =
-        match normalize_optional_cli_token(hf_model_id.as_deref(), "hf_model_id", "assistant start")
-        {
-            Ok(value) => value,
-            Err(error) => return BridgeResult::err(error),
-        };
+    let hf_model_id = match normalize_optional_cli_token(
+        hf_model_id.as_deref(),
+        "hf_model_id",
+        "assistant start",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
 
     let resource_dir = app_resource_dir(&app);
     let resolved = match resolve_cli_command(&config, resource_dir.as_deref()) {
@@ -2358,12 +2362,14 @@ fn bundled_python_relative_path() -> &'static str {
 }
 
 fn resolve_bundled_python_from_resource_dir(resource_dir: &Path) -> Option<PathBuf> {
-    let path = resource_dir.join(bundled_python_relative_path());
-    if path.exists() {
-        Some(path)
-    } else {
-        None
-    }
+    [
+        resource_dir.join(bundled_python_relative_path()),
+        resource_dir
+            .join("resources")
+            .join(bundled_python_relative_path()),
+    ]
+    .into_iter()
+    .find(|path| path.exists())
 }
 
 fn path_separator() -> &'static str {
@@ -3150,8 +3156,12 @@ mod tests {
             Some("qwen3.5:4b".to_string())
         );
         assert_eq!(
-            normalize_optional_cli_token(Some("Qwen/Qwen2.5-Instruct@q4"), "hf_model_id", "assistant start")
-                .expect("hf model"),
+            normalize_optional_cli_token(
+                Some("Qwen/Qwen2.5-Instruct@q4"),
+                "hf_model_id",
+                "assistant start"
+            )
+            .expect("hf model"),
             Some("Qwen/Qwen2.5-Instruct@q4".to_string())
         );
         assert_eq!(
@@ -3413,6 +3423,21 @@ mod tests {
     }
 
     #[test]
+    fn resolve_bundled_python_from_resource_dir_detects_tauri_nested_runtime() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let resource_dir = dir.path();
+        let python = resource_dir
+            .join("resources")
+            .join(bundled_python_relative_path());
+        fs::create_dir_all(python.parent().expect("parent")).expect("mkdir");
+        fs::write(&python, "placeholder").expect("python");
+
+        let resolved = resolve_bundled_python_from_resource_dir(resource_dir).expect("runtime");
+
+        assert_eq!(resolved, python);
+    }
+
+    #[test]
     fn resolve_cli_command_auto_prefers_cli_path_then_bundled() {
         let dir = tempfile::tempdir().expect("tempdir");
         let bundled = dir.path().join("python");
@@ -3468,6 +3493,32 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let resource_dir = dir.path().join("resources");
         let python = resource_dir.join(bundled_python_relative_path());
+        fs::create_dir_all(python.parent().expect("parent")).expect("mkdir");
+        fs::write(&python, "placeholder").expect("python");
+        let config = BridgeConfig {
+            mode: Some("auto".to_string()),
+            cli_path: None,
+            bundled_python_path: None,
+            profile: Some("balanced".to_string()),
+            root_dir: None,
+            env: HashMap::new(),
+            timeout_ms: None,
+        };
+
+        let resolved = resolve_cli_command(&config, Some(&resource_dir)).expect("bundled");
+
+        assert_eq!(resolved.mode, CoreMode::Bundled);
+        assert_eq!(resolved.program, python.to_string_lossy());
+        assert_eq!(resolved.prefix_args, vec!["-m", "binliquid"]);
+    }
+
+    #[test]
+    fn resolve_cli_command_auto_uses_tauri_nested_resource_runtime_when_cli_absent() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let resource_dir = dir.path().join("Resources");
+        let python = resource_dir
+            .join("resources")
+            .join(bundled_python_relative_path());
         fs::create_dir_all(python.parent().expect("parent")).expect("mkdir");
         fs::write(&python, "placeholder").expect("python");
         let config = BridgeConfig {

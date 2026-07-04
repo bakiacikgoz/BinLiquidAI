@@ -111,11 +111,10 @@ describe('AssistantTranscript sticky scrolling', () => {
     HTMLElement.prototype.scrollTo = originalScrollTo;
   });
 
-  it('anchors the newest turn start when a new turn appears', () => {
+  it('follows the newest turn to the bottom when a new turn appears', () => {
     renderTranscript([baseTurn]);
 
-    expect(scrollToMock).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
-    expect(scrollToMock).not.toHaveBeenCalledWith(expect.objectContaining({ top: 1000 }));
+    expect(scrollToMock).toHaveBeenCalledWith(expect.objectContaining({ top: 1000 }));
   });
 
   it('keeps the current position when the user has scrolled away from latest content', () => {
