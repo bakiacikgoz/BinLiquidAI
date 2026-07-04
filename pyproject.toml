@@ -39,7 +39,7 @@ aegis = "binliquid.cli:app"
 
 [tool.hatch.build.targets.wheel]
 dev-mode-exact = true
-packages = ["binliquid", "benchmarks", "research"]
+packages = ["binliquid", "benchmarks", "research", "scripts"]
 
 [tool.ruff]
 line-length = 100
