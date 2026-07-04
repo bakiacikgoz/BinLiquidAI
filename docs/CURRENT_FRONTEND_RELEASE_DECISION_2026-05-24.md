@@ -16,6 +16,7 @@ Evidence:
 - `artifacts/operator-panel-ui/FRONTEND_FUNCTIONAL_GAP_REPORT.md`
 - `artifacts/operator-panel-ui/qa-summary.md`
 - `artifacts/operator-panel-ui/tauri-bridge-smoke.json`
+- `artifacts/operator-panel-ui/tauri-smoke/report.json`
 - `artifacts/operator-panel-ui/live-cli-smoke.json`
 
 ## Closed frontend blockers
@@ -45,12 +46,15 @@ Evidence:
 - Preview E2E: PASS.
 - Bridge unit tests: PASS.
 - Tauri bridge smoke: PASS.
+- Tauri launched smoke reportability: PASS/CONDITIONAL depending on whether
+  `--launch` was run on a real macOS desktop session.
 - Live CLI smoke: PASS for read-only capabilities/config commands.
 
-The live Tauri desktop window was not used to claim unrestricted automation or
-real model execution. The bridge confidence is based on TypeScript invoke
-contract tests, Rust bridge tests, command-argument validation, stdio-json event
-parsing smoke, and read-only CLI smoke.
+The live Tauri desktop window is not used to claim unrestricted automation,
+public desktop release readiness, or guaranteed real model execution. The
+bridge confidence is based on TypeScript invoke contract tests, Rust bridge
+tests, command-argument validation, stdio-json event parsing smoke, read-only
+CLI smoke, and the macOS local trial launched smoke report when run manually.
 
 ## Green gates
 
@@ -66,12 +70,21 @@ parsing smoke, and read-only CLI smoke.
 - Do not claim live assistant execution against a real provider/model from this
   frontend decision alone.
 - Do not treat preview E2E as proof of a launched production Tauri desktop app.
+- Treat launched smoke without full desktop bridge instrumentation as partial
+  evidence, not a public release claim.
 - Do not ship public desktop artifacts without the existing signing,
   notarization, clean-machine, and promote-gate evidence required by the main
   release decision.
 
-## Next single blocker to close
+## Next single local-trial check
 
-For full live Tauri confidence, run a launched Tauri dev/debug smoke that
-exercises bridge handshake, config resolve, capabilities read, and assistant
-start-turn event flow from the actual desktop shell.
+For personal macOS M4 source/dev confidence, run:
+
+```bash
+uv run python scripts/run_macos_local_trial_gate.py --profile enterprise --json
+OPERATOR_PANEL_TAURI_LAUNCH=1 corepack pnpm --dir apps/operator-panel exec tsx scripts/tauri-launched-smoke.ts --launch
+```
+
+If no real assistant model/provider is configured, `setup_required` or
+`conditional` is acceptable for local trial, but it must not be reported as a
+fake assistant success.

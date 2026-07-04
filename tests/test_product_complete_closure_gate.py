@@ -47,6 +47,7 @@ def test_product_complete_closure_gate_passes_when_required_checks_pass(
         "governedWorkflow": "pass",
         "installerFirstRun": "pass",
         "evidence": "pass",
+        "macosLocalTrial": "not_run",
     }
     assert (tmp_path / "product_complete_closure_report.json").exists()
     assert (tmp_path / "product_complete_pr_body.md").exists()
@@ -80,3 +81,45 @@ def test_product_complete_closure_gate_blocks_required_failure(
     assert report["status"] == "fail"
     assert "PRODUCT_COMPLETE_CHECK_FAILED:assistant_real_runtime_gate" in report["noShipBlockers"]
     assert report["productReadiness"]["assistant"] == "fail"
+
+
+def test_product_complete_closure_gate_can_include_conditional_local_trial(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(gate, "_git", _fake_git)
+
+    def fake_run(command: list[str], *, name: str, required: bool = True) -> dict[str, object]:
+        if name == "macos_local_trial_gate":
+            return {
+                "name": name,
+                "command": command,
+                "required": required,
+                "returnCode": 3,
+                "status": "conditional",
+                "reasonCode": "MACOS_LOCAL_TRIAL_CONDITIONAL",
+                "tail": [],
+            }
+        return {
+            "name": name,
+            "command": command,
+            "required": required,
+            "returnCode": 0,
+            "status": "pass",
+            "reasonCode": "OK",
+            "tail": [],
+        }
+
+    monkeypatch.setattr(gate, "_run", fake_run)
+
+    report = gate.run_product_complete_closure_gate(
+        output_root=tmp_path,
+        profile="enterprise",
+        skip_commands=False,
+        include_local_trial=True,
+    )
+
+    assert report["status"] == "pass"
+    assert report["productReadiness"]["macosLocalTrial"] == "conditional"
+    assert report["conditionalNotes"] == ["macOS local trial has setup-required notes."]
+    assert report["noShipBlockers"] == []

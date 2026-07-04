@@ -34,10 +34,12 @@ def _resolve(command: list[str]) -> list[str]:
 
 def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, Any]:
     started = time.monotonic()
+    env = {**os.environ, "COREPACK_ENABLE_AUTO_PIN": "0"}
     try:
         result = subprocess.run(
             _resolve(command),
             cwd=REPO_ROOT,
+            env=env,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -55,13 +57,18 @@ def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, A
             "reasonCode": "EXECUTABLE_MISSING",
             "tail": [str(exc)],
         }
+    status = "pass" if result.returncode == 0 else "fail"
+    reason = "OK" if result.returncode == 0 else "COMMAND_FAILED"
+    if name == "macos_local_trial_gate" and result.returncode == 3:
+        status = "conditional"
+        reason = "MACOS_LOCAL_TRIAL_CONDITIONAL"
     return {
         "name": name,
         "command": command,
         "required": required,
         "returnCode": result.returncode,
-        "status": "pass" if result.returncode == 0 else "fail",
-        "reasonCode": "OK" if result.returncode == 0 else "COMMAND_FAILED",
+        "status": status,
+        "reasonCode": reason,
         "durationMs": int((time.monotonic() - started) * 1000),
         "tail": result.stdout.splitlines()[-30:],
     }
@@ -80,8 +87,10 @@ def _git(args: list[str]) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
-def build_command_plan(profile: str, output_root: Path) -> list[dict[str, Any]]:
-    return [
+def build_command_plan(
+    profile: str, output_root: Path, *, include_local_trial: bool = False
+) -> list[dict[str, Any]]:
+    plan = [
         {
             "name": "scope_gate",
             "readiness": None,
@@ -190,6 +199,26 @@ def build_command_plan(profile: str, output_root: Path) -> list[dict[str, Any]]:
             "required": True,
         },
     ]
+    if include_local_trial:
+        plan.append(
+            {
+                "name": "macos_local_trial_gate",
+                "readiness": "macosLocalTrial",
+                "command": [
+                    "uv",
+                    "run",
+                    "python",
+                    "scripts/run_macos_local_trial_gate.py",
+                    "--profile",
+                    profile,
+                    "--output-root",
+                    str(output_root / "macos-local-trial"),
+                    "--json",
+                ],
+                "required": True,
+            }
+        )
+    return plan
 
 
 def _empty_readiness() -> dict[str, str]:
@@ -200,6 +229,7 @@ def _empty_readiness() -> dict[str, str]:
         "governedWorkflow": "pass",
         "installerFirstRun": "pass",
         "evidence": "pass",
+        "macosLocalTrial": "not_run",
     }
 
 
@@ -208,24 +238,31 @@ def run_product_complete_closure_gate(
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     profile: str = "enterprise",
     skip_commands: bool = False,
+    include_local_trial: bool = False,
 ) -> dict[str, Any]:
     output_root.mkdir(parents=True, exist_ok=True)
     checks: list[dict[str, Any]] = []
     readiness = _empty_readiness()
     if not skip_commands:
-        for item in build_command_plan(profile, output_root):
+        for item in build_command_plan(
+            profile, output_root, include_local_trial=include_local_trial
+        ):
             result = _run(item["command"], name=item["name"], required=item["required"])
             checks.append(result)
             readiness_key = item.get("readiness")
-            if readiness_key and result["returnCode"] != 0:
+            if readiness_key and result["status"] == "fail":
                 readiness[str(readiness_key)] = "fail"
-            if result["required"] and result["returnCode"] != 0:
+            elif readiness_key and result["status"] == "conditional":
+                readiness[str(readiness_key)] = "conditional"
+            elif readiness_key and result["status"] == "pass":
+                readiness[str(readiness_key)] = "pass"
+            if result["required"] and result["status"] == "fail":
                 break
     no_ship_register = build_product_complete_no_ship_register()
     blockers = [
         f"PRODUCT_COMPLETE_CHECK_FAILED:{check['name']}"
         for check in checks
-        if check["required"] and check["returnCode"] != 0
+        if check["required"] and check["status"] == "fail"
     ]
     blockers.extend(item.reason_code for item in no_ship_register.items if item.status == "open")
     status = "pass" if not blockers else "fail"
@@ -238,7 +275,7 @@ def run_product_complete_closure_gate(
         "headSha": _git(["rev-parse", "HEAD"]),
         "checks": checks,
         "noShipBlockers": blockers,
-        "conditionalNotes": [],
+        "conditionalNotes": _conditional_notes(checks),
         "artifacts": {
             "json": "artifacts/product-complete-closure/product_complete_closure_report.json",
             "markdown": "artifacts/product-complete-closure/product_complete_closure_report.md",
@@ -276,6 +313,20 @@ def _write_outputs(
     )
 
 
+def _conditional_notes(checks: list[dict[str, Any]]) -> list[str]:
+    notes: list[str] = []
+    for check in checks:
+        if check["name"] != "macos_local_trial_gate":
+            continue
+        if check["status"] == "pass":
+            notes.append("macOS local trial gate passed.")
+        elif check["status"] == "conditional":
+            notes.append("macOS local trial has setup-required notes.")
+        elif check["status"] == "fail":
+            notes.append("macOS local trial is blocked.")
+    return notes
+
+
 def render_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# Product-Complete Closure Report",
@@ -291,6 +342,9 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.extend(["", "## Checks"])
     for check in report["checks"]:
         lines.append(f"- `{check['status']}` `{check['name']}` `{check['reasonCode']}`")
+    if report["conditionalNotes"]:
+        lines.extend(["", "## Conditional Notes"])
+        lines.extend(f"- {item}" for item in report["conditionalNotes"])
     if report["noShipBlockers"]:
         lines.extend(["", "## No-Ship Blockers"])
         lines.extend(f"- `{item}`" for item in report["noShipBlockers"])
@@ -317,12 +371,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profile", default="enterprise")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--skip-commands", action="store_true")
+    parser.add_argument("--include-local-trial", action="store_true")
     parser.add_argument("--json", action="store_true", dest="json_output")
     args = parser.parse_args(argv)
     report = run_product_complete_closure_gate(
         output_root=args.output_root,
         profile=args.profile,
         skip_commands=args.skip_commands,
+        include_local_trial=args.include_local_trial,
     )
     if args.json_output:
         print(json.dumps(report, indent=2, sort_keys=True))

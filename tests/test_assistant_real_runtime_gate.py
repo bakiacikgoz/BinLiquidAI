@@ -5,7 +5,9 @@ from pathlib import Path
 from scripts import run_assistant_real_runtime_gate as gate
 
 
-def test_assistant_gate_passes_with_setup_required_diagnostic(tmp_path: Path, monkeypatch) -> None:
+def test_assistant_gate_is_conditional_with_setup_required_diagnostic(
+    tmp_path: Path, monkeypatch
+) -> None:
     def fake_run(command: list[str], *, name: str, required: bool = True) -> dict[str, object]:
         if name == "assistant_doctor":
             return {
@@ -13,7 +15,7 @@ def test_assistant_gate_passes_with_setup_required_diagnostic(tmp_path: Path, mo
                 "command": command,
                 "required": required,
                 "returnCode": 3,
-                "status": "pass",
+                "status": "conditional",
                 "reasonCode": "ASSISTANT_SETUP_REQUIRED_DIAGNOSTIC",
                 "json": {
                     "schemaVersion": "assistant.doctor/v1",
@@ -37,8 +39,9 @@ def test_assistant_gate_passes_with_setup_required_diagnostic(tmp_path: Path, mo
 
     report = gate.run_assistant_gate(output_root=tmp_path, profile="enterprise")
 
-    assert report["status"] == "pass"
-    assert report["productReadiness"]["assistant"] == "pass"
+    assert report["status"] == "conditional"
+    assert report["productReadiness"]["assistant"] == "conditional"
+    assert report["conditionalNotes"] == ["assistant_doctor:ASSISTANT_SETUP_REQUIRED_DIAGNOSTIC"]
     assert report["noShipBlockers"] == []
     assert (tmp_path / "assistant_real_runtime_gate.json").exists()
 

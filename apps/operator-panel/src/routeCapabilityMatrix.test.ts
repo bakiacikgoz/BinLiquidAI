@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { routes } from './routeRegistry';
+import { assertRouteBridgeCommandParity } from './routeCapabilityBridgeParity';
 import { routeCapabilityMatrix } from './routeCapabilityMatrix';
 
 describe('routeCapabilityMatrix', () => {
@@ -27,5 +28,15 @@ describe('routeCapabilityMatrix', () => {
         }
       }
     }
+  });
+
+  it('keeps working bridge commands registered in Tauri', () => {
+    const workingCommands = routeCapabilityMatrix.flatMap((route) =>
+      route.primaryActions.flatMap((action) =>
+        action.state === 'working' && action.bridgeCommand ? [`bridge::${action.bridgeCommand}`] : [],
+      ),
+    );
+    expect(assertRouteBridgeCommandParity(routeCapabilityMatrix, workingCommands.join('\n')).status).toBe('passed');
+    expect(() => assertRouteBridgeCommandParity(routeCapabilityMatrix, '')).toThrow(/Bridge command parity failed/);
   });
 });

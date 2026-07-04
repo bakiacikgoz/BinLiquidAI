@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-type CheckStatus = 'passed' | 'failed' | 'skipped';
+type CheckStatus = 'passed' | 'failed' | 'skipped' | 'conditional';
 type Check = {
   name: string;
   status: CheckStatus;
@@ -17,13 +17,17 @@ const OUTPUT_ROOT = path.join(REPO_ROOT, 'artifacts', 'operator-panel-ui', 'taur
 const LEGACY_REPORT_PATH = path.join(REPO_ROOT, 'artifacts', 'operator-panel-ui', 'tauri-bridge-smoke.json');
 const REPORT_PATH = path.join(OUTPUT_ROOT, 'report.json');
 const MARKDOWN_PATH = path.join(OUTPUT_ROOT, 'TAURI_LAUNCHED_SMOKE.md');
-const RUN_LAUNCH = process.argv.includes('--launch') || process.env.OPERATOR_PANEL_TAURI_LAUNCH === '1';
+const MODE = readMode();
+const RUN_LAUNCH = MODE === 'launched' || process.argv.includes('--launch') || process.env.OPERATOR_PANEL_TAURI_LAUNCH === '1';
 const SKIP_RUST = process.argv.includes('--skip-rust');
 const LAUNCH_TIMEOUT_MS = readTimeoutMs();
 const REQUIRED_HANDLERS = [
   'bridge_handshake',
   'bridge_config_resolve',
   'bridge_control_plane_snapshot',
+  'bridge_assistant_provider_models',
+  'bridge_assistant_start_turn',
+  'bridge_assistant_cancel_turn',
   'bridge_team_list',
   'bridge_approval_pending',
   'bridge_control_plane_evidence_verify',
@@ -44,6 +48,15 @@ function findRepoRoot(start: string): string {
 function readTimeoutMs(): number {
   const raw = Number(process.env.OPERATOR_PANEL_TAURI_LAUNCH_TIMEOUT_MS ?? 20_000);
   return Number.isFinite(raw) && raw >= 5_000 ? raw : 20_000;
+}
+
+function readMode(): 'contract' | 'launched' {
+  const modeIndex = process.argv.indexOf('--mode');
+  const mode = modeIndex >= 0 ? process.argv[modeIndex + 1] : undefined;
+  if (mode === 'launched') {
+    return 'launched';
+  }
+  return 'contract';
 }
 
 function addCheck(checks: Check[], name: string, status: CheckStatus, detail: string): void {
@@ -132,13 +145,26 @@ function checkPreviewRuntimeTruth(checks: Check[]): void {
   );
 }
 
+function checkNoPreviewFallbackInProductMode(checks: Check[]): void {
+  const bridgeSource = fs.readFileSync(path.join(APP_ROOT, 'src', 'bridge.ts'), 'utf8');
+  const hasExplicitTrue = /previewFallbackAllowed\s*[:=]\s*true/.test(bridgeSource);
+  addCheck(
+    checks,
+    'assistantPreviewFallback',
+    hasExplicitTrue ? 'failed' : 'passed',
+    hasExplicitTrue
+      ? 'previewFallbackAllowed=true was found in product bridge source.'
+      : 'No product-mode previewFallbackAllowed=true marker found.',
+  );
+}
+
 async function runOptionalLaunch(checks: Check[]): Promise<void> {
   if (!RUN_LAUNCH) {
     addCheck(
       checks,
       'desktopLaunch',
-      'skipped',
-      'Set OPERATOR_PANEL_TAURI_LAUNCH=1 or pass --launch to run the real GUI launch probe.',
+      'conditional',
+      'Real launched GUI probe not executed. Set OPERATOR_PANEL_TAURI_LAUNCH=1 or pass --launch.',
     );
     return;
   }
@@ -148,56 +174,103 @@ async function runOptionalLaunch(checks: Check[]): Promise<void> {
       cwd: REPO_ROOT,
       env: { ...process.env, VITE_OPERATOR_PANEL_PREVIEW: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
     let output = '';
+    let settled = false;
     const append = (chunk: Buffer) => {
       output += chunk.toString('utf8');
       output = output.slice(-4_000);
     };
+    const terminateChild = () => {
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      if (child.pid) {
+        try {
+          if (process.platform === 'win32') {
+            child.kill('SIGTERM');
+          } else {
+            process.kill(-child.pid, 'SIGTERM');
+          }
+        } catch {
+          child.kill('SIGTERM');
+        }
+      }
+      child.unref();
+    };
+    const finish = (name: string, status: CheckStatus, detail: string) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      addCheck(checks, name, status, detail);
+      resolve();
+    };
     child.stdout.on('data', append);
     child.stderr.on('data', append);
     const timer = setTimeout(() => {
-      child.kill('SIGTERM');
       const failed = /panic|error while running operator panel|failed/i.test(output);
-      addCheck(
-        checks,
+      terminateChild();
+      finish(
         'desktopLaunch',
         failed ? 'failed' : 'passed',
         failed ? output.slice(-1_200) : `Tauri dev process stayed alive for ${LAUNCH_TIMEOUT_MS}ms.`,
       );
-      resolve();
     }, LAUNCH_TIMEOUT_MS);
     child.on('exit', (code) => {
-      clearTimeout(timer);
-      addCheck(
-        checks,
+      finish(
         'desktopLaunch',
         code === 0 ? 'passed' : 'failed',
         `Tauri dev exited with code ${String(code)}. ${output.slice(-1_200)}`,
       );
-      resolve();
     });
     child.on('error', (error) => {
-      clearTimeout(timer);
-      addCheck(checks, 'desktopLaunch', 'failed', error.message);
-      resolve();
+      terminateChild();
+      finish('desktopLaunch', 'failed', error.message);
     });
   });
+
+  const launched = checks.find((check) => check.name === 'desktopLaunch');
+  if (launched?.status === 'passed') {
+    addCheck(
+      checks,
+      'launchedBridgeProbe',
+      'conditional',
+      'partial: Tauri process launched; bridge command instrumentation is contract/Rust-harness backed in this smoke.',
+    );
+    addCheck(
+      checks,
+      'assistantStartTurn',
+      'conditional',
+      'setup_required or stream event must be verified by local assistant runtime gate; no fake_response is accepted here.',
+    );
+  }
 }
 
 function writeReports(checks: Check[]): boolean {
   fs.mkdirSync(path.join(OUTPUT_ROOT, 'screenshots'), { recursive: true });
   const failed = checks.filter((check) => check.status === 'failed');
+  const conditional = checks.filter((check) => check.status === 'conditional');
   const report = {
     schemaVersion: 'operator-panel.tauri-launched-smoke/v1',
     generatedAtUtc: new Date().toISOString(),
-    status: failed.length === 0 ? 'passed' : 'failed',
+    mode: MODE,
+    status: failed.length > 0 ? 'failed' : conditional.length > 0 ? 'conditional' : 'passed',
     launchRequested: RUN_LAUNCH,
     launchTimeoutMs: LAUNCH_TIMEOUT_MS,
+    desktopLaunch: checks.find((check) => check.name === 'desktopLaunch') ?? null,
+    launchedBridgeProbe:
+      checks.find((check) => check.name === 'launchedBridgeProbe') ??
+      (RUN_LAUNCH ? { status: 'failed', detail: 'desktop launch did not pass.' } : { status: 'not_executed' }),
+    assistantStartTurn:
+      checks.find((check) => check.name === 'assistantStartTurn') ??
+      { status: 'conditional', detail: 'assistant start-turn is covered by assistant runtime gate.' },
     checks,
     notes: [
       'Default mode verifies the Tauri bridge contract, Rust bridge smoke tests, runtime truth fixture, and reportability.',
       'Set OPERATOR_PANEL_TAURI_LAUNCH=1 for a local GUI launch probe on a desktop session.',
+      'Launched bridge instrumentation is partial unless a desktop automation harness is available.',
       'No live computer-use gates are opened by this smoke.',
     ],
   };
@@ -209,6 +282,7 @@ function writeReports(checks: Check[]): boolean {
       '# Tauri Launched Smoke',
       '',
       `Status: **${report.status}**`,
+      `Mode: **${report.mode}**`,
       `Generated: ${report.generatedAtUtc}`,
       `Launch requested: ${String(RUN_LAUNCH)}`,
       '',
@@ -227,11 +301,13 @@ function writeReports(checks: Check[]): boolean {
 const checks: Check[] = [];
 checkTauriContract(checks);
 checkPreviewRuntimeTruth(checks);
+checkNoPreviewFallbackInProductMode(checks);
 runRustBridgeSmoke(checks);
 await runOptionalLaunch(checks);
 
 const passed = writeReports(checks);
-console.log(JSON.stringify({ status: passed ? 'passed' : 'failed', report: path.relative(REPO_ROOT, REPORT_PATH) }, null, 2));
+const report = readJson(REPORT_PATH);
+console.log(JSON.stringify({ status: report.status, report: path.relative(REPO_ROOT, REPORT_PATH) }, null, 2));
 if (!passed) {
   process.exit(1);
 }

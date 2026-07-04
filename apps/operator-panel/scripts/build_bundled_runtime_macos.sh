@@ -71,21 +71,28 @@ if ! "${RUNTIME_PYTHON}" -m binliquid --version >/dev/null; then
 fi
 
 BINLIQUID_VERSION="$("${RUNTIME_PYTHON}" -m binliquid --version)"
+PYTHON_VERSION="$("${RUNTIME_PYTHON}" --version 2>&1)"
+WHEEL_SHA256="$(shasum -a 256 "${WHEEL_PATH}" | awk '{print $1}')"
+GIT_HEAD="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
 echo "${BINLIQUID_VERSION}"
 
 cat > "${RUNTIME_DIR}/RUNTIME_MANIFEST.txt" <<EOF
+platform=macos
 arch=${ARCH}
-python=${RUNTIME_PYTHON}
+python=${PYTHON_VERSION}
 binliquid_version=${BINLIQUID_VERSION}
+wheel_sha256=${WHEEL_SHA256}
+git_head=${GIT_HEAD}
 built_at_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EOF
 
 cat > "${RUNTIME_DIR}/README.txt" <<'EOF'
-Generated runtime bundle for AegisOS Operator Panel.
+Generated runtime bundle location for AegisOS Operator Panel.
 
 Release gate:
-1) python/bin/python is executable
-2) python -m binliquid --version passes
+1) python/bin/python is executable on macOS bundles
+2) python/bin/python -m binliquid --version passes
+3) RUNTIME_MANIFEST.txt records platform, arch, Python version, BinLiquid version, wheel hash, git evidence, and build time
 
 Do not ship placeholder-only runtime contents.
 EOF

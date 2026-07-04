@@ -8,6 +8,9 @@ const copy = {
     unsupportedBlocked: (count: number) => `${count} unsupported claim blocked`,
     noBlockedClaims: 'No blocked claims',
     noBlockingReason: 'No blocking reason',
+    computerUseBoundary: 'Live computer-use qualification-gated.',
+    macosQualification:
+      'macOS live qualification requires explicit opt-in, Screen Recording, Accessibility, provider readiness and replay evidence.',
     blocked: 'blocked',
   },
   tr: {
@@ -15,6 +18,9 @@ const copy = {
     unsupportedBlocked: (count: number) => `${count} desteklenmeyen claim blokelendi`,
     noBlockedClaims: 'Blokelenen claim yok',
     noBlockingReason: 'Bloklama nedeni yok',
+    computerUseBoundary: 'Live computer-use qualification-gated.',
+    macosQualification:
+      'macOS live qualification requires explicit opt-in, Screen Recording, Accessibility, provider readiness and replay evidence.',
     blocked: 'bloke',
   },
 } satisfies Record<UiLocale, {
@@ -22,6 +28,8 @@ const copy = {
   unsupportedBlocked: (count: number) => string;
   noBlockedClaims: string;
   noBlockingReason: string;
+  computerUseBoundary: string;
+  macosQualification: string;
   blocked: string;
 }>;
 
@@ -35,6 +43,8 @@ export function ClaimBoundaryBanner({ claims, locale = 'en' }: { claims: unknown
       <p className="workspace-lead">
         {blocked.length > 0 ? text.unsupportedBlocked(blocked.length) : text.noBlockedClaims}
       </p>
+      <p className="workspace-lead">{text.computerUseBoundary}</p>
+      <p className="workspace-lead">{text.macosQualification}</p>
       <div className="run-list">
         {matrix.claims.map((claim) => (
           <article className="run-list-item" key={claim.claim_id}>

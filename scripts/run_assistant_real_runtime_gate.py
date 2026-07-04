@@ -44,10 +44,12 @@ def _extract_json(text: str) -> dict[str, Any] | None:
 
 def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, Any]:
     started = time.monotonic()
+    env = {**os.environ, "COREPACK_ENABLE_AUTO_PIN": "0"}
     try:
         result = subprocess.run(
             _resolve(command),
             cwd=REPO_ROOT,
+            env=env,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -70,7 +72,7 @@ def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, A
     status = "pass" if result.returncode == 0 else "fail"
     reason = "OK" if result.returncode == 0 else "COMMAND_FAILED"
     if name == "assistant_doctor" and result.returncode == 3:
-        status = "pass"
+        status = "conditional"
         reason = "ASSISTANT_SETUP_REQUIRED_DIAGNOSTIC"
     payload = {
         "name": name,
@@ -175,7 +177,7 @@ def _no_ship_from_results(results: list[dict[str, Any]]) -> list[str]:
     if isinstance(doctor_json, dict) and doctor_json.get("previewFallbackAllowed") is True:
         blockers.append("ASSISTANT_PREVIEW_IN_PRODUCT_MODE")
     for result in results:
-        if result["required"] and result["status"] != "pass":
+        if result["required"] and result["status"] == "fail":
             blockers.append(f"ASSISTANT_GATE_CHECK_FAILED:{result['name']}")
     return blockers
 
@@ -195,14 +197,22 @@ def run_assistant_gate(
             if result["required"] and result["status"] != "pass":
                 break
     blockers = _no_ship_from_results(results)
-    status = "pass" if not blockers else "fail"
+    conditional_notes = [
+        f"{result['name']}:{result['reasonCode']}"
+        for result in results
+        if result.get("status") == "conditional"
+    ]
+    status = "fail" if blockers else "conditional" if conditional_notes else "pass"
     report = {
         "schemaVersion": "assistant.real-runtime-gate/v1",
         "generatedAtUtc": _now(),
         "profile": profile,
         "status": status,
-        "productReadiness": {"assistant": "pass" if not blockers else "fail"},
+        "productReadiness": {
+            "assistant": "fail" if blockers else "conditional" if conditional_notes else "pass"
+        },
         "checks": results,
+        "conditionalNotes": conditional_notes,
         "noShipBlockers": blockers,
         "artifacts": [
             "artifacts/assistant-real-runtime/assistant_real_runtime_gate.json",
@@ -234,6 +244,9 @@ def render_markdown(report: dict[str, Any]) -> str:
     if report["noShipBlockers"]:
         lines.extend(["", "## No-Ship Blockers"])
         lines.extend(f"- `{item}`" for item in report["noShipBlockers"])
+    if report.get("conditionalNotes"):
+        lines.extend(["", "## Conditional Notes"])
+        lines.extend(f"- `{item}`" for item in report["conditionalNotes"])
     return "\n".join(lines) + "\n"
 
 
@@ -253,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
         print(f"status={report['status']} output={args.output_root}")
-    return 0 if report["status"] == "pass" else 1
+    return 0 if report["status"] == "pass" else 3 if report["status"] == "conditional" else 1
 
 
 if __name__ == "__main__":
