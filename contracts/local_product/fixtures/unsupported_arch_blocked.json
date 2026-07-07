@@ -1,0 +1,14 @@
+{
+  "expectedStatus": "blocked",
+  "fixtureSchema": "platform_target",
+  "payload": {
+    "arch": "unknown",
+    "claimAllowed": false,
+    "os": "linux",
+    "reasonCodes": [
+      "UNSUPPORTED_PLATFORM_TARGET"
+    ],
+    "supportTier": "unsupported",
+    "targetId": "linux-unknown"
+  }
+}

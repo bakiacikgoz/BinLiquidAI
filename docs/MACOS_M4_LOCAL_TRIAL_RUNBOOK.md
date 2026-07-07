@@ -1,6 +1,8 @@
-# macOS M4 Local Trial Runbook
+# macOS Apple Silicon Local Trial Runbook
 
-This runbook prepares BinLiquid / AegisOS for a personal Apple Silicon M4 local trial from source. It is not a public desktop release, signing, notarization, production deployment, or unrestricted live computer-use procedure.
+Deprecated naming note: this runbook originally named an M4 device. M4 is only an example local validation target for `darwin-arm64`; the product target is now cross-platform local readiness. See `docs/CROSS_PLATFORM_LOCAL_PRODUCT_READINESS.md`.
+
+This runbook prepares BinLiquid / AegisOS for a personal Apple Silicon local trial from source. It is not a public desktop release, signing, notarization, production deployment, or unrestricted live computer-use procedure.
 
 ## Boundaries
 
@@ -12,7 +14,7 @@ This runbook prepares BinLiquid / AegisOS for a personal Apple Silicon M4 local 
 
 ## Prerequisites
 
-- macOS on Apple Silicon M4.
+- macOS on Apple Silicon, for example an M4 device used as a local validation target only.
 - Xcode Command Line Tools.
 - Python 3.11. The project expects Python `>=3.11,<3.12`; `uv` is preferred.
 - `uv`.

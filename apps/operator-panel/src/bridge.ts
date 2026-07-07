@@ -211,6 +211,10 @@ export interface AssistantTaskSubmitOptions {
   operatorId: string;
 }
 
+export interface LocalProductReadinessOptions {
+  target?: string;
+}
+
 export interface ControlPlaneEvidenceExportOptions {
   runId: string;
   outputDir?: string;
@@ -377,6 +381,47 @@ function previewAssistantTaskSubmission(options: AssistantTaskSubmitOptions): As
     nextActions: ['approval.show', 'approval.decide', 'approval.execute'],
     generatedAtUtc: '2026-01-01T00:00:01Z',
   });
+}
+
+function previewLocalProductReadiness(target = 'windows-x64'): unknown {
+  return {
+    schemaVersion: 'local_product_readiness/v1',
+    profile: 'enterprise',
+    overallStatus: 'pass',
+    target: {
+      os: 'windows',
+      arch: 'x64',
+      targetId: target,
+      supportTier: 'supported',
+      claimAllowed: true,
+      reasonCodes: [],
+    },
+    claimBoundary: {
+      schemaVersion: 'local_product_claim_boundary/v1',
+      targetId: target,
+      claimAllowed: true,
+      supportedClaims: [target],
+      notEvidencedTargets: ['darwin-arm64', 'darwin-x64', 'linux-x64'],
+      unsupportedTargets: [],
+      blockedTargets: [],
+      productClaimSummary: `Claims are limited to evidenced target ${target}.`,
+      blockingReasons: [],
+    },
+    rawPromptPersisted: false,
+    liveComputerUseEnabled: false,
+  };
+}
+
+function previewLocalProductMatrix(): unknown {
+  return {
+    schemaVersion: 'local_product_readiness_matrix/v1',
+    targets: [previewLocalProductReadiness('windows-x64')],
+    supportedClaims: ['windows-x64'],
+    notEvidencedTargets: ['darwin-arm64', 'darwin-x64', 'linux-x64'],
+    unsupportedTargets: [],
+    blockedTargets: [],
+    productClaimSummary: 'Supported platform claims are limited to evidenced targets: windows-x64',
+  };
 }
 
 export async function handshake(settings: PanelSettings): Promise<unknown> {
@@ -1126,6 +1171,32 @@ export async function submitAssistantTask(
       operatorId: options.operatorId,
     }),
   );
+}
+
+export async function fetchLocalProductReadiness(
+  settings: PanelSettings,
+  target = 'auto',
+): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewLocalProductReadiness(target === 'auto' ? 'windows-x64' : target);
+  }
+  return callBridge('bridge_local_product_readiness', {
+    config: toBridgeConfig(settings, 30000),
+    target,
+  });
+}
+
+export async function fetchLocalProductMatrix(
+  settings: PanelSettings,
+  includeExperimental = false,
+): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewLocalProductMatrix();
+  }
+  return callBridge('bridge_local_product_matrix', {
+    config: toBridgeConfig(settings, 30000),
+    includeExperimental,
+  });
 }
 
 export async function getAssistantTaskStatus(settings: PanelSettings, proposalId: string): Promise<unknown> {

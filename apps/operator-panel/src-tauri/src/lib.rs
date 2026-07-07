@@ -39,6 +39,8 @@ pub fn run() {
             bridge::bridge_assistant_task_submit,
             bridge::bridge_assistant_task_status,
             bridge::bridge_assistant_task_explain,
+            bridge::bridge_local_product_readiness,
+            bridge::bridge_local_product_matrix,
             bridge::bridge_auth_whoami,
             bridge::bridge_auth_check,
             bridge::bridge_security_baseline,

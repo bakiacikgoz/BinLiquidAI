@@ -93,9 +93,9 @@ make macos-local-trial-gate
 
 ## First Run And Local Trial
 
-First-run readiness should be diagnosed with setup and product gates. Mac M4 local trial work
-is evidence-gated and should be described as a local qualification path, not as public release
-proof.
+First-run readiness should be diagnosed with setup and product gates. Apple Silicon local trial work,
+including an M4 device when used, is an example local validation target only and should be described
+as a local qualification path, not as public release proof.
 
 Useful commands include:
 

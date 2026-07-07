@@ -8,6 +8,8 @@ import {
   getComputerUseSessionState,
   getComputerUseSummary,
   handshake,
+  fetchLocalProductMatrix,
+  fetchLocalProductReadiness,
   isBridgePreviewMode,
   isPreviewAllowedForEnv,
   listAssistantModels,
@@ -120,6 +122,20 @@ describe('bridge preview fallback', () => {
     expect(submission.schemaVersion).toBe('assistant-tasking.submission/v1');
     expect(submission.status).toBe('blocked_pending_approval');
     expect(submission.approvalId).toBe('apr-preview-task-001');
+  });
+
+  it('returns preview local product readiness and matrix payloads', async () => {
+    const [readiness, matrix] = await Promise.all([
+      fetchLocalProductReadiness({ ...DEFAULT_SETTINGS }),
+      fetchLocalProductMatrix({ ...DEFAULT_SETTINGS }),
+    ]);
+
+    expect((readiness as Record<string, unknown>).schemaVersion).toBe('local_product_readiness/v1');
+    expect(((readiness as Record<string, unknown>).target as Record<string, unknown>).targetId).toBe(
+      'windows-x64',
+    );
+    expect((matrix as Record<string, unknown>).schemaVersion).toBe('local_product_readiness_matrix/v1');
+    expect((matrix as Record<string, unknown>).notEvidencedTargets).toContain('darwin-arm64');
   });
 
   it('returns preview assistant cancel payloads without a bridge process', async () => {

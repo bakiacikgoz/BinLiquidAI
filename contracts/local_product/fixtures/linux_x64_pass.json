@@ -1,0 +1,73 @@
+{
+  "expectedStatus": "pass",
+  "fixtureSchema": "local_product_readiness_report",
+  "payload": {
+    "artifacts": {},
+    "checks": [
+      {
+        "artifactPath": null,
+        "durationMs": null,
+        "name": "fixture",
+        "reasonCodes": [],
+        "redacted": true,
+        "required": true,
+        "status": "pass"
+      }
+    ],
+    "claimBoundary": {
+      "blockedTargets": [],
+      "blockingReasons": [],
+      "claimAllowed": true,
+      "notEvidencedTargets": [
+        "darwin-arm64",
+        "darwin-x64",
+        "windows-x64"
+      ],
+      "productClaimSummary": "Claims are limited to evidenced target linux-x64.",
+      "schemaVersion": "local_product_claim_boundary/v1",
+      "supportedClaims": [
+        "linux-x64"
+      ],
+      "targetId": "linux-x64",
+      "unsupportedTargets": []
+    },
+    "liveComputerUseEnabled": false,
+    "noShipBlockers": [],
+    "overallStatus": "pass",
+    "probe": {
+      "cargoAvailable": true,
+      "detectedAt": "2026-07-07T00:00:00Z",
+      "newlineMode": "unknown",
+      "nodeVersion": "v22.12.0",
+      "pathStyle": "posix",
+      "pnpmMode": "corepack",
+      "pythonVersion": "Python 3.11.9",
+      "rustcVersion": "rustc 1.88.0",
+      "target": {
+        "arch": "x64",
+        "claimAllowed": false,
+        "os": "linux",
+        "reasonCodes": [
+          "EVIDENCE_REQUIRED_FOR_CLAIM"
+        ],
+        "supportTier": "supported",
+        "targetId": "linux-x64"
+      },
+      "tauriCliAvailable": true,
+      "uvAvailable": true,
+      "webviewStatus": "unknown"
+    },
+    "profile": "enterprise",
+    "rawPromptPersisted": false,
+    "schemaVersion": "local_product_readiness/v1",
+    "secretScanStatus": "pass",
+    "target": {
+      "arch": "x64",
+      "claimAllowed": true,
+      "os": "linux",
+      "reasonCodes": [],
+      "supportTier": "supported",
+      "targetId": "linux-x64"
+    }
+  }
+}

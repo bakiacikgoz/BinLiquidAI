@@ -413,7 +413,12 @@ def run_macos_local_trial_gate(
 
 def render_markdown(report: dict[str, Any]) -> str:
     lines = [
-        "# macOS M4 Local Trial Gate",
+        "# macOS Apple Silicon Local Trial Gate",
+        "",
+        (
+            "This gate is an example local validation target only; the product target is "
+            "the cross-platform platform/architecture matrix."
+        ),
         "",
         f"- Status: `{report['status']}`",
         f"- Profile: `{report['profile']}`",
@@ -434,7 +439,9 @@ def render_markdown(report: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run macOS M4 local trial readiness gate.")
+    parser = argparse.ArgumentParser(
+        description="Run macOS Apple Silicon local trial readiness gate."
+    )
     parser.add_argument("--profile", default="enterprise")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--full", action="store_true")

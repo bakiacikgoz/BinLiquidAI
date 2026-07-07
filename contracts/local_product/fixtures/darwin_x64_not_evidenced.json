@@ -1,0 +1,14 @@
+{
+  "expectedStatus": "not_evidenced",
+  "fixtureSchema": "platform_target",
+  "payload": {
+    "arch": "x64",
+    "claimAllowed": false,
+    "os": "darwin",
+    "reasonCodes": [
+      "EVIDENCE_REQUIRED_FOR_CLAIM"
+    ],
+    "supportTier": "supported",
+    "targetId": "darwin-x64"
+  }
+}

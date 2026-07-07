@@ -18,6 +18,7 @@ import {
   fetchGaReadiness,
   fetchIdentity,
   fetchKeysStatus,
+  fetchLocalProductReadiness,
   fetchSecurityBaseline,
   generateSecurityReview,
   getRunReplay,
@@ -137,6 +138,7 @@ import { UsersMembershipsView } from './enterprise-workspace/UsersMembershipsVie
 import { MainlineRcFreezeView } from './mainline-rc-freeze/MainlineRcFreezeView';
 import { RcGateEvidenceView } from './rc-gate-evidence/RcGateEvidenceView';
 import { ReleaseDecisionView } from './release-decision/ReleaseDecisionView';
+import { LocalProductReadinessView } from './local-product/LocalProductReadinessView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
@@ -384,6 +386,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [controlPlaneEvidenceVerifyResult, setControlPlaneEvidenceVerifyResult] = useState<unknown>(null);
   const [controlPlaneSnapshotVm, setControlPlaneSnapshotVm] =
     useState<PageViewModel<ControlPlaneSnapshot> | null>(null);
+  const [localProductReadiness, setLocalProductReadiness] = useState<unknown>(null);
 
   const [approvalsData, setApprovalsData] = useState<unknown>({ pending: [] });
   const [selectedApprovalId, setSelectedApprovalId] = useState('');
@@ -768,6 +771,48 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     setComputerUseState(null);
     void loadRunContext(selectedRunId);
   }, [selectedRunId, settings.profile, settings.rootDir]);
+
+  useEffect(() => {
+    if (activeView !== 'local-product-readiness') {
+      return;
+    }
+    let cancelled = false;
+    void fetchLocalProductReadiness(settings)
+      .then((payload) => {
+        if (!cancelled) {
+          setLocalProductReadiness(payload);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const parsed = getErrorPayload(error);
+          setLocalProductReadiness({
+            schemaVersion: 'local_product_readiness/v1',
+            overallStatus: 'blocked',
+            target: {
+              os: 'unknown',
+              arch: 'unknown',
+              targetId: 'unknown-unknown',
+              supportTier: 'unsupported',
+              claimAllowed: false,
+              reasonCodes: [parsed?.code ?? 'BRIDGE_LOCAL_PRODUCT_READINESS_FAILED'],
+            },
+            claimBoundary: {
+              claimAllowed: false,
+              supportedClaims: [],
+              notEvidencedTargets: ['darwin-arm64', 'darwin-x64', 'windows-x64', 'linux-x64'],
+              unsupportedTargets: ['unknown-unknown'],
+              blockedTargets: ['unknown-unknown'],
+              productClaimSummary: parsed?.message ?? 'Local readiness bridge failed.',
+              blockingReasons: [parsed?.code ?? 'BRIDGE_LOCAL_PRODUCT_READINESS_FAILED'],
+            },
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeView, settings]);
 
   useEffect(() => {
     if (!selectedRunId) {
@@ -2777,6 +2822,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'rc-release-decision' ? (
           <ReleaseDecisionView snapshot={rcReleaseDecision} locale={locale} />
+        ) : null}
+
+        {activeView === 'local-product-readiness' ? (
+          <LocalProductReadinessView report={localProductReadiness ?? {}} />
         ) : null}
 
         {activeView === 'operations' ? (

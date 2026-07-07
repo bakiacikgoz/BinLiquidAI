@@ -43,6 +43,19 @@ jobs:
           "${RUNTIME_ROOT}/python/bin/python" -m binliquid --version
           cat "${RUNTIME_ROOT}/RUNTIME_MANIFEST.txt"
 
+      - name: Local product readiness target proof
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            TARGET="darwin-arm64"
+          else
+            TARGET="darwin-x64"
+          fi
+          uv run python scripts/run_local_product_readiness_gate.py \
+            --profile enterprise \
+            --target "${TARGET}" \
+            --output-root artifacts/local-product-readiness \
+            --json
+
       - name: Write runtime proof
         run: |
           mkdir -p artifacts

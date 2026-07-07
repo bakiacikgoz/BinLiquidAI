@@ -28,6 +28,7 @@ export type RouteId =
   | 'mainline-rc-freeze'
   | 'rc-gate-evidence'
   | 'rc-release-decision'
+  | 'local-product-readiness'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -193,6 +194,13 @@ export const routeGroups: RouteGroup[] = [
         icon: 'shield',
       },
       { id: 'operations', routeId: 'operations', label: 'Yürütmeler', heading: 'Operations', icon: 'clipboard' },
+      {
+        id: 'local-product-readiness',
+        routeId: 'local-product-readiness',
+        label: 'Local Readiness',
+        heading: 'Local Product Readiness',
+        icon: 'monitor',
+      },
       { id: 'settings', routeId: 'settings', label: 'Ayarlar', heading: 'Settings', icon: 'settings' },
     ],
   },

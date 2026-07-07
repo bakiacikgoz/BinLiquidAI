@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockedTargets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockedtargets",
+      "type": "array"
+    },
+    "blockingReasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "claimAllowed": {
+      "title": "Claimallowed",
+      "type": "boolean"
+    },
+    "notEvidencedTargets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notevidencedtargets",
+      "type": "array"
+    },
+    "productClaimSummary": {
+      "title": "Productclaimsummary",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "local_product_claim_boundary/v1",
+      "default": "local_product_claim_boundary/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "supportedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Supportedclaims",
+      "type": "array"
+    },
+    "targetId": {
+      "title": "Targetid",
+      "type": "string"
+    },
+    "unsupportedTargets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unsupportedtargets",
+      "type": "array"
+    }
+  },
+  "required": [
+    "targetId",
+    "claimAllowed",
+    "productClaimSummary"
+  ],
+  "title": "LocalProductClaimBoundary",
+  "type": "object"
+}

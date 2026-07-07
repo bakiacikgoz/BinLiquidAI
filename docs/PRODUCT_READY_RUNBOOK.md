@@ -19,8 +19,8 @@
    uv run python scripts/run_product_complete_closure_gate.py --profile enterprise --json
    ```
 
-4. Run the macOS M4 local trial gate when preparing a personal Apple Silicon
-   source/dev trial:
+4. Run the macOS Apple Silicon local trial gate when preparing a personal
+   source/dev trial. An M4 device is only an example local validation target:
 
    ```bash
    uv run python scripts/run_macos_local_trial_gate.py --profile enterprise --json

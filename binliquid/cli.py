@@ -205,6 +205,15 @@ from binliquid.governance.runtime import (
     build_governance_runtime,
     governance_startup_abort,
 )
+from binliquid.local_product.cli import (
+    build_doctor_report as build_local_product_doctor_report,
+)
+from binliquid.local_product.cli import (
+    build_matrix_report as build_local_product_matrix_report,
+)
+from binliquid.local_product.cli import (
+    build_readiness_report as build_local_product_readiness_report,
+)
 from binliquid.memory.authority import build_memory_authority, proposal_from_cli
 from binliquid.memory.evaluation import run_memory_retrieval_eval
 from binliquid.memory.manager import MemoryManager
@@ -307,6 +316,7 @@ from research.sltc_experiments.eval_router import evaluate_router_model
 from research.sltc_experiments.train_router import calibrate_router_params, train_router_model
 
 app = typer.Typer(help="BinLiquidAI CLI")
+LOCAL_PRODUCT_DEFAULT_OUTPUT_ROOT = Path("artifacts/local-product-readiness")
 benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
 memory_index_app = typer.Typer(help="Memory index commands")
@@ -337,6 +347,7 @@ provider_native_conformance_app = typer.Typer(
 assistant_app = typer.Typer(help="Product assistant runtime commands")
 assistant_knowledge_app = typer.Typer(help="Assistant local system knowledge commands")
 assistant_task_app = typer.Typer(help="Assistant governed agent tasking commands")
+local_product_app = typer.Typer(help="Cross-platform local product readiness commands")
 ASSISTANT_KNOWLEDGE_OUTPUT_ROOT_OPTION = typer.Option(
     "--output-root",
     help="Knowledge artifact output root",
@@ -463,6 +474,7 @@ provider_native_app.add_typer(provider_native_conformance_app, name="conformance
 app.add_typer(assistant_app, name="assistant")
 assistant_app.add_typer(assistant_knowledge_app, name="knowledge")
 assistant_app.add_typer(assistant_task_app, name="task")
+app.add_typer(local_product_app, name="local-product")
 app.add_typer(setup_app, name="setup")
 app.add_typer(product_app, name="product")
 product_app.add_typer(product_demo_app, name="demo")
@@ -1769,6 +1781,57 @@ def assistant_task_explain(
     _emit_payload(payload, json_output=json_output)
     if payload["status"] == "missing":
         raise typer.Exit(code=3)
+
+
+@local_product_app.command("doctor")
+def local_product_doctor(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    target: str = typer.Option("auto", "--target", help="auto or <os>-<arch>"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Collect local OS/architecture and dependency diagnostics."""
+    del profile
+    _emit_payload(
+        build_local_product_doctor_report(target_value=target),
+        json_output=json_output,
+    )
+
+
+@local_product_app.command("readiness")
+def local_product_readiness(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    target: str = typer.Option("auto", "--target", help="auto or <os>-<arch>"),
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", help="Evidence output root"),
+    ] = LOCAL_PRODUCT_DEFAULT_OUTPUT_ROOT,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Build a local product readiness report for one target."""
+    payload = build_local_product_readiness_report(
+        profile=profile,
+        target_value=target,
+        output_root=output_root,
+    )
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("overallStatus") in {"blocked", "fail"}:
+        raise typer.Exit(code=1)
+
+
+@local_product_app.command("matrix")
+def local_product_matrix(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    include_experimental: bool = typer.Option(False, "--include-experimental"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Report supported, not-evidenced, and experimental platform claim boundaries."""
+    _emit_payload(
+        build_local_product_matrix_report(
+            profile=profile,
+            include_experimental=include_experimental,
+        ),
+        json_output=json_output,
+    )
 
 
 @assistant_app.command("turn")

@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from binliquid.local_product.cli import build_matrix_report, build_readiness_report
 from binliquid.release.product_complete import build_product_complete_no_ship_register
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -298,6 +299,28 @@ def _empty_readiness() -> dict[str, str]:
     }
 
 
+def _local_product_readiness_summary(profile: str) -> dict[str, Any]:
+    current = build_readiness_report(profile=profile, target_value="auto", output_root=None)
+    matrix = build_matrix_report(profile=profile, include_experimental=True)
+    boundary = current.get("claimBoundary", {})
+    return {
+        "status": current.get("overallStatus", "blocked"),
+        "currentTarget": current.get("target", {}).get("targetId")
+        if isinstance(current.get("target"), dict)
+        else "unknown-unknown",
+        "supportedClaims": (
+            boundary.get("supportedClaims", []) if isinstance(boundary, dict) else []
+        ),
+        "notEvidencedTargets": matrix.get("notEvidencedTargets", []),
+        "unsupportedTargets": matrix.get("unsupportedTargets", []),
+        "blockedTargets": matrix.get("blockedTargets", []),
+        "noShipBlockers": [],
+        "productClaimSummary": boundary.get("productClaimSummary", "")
+        if isinstance(boundary, dict)
+        else "",
+    }
+
+
 def run_product_complete_closure_gate(
     *,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
@@ -323,6 +346,7 @@ def run_product_complete_closure_gate(
                 readiness[str(readiness_key)] = "pass"
             if result["required"] and result["status"] == "fail":
                 break
+    local_product_readiness = _local_product_readiness_summary(profile)
     no_ship_register = build_product_complete_no_ship_register()
     blockers = [
         f"PRODUCT_COMPLETE_CHECK_FAILED:{check['name']}"
@@ -350,6 +374,7 @@ def run_product_complete_closure_gate(
         "ci": {},
         "rawLeakScan": {},
         "productReadiness": readiness,
+        "localProductReadiness": local_product_readiness,
     }
     _write_outputs(output_root, report, no_ship_register.model_dump(mode="json", by_alias=True))
     return report

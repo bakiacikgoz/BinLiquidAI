@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "arch": {
+      "enum": [
+        "arm64",
+        "x64",
+        "unknown"
+      ],
+      "title": "Arch",
+      "type": "string"
+    },
+    "claimAllowed": {
+      "default": false,
+      "title": "Claimallowed",
+      "type": "boolean"
+    },
+    "os": {
+      "enum": [
+        "darwin",
+        "windows",
+        "linux",
+        "unknown"
+      ],
+      "title": "Os",
+      "type": "string"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "supportTier": {
+      "default": "not_evidenced",
+      "enum": [
+        "supported",
+        "experimental",
+        "not_evidenced",
+        "unsupported"
+      ],
+      "title": "Supporttier",
+      "type": "string"
+    },
+    "targetId": {
+      "title": "Targetid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "os",
+    "arch",
+    "targetId"
+  ],
+  "title": "PlatformTarget",
+  "type": "object"
+}

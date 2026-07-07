@@ -102,6 +102,10 @@ class ProductCompleteInput(StrictModel):
         default=False,
         alias="publicInstallerSignedClaimWithoutEvidence",
     )
+    local_product_overbroad_platform_claim: bool = Field(
+        default=False,
+        alias="localProductOverbroadPlatformClaim",
+    )
 
 
 def _blocker(
@@ -327,6 +331,17 @@ def build_product_complete_no_ship_register(
                 claim_id="desktop_public_release",
                 resolution_path=(
                     "Attach real signing/notarization evidence or keep the claim internal-only."
+                ),
+            )
+        )
+    if state.local_product_overbroad_platform_claim:
+        items.append(
+            _blocker(
+                reason_code="LOCAL_PRODUCT_OVERBROAD_PLATFORM_CLAIM",
+                claim_id="local_product_platform_readiness",
+                resolution_path=(
+                    "Limit product support claims to evidenced platform/architecture targets "
+                    "and keep not-evidenced targets out of supported claims."
                 ),
             )
         )

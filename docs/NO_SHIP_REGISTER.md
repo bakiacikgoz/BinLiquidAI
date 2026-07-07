@@ -14,5 +14,8 @@ Default boundaries:
 - `MISSING_HUMAN_SIGNOFF`
 - `GATE_LEDGER_NOT_READY`
 - `RC_FREEZE_NOT_RECONCILED`
+- `LOCAL_PRODUCT_OVERBROAD_PLATFORM_CLAIM`
 
 External Hat B blockers may be accepted boundaries for source/CLI RC. They remain blockers for public desktop release claims.
+
+Platform/architecture targets without evidence should be reported as `not_evidenced`, not as supported. A broad CPU claim becomes no-ship only when the product text claims more targets than the evidence supports.

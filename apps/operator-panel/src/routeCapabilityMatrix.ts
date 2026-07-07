@@ -82,6 +82,26 @@ const bridgeActions: Partial<Record<RouteId, RouteCapability['primaryActions']>>
       noShipIfInert: true,
     },
   ],
+  'local-product-readiness': [
+    {
+      actionId: 'local_product.readiness',
+      label: 'Refresh readiness',
+      state: 'working',
+      bridgeCommand: 'bridge_local_product_readiness',
+      cliCommand: 'binliquid local-product readiness',
+      requiredPermission: 'system.read',
+      noShipIfInert: true,
+    },
+    {
+      actionId: 'local_product.matrix',
+      label: 'Refresh matrix',
+      state: 'working',
+      bridgeCommand: 'bridge_local_product_matrix',
+      cliCommand: 'binliquid local-product matrix',
+      requiredPermission: 'system.read',
+      noShipIfInert: true,
+    },
+  ],
   'enterprise-workspace': [
     {
       actionId: 'workspace.bootstrap',

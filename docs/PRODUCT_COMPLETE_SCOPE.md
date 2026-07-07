@@ -13,6 +13,7 @@ In scope:
 - Enterprise workspace, identity, RBAC, agent enrollment, governed run, approval,
   evidence, memory, and support bundle workflows.
 - First-run setup and internal desktop readiness evidence.
+- Cross-platform local product readiness with platform/architecture claim boundaries.
 - Product-complete closure gate with no-ship blockers.
 
 Out of scope:
@@ -22,6 +23,7 @@ Out of scope:
 - Assistant bypass of proposal, approval, workspace, enrollment, or evidence gates.
 - Production SSO/LDAP/Active Directory sync.
 - Public signed desktop release without real signing and notarization evidence.
+- Universal "all processors supported" claims without per-target evidence.
 - External customer pilot execution.
 
 Every visible product capability must be one of:

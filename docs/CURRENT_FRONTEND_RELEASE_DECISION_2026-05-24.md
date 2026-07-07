@@ -78,7 +78,7 @@ CLI smoke, and the macOS local trial launched smoke report when run manually.
 
 ## Next single local-trial check
 
-For personal macOS M4 source/dev confidence, run:
+For personal macOS Apple Silicon source/dev confidence, for example on an M4 device as a local validation target only, run:
 
 ```bash
 uv run python scripts/run_macos_local_trial_gate.py --profile enterprise --json

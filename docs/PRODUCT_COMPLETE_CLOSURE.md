@@ -17,6 +17,7 @@ The gate aggregates:
 - Assistant governed tasking gate.
 - Operator Panel route/action productization.
 - First-run readiness diagnostics.
+- Local product platform/architecture readiness and claim boundary.
 - Enterprise workspace onboarding.
 - Governed agent workflow smoke.
 - Evidence/release closure.
@@ -27,3 +28,5 @@ Generated artifacts:
 - `artifacts/product-complete-closure/product_complete_closure_report.md`
 - `artifacts/product-complete-closure/product_complete_pr_body.md`
 - `artifacts/product-complete-closure/no_ship_register.json`
+
+The `localProductReadiness` field reports the current target, evidenced supported claims, and not-evidenced targets. Not-evidenced targets are not product failures; they are unsupported claims until evidence exists.

@@ -1,0 +1,23 @@
+{
+  "expectedStatus": "blocked",
+  "fixtureSchema": "local_product_claim_boundary",
+  "payload": {
+    "blockedTargets": [],
+    "blockingReasons": [
+      "OVERBROAD_PLATFORM_CLAIM"
+    ],
+    "claimAllowed": false,
+    "notEvidencedTargets": [
+      "darwin-x64",
+      "windows-x64",
+      "linux-x64"
+    ],
+    "productClaimSummary": "Supported platform claims are limited to evidenced targets: darwin-arm64",
+    "schemaVersion": "local_product_claim_boundary/v1",
+    "supportedClaims": [
+      "darwin-arm64"
+    ],
+    "targetId": "darwin-arm64",
+    "unsupportedTargets": []
+  }
+}

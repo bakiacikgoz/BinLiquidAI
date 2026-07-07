@@ -1,0 +1,379 @@
+{
+  "$defs": {
+    "GateCheckResult": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifactpath"
+        },
+        "durationMs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Durationms"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "redacted": {
+          "default": true,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "blocked",
+            "skipped",
+            "not_applicable"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "required"
+      ],
+      "title": "GateCheckResult",
+      "type": "object"
+    },
+    "LocalEnvironmentProbe": {
+      "additionalProperties": false,
+      "properties": {
+        "cargoAvailable": {
+          "title": "Cargoavailable",
+          "type": "boolean"
+        },
+        "detectedAt": {
+          "title": "Detectedat",
+          "type": "string"
+        },
+        "newlineMode": {
+          "enum": [
+            "lf",
+            "crlf",
+            "mixed",
+            "unknown"
+          ],
+          "title": "Newlinemode",
+          "type": "string"
+        },
+        "nodeVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Nodeversion"
+        },
+        "pathStyle": {
+          "enum": [
+            "posix",
+            "windows"
+          ],
+          "title": "Pathstyle",
+          "type": "string"
+        },
+        "pnpmMode": {
+          "enum": [
+            "corepack",
+            "local_bin",
+            "missing"
+          ],
+          "title": "Pnpmmode",
+          "type": "string"
+        },
+        "pythonVersion": {
+          "title": "Pythonversion",
+          "type": "string"
+        },
+        "rustcVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rustcversion"
+        },
+        "target": {
+          "$ref": "#/$defs/PlatformTarget"
+        },
+        "tauriCliAvailable": {
+          "title": "Tauricliavailable",
+          "type": "boolean"
+        },
+        "uvAvailable": {
+          "title": "Uvavailable",
+          "type": "boolean"
+        },
+        "webviewStatus": {
+          "enum": [
+            "available",
+            "missing",
+            "not_applicable",
+            "unknown"
+          ],
+          "title": "Webviewstatus",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "pythonVersion",
+        "uvAvailable",
+        "nodeVersion",
+        "pnpmMode",
+        "rustcVersion",
+        "cargoAvailable",
+        "tauriCliAvailable",
+        "webviewStatus",
+        "pathStyle",
+        "newlineMode",
+        "detectedAt"
+      ],
+      "title": "LocalEnvironmentProbe",
+      "type": "object"
+    },
+    "LocalProductClaimBoundary": {
+      "additionalProperties": false,
+      "properties": {
+        "blockedTargets": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedtargets",
+          "type": "array"
+        },
+        "blockingReasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "claimAllowed": {
+          "title": "Claimallowed",
+          "type": "boolean"
+        },
+        "notEvidencedTargets": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notevidencedtargets",
+          "type": "array"
+        },
+        "productClaimSummary": {
+          "title": "Productclaimsummary",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "local_product_claim_boundary/v1",
+          "default": "local_product_claim_boundary/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "supportedClaims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supportedclaims",
+          "type": "array"
+        },
+        "targetId": {
+          "title": "Targetid",
+          "type": "string"
+        },
+        "unsupportedTargets": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unsupportedtargets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "targetId",
+        "claimAllowed",
+        "productClaimSummary"
+      ],
+      "title": "LocalProductClaimBoundary",
+      "type": "object"
+    },
+    "PlatformTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "enum": [
+            "arm64",
+            "x64",
+            "unknown"
+          ],
+          "title": "Arch",
+          "type": "string"
+        },
+        "claimAllowed": {
+          "default": false,
+          "title": "Claimallowed",
+          "type": "boolean"
+        },
+        "os": {
+          "enum": [
+            "darwin",
+            "windows",
+            "linux",
+            "unknown"
+          ],
+          "title": "Os",
+          "type": "string"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "supportTier": {
+          "default": "not_evidenced",
+          "enum": [
+            "supported",
+            "experimental",
+            "not_evidenced",
+            "unsupported"
+          ],
+          "title": "Supporttier",
+          "type": "string"
+        },
+        "targetId": {
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "os",
+        "arch",
+        "targetId"
+      ],
+      "title": "PlatformTarget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Artifacts",
+      "type": "object"
+    },
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/GateCheckResult"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "claimBoundary": {
+      "$ref": "#/$defs/LocalProductClaimBoundary"
+    },
+    "liveComputerUseEnabled": {
+      "default": false,
+      "title": "Livecomputeruseenabled",
+      "type": "boolean"
+    },
+    "noShipBlockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Noshipblockers",
+      "type": "array"
+    },
+    "overallStatus": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked",
+        "fail"
+      ],
+      "title": "Overallstatus",
+      "type": "string"
+    },
+    "probe": {
+      "$ref": "#/$defs/LocalEnvironmentProbe"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rawPromptPersisted": {
+      "default": false,
+      "title": "Rawpromptpersisted",
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "local_product_readiness/v1",
+      "default": "local_product_readiness/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "secretScanStatus": {
+      "default": "pass",
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "title": "Secretscanstatus",
+      "type": "string"
+    },
+    "target": {
+      "$ref": "#/$defs/PlatformTarget"
+    }
+  },
+  "required": [
+    "profile",
+    "target",
+    "probe",
+    "checks",
+    "overallStatus",
+    "claimBoundary"
+  ],
+  "title": "LocalProductReadinessReport",
+  "type": "object"
+}

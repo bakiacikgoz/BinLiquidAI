@@ -220,6 +220,33 @@ describe('bridge tauri contract', () => {
     );
   });
 
+  it('passes local product readiness requests to the Tauri commands', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      schemaVersion: 'local_product_readiness/v1',
+      target: { targetId: 'windows-x64' },
+    });
+
+    await bridge.fetchLocalProductReadiness({ ...DEFAULT_SETTINGS, profile: 'enterprise' }, 'windows-x64');
+    await bridge.fetchLocalProductMatrix({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
+
+    expect(invoke).toHaveBeenNthCalledWith(
+      1,
+      'bridge_local_product_readiness',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
+        target: 'windows-x64',
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      'bridge_local_product_matrix',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
+        includeExperimental: false,
+      }),
+    );
+  });
+
   it('passes assistant model discovery requests to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
       contractVersion: 'operator-panel.assistant-provider-models/v2',

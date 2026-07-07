@@ -1352,6 +1352,55 @@ pub async fn bridge_assistant_task_explain(
 }
 
 #[tauri::command]
+pub async fn bridge_local_product_readiness(
+    config: BridgeConfig,
+    target: Option<String>,
+) -> BridgeResult<Value> {
+    let target = match normalize_optional_cli_token(target.as_deref(), "target", "local product") {
+        Ok(value) => value.unwrap_or_else(|| "auto".to_string()),
+        Err(error) => return BridgeResult::err(error),
+    };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "local-product".to_string(),
+            "readiness".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--target".to_string(),
+            target,
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_local_product_matrix(
+    config: BridgeConfig,
+    include_experimental: Option<bool>,
+) -> BridgeResult<Value> {
+    let mut args = vec![
+        "local-product".to_string(),
+        "matrix".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--json".to_string(),
+    ];
+    if include_experimental.unwrap_or(false) {
+        args.push("--include-experimental".to_string());
+    }
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
 pub async fn bridge_auth_whoami(config: BridgeConfig) -> BridgeResult<Value> {
     match run_cli_json_owned(
         &config,
