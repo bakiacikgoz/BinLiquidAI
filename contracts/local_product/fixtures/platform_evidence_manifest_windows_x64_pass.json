@@ -1,0 +1,53 @@
+{
+  "artifactVersion": "local-product-platform-evidence/v1",
+  "claimStatus": "evidenced",
+  "commands": [
+    {
+      "artifactPaths": [],
+      "commandId": "local_readiness",
+      "displayName": "Local product readiness",
+      "durationMs": 1200,
+      "exitCode": 0,
+      "reasonCode": null,
+      "status": "pass",
+      "stderrHash": null,
+      "stdoutHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "evidenceId": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "generatedAt": "2026-07-07T00:00:00Z",
+  "gitCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hashes": {},
+  "hostProbe": {
+    "branch": "codex/multi-host-platform-evidence-rc-handoff-v1",
+    "gitCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "hostIdHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "machine": "AMD64",
+    "nodeVersion": "v24.0.0",
+    "osName": "Windows",
+    "osVersion": "10",
+    "pythonVersion": "3.11.0",
+    "rustVersion": "rustc 1.90.0",
+    "targetId": "windows-x64"
+  },
+  "limitations": [],
+  "profile": "enterprise",
+  "rawArtifactPolicy": {
+    "providerPayloadPersisted": false,
+    "rawPromptPersisted": false,
+    "secretsPersisted": false
+  },
+  "readinessStatus": "pass",
+  "secretScanStatus": "pass",
+  "target": {
+    "arch": "x64",
+    "claimLevel": "source_supported",
+    "experimental": false,
+    "os": "windows",
+    "requiredEvidence": [
+      "local_readiness"
+    ],
+    "runnerMode": "manual_or_ci",
+    "targetId": "windows-x64"
+  }
+}

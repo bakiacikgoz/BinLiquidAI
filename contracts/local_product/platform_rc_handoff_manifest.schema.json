@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifactVersion": {
+      "const": "local-product-rc-handoff/v1",
+      "default": "local-product-rc-handoff/v1",
+      "title": "Artifactversion",
+      "type": "string"
+    },
+    "blockedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockedclaims",
+      "type": "array"
+    },
+    "branch": {
+      "title": "Branch",
+      "type": "string"
+    },
+    "evidenceBundles": {
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Evidencebundles",
+      "type": "array"
+    },
+    "gitCommit": {
+      "title": "Gitcommit",
+      "type": "string"
+    },
+    "hashLedger": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Hashledger",
+      "type": "object"
+    },
+    "operatorNextSteps": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Operatornextsteps",
+      "type": "array"
+    },
+    "productClosurePath": {
+      "title": "Productclosurepath",
+      "type": "string"
+    },
+    "reconciliationPath": {
+      "title": "Reconciliationpath",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "supportedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Supportedclaims",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "gitCommit",
+    "branch",
+    "reconciliationPath",
+    "productClosurePath"
+  ],
+  "title": "PlatformRCHandoffManifest",
+  "type": "object"
+}

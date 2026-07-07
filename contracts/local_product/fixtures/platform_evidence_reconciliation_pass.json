@@ -1,0 +1,60 @@
+{
+  "artifactVersion": "local-product-platform-reconciliation/v1",
+  "claimedTargets": [],
+  "evidencedTargets": [
+    "windows-x64"
+  ],
+  "gitCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "noShipBlockers": [],
+  "notEvidencedTargets": [
+    "darwin-arm64",
+    "darwin-x64",
+    "linux-x64"
+  ],
+  "status": "pass",
+  "targets": {
+    "darwin-arm64": {
+      "bundleSha256": null,
+      "evidenceId": null,
+      "gitCommit": null,
+      "reasonCodes": [
+        "PLATFORM_EVIDENCE_NOT_IMPORTED"
+      ],
+      "source": "none",
+      "status": "not_evidenced",
+      "targetId": "darwin-arm64"
+    },
+    "darwin-x64": {
+      "bundleSha256": null,
+      "evidenceId": null,
+      "gitCommit": null,
+      "reasonCodes": [
+        "PLATFORM_EVIDENCE_NOT_IMPORTED"
+      ],
+      "source": "none",
+      "status": "not_evidenced",
+      "targetId": "darwin-x64"
+    },
+    "linux-x64": {
+      "bundleSha256": null,
+      "evidenceId": null,
+      "gitCommit": null,
+      "reasonCodes": [
+        "PLATFORM_EVIDENCE_NOT_IMPORTED"
+      ],
+      "source": "none",
+      "status": "not_evidenced",
+      "targetId": "linux-x64"
+    },
+    "windows-x64": {
+      "bundleSha256": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "evidenceId": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "gitCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reasonCodes": [],
+      "source": "imported",
+      "status": "evidenced",
+      "targetId": "windows-x64"
+    }
+  },
+  "warnings": []
+}

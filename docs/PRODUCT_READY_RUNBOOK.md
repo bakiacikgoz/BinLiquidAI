@@ -19,7 +19,21 @@
    uv run python scripts/run_product_complete_closure_gate.py --profile enterprise --json
    ```
 
-4. Run the macOS Apple Silicon local trial gate when preparing a personal
+4. Collect and reconcile platform evidence before making cross-platform local
+   product claims:
+
+   ```bash
+   uv run python scripts/run_platform_evidence_orchestrator_gate.py --profile enterprise --json
+   uv run binliquid local-product rc-handoff build --profile enterprise --json
+   uv run binliquid local-product rc-handoff verify \
+     --manifest artifacts/local-product-rc-handoff/manifest.json \
+     --json
+   ```
+
+   Only targets listed in `supportedClaims` may be described as evidenced.
+   `notEvidencedTargets` must remain out of release support claims.
+
+5. Run the macOS Apple Silicon local trial gate when preparing a personal
    source/dev trial. An M4 device is only an example local validation target:
 
    ```bash
@@ -30,7 +44,7 @@
    notes, such as missing assistant model/provider readiness. It is not a public
    desktop release signal.
 
-5. Treat any `noShipBlockers` as release-blocking.
+6. Treat any `noShipBlockers` as release-blocking.
 
 External requirements remain outside this local proof: public signing,
 notarization, customer pilot execution, and public cloud multi-tenant SaaS.

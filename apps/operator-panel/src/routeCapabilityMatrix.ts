@@ -102,6 +102,26 @@ const bridgeActions: Partial<Record<RouteId, RouteCapability['primaryActions']>>
       noShipIfInert: true,
     },
   ],
+  'local-product-platform-evidence': [
+    {
+      actionId: 'local_product.platform_evidence_status',
+      label: 'Refresh evidence',
+      state: 'working',
+      bridgeCommand: 'bridge_local_product_platform_evidence_status',
+      cliCommand: 'binliquid local-product evidence reconcile',
+      requiredPermission: 'system.read',
+      noShipIfInert: true,
+    },
+    {
+      actionId: 'local_product.rc_handoff_status',
+      label: 'Refresh RC handoff',
+      state: 'working',
+      bridgeCommand: 'bridge_local_product_rc_handoff_status',
+      cliCommand: 'binliquid local-product rc-handoff build',
+      requiredPermission: 'system.read',
+      noShipIfInert: true,
+    },
+  ],
   'enterprise-workspace': [
     {
       actionId: 'workspace.bootstrap',

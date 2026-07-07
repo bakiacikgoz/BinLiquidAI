@@ -10,6 +10,8 @@ import {
   handshake,
   fetchLocalProductMatrix,
   fetchLocalProductReadiness,
+  fetchPlatformEvidenceStatus,
+  fetchRcHandoffStatus,
   isBridgePreviewMode,
   isPreviewAllowedForEnv,
   listAssistantModels,
@@ -136,6 +138,20 @@ describe('bridge preview fallback', () => {
     );
     expect((matrix as Record<string, unknown>).schemaVersion).toBe('local_product_readiness_matrix/v1');
     expect((matrix as Record<string, unknown>).notEvidencedTargets).toContain('darwin-arm64');
+  });
+
+  it('returns preview platform evidence and rc handoff payloads', async () => {
+    const [evidence, handoff] = await Promise.all([
+      fetchPlatformEvidenceStatus({ ...DEFAULT_SETTINGS }),
+      fetchRcHandoffStatus({ ...DEFAULT_SETTINGS }),
+    ]);
+
+    expect((evidence as Record<string, unknown>).artifactVersion).toBe(
+      'local-product-platform-reconciliation/v1',
+    );
+    expect((evidence as Record<string, unknown>).evidencedTargets).toContain('windows-x64');
+    expect((handoff as Record<string, unknown>).artifactVersion).toBe('local-product-rc-handoff/v1');
+    expect((handoff as Record<string, unknown>).status).toBe('ready');
   });
 
   it('returns preview assistant cancel payloads without a bridge process', async () => {

@@ -1,0 +1,80 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "branch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Branch"
+    },
+    "gitCommit": {
+      "title": "Gitcommit",
+      "type": "string"
+    },
+    "hostIdHash": {
+      "title": "Hostidhash",
+      "type": "string"
+    },
+    "machine": {
+      "title": "Machine",
+      "type": "string"
+    },
+    "nodeVersion": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Nodeversion"
+    },
+    "osName": {
+      "title": "Osname",
+      "type": "string"
+    },
+    "osVersion": {
+      "title": "Osversion",
+      "type": "string"
+    },
+    "pythonVersion": {
+      "title": "Pythonversion",
+      "type": "string"
+    },
+    "rustVersion": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rustversion"
+    },
+    "targetId": {
+      "title": "Targetid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "hostIdHash",
+    "targetId",
+    "osName",
+    "osVersion",
+    "machine",
+    "pythonVersion",
+    "gitCommit"
+  ],
+  "title": "HostProbe",
+  "type": "object"
+}

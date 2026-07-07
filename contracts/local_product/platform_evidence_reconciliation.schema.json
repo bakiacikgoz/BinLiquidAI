@@ -1,0 +1,186 @@
+{
+  "$defs": {
+    "PlatformNoShipBlocker": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "targetId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targetid"
+        }
+      },
+      "required": [
+        "reasonCode",
+        "message"
+      ],
+      "title": "PlatformNoShipBlocker",
+      "type": "object"
+    },
+    "TargetReconciliation": {
+      "additionalProperties": false,
+      "properties": {
+        "bundleSha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bundlesha256"
+        },
+        "evidenceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidenceid"
+        },
+        "gitCommit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gitcommit"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "source": {
+          "default": "none",
+          "enum": [
+            "current_host",
+            "imported",
+            "none"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "evidenced",
+            "not_evidenced",
+            "stale",
+            "mismatch",
+            "unsupported",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "targetId": {
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "targetId",
+        "status"
+      ],
+      "title": "TargetReconciliation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactVersion": {
+      "const": "local-product-platform-reconciliation/v1",
+      "default": "local-product-platform-reconciliation/v1",
+      "title": "Artifactversion",
+      "type": "string"
+    },
+    "claimedTargets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Claimedtargets",
+      "type": "array"
+    },
+    "evidencedTargets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidencedtargets",
+      "type": "array"
+    },
+    "gitCommit": {
+      "title": "Gitcommit",
+      "type": "string"
+    },
+    "noShipBlockers": {
+      "items": {
+        "$ref": "#/$defs/PlatformNoShipBlocker"
+      },
+      "title": "Noshipblockers",
+      "type": "array"
+    },
+    "notEvidencedTargets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notevidencedtargets",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "targets": {
+      "additionalProperties": {
+        "$ref": "#/$defs/TargetReconciliation"
+      },
+      "title": "Targets",
+      "type": "object"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "gitCommit",
+    "targets"
+  ],
+  "title": "PlatformEvidenceReconciliation",
+  "type": "object"
+}

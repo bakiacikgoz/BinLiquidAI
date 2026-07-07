@@ -247,6 +247,31 @@ describe('bridge tauri contract', () => {
     );
   });
 
+  it('passes platform evidence and rc handoff requests to the Tauri commands', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      artifactVersion: 'local-product-platform-reconciliation/v1',
+      status: 'pass',
+    });
+
+    await bridge.fetchPlatformEvidenceStatus({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
+    await bridge.fetchRcHandoffStatus({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
+
+    expect(invoke).toHaveBeenNthCalledWith(
+      1,
+      'bridge_local_product_platform_evidence_status',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      'bridge_local_product_rc_handoff_status',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
+      }),
+    );
+  });
+
   it('passes assistant model discovery requests to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
       contractVersion: 'operator-panel.assistant-provider-models/v2',

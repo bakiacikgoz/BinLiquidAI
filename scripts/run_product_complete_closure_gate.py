@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from binliquid.local_product.cli import build_matrix_report, build_readiness_report
+from binliquid.local_product.evidence_reconciler import reconcile_platform_evidence
 from binliquid.release.product_complete import build_product_complete_no_ship_register
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -321,6 +322,11 @@ def _local_product_readiness_summary(profile: str) -> dict[str, Any]:
     }
 
 
+def _platform_evidence_store_for_closure(output_root: Path) -> Path | None:
+    artifact_store = output_root.parent / "local-product-platform-evidence" / "store"
+    return artifact_store if artifact_store.exists() else None
+
+
 def run_product_complete_closure_gate(
     *,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
@@ -347,6 +353,12 @@ def run_product_complete_closure_gate(
             if result["required"] and result["status"] == "fail":
                 break
     local_product_readiness = _local_product_readiness_summary(profile)
+    platform_evidence_store = _platform_evidence_store_for_closure(output_root)
+    platform_evidence_reconciliation = (
+        reconcile_platform_evidence(store_root=platform_evidence_store)
+        if platform_evidence_store
+        else reconcile_platform_evidence()
+    )
     no_ship_register = build_product_complete_no_ship_register()
     blockers = [
         f"PRODUCT_COMPLETE_CHECK_FAILED:{check['name']}"
@@ -354,6 +366,9 @@ def run_product_complete_closure_gate(
         if check["required"] and check["status"] == "fail"
     ]
     blockers.extend(item.reason_code for item in no_ship_register.items if item.status == "open")
+    blockers.extend(
+        blocker.reason_code for blocker in platform_evidence_reconciliation.no_ship_blockers
+    )
     status = "pass" if not blockers else "fail"
     report = {
         "schemaVersion": "product-complete.closure/v1",
@@ -375,6 +390,10 @@ def run_product_complete_closure_gate(
         "rawLeakScan": {},
         "productReadiness": readiness,
         "localProductReadiness": local_product_readiness,
+        "platformEvidenceReconciliation": platform_evidence_reconciliation.model_dump(
+            mode="json",
+            by_alias=True,
+        ),
     }
     _write_outputs(output_root, report, no_ship_register.model_dump(mode="json", by_alias=True))
     return report

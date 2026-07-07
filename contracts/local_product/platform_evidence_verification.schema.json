@@ -1,0 +1,79 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifactVersion": {
+      "const": "local-product-platform-evidence-verification/v1",
+      "default": "local-product-platform-evidence-verification/v1",
+      "title": "Artifactversion",
+      "type": "string"
+    },
+    "bundlePath": {
+      "title": "Bundlepath",
+      "type": "string"
+    },
+    "commitMatch": {
+      "title": "Commitmatch",
+      "type": "boolean"
+    },
+    "fresh": {
+      "title": "Fresh",
+      "type": "boolean"
+    },
+    "hashesValid": {
+      "title": "Hashesvalid",
+      "type": "boolean"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "schemaValid": {
+      "title": "Schemavalid",
+      "type": "boolean"
+    },
+    "secretScanPass": {
+      "title": "Secretscanpass",
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "targetId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Targetid"
+    },
+    "targetMatch": {
+      "title": "Targetmatch",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "status",
+    "bundlePath",
+    "commitMatch",
+    "targetMatch",
+    "schemaValid",
+    "hashesValid",
+    "secretScanPass",
+    "fresh"
+  ],
+  "title": "PlatformEvidenceVerification",
+  "type": "object"
+}

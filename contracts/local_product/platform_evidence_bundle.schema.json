@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifactVersion": {
+      "const": "local-product-platform-evidence-bundle/v1",
+      "default": "local-product-platform-evidence-bundle/v1",
+      "title": "Artifactversion",
+      "type": "string"
+    },
+    "bundlePath": {
+      "title": "Bundlepath",
+      "type": "string"
+    },
+    "bundleSha256": {
+      "title": "Bundlesha256",
+      "type": "string"
+    },
+    "fileCount": {
+      "title": "Filecount",
+      "type": "integer"
+    },
+    "gitCommit": {
+      "title": "Gitcommit",
+      "type": "string"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "targetId": {
+      "title": "Targetid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "bundlePath",
+    "bundleSha256",
+    "targetId",
+    "gitCommit",
+    "fileCount"
+  ],
+  "title": "PlatformEvidenceBundleSummary",
+  "type": "object"
+}

@@ -424,6 +424,52 @@ function previewLocalProductMatrix(): unknown {
   };
 }
 
+function previewPlatformEvidenceStatus(): unknown {
+  return {
+    artifactVersion: 'local-product-platform-reconciliation/v1',
+    status: 'pass',
+    gitCommit: 'preview',
+    claimedTargets: [],
+    evidencedTargets: ['windows-x64'],
+    notEvidencedTargets: ['darwin-arm64', 'darwin-x64', 'linux-x64'],
+    noShipBlockers: [],
+    warnings: [],
+    targets: {
+      'windows-x64': { targetId: 'windows-x64', status: 'evidenced', reasonCodes: [] },
+      'darwin-arm64': {
+        targetId: 'darwin-arm64',
+        status: 'not_evidenced',
+        reasonCodes: ['TARGET_NOT_EVIDENCED'],
+      },
+      'darwin-x64': {
+        targetId: 'darwin-x64',
+        status: 'not_evidenced',
+        reasonCodes: ['TARGET_NOT_EVIDENCED'],
+      },
+      'linux-x64': {
+        targetId: 'linux-x64',
+        status: 'not_evidenced',
+        reasonCodes: ['TARGET_NOT_EVIDENCED'],
+      },
+    },
+  };
+}
+
+function previewRcHandoffStatus(): unknown {
+  return {
+    artifactVersion: 'local-product-rc-handoff/v1',
+    status: 'ready',
+    gitCommit: 'preview',
+    branch: 'preview',
+    reconciliationPath: 'platform_evidence_reconciliation.json',
+    productClosurePath: 'artifacts/product-complete-closure/product_complete_closure_report.json',
+    evidenceBundles: [],
+    supportedClaims: ['windows-x64 source/local install evidenced'],
+    blockedClaims: [],
+    operatorNextSteps: ['Collect and import evidence for not-evidenced targets before claiming support.'],
+  };
+}
+
 export async function handshake(settings: PanelSettings): Promise<unknown> {
   if (isBridgePreviewMode()) {
     return previewHandshake(settings);
@@ -1196,6 +1242,24 @@ export async function fetchLocalProductMatrix(
   return callBridge('bridge_local_product_matrix', {
     config: toBridgeConfig(settings, 30000),
     includeExperimental,
+  });
+}
+
+export async function fetchPlatformEvidenceStatus(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewPlatformEvidenceStatus();
+  }
+  return callBridge('bridge_local_product_platform_evidence_status', {
+    config: toBridgeConfig(settings, 30000),
+  });
+}
+
+export async function fetchRcHandoffStatus(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewRcHandoffStatus();
+  }
+  return callBridge('bridge_local_product_rc_handoff_status', {
+    config: toBridgeConfig(settings, 30000),
   });
 }
 

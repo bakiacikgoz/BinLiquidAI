@@ -214,6 +214,18 @@ from binliquid.local_product.cli import (
 from binliquid.local_product.cli import (
     build_readiness_report as build_local_product_readiness_report,
 )
+from binliquid.local_product.evidence_bundle import export_platform_evidence_bundle
+from binliquid.local_product.evidence_collector import collect_platform_evidence
+from binliquid.local_product.evidence_importer import (
+    DEFAULT_EVIDENCE_STORE,
+    import_platform_evidence_bundle,
+)
+from binliquid.local_product.evidence_reconciler import reconcile_platform_evidence
+from binliquid.local_product.evidence_verifier import verify_platform_evidence_bundle
+from binliquid.local_product.rc_handoff import (
+    build_local_product_rc_handoff,
+    verify_local_product_rc_handoff,
+)
 from binliquid.memory.authority import build_memory_authority, proposal_from_cli
 from binliquid.memory.evaluation import run_memory_retrieval_eval
 from binliquid.memory.manager import MemoryManager
@@ -348,6 +360,8 @@ assistant_app = typer.Typer(help="Product assistant runtime commands")
 assistant_knowledge_app = typer.Typer(help="Assistant local system knowledge commands")
 assistant_task_app = typer.Typer(help="Assistant governed agent tasking commands")
 local_product_app = typer.Typer(help="Cross-platform local product readiness commands")
+local_product_evidence_app = typer.Typer(help="Multi-host platform evidence commands")
+local_product_rc_handoff_app = typer.Typer(help="Local product RC handoff commands")
 ASSISTANT_KNOWLEDGE_OUTPUT_ROOT_OPTION = typer.Option(
     "--output-root",
     help="Knowledge artifact output root",
@@ -475,6 +489,8 @@ app.add_typer(assistant_app, name="assistant")
 assistant_app.add_typer(assistant_knowledge_app, name="knowledge")
 assistant_app.add_typer(assistant_task_app, name="task")
 app.add_typer(local_product_app, name="local-product")
+local_product_app.add_typer(local_product_evidence_app, name="evidence")
+local_product_app.add_typer(local_product_rc_handoff_app, name="rc-handoff")
 app.add_typer(setup_app, name="setup")
 app.add_typer(product_app, name="product")
 product_app.add_typer(product_demo_app, name="demo")
@@ -1832,6 +1848,167 @@ def local_product_matrix(
         ),
         json_output=json_output,
     )
+
+
+@local_product_evidence_app.command("collect")
+def local_product_evidence_collect(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    target: str = typer.Option("current", "--target", help="current or <os>-<arch>"),
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", help="Evidence output root"),
+    ] = Path("artifacts/local-product/evidence/current"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Collect current-host platform evidence."""
+    payload = collect_platform_evidence(
+        profile=profile,
+        target=target,
+        output_root=output_root,
+    ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("claimStatus") == "blocked":
+        raise typer.Exit(code=1)
+
+
+@local_product_evidence_app.command("export")
+def local_product_evidence_export(
+    manifest: Annotated[Path, typer.Option("--manifest", help="Platform evidence manifest")],
+    bundle: Annotated[Path, typer.Option("--bundle", help="Output bundle zip")],
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Export an evidence manifest as a portable bundle."""
+    payload = export_platform_evidence_bundle(
+        manifest_path=manifest,
+        bundle_path=bundle,
+    ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+
+
+@local_product_evidence_app.command("verify")
+def local_product_evidence_verify(
+    bundle: Annotated[Path, typer.Option("--bundle", help="Evidence bundle path")],
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    expected_commit: str | None = typer.Option(None, "--expected-commit"),
+    expected_target: str | None = typer.Option(None, "--expected-target"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Verify bundle schema, hashes, target, commit, freshness, and secret posture."""
+    del profile
+    payload = verify_platform_evidence_bundle(
+        bundle_path=bundle,
+        expected_commit=expected_commit,
+        expected_target=expected_target,
+    ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("status") != "pass":
+        raise typer.Exit(code=1)
+
+
+@local_product_evidence_app.command("import")
+def local_product_evidence_import(
+    bundle: Annotated[Path, typer.Option("--bundle", help="Evidence bundle path")],
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    store_root: Annotated[
+        Path,
+        typer.Option("--store-root", help="Evidence store root"),
+    ] = DEFAULT_EVIDENCE_STORE,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Verify and import a platform evidence bundle into the local store."""
+    del profile
+    payload = import_platform_evidence_bundle(
+        bundle_path=bundle,
+        store_root=store_root,
+    ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+
+
+@local_product_evidence_app.command("reconcile")
+def local_product_evidence_reconcile(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    store_root: Annotated[
+        Path,
+        typer.Option("--store-root", help="Evidence store root"),
+    ] = DEFAULT_EVIDENCE_STORE,
+    claimed_target: Annotated[
+        list[str] | None,
+        typer.Option("--claimed-target"),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output"),
+    ] = None,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Reconcile imported evidence into a target-by-target platform matrix."""
+    del profile
+    payload = reconcile_platform_evidence(
+        store_root=store_root,
+        claimed_targets=claimed_target or [],
+    ).model_dump(mode="json", by_alias=True)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("status") == "blocked":
+        raise typer.Exit(code=1)
+
+
+@local_product_evidence_app.command("status")
+def local_product_evidence_status(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    store_root: Annotated[
+        Path,
+        typer.Option("--store-root", help="Evidence store root"),
+    ] = DEFAULT_EVIDENCE_STORE,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Read current platform evidence reconciliation without mutating state."""
+    del profile
+    _emit_payload(
+        reconcile_platform_evidence(store_root=store_root).model_dump(mode="json", by_alias=True),
+        json_output=json_output,
+    )
+
+
+@local_product_rc_handoff_app.command("build")
+def local_product_rc_handoff_build(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    evidence_root: Annotated[
+        Path,
+        typer.Option("--evidence-root", help="Evidence store root"),
+    ] = DEFAULT_EVIDENCE_STORE,
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", help="RC handoff output root"),
+    ] = Path("artifacts/local-product-rc-handoff"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Build a local product RC handoff manifest from platform evidence."""
+    payload = build_local_product_rc_handoff(
+        profile=profile,
+        evidence_root=evidence_root,
+        output_root=output_root,
+    ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("status") == "blocked":
+        raise typer.Exit(code=1)
+
+
+@local_product_rc_handoff_app.command("verify")
+def local_product_rc_handoff_verify(
+    manifest: Annotated[Path, typer.Option("--manifest", help="RC handoff manifest")],
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Verify a local product RC handoff manifest and hash ledger."""
+    payload = verify_local_product_rc_handoff(manifest_path=manifest).model_dump(
+        mode="json",
+        by_alias=True,
+    )
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("status") != "pass":
+        raise typer.Exit(code=1)
 
 
 @assistant_app.command("turn")

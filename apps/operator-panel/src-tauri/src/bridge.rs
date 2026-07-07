@@ -1401,6 +1401,50 @@ pub async fn bridge_local_product_matrix(
 }
 
 #[tauri::command]
+pub async fn bridge_local_product_platform_evidence_status(
+    config: BridgeConfig,
+) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "local-product".to_string(),
+            "evidence".to_string(),
+            "reconcile".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_local_product_rc_handoff_status(
+    config: BridgeConfig,
+) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "local-product".to_string(),
+            "rc-handoff".to_string(),
+            "build".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
 pub async fn bridge_auth_whoami(config: BridgeConfig) -> BridgeResult<Value> {
     match run_cli_json_owned(
         &config,

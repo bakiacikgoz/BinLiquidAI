@@ -106,6 +106,27 @@ class ProductCompleteInput(StrictModel):
         default=False,
         alias="localProductOverbroadPlatformClaim",
     )
+    platform_claim_without_evidence: bool = Field(
+        default=False,
+        alias="platformClaimWithoutEvidence",
+    )
+    platform_evidence_commit_mismatch: bool = Field(
+        default=False,
+        alias="platformEvidenceCommitMismatch",
+    )
+    platform_evidence_target_mismatch: bool = Field(
+        default=False,
+        alias="platformEvidenceTargetMismatch",
+    )
+    platform_evidence_secret_leak: bool = Field(
+        default=False,
+        alias="platformEvidenceSecretLeak",
+    )
+    platform_evidence_stale: bool = Field(default=False, alias="platformEvidenceStale")
+    unbounded_platform_support_claim: bool = Field(
+        default=False,
+        alias="unboundedPlatformSupportClaim",
+    )
 
 
 def _blocker(
@@ -345,4 +366,45 @@ def build_product_complete_no_ship_register(
                 ),
             )
         )
+    platform_blockers = [
+        (
+            state.platform_claim_without_evidence,
+            "PLATFORM_CLAIM_WITHOUT_EVIDENCE",
+            "Remove the unsupported claim or import matching platform evidence.",
+        ),
+        (
+            state.platform_evidence_commit_mismatch,
+            "PLATFORM_EVIDENCE_COMMIT_MISMATCH",
+            "Regenerate platform evidence on the release candidate commit.",
+        ),
+        (
+            state.platform_evidence_target_mismatch,
+            "PLATFORM_EVIDENCE_TARGET_MISMATCH",
+            "Use evidence whose target matches the claimed OS/architecture.",
+        ),
+        (
+            state.platform_evidence_secret_leak,
+            "PLATFORM_EVIDENCE_SECRET_LEAK",
+            "Remove leaked sensitive content and regenerate the evidence bundle.",
+        ),
+        (
+            state.platform_evidence_stale,
+            "PLATFORM_EVIDENCE_STALE",
+            "Refresh stale platform evidence before making a support claim.",
+        ),
+        (
+            state.unbounded_platform_support_claim,
+            "UNBOUNDED_PLATFORM_SUPPORT_CLAIM",
+            "Replace broad platform claims with explicit evidenced target claims.",
+        ),
+    ]
+    for enabled, reason_code, resolution_path in platform_blockers:
+        if enabled:
+            items.append(
+                _blocker(
+                    reason_code=reason_code,
+                    claim_id="platform_evidence_reconciliation",
+                    resolution_path=resolution_path,
+                )
+            )
     return NoShipRegister(status="clear", items=items)

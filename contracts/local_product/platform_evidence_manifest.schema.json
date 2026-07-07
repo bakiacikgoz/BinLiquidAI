@@ -1,0 +1,373 @@
+{
+  "$defs": {
+    "CommandEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactPaths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifactpaths",
+          "type": "array"
+        },
+        "commandId": {
+          "title": "Commandid",
+          "type": "string"
+        },
+        "displayName": {
+          "title": "Displayname",
+          "type": "string"
+        },
+        "durationMs": {
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "exitCode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exitcode"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoncode"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "skipped",
+            "not_available"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "stderrHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stderrhash"
+        },
+        "stdoutHash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stdouthash"
+        }
+      },
+      "required": [
+        "commandId",
+        "displayName",
+        "status",
+        "durationMs"
+      ],
+      "title": "CommandEvidence",
+      "type": "object"
+    },
+    "HostProbe": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Branch"
+        },
+        "gitCommit": {
+          "title": "Gitcommit",
+          "type": "string"
+        },
+        "hostIdHash": {
+          "title": "Hostidhash",
+          "type": "string"
+        },
+        "machine": {
+          "title": "Machine",
+          "type": "string"
+        },
+        "nodeVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nodeversion"
+        },
+        "osName": {
+          "title": "Osname",
+          "type": "string"
+        },
+        "osVersion": {
+          "title": "Osversion",
+          "type": "string"
+        },
+        "pythonVersion": {
+          "title": "Pythonversion",
+          "type": "string"
+        },
+        "rustVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rustversion"
+        },
+        "targetId": {
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hostIdHash",
+        "targetId",
+        "osName",
+        "osVersion",
+        "machine",
+        "pythonVersion",
+        "gitCommit"
+      ],
+      "title": "HostProbe",
+      "type": "object"
+    },
+    "PlatformTargetDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "anyOf": [
+            {
+              "enum": [
+                "arm64",
+                "x64"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Arch"
+        },
+        "claimLevel": {
+          "enum": [
+            "not_claimed",
+            "source_supported",
+            "internal_desktop_validated",
+            "public_release_blocked"
+          ],
+          "title": "Claimlevel",
+          "type": "string"
+        },
+        "experimental": {
+          "default": false,
+          "title": "Experimental",
+          "type": "boolean"
+        },
+        "os": {
+          "anyOf": [
+            {
+              "enum": [
+                "darwin",
+                "windows",
+                "linux"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Os"
+        },
+        "requiredEvidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requiredevidence",
+          "type": "array"
+        },
+        "runnerMode": {
+          "default": "manual_or_ci",
+          "enum": [
+            "github_hosted",
+            "self_hosted",
+            "manual_or_ci"
+          ],
+          "title": "Runnermode",
+          "type": "string"
+        },
+        "targetId": {
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "targetId",
+        "os",
+        "arch",
+        "claimLevel"
+      ],
+      "title": "PlatformTargetDefinition",
+      "type": "object"
+    },
+    "RawArtifactPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "providerPayloadPersisted": {
+          "default": false,
+          "title": "Providerpayloadpersisted",
+          "type": "boolean"
+        },
+        "rawPromptPersisted": {
+          "default": false,
+          "title": "Rawpromptpersisted",
+          "type": "boolean"
+        },
+        "secretsPersisted": {
+          "default": false,
+          "title": "Secretspersisted",
+          "type": "boolean"
+        }
+      },
+      "title": "RawArtifactPolicy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactVersion": {
+      "const": "local-product-platform-evidence/v1",
+      "default": "local-product-platform-evidence/v1",
+      "title": "Artifactversion",
+      "type": "string"
+    },
+    "claimStatus": {
+      "enum": [
+        "evidenced",
+        "not_evidenced",
+        "blocked"
+      ],
+      "title": "Claimstatus",
+      "type": "string"
+    },
+    "commands": {
+      "items": {
+        "$ref": "#/$defs/CommandEvidence"
+      },
+      "title": "Commands",
+      "type": "array"
+    },
+    "evidenceId": {
+      "title": "Evidenceid",
+      "type": "string"
+    },
+    "generatedAt": {
+      "title": "Generatedat",
+      "type": "string"
+    },
+    "gitCommit": {
+      "title": "Gitcommit",
+      "type": "string"
+    },
+    "hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Hashes",
+      "type": "object"
+    },
+    "hostProbe": {
+      "$ref": "#/$defs/HostProbe"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "rawArtifactPolicy": {
+      "$ref": "#/$defs/RawArtifactPolicy"
+    },
+    "readinessStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "partial",
+        "blocked"
+      ],
+      "title": "Readinessstatus",
+      "type": "string"
+    },
+    "secretScanStatus": {
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "title": "Secretscanstatus",
+      "type": "string"
+    },
+    "target": {
+      "$ref": "#/$defs/PlatformTargetDefinition"
+    }
+  },
+  "required": [
+    "evidenceId",
+    "target",
+    "hostProbe",
+    "profile",
+    "gitCommit",
+    "generatedAt",
+    "commands",
+    "readinessStatus",
+    "claimStatus",
+    "secretScanStatus",
+    "rawArtifactPolicy"
+  ],
+  "title": "PlatformEvidenceManifest",
+  "type": "object"
+}

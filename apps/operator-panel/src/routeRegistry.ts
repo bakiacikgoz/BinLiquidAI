@@ -29,6 +29,7 @@ export type RouteId =
   | 'rc-gate-evidence'
   | 'rc-release-decision'
   | 'local-product-readiness'
+  | 'local-product-platform-evidence'
   | 'operations'
   | 'settings'
   | 'logs'
@@ -200,6 +201,13 @@ export const routeGroups: RouteGroup[] = [
         label: 'Local Readiness',
         heading: 'Local Product Readiness',
         icon: 'monitor',
+      },
+      {
+        id: 'local-product-platform-evidence',
+        routeId: 'local-product-platform-evidence',
+        label: 'Platform Evidence',
+        heading: 'Platform Evidence / RC Handoff',
+        icon: 'archive',
       },
       { id: 'settings', routeId: 'settings', label: 'Ayarlar', heading: 'Settings', icon: 'settings' },
     ],

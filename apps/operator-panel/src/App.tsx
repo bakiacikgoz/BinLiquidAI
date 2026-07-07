@@ -19,6 +19,8 @@ import {
   fetchIdentity,
   fetchKeysStatus,
   fetchLocalProductReadiness,
+  fetchPlatformEvidenceStatus,
+  fetchRcHandoffStatus,
   fetchSecurityBaseline,
   generateSecurityReview,
   getRunReplay,
@@ -139,6 +141,8 @@ import { MainlineRcFreezeView } from './mainline-rc-freeze/MainlineRcFreezeView'
 import { RcGateEvidenceView } from './rc-gate-evidence/RcGateEvidenceView';
 import { ReleaseDecisionView } from './release-decision/ReleaseDecisionView';
 import { LocalProductReadinessView } from './local-product/LocalProductReadinessView';
+import { PlatformEvidenceView } from './local-product/PlatformEvidenceView';
+import { RcHandoffView } from './local-product/RcHandoffView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
@@ -387,6 +391,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [controlPlaneSnapshotVm, setControlPlaneSnapshotVm] =
     useState<PageViewModel<ControlPlaneSnapshot> | null>(null);
   const [localProductReadiness, setLocalProductReadiness] = useState<unknown>(null);
+  const [platformEvidenceStatus, setPlatformEvidenceStatus] = useState<unknown>(null);
+  const [rcHandoffStatus, setRcHandoffStatus] = useState<unknown>(null);
 
   const [approvalsData, setApprovalsData] = useState<unknown>({ pending: [] });
   const [selectedApprovalId, setSelectedApprovalId] = useState('');
@@ -806,6 +812,45 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               productClaimSummary: parsed?.message ?? 'Local readiness bridge failed.',
               blockingReasons: [parsed?.code ?? 'BRIDGE_LOCAL_PRODUCT_READINESS_FAILED'],
             },
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeView, settings]);
+
+  useEffect(() => {
+    if (activeView !== 'local-product-platform-evidence') {
+      return;
+    }
+    let cancelled = false;
+    void Promise.all([fetchPlatformEvidenceStatus(settings), fetchRcHandoffStatus(settings)])
+      .then(([evidence, handoff]) => {
+        if (!cancelled) {
+          setPlatformEvidenceStatus(evidence);
+          setRcHandoffStatus(handoff);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const parsed = getErrorPayload(error);
+          setPlatformEvidenceStatus({
+            artifactVersion: 'local-product-platform-reconciliation/v1',
+            status: 'blocked',
+            evidencedTargets: [],
+            notEvidencedTargets: ['darwin-arm64', 'darwin-x64', 'windows-x64', 'linux-x64'],
+            noShipBlockers: [{ reasonCode: parsed?.code ?? 'BRIDGE_PLATFORM_EVIDENCE_FAILED' }],
+            targets: {},
+          });
+          setRcHandoffStatus({
+            artifactVersion: 'local-product-rc-handoff/v1',
+            status: 'blocked',
+            branch: 'unknown',
+            gitCommit: 'unknown',
+            supportedClaims: [],
+            blockedClaims: [parsed?.code ?? 'BRIDGE_RC_HANDOFF_FAILED'],
+            operatorNextSteps: [parsed?.message ?? 'RC handoff bridge failed.'],
           });
         }
       });
@@ -2826,6 +2871,13 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'local-product-readiness' ? (
           <LocalProductReadinessView report={localProductReadiness ?? {}} />
+        ) : null}
+
+        {activeView === 'local-product-platform-evidence' ? (
+          <>
+            <PlatformEvidenceView report={platformEvidenceStatus ?? {}} />
+            <RcHandoffView manifest={rcHandoffStatus ?? {}} />
+          </>
         ) : null}
 
         {activeView === 'operations' ? (
