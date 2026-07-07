@@ -24,6 +24,8 @@
 
    ```bash
    uv run python scripts/run_platform_evidence_orchestrator_gate.py --profile enterprise --json
+   uv run python scripts/run_remote_platform_evidence_harvest_gate.py --profile enterprise --json
+   uv run python scripts/run_source_install_rc_closure_gate.py --profile enterprise --json
    uv run binliquid local-product rc-handoff build --profile enterprise --json
    uv run binliquid local-product rc-handoff verify \
      --manifest artifacts/local-product-rc-handoff/manifest.json \

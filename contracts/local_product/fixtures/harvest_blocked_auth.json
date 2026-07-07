@@ -1,0 +1,29 @@
+{
+  "artifactsDiscovered": 0,
+  "artifactsDownloaded": 0,
+  "artifactsImported": 0,
+  "blockers": [],
+  "branch": "codex/remote-platform-evidence-harvest-source-install-rc-v1",
+  "generatedAtUtc": "2026-07-07T00:00:00Z",
+  "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "outputRoot": "artifacts/local-product/harvest",
+  "reconciliation": null,
+  "schemaVersion": "local_product_harvest/v1",
+  "sources": [
+    {
+      "artifactPattern": "local-product-evidence-*",
+      "authMode": "auto",
+      "branch": "codex/remote-platform-evidence-harvest-source-install-rc-v1",
+      "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repo": "bakiacikgoz/BinLiquidAI",
+      "sourceId": "github-actions",
+      "sourceType": "github_actions",
+      "workflow": "local-product-platform-evidence.yml"
+    }
+  ],
+  "status": "conditional",
+  "targetResults": [],
+  "warnings": [
+    "blocked_external_auth"
+  ]
+}

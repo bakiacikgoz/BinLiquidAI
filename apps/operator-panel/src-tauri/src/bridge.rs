@@ -1445,6 +1445,68 @@ pub async fn bridge_local_product_rc_handoff_status(
 }
 
 #[tauri::command]
+pub async fn bridge_local_product_harvest_status(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "local-product".to_string(),
+            "ci".to_string(),
+            "harvest".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_local_product_source_install_claim(
+    config: BridgeConfig,
+) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "local-product".to_string(),
+            "source-install".to_string(),
+            "claim".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_local_product_target_actions(config: BridgeConfig) -> BridgeResult<Value> {
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "local-product".to_string(),
+            "target".to_string(),
+            "actions".to_string(),
+            "--profile".to_string(),
+            config.profile(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
 pub async fn bridge_auth_whoami(config: BridgeConfig) -> BridgeResult<Value> {
     match run_cli_json_owned(
         &config,

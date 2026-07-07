@@ -247,7 +247,7 @@ describe('bridge tauri contract', () => {
     );
   });
 
-  it('passes platform evidence and rc handoff requests to the Tauri commands', async () => {
+  it('passes platform evidence harvest, claim, actions and rc handoff requests to Tauri', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
       artifactVersion: 'local-product-platform-reconciliation/v1',
       status: 'pass',
@@ -255,6 +255,9 @@ describe('bridge tauri contract', () => {
 
     await bridge.fetchPlatformEvidenceStatus({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
     await bridge.fetchRcHandoffStatus({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
+    await bridge.fetchPlatformEvidenceHarvestStatus({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
+    await bridge.fetchSourceInstallRcClaim({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
+    await bridge.fetchTargetClosureActions({ ...DEFAULT_SETTINGS, profile: 'enterprise' });
 
     expect(invoke).toHaveBeenNthCalledWith(
       1,
@@ -266,6 +269,27 @@ describe('bridge tauri contract', () => {
     expect(invoke).toHaveBeenNthCalledWith(
       2,
       'bridge_local_product_rc_handoff_status',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      3,
+      'bridge_local_product_harvest_status',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      4,
+      'bridge_local_product_source_install_claim',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      5,
+      'bridge_local_product_target_actions',
       expect.objectContaining({
         config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
       }),

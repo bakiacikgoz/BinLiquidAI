@@ -30,12 +30,16 @@ jobs:
             scripts/run_governed_agent_workflow_product_gate.py \
             scripts/generate_local_product_contract_schemas.py \
             scripts/generate_local_product_evidence_contract_schemas.py \
+            scripts/generate_local_product_harvest_contract_schemas.py \
             scripts/run_local_product_readiness_gate.py \
             scripts/run_platform_evidence_orchestrator_gate.py \
+            scripts/run_remote_platform_evidence_harvest_gate.py \
+            scripts/run_source_install_rc_closure_gate.py \
             scripts/build_local_product_rc_handoff_pack.py \
             scripts/run_product_complete_closure_gate.py
           uv run python scripts/generate_local_product_contract_schemas.py
           uv run python scripts/generate_local_product_evidence_contract_schemas.py
+          uv run python scripts/generate_local_product_harvest_contract_schemas.py
           uv run --extra dev python -m pytest -q \
             tests/test_local_product_platforms.py \
             tests/test_local_product_platform_targets.py \
@@ -47,7 +51,13 @@ jobs:
             tests/test_local_product_evidence_importer.py \
             tests/test_local_product_evidence_reconciler.py \
             tests/test_local_product_evidence_verifier.py \
+            tests/test_local_product_github_actions_adapter.py \
+            tests/test_local_product_harvest.py \
+            tests/test_local_product_harvest_cli.py \
+            tests/test_local_product_harvest_contracts.py \
             tests/test_local_product_rc_handoff.py \
+            tests/test_source_install_rc_claim.py \
+            tests/test_target_closure_actions.py \
             tests/test_local_product_claim_guard.py \
             tests/test_local_product_cli.py \
             tests/test_local_product_contracts.py \
@@ -63,6 +73,8 @@ jobs:
             tests/test_product_support_bundle_redaction.py \
             tests/test_product_complete_closure_gate.py
           uv run python scripts/run_local_product_readiness_gate.py --profile enterprise --matrix --json
+          uv run python scripts/run_remote_platform_evidence_harvest_gate.py --profile enterprise --json
+          uv run python scripts/run_source_install_rc_closure_gate.py --profile enterprise --json
 
   operator-panel-product-complete:
     runs-on: ubuntu-latest
@@ -84,6 +96,10 @@ jobs:
             src/local-product/platformEvidenceMappers.test.ts \
             src/local-product/PlatformEvidenceView.test.tsx \
             src/local-product/RcHandoffView.test.tsx \
+            src/local-product/platformEvidenceHarvestMappers.test.ts \
+            src/local-product/PlatformEvidenceHarvestView.test.tsx \
+            src/local-product/SourceInstallRcClaimView.test.tsx \
+            src/local-product/TargetClosureActionsView.test.tsx \
             src/bridge.test.ts \
             src/bridge.tauri.test.ts \
             src/routeCapabilityMatrix.test.ts \

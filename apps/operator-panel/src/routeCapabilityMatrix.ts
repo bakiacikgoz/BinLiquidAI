@@ -104,6 +104,33 @@ const bridgeActions: Partial<Record<RouteId, RouteCapability['primaryActions']>>
   ],
   'local-product-platform-evidence': [
     {
+      actionId: 'local_product.harvest_status',
+      label: 'Refresh harvest',
+      state: 'working',
+      bridgeCommand: 'bridge_local_product_harvest_status',
+      cliCommand: 'binliquid local-product ci harvest',
+      requiredPermission: 'system.read',
+      noShipIfInert: true,
+    },
+    {
+      actionId: 'local_product.source_install_claim',
+      label: 'Refresh source claim',
+      state: 'working',
+      bridgeCommand: 'bridge_local_product_source_install_claim',
+      cliCommand: 'binliquid local-product source-install claim',
+      requiredPermission: 'system.read',
+      noShipIfInert: true,
+    },
+    {
+      actionId: 'local_product.target_actions',
+      label: 'Refresh target actions',
+      state: 'working',
+      bridgeCommand: 'bridge_local_product_target_actions',
+      cliCommand: 'binliquid local-product target actions',
+      requiredPermission: 'system.read',
+      noShipIfInert: true,
+    },
+    {
       actionId: 'local_product.platform_evidence_status',
       label: 'Refresh evidence',
       state: 'working',

@@ -1,0 +1,29 @@
+{
+  "blockedTargets": [
+    {
+      "message": "linux-x64 was requested for source install RC claim without evidence.",
+      "reasonCode": "SOURCE_INSTALL_TARGET_WITHOUT_EVIDENCE",
+      "target": "linux-x64"
+    }
+  ],
+  "claimSet": "source-local-install",
+  "claimedTargets": [
+    "windows-x64"
+  ],
+  "evidenceMaxAgeHours": 168,
+  "generatedAtUtc": "2026-07-07T00:00:00Z",
+  "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "noShipBlockers": [
+    "SOURCE_INSTALL_TARGET_WITHOUT_EVIDENCE"
+  ],
+  "notEvidencedTargets": [
+    "darwin-arm64",
+    "darwin-x64",
+    "linux-x64"
+  ],
+  "releaseNotesAllowedClaims": [
+    "windows-x64 source-local-install evidenced"
+  ],
+  "schemaVersion": "source_install_rc_claim/v1",
+  "status": "blocked"
+}

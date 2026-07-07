@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blockingForCurrentClaim": {
+      "title": "Blockingforcurrentclaim",
+      "type": "boolean"
+    },
+    "commands": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Commands",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "reasonCodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasoncodes",
+      "type": "array"
+    },
+    "recommendedPath": {
+      "enum": [
+        "hosted_ci",
+        "self_hosted",
+        "manual_local"
+      ],
+      "title": "Recommendedpath",
+      "type": "string"
+    },
+    "runbook": {
+      "title": "Runbook",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "target_closure_action/v1",
+      "default": "target_closure_action/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "not_evidenced",
+        "stale",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "target": {
+      "title": "Target",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "status",
+    "recommendedPath",
+    "commands",
+    "runbook",
+    "blockingForCurrentClaim"
+  ],
+  "title": "TargetClosureAction",
+  "type": "object"
+}

@@ -164,6 +164,10 @@ class PlatformRCHandoffManifest(StrictModel):
     evidence_bundles: list[dict[str, str]] = Field(default_factory=list, alias="evidenceBundles")
     supported_claims: list[str] = Field(default_factory=list, alias="supportedClaims")
     blocked_claims: list[str] = Field(default_factory=list, alias="blockedClaims")
+    source_install_rc_claim: dict[str, object] | None = Field(
+        default=None,
+        alias="sourceInstallRcClaim",
+    )
     operator_next_steps: list[str] = Field(default_factory=list, alias="operatorNextSteps")
     hash_ledger: dict[str, str] = Field(default_factory=dict, alias="hashLedger")
 

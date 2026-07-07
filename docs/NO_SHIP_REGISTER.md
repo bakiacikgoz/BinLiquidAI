@@ -21,6 +21,10 @@ Default boundaries:
 - `PLATFORM_EVIDENCE_SECRET_LEAK`
 - `PLATFORM_EVIDENCE_STALE`
 - `UNBOUNDED_PLATFORM_SUPPORT_CLAIM`
+- `SOURCE_INSTALL_TARGET_WITHOUT_EVIDENCE`
+- `SOURCE_INSTALL_TARGET_STALE`
+- `SOURCE_INSTALL_TARGET_BLOCKED`
+- `SOURCE_INSTALL_OVERCLAIM`
 
 External Hat B blockers may be accepted boundaries for source/CLI RC. They remain blockers for public desktop release claims.
 

@@ -470,6 +470,60 @@ function previewRcHandoffStatus(): unknown {
   };
 }
 
+function previewPlatformEvidenceHarvestStatus(): unknown {
+  return {
+    schemaVersion: 'local_product_harvest/v1',
+    status: 'pass',
+    headSha: 'preview',
+    artifactsDiscovered: 1,
+    artifactsImported: 1,
+    blockers: [],
+    warnings: [],
+    targetResults: [
+      { target: 'windows-x64', status: 'evidenced', reasonCodes: [] },
+      { target: 'linux-x64', status: 'not_evidenced', reasonCodes: ['TARGET_NOT_EVIDENCED'] },
+    ],
+  };
+}
+
+function previewSourceInstallRcClaim(): unknown {
+  return {
+    schemaVersion: 'source_install_rc_claim/v1',
+    status: 'pass',
+    claimSet: 'source-local-install',
+    claimedTargets: ['windows-x64'],
+    notEvidencedTargets: ['darwin-arm64', 'darwin-x64', 'linux-x64'],
+    blockedTargets: [],
+    releaseNotesAllowedClaims: ['windows-x64 source-local-install evidenced'],
+    noShipBlockers: [],
+  };
+}
+
+function previewTargetClosureActions(): unknown {
+  return [
+    {
+      schemaVersion: 'target_closure_action/v1',
+      target: 'darwin-arm64',
+      status: 'not_evidenced',
+      recommendedPath: 'manual_local',
+      commands: ['uv run binliquid local-product evidence collect --target current --profile enterprise --json'],
+      runbook: 'docs/MACOS_LOCAL_EVIDENCE_RUNBOOK.md',
+      blockingForCurrentClaim: false,
+      reasonCodes: ['TARGET_NOT_EVIDENCED'],
+    },
+    {
+      schemaVersion: 'target_closure_action/v1',
+      target: 'linux-x64',
+      status: 'not_evidenced',
+      recommendedPath: 'hosted_ci',
+      commands: ['uv run binliquid local-product ci harvest --profile enterprise --json'],
+      runbook: 'docs/LINUX_CI_EVIDENCE_RUNBOOK.md',
+      blockingForCurrentClaim: false,
+      reasonCodes: ['TARGET_NOT_EVIDENCED'],
+    },
+  ];
+}
+
 export async function handshake(settings: PanelSettings): Promise<unknown> {
   if (isBridgePreviewMode()) {
     return previewHandshake(settings);
@@ -1259,6 +1313,33 @@ export async function fetchRcHandoffStatus(settings: PanelSettings): Promise<unk
     return previewRcHandoffStatus();
   }
   return callBridge('bridge_local_product_rc_handoff_status', {
+    config: toBridgeConfig(settings, 30000),
+  });
+}
+
+export async function fetchPlatformEvidenceHarvestStatus(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewPlatformEvidenceHarvestStatus();
+  }
+  return callBridge('bridge_local_product_harvest_status', {
+    config: toBridgeConfig(settings, 30000),
+  });
+}
+
+export async function fetchSourceInstallRcClaim(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewSourceInstallRcClaim();
+  }
+  return callBridge('bridge_local_product_source_install_claim', {
+    config: toBridgeConfig(settings, 30000),
+  });
+}
+
+export async function fetchTargetClosureActions(settings: PanelSettings): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return previewTargetClosureActions();
+  }
+  return callBridge('bridge_local_product_target_actions', {
     config: toBridgeConfig(settings, 30000),
   });
 }

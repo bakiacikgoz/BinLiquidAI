@@ -1,0 +1,21 @@
+{
+  "blockedTargets": [],
+  "claimSet": "source-local-install",
+  "claimedTargets": [
+    "windows-x64"
+  ],
+  "evidenceMaxAgeHours": 168,
+  "generatedAtUtc": "2026-07-07T00:00:00Z",
+  "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "noShipBlockers": [],
+  "notEvidencedTargets": [
+    "darwin-arm64",
+    "darwin-x64",
+    "linux-x64"
+  ],
+  "releaseNotesAllowedClaims": [
+    "windows-x64 source-local-install evidenced"
+  ],
+  "schemaVersion": "source_install_rc_claim/v1",
+  "status": "pass"
+}

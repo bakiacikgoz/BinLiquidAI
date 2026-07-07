@@ -12,6 +12,12 @@ from typing import Any
 
 from binliquid.local_product.cli import build_matrix_report, build_readiness_report
 from binliquid.local_product.evidence_reconciler import reconcile_platform_evidence
+from binliquid.local_product.harvest import HarvestRequest, harvest_platform_evidence
+from binliquid.local_product.source_install_claim import (
+    SourceInstallClaimPolicy,
+    build_source_install_rc_claim,
+)
+from binliquid.local_product.target_closure import build_target_closure_actions
 from binliquid.release.product_complete import build_product_complete_no_ship_register
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -323,8 +329,43 @@ def _local_product_readiness_summary(profile: str) -> dict[str, Any]:
 
 
 def _platform_evidence_store_for_closure(output_root: Path) -> Path | None:
+    harvest_store = output_root.parent / "local-product" / "harvest" / "store"
+    if harvest_store.exists():
+        return harvest_store
     artifact_store = output_root.parent / "local-product-platform-evidence" / "store"
     return artifact_store if artifact_store.exists() else None
+
+
+def _latest_harvest_report(output_root: Path) -> dict[str, Any]:
+    harvest_path = (
+        output_root.parent
+        / "local-product"
+        / "harvest"
+        / "platform_evidence_harvest_report.json"
+    )
+    if harvest_path.exists():
+        try:
+            return json.loads(harvest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {"schemaVersion": "local_product_harvest/v1", "status": "blocked"}
+    report = harvest_platform_evidence(
+        request=HarvestRequest(
+            outputRoot=str(output_root.parent / "local-product" / "harvest"),
+            evidenceStore=str(output_root.parent / "local-product" / "harvest" / "store"),
+        )
+    )
+    return report.model_dump(mode="json", by_alias=True)
+
+
+def _release_claim_accuracy(source_claim: dict[str, Any]) -> dict[str, Any]:
+    blockers = source_claim.get("noShipBlockers", [])
+    return {
+        "schemaVersion": "release_claim_accuracy/v1",
+        "status": "blocked" if blockers else "pass",
+        "claimSet": source_claim.get("claimSet", "source-local-install"),
+        "allowedClaims": source_claim.get("releaseNotesAllowedClaims", []),
+        "noShipBlockers": blockers,
+    }
 
 
 def run_product_complete_closure_gate(
@@ -359,6 +400,19 @@ def run_product_complete_closure_gate(
         if platform_evidence_store
         else reconcile_platform_evidence()
     )
+    platform_evidence_harvest = _latest_harvest_report(output_root)
+    source_install_claim = build_source_install_rc_claim(
+        policy=SourceInstallClaimPolicy(expectedHeadSha=_git(["rev-parse", "HEAD"])),
+        evidence_root=platform_evidence_store or Path(".binliquid/local-product/evidence"),
+    ).model_dump(mode="json", by_alias=True)
+    target_closure_actions = [
+        action.model_dump(mode="json", by_alias=True)
+        for action in build_target_closure_actions(
+            reconciliation=platform_evidence_reconciliation,
+            head_sha=_git(["rev-parse", "HEAD"]),
+        )
+    ]
+    release_claim_accuracy = _release_claim_accuracy(source_install_claim)
     no_ship_register = build_product_complete_no_ship_register()
     blockers = [
         f"PRODUCT_COMPLETE_CHECK_FAILED:{check['name']}"
@@ -369,6 +423,7 @@ def run_product_complete_closure_gate(
     blockers.extend(
         blocker.reason_code for blocker in platform_evidence_reconciliation.no_ship_blockers
     )
+    blockers.extend(source_install_claim.get("noShipBlockers", []))
     status = "pass" if not blockers else "fail"
     report = {
         "schemaVersion": "product-complete.closure/v1",
@@ -394,6 +449,10 @@ def run_product_complete_closure_gate(
             mode="json",
             by_alias=True,
         ),
+        "platformEvidenceHarvest": platform_evidence_harvest,
+        "sourceInstallRcClaim": source_install_claim,
+        "targetClosureActions": target_closure_actions,
+        "releaseClaimAccuracy": release_claim_accuracy,
     }
     _write_outputs(output_root, report, no_ship_register.model_dump(mode="json", by_alias=True))
     return report

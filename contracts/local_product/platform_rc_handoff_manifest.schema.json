@@ -54,6 +54,19 @@
       "title": "Reconciliationpath",
       "type": "string"
     },
+    "sourceInstallRcClaim": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sourceinstallrcclaim"
+    },
     "status": {
       "enum": [
         "ready",

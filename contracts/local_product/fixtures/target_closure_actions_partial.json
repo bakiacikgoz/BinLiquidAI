@@ -1,0 +1,19 @@
+[
+  {
+    "blockingForCurrentClaim": false,
+    "commands": [
+      "uv sync --python 3.11 --extra dev",
+      "uv run binliquid local-product evidence collect --target current --profile enterprise --json",
+      "uv run binliquid local-product evidence export --manifest artifacts/local-product/evidence/current/platform_evidence_manifest.json --bundle artifacts/local-product/evidence-bundles/darwin-arm64.zip --json"
+    ],
+    "generatedAtUtc": "2026-07-07T00:00:00Z",
+    "reasonCodes": [
+      "TARGET_NOT_EVIDENCED"
+    ],
+    "recommendedPath": "manual_local",
+    "runbook": "docs/MACOS_LOCAL_EVIDENCE_RUNBOOK.md",
+    "schemaVersion": "target_closure_action/v1",
+    "status": "not_evidenced",
+    "target": "darwin-arm64"
+  }
+]

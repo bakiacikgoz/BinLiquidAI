@@ -127,6 +127,19 @@ class ProductCompleteInput(StrictModel):
         default=False,
         alias="unboundedPlatformSupportClaim",
     )
+    source_install_target_without_evidence: bool = Field(
+        default=False,
+        alias="sourceInstallTargetWithoutEvidence",
+    )
+    source_install_target_stale: bool = Field(
+        default=False,
+        alias="sourceInstallTargetStale",
+    )
+    source_install_target_blocked: bool = Field(
+        default=False,
+        alias="sourceInstallTargetBlocked",
+    )
+    release_claim_overclaim: bool = Field(default=False, alias="releaseClaimOverclaim")
 
 
 def _blocker(
@@ -404,6 +417,37 @@ def build_product_complete_no_ship_register(
                 _blocker(
                     reason_code=reason_code,
                     claim_id="platform_evidence_reconciliation",
+                    resolution_path=resolution_path,
+                )
+            )
+    source_install_blockers = [
+        (
+            state.source_install_target_without_evidence,
+            "SOURCE_INSTALL_TARGET_WITHOUT_EVIDENCE",
+            "Remove the target from source install RC claims or import matching evidence.",
+        ),
+        (
+            state.source_install_target_stale,
+            "SOURCE_INSTALL_TARGET_STALE",
+            "Regenerate source install evidence on the release candidate commit.",
+        ),
+        (
+            state.source_install_target_blocked,
+            "SOURCE_INSTALL_TARGET_BLOCKED",
+            "Fix the blocked source install evidence verification result.",
+        ),
+        (
+            state.release_claim_overclaim,
+            "SOURCE_INSTALL_OVERCLAIM",
+            "Restrict release text to the source install targets allowed by evidence.",
+        ),
+    ]
+    for enabled, reason_code, resolution_path in source_install_blockers:
+        if enabled:
+            items.append(
+                _blocker(
+                    reason_code=reason_code,
+                    claim_id="source_install_rc_claim",
                     resolution_path=resolution_path,
                 )
             )

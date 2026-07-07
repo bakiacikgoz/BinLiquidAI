@@ -47,6 +47,7 @@ def verify_platform_evidence_bundle(
     *,
     bundle_path: Path,
     expected_commit: str | None = None,
+    expected_head_sha: str | None = None,
     expected_target: str | None = None,
     freshness_window_days: int = 30,
 ) -> PlatformEvidenceVerification:
@@ -77,6 +78,7 @@ def verify_platform_evidence_bundle(
     if not secret_scan_pass:
         reason_codes.append("PLATFORM_EVIDENCE_SECRET_LEAK")
     target_id = manifest.target.target_id if manifest else None
+    expected_commit = expected_commit or expected_head_sha
     commit_match = bool(
         manifest and (expected_commit is None or manifest.git_commit == expected_commit)
     )

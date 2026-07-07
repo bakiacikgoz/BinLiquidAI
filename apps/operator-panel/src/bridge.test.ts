@@ -10,8 +10,11 @@ import {
   handshake,
   fetchLocalProductMatrix,
   fetchLocalProductReadiness,
+  fetchPlatformEvidenceHarvestStatus,
   fetchPlatformEvidenceStatus,
   fetchRcHandoffStatus,
+  fetchSourceInstallRcClaim,
+  fetchTargetClosureActions,
   isBridgePreviewMode,
   isPreviewAllowedForEnv,
   listAssistantModels,
@@ -140,10 +143,13 @@ describe('bridge preview fallback', () => {
     expect((matrix as Record<string, unknown>).notEvidencedTargets).toContain('darwin-arm64');
   });
 
-  it('returns preview platform evidence and rc handoff payloads', async () => {
-    const [evidence, handoff] = await Promise.all([
+  it('returns preview platform evidence, harvest, source claim, actions and rc handoff payloads', async () => {
+    const [evidence, handoff, harvest, claim, actions] = await Promise.all([
       fetchPlatformEvidenceStatus({ ...DEFAULT_SETTINGS }),
       fetchRcHandoffStatus({ ...DEFAULT_SETTINGS }),
+      fetchPlatformEvidenceHarvestStatus({ ...DEFAULT_SETTINGS }),
+      fetchSourceInstallRcClaim({ ...DEFAULT_SETTINGS }),
+      fetchTargetClosureActions({ ...DEFAULT_SETTINGS }),
     ]);
 
     expect((evidence as Record<string, unknown>).artifactVersion).toBe(
@@ -152,6 +158,9 @@ describe('bridge preview fallback', () => {
     expect((evidence as Record<string, unknown>).evidencedTargets).toContain('windows-x64');
     expect((handoff as Record<string, unknown>).artifactVersion).toBe('local-product-rc-handoff/v1');
     expect((handoff as Record<string, unknown>).status).toBe('ready');
+    expect((harvest as Record<string, unknown>).schemaVersion).toBe('local_product_harvest/v1');
+    expect((claim as Record<string, unknown>).schemaVersion).toBe('source_install_rc_claim/v1');
+    expect(Array.isArray(actions)).toBe(true);
   });
 
   it('returns preview assistant cancel payloads without a bridge process', async () => {

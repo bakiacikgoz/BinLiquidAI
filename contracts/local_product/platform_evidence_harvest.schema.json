@@ -1,0 +1,281 @@
+{
+  "$defs": {
+    "HarvestTargetResult": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifactid"
+        },
+        "bundleSha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bundlesha256"
+        },
+        "evidenceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidenceid"
+        },
+        "reasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "sourceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sourceid"
+        },
+        "status": {
+          "enum": [
+            "evidenced",
+            "not_evidenced",
+            "stale",
+            "blocked",
+            "downloaded",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "status"
+      ],
+      "title": "HarvestTargetResult",
+      "type": "object"
+    },
+    "RemoteArtifactSource": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactPattern": {
+          "default": "local-product-evidence-*",
+          "title": "Artifactpattern",
+          "type": "string"
+        },
+        "authMode": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "gh_cli",
+            "token_env",
+            "none"
+          ],
+          "title": "Authmode",
+          "type": "string"
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Branch"
+        },
+        "headSha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headsha"
+        },
+        "repo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repo"
+        },
+        "sourceId": {
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "sourceType": {
+          "enum": [
+            "local_current_host",
+            "github_actions",
+            "self_hosted_runner",
+            "manual_bundle"
+          ],
+          "title": "Sourcetype",
+          "type": "string"
+        },
+        "workflow": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workflow"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceType"
+      ],
+      "title": "RemoteArtifactSource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifactsDiscovered": {
+      "default": 0,
+      "title": "Artifactsdiscovered",
+      "type": "integer"
+    },
+    "artifactsDownloaded": {
+      "default": 0,
+      "title": "Artifactsdownloaded",
+      "type": "integer"
+    },
+    "artifactsImported": {
+      "default": 0,
+      "title": "Artifactsimported",
+      "type": "integer"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "branch": {
+      "title": "Branch",
+      "type": "string"
+    },
+    "generatedAtUtc": {
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "headSha": {
+      "title": "Headsha",
+      "type": "string"
+    },
+    "outputRoot": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Outputroot"
+    },
+    "reconciliation": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reconciliation"
+    },
+    "schemaVersion": {
+      "const": "local_product_harvest/v1",
+      "default": "local_product_harvest/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/RemoteArtifactSource"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked",
+        "fail"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "targetResults": {
+      "items": {
+        "$ref": "#/$defs/HarvestTargetResult"
+      },
+      "title": "Targetresults",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "headSha",
+    "branch"
+  ],
+  "title": "PlatformEvidenceHarvestReport",
+  "type": "object"
+}

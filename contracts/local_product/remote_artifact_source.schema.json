@@ -1,0 +1,89 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifactPattern": {
+      "default": "local-product-evidence-*",
+      "title": "Artifactpattern",
+      "type": "string"
+    },
+    "authMode": {
+      "default": "auto",
+      "enum": [
+        "auto",
+        "gh_cli",
+        "token_env",
+        "none"
+      ],
+      "title": "Authmode",
+      "type": "string"
+    },
+    "branch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Branch"
+    },
+    "headSha": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headsha"
+    },
+    "repo": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Repo"
+    },
+    "sourceId": {
+      "title": "Sourceid",
+      "type": "string"
+    },
+    "sourceType": {
+      "enum": [
+        "local_current_host",
+        "github_actions",
+        "self_hosted_runner",
+        "manual_bundle"
+      ],
+      "title": "Sourcetype",
+      "type": "string"
+    },
+    "workflow": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workflow"
+    }
+  },
+  "required": [
+    "sourceId",
+    "sourceType"
+  ],
+  "title": "RemoteArtifactSource",
+  "type": "object"
+}

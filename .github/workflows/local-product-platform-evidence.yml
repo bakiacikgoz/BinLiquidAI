@@ -47,7 +47,7 @@ jobs:
             --json
       - uses: actions/upload-artifact@v4
         with:
-          name: local-product-platform-evidence-${{ matrix.target }}
+          name: local-product-evidence-${{ matrix.target }}-${{ github.sha }}
           path: |
             artifacts/local-product/evidence/${{ matrix.target }}/
             artifacts/local-product/evidence-bundles/${{ matrix.target }}.zip
@@ -67,7 +67,7 @@ jobs:
         run: uv sync --python 3.11 --extra dev
       - uses: actions/download-artifact@v4
         with:
-          pattern: local-product-platform-evidence-*
+          pattern: local-product-evidence-*
           path: artifacts/local-product/downloaded-evidence
           merge-multiple: true
       - name: Import, reconcile, and build handoff

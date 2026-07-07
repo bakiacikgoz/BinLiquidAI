@@ -205,6 +205,12 @@ from binliquid.governance.runtime import (
     build_governance_runtime,
     governance_startup_abort,
 )
+from binliquid.local_product.artifact_sources import (
+    ArtifactDiscoveryRequest,
+    RemoteArtifactSource,
+    current_git_branch,
+    current_git_head,
+)
 from binliquid.local_product.cli import (
     build_doctor_report as build_local_product_doctor_report,
 )
@@ -222,10 +228,17 @@ from binliquid.local_product.evidence_importer import (
 )
 from binliquid.local_product.evidence_reconciler import reconcile_platform_evidence
 from binliquid.local_product.evidence_verifier import verify_platform_evidence_bundle
+from binliquid.local_product.github_actions import GitHubActionsArtifactAdapter
+from binliquid.local_product.harvest import HarvestRequest, harvest_platform_evidence
 from binliquid.local_product.rc_handoff import (
     build_local_product_rc_handoff,
     verify_local_product_rc_handoff,
 )
+from binliquid.local_product.source_install_claim import (
+    SourceInstallClaimPolicy,
+    build_source_install_rc_claim,
+)
+from binliquid.local_product.target_closure import build_target_closure_actions
 from binliquid.memory.authority import build_memory_authority, proposal_from_cli
 from binliquid.memory.evaluation import run_memory_retrieval_eval
 from binliquid.memory.manager import MemoryManager
@@ -362,6 +375,9 @@ assistant_task_app = typer.Typer(help="Assistant governed agent tasking commands
 local_product_app = typer.Typer(help="Cross-platform local product readiness commands")
 local_product_evidence_app = typer.Typer(help="Multi-host platform evidence commands")
 local_product_rc_handoff_app = typer.Typer(help="Local product RC handoff commands")
+local_product_ci_app = typer.Typer(help="Remote platform evidence CI harvest commands")
+local_product_source_install_app = typer.Typer(help="Source install RC claim commands")
+local_product_target_app = typer.Typer(help="Local product target closure commands")
 ASSISTANT_KNOWLEDGE_OUTPUT_ROOT_OPTION = typer.Option(
     "--output-root",
     help="Knowledge artifact output root",
@@ -489,8 +505,11 @@ app.add_typer(assistant_app, name="assistant")
 assistant_app.add_typer(assistant_knowledge_app, name="knowledge")
 assistant_app.add_typer(assistant_task_app, name="task")
 app.add_typer(local_product_app, name="local-product")
+local_product_app.add_typer(local_product_ci_app, name="ci")
 local_product_app.add_typer(local_product_evidence_app, name="evidence")
 local_product_app.add_typer(local_product_rc_handoff_app, name="rc-handoff")
+local_product_app.add_typer(local_product_source_install_app, name="source-install")
+local_product_app.add_typer(local_product_target_app, name="target")
 app.add_typer(setup_app, name="setup")
 app.add_typer(product_app, name="product")
 product_app.add_typer(product_demo_app, name="demo")
@@ -1850,6 +1869,90 @@ def local_product_matrix(
     )
 
 
+@local_product_ci_app.command("discover")
+def local_product_ci_discover(
+    repo: str = typer.Option("bakiacikgoz/BinLiquidAI", "--repo", help="GitHub repo slug"),
+    branch: str = typer.Option(None, "--branch", help="Branch/ref to inspect"),
+    workflow: str | None = typer.Option(
+        "local-product-platform-evidence.yml",
+        "--workflow",
+        help="Workflow name or path",
+    ),
+    head_sha: str | None = typer.Option(None, "--head-sha", help="Expected commit SHA"),
+    artifact_pattern: str = typer.Option(
+        "local-product-evidence-*",
+        "--artifact-pattern",
+        help="Safe artifact name glob",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Discover remote platform evidence artifacts without importing them."""
+    resolved_branch = branch or current_git_branch()
+    resolved_head = head_sha or current_git_head()
+    source = RemoteArtifactSource(
+        sourceId="github-actions",
+        sourceType="github_actions",
+        repo=repo,
+        workflow=workflow,
+        branch=resolved_branch,
+        headSha=resolved_head,
+        artifactPattern=artifact_pattern,
+        authMode="auto",
+    )
+    payload = GitHubActionsArtifactAdapter().discover(
+        ArtifactDiscoveryRequest(
+            source=source,
+            branch=resolved_branch,
+            headSha=resolved_head,
+            workflow=workflow,
+        )
+    ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+
+
+@local_product_ci_app.command("harvest")
+def local_product_ci_harvest(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    repo: str = typer.Option("bakiacikgoz/BinLiquidAI", "--repo", help="GitHub repo slug"),
+    branch: str | None = typer.Option(None, "--branch", help="Branch/ref to inspect"),
+    workflow: str | None = typer.Option(
+        "local-product-platform-evidence.yml",
+        "--workflow",
+        help="Workflow name or path",
+    ),
+    head_sha: str | None = typer.Option(None, "--head-sha", help="Expected commit SHA"),
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", help="Harvest output root"),
+    ] = Path("artifacts/local-product/harvest"),
+    evidence_store: Annotated[
+        Path,
+        typer.Option("--evidence-store", help="Evidence store root"),
+    ] = DEFAULT_EVIDENCE_STORE,
+    manual_bundle: Annotated[
+        Path | None,
+        typer.Option("--manual-bundle", help="Already-downloaded evidence bundle"),
+    ] = None,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Harvest verified platform evidence from CI or a manual bundle."""
+    payload = harvest_platform_evidence(
+        request=HarvestRequest(
+            profile=profile,
+            repo=repo,
+            branch=branch or current_git_branch(),
+            workflow=workflow,
+            headSha=head_sha or current_git_head(),
+            outputRoot=str(output_root),
+            evidenceStore=str(evidence_store),
+            manualBundle=str(manual_bundle) if manual_bundle else None,
+        )
+    ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("status") in {"blocked", "fail"}:
+        raise typer.Exit(code=1)
+
+
 @local_product_evidence_app.command("collect")
 def local_product_evidence_collect(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
@@ -1890,6 +1993,7 @@ def local_product_evidence_verify(
     bundle: Annotated[Path, typer.Option("--bundle", help="Evidence bundle path")],
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     expected_commit: str | None = typer.Option(None, "--expected-commit"),
+    expected_head: str | None = typer.Option(None, "--expected-head"),
     expected_target: str | None = typer.Option(None, "--expected-target"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
@@ -1898,6 +2002,7 @@ def local_product_evidence_verify(
     payload = verify_platform_evidence_bundle(
         bundle_path=bundle,
         expected_commit=expected_commit,
+        expected_head_sha=expected_head,
         expected_target=expected_target,
     ).model_dump(mode="json", by_alias=True)
     _emit_payload(payload, json_output=json_output)
@@ -1970,6 +2075,69 @@ def local_product_evidence_status(
         reconcile_platform_evidence(store_root=store_root).model_dump(mode="json", by_alias=True),
         json_output=json_output,
     )
+
+
+@local_product_source_install_app.command("claim")
+def local_product_source_install_claim(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    expected_head: str | None = typer.Option(None, "--expected-head", help="Expected HEAD SHA"),
+    evidence_root: Annotated[
+        Path,
+        typer.Option("--evidence-root", help="Evidence store root"),
+    ] = DEFAULT_EVIDENCE_STORE,
+    requested_target: Annotated[
+        list[str] | None,
+        typer.Option("--requested-target", help="Target to require in the claim set"),
+    ] = None,
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", help="Claim output root"),
+    ] = Path("artifacts/local-product/source-install-rc"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Build the source-local-install RC claim set from verified evidence."""
+    del profile
+    output_root.mkdir(parents=True, exist_ok=True)
+    claim = build_source_install_rc_claim(
+        policy=SourceInstallClaimPolicy(
+            expectedHeadSha=expected_head or current_git_head(),
+            requestedTargets=requested_target or [],
+        ),
+        evidence_root=evidence_root,
+    )
+    payload = claim.model_dump(mode="json", by_alias=True)
+    (output_root / "source_install_rc_claim.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("status") == "blocked":
+        raise typer.Exit(code=1)
+
+
+@local_product_target_app.command("actions")
+def local_product_target_actions(
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    evidence_root: Annotated[
+        Path,
+        typer.Option("--evidence-root", help="Evidence store root"),
+    ] = DEFAULT_EVIDENCE_STORE,
+    output_root: Annotated[
+        Path,
+        typer.Option("--output-root", help="Target actions output root"),
+    ] = Path("artifacts/local-product/target-closure"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Generate operator-safe next actions for missing or stale targets."""
+    del profile
+    output_root.mkdir(parents=True, exist_ok=True)
+    actions = build_target_closure_actions(evidence_root=evidence_root)
+    payload = [action.model_dump(mode="json", by_alias=True) for action in actions]
+    (output_root / "target_closure_actions.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    _emit_payload(payload, json_output=json_output)
 
 
 @local_product_rc_handoff_app.command("build")

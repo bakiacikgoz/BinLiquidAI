@@ -1,0 +1,106 @@
+{
+  "$defs": {
+    "SourceInstallBlockedTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "reasonCode",
+        "message"
+      ],
+      "title": "SourceInstallBlockedTarget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockedTargets": {
+      "items": {
+        "$ref": "#/$defs/SourceInstallBlockedTarget"
+      },
+      "title": "Blockedtargets",
+      "type": "array"
+    },
+    "claimSet": {
+      "const": "source-local-install",
+      "default": "source-local-install",
+      "title": "Claimset",
+      "type": "string"
+    },
+    "claimedTargets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Claimedtargets",
+      "type": "array"
+    },
+    "evidenceMaxAgeHours": {
+      "title": "Evidencemaxagehours",
+      "type": "integer"
+    },
+    "generatedAtUtc": {
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "headSha": {
+      "title": "Headsha",
+      "type": "string"
+    },
+    "noShipBlockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Noshipblockers",
+      "type": "array"
+    },
+    "notEvidencedTargets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notevidencedtargets",
+      "type": "array"
+    },
+    "releaseNotesAllowedClaims": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Releasenotesallowedclaims",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "source_install_rc_claim/v1",
+      "default": "source_install_rc_claim/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "conditional",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "headSha",
+    "evidenceMaxAgeHours"
+  ],
+  "title": "SourceInstallRcClaim",
+  "type": "object"
+}

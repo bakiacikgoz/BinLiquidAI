@@ -20,8 +20,11 @@ import {
   fetchKeysStatus,
   fetchLocalProductReadiness,
   fetchPlatformEvidenceStatus,
+  fetchPlatformEvidenceHarvestStatus,
   fetchRcHandoffStatus,
+  fetchSourceInstallRcClaim,
   fetchSecurityBaseline,
+  fetchTargetClosureActions,
   generateSecurityReview,
   getRunReplay,
   getRunStatus,
@@ -142,7 +145,10 @@ import { RcGateEvidenceView } from './rc-gate-evidence/RcGateEvidenceView';
 import { ReleaseDecisionView } from './release-decision/ReleaseDecisionView';
 import { LocalProductReadinessView } from './local-product/LocalProductReadinessView';
 import { PlatformEvidenceView } from './local-product/PlatformEvidenceView';
+import { PlatformEvidenceHarvestView } from './local-product/PlatformEvidenceHarvestView';
 import { RcHandoffView } from './local-product/RcHandoffView';
+import { SourceInstallRcClaimView } from './local-product/SourceInstallRcClaimView';
+import { TargetClosureActionsView } from './local-product/TargetClosureActionsView';
 import { MemoryGovernanceView } from './memory/MemoryGovernanceView';
 import { MemoryRuntimeView } from './memory-runtime/MemoryRuntimeView';
 import { MemoryRuntimePolicyView } from './memory-runtime/MemoryRuntimePolicyView';
@@ -393,6 +399,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [localProductReadiness, setLocalProductReadiness] = useState<unknown>(null);
   const [platformEvidenceStatus, setPlatformEvidenceStatus] = useState<unknown>(null);
   const [rcHandoffStatus, setRcHandoffStatus] = useState<unknown>(null);
+  const [platformEvidenceHarvestStatus, setPlatformEvidenceHarvestStatus] = useState<unknown>(null);
+  const [sourceInstallRcClaim, setSourceInstallRcClaim] = useState<unknown>(null);
+  const [targetClosureActions, setTargetClosureActions] = useState<unknown>(null);
 
   const [approvalsData, setApprovalsData] = useState<unknown>({ pending: [] });
   const [selectedApprovalId, setSelectedApprovalId] = useState('');
@@ -825,11 +834,20 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       return;
     }
     let cancelled = false;
-    void Promise.all([fetchPlatformEvidenceStatus(settings), fetchRcHandoffStatus(settings)])
-      .then(([evidence, handoff]) => {
+    void Promise.all([
+      fetchPlatformEvidenceStatus(settings),
+      fetchRcHandoffStatus(settings),
+      fetchPlatformEvidenceHarvestStatus(settings),
+      fetchSourceInstallRcClaim(settings),
+      fetchTargetClosureActions(settings),
+    ])
+      .then(([evidence, handoff, harvest, claim, actions]) => {
         if (!cancelled) {
           setPlatformEvidenceStatus(evidence);
           setRcHandoffStatus(handoff);
+          setPlatformEvidenceHarvestStatus(harvest);
+          setSourceInstallRcClaim(claim);
+          setTargetClosureActions(actions);
         }
       })
       .catch((error) => {
@@ -852,6 +870,20 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             blockedClaims: [parsed?.code ?? 'BRIDGE_RC_HANDOFF_FAILED'],
             operatorNextSteps: [parsed?.message ?? 'RC handoff bridge failed.'],
           });
+          setPlatformEvidenceHarvestStatus({
+            schemaVersion: 'local_product_harvest/v1',
+            status: 'blocked',
+            blockers: [parsed?.code ?? 'BRIDGE_HARVEST_FAILED'],
+            targetResults: [],
+          });
+          setSourceInstallRcClaim({
+            schemaVersion: 'source_install_rc_claim/v1',
+            status: 'blocked',
+            claimedTargets: [],
+            notEvidencedTargets: [],
+            blockedTargets: [{ target: 'unknown', reasonCode: parsed?.code ?? 'BRIDGE_CLAIM_FAILED' }],
+          });
+          setTargetClosureActions([]);
         }
       });
     return () => {
@@ -2875,8 +2907,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'local-product-platform-evidence' ? (
           <>
+            <PlatformEvidenceHarvestView report={platformEvidenceHarvestStatus ?? {}} />
+            <SourceInstallRcClaimView claim={sourceInstallRcClaim ?? {}} />
             <PlatformEvidenceView report={platformEvidenceStatus ?? {}} />
             <RcHandoffView manifest={rcHandoffStatus ?? {}} />
+            <TargetClosureActionsView actions={targetClosureActions ?? []} />
           </>
         ) : null}
 

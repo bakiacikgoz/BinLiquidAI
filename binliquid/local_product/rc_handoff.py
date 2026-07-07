@@ -14,6 +14,10 @@ from binliquid.local_product.evidence_reconciler import (
     current_git_commit,
     reconcile_platform_evidence,
 )
+from binliquid.local_product.source_install_claim import (
+    SourceInstallClaimPolicy,
+    build_source_install_rc_claim,
+)
 
 
 def _git_branch() -> str:
@@ -79,6 +83,16 @@ def build_local_product_rc_handoff(
         status = "ready"
     else:
         status = "conditional"
+    source_claim = build_source_install_rc_claim(
+        reconciliation=reconciliation,
+        policy=SourceInstallClaimPolicy(expectedHeadSha=current_git_commit()),
+        evidence_root=evidence_root,
+    ).model_dump(mode="json", by_alias=True)
+    source_claim_path = output_root / "source_install_rc_claim.json"
+    source_claim_path.write_text(
+        json.dumps(source_claim, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     manifest = PlatformRCHandoffManifest(
         status=status,
         gitCommit=current_git_commit(),
@@ -91,6 +105,7 @@ def build_local_product_rc_handoff(
             for target in reconciliation.evidenced_targets
         ],
         blockedClaims=[blocker.reason_code for blocker in reconciliation.no_ship_blockers],
+        sourceInstallRcClaim=source_claim,
         operatorNextSteps=[
             "Collect and import evidence for not-evidenced targets before claiming support.",
             "Run product-complete closure before release-candidate review.",
@@ -111,6 +126,7 @@ def build_local_product_rc_handoff(
         "LOCAL_PRODUCT_RC_HANDOFF.md": sha256_file(markdown_path),
         "PRODUCT_COMPLETE_PR_BODY.md": sha256_file(pr_body_path),
         "platform_evidence_reconciliation.json": sha256_file(reconciliation_path),
+        "source_install_rc_claim.json": sha256_file(source_claim_path),
     }
     manifest = manifest.model_copy(update={"hash_ledger": hash_ledger})
     manifest_path.write_text(
