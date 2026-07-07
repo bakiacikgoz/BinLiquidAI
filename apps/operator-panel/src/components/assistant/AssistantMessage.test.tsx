@@ -1,5 +1,5 @@
 import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { AssistantTurn } from '../../assistant/assistantTypes';
 import { renderOperatorPanel } from '../../test/render';
@@ -36,7 +36,7 @@ function turnWithText(userText: string, assistantText: string): AssistantTurn {
   };
 }
 
-function renderMessage(turn: AssistantTurn) {
+function renderMessage(turn: AssistantTurn, onSubmitTask = noop) {
   return renderOperatorPanel(
     <AssistantMessage
       turn={turn}
@@ -49,6 +49,7 @@ function renderMessage(turn: AssistantTurn) {
       onReject={noop}
       onExecute={noop}
       onRegenerate={noop}
+      onSubmitTask={onSubmitTask}
     />,
   );
 }
@@ -119,5 +120,66 @@ describe('AssistantMessage', () => {
     expect(screen.queryByText('Approval required')).not.toBeInTheDocument();
     expect(screen.queryByText('Status')).not.toBeInTheDocument();
     expect(screen.queryByText('Streaming response')).not.toBeInTheDocument();
+  });
+
+  it('renders governed task proposal and submits with the plan hash', async () => {
+    const onSubmitTask = vi.fn();
+    const turn = turnWithText('Plan a task.', '');
+    turn.assistantMessage.taskPlan = {
+      schemaVersion: 'assistant-tasking.plan/v1',
+      proposalId: 'astp-card',
+      planHash: 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944',
+      status: 'planned',
+      intentKind: 'plan_agent_task',
+      selectedAgent: null,
+      candidateAgents: [],
+      taskSummary: 'Read external ticket queue',
+      riskClass: 'read_only',
+      policyPreview: {
+        decision: 'allow',
+        riskClass: 'read_only',
+        approvalRequired: false,
+        safeToSubmit: true,
+        reasonCode: 'ASSISTANT_TASK_READ_ONLY_ALLOWED',
+        blockedReasons: [],
+      },
+      approvalRequired: false,
+      submitMode: 'proposal_first',
+      idempotencyKey: 'assistant-task:astp-card',
+      evidenceExpectation: { mode: 'hash_only_redacted', expectedRefs: [], rawContentPersisted: false },
+      safeToSubmit: true,
+      blockedReasons: [],
+      sourceRefs: ['docs/ASSISTANT_GOVERNED_TASKING.md'],
+      createdAtUtc: '2026-03-08T09:00:00Z',
+    };
+    turn.assistantMessage.taskSubmission = {
+      schemaVersion: 'assistant-tasking.submission/v1',
+      proposalId: 'astp-card',
+      planHash: turn.assistantMessage.taskPlan.planHash,
+      status: 'accepted',
+      policyDecision: 'allow',
+      reasonCode: 'ASSISTANT_TASK_READ_ONLY_ALLOWED',
+      runId: 'agt-card',
+      approvalId: null,
+      evidenceRef: null,
+      replayStatus: null,
+      idempotencyStatus: 'created',
+      blockedReasons: [],
+      nextActions: ['run.status'],
+      generatedAtUtc: '2026-03-08T09:00:01Z',
+    };
+
+    const { user } = renderMessage(turn, onSubmitTask);
+
+    expect(screen.getByText('Governed task proposal')).toBeInTheDocument();
+    expect(screen.getByText('Read external ticket queue')).toBeInTheDocument();
+    expect(screen.getByText('Task submission')).toBeInTheDocument();
+    expect(screen.getByText('agt-card')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Submit with plan hash' }));
+
+    const taskPlan = turn.assistantMessage.taskPlan;
+    expect(taskPlan).not.toBeNull();
+    expect(onSubmitTask).toHaveBeenCalledWith('astp-card', taskPlan?.planHash);
   });
 });

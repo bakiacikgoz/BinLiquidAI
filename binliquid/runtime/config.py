@@ -1004,7 +1004,9 @@ def _load_profile_payload(
         config_dir = root_dir / "config"
     elif config_root:
         configured = Path(config_root)
-        config_dir = configured if (configured / f"{profile}.toml").exists() else configured / "config"
+        config_dir = (
+            configured if (configured / f"{profile}.toml").exists() else configured / "config"
+        )
     else:
         config_dir = Path(__file__).resolve().parents[2] / "config"
     config_path = config_dir / f"{profile}.toml"

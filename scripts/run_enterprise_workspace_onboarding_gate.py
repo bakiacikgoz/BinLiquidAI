@@ -72,11 +72,22 @@ def _resolve(command: list[str]) -> list[str]:
     return command
 
 
+def _command_cwd(command: list[str]) -> Path:
+    if command:
+        local_bin = REPO_ROOT / "apps" / "operator-panel" / "node_modules" / ".bin"
+        try:
+            if Path(command[0]).resolve().parent == local_bin.resolve():
+                return REPO_ROOT / "apps" / "operator-panel"
+        except OSError:
+            pass
+    return REPO_ROOT
+
+
 def _run(command: list[str]) -> dict[str, Any]:
     try:
         result = subprocess.run(
             _resolve(command),
-            cwd=REPO_ROOT,
+            cwd=_command_cwd(command),
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -92,6 +103,29 @@ def _run(command: list[str]) -> dict[str, Any]:
         "status": "pass" if result.returncode == 0 else "fail",
         "tail": result.stdout.splitlines()[-25:],
     }
+
+
+def _node_bin(name: str) -> str | None:
+    suffix = ".cmd" if os.name == "nt" else ""
+    candidate = REPO_ROOT / "apps" / "operator-panel" / "node_modules" / ".bin" / f"{name}{suffix}"
+    return str(candidate) if candidate.exists() else None
+
+
+def _operator_panel_exec(name: str, args: list[str]) -> list[str]:
+    local = _node_bin(name)
+    if local is not None:
+        return [local, *args]
+    return ["corepack", "pnpm", "--dir", "apps/operator-panel", "exec", name, *args]
+
+
+def _operator_panel_script(script: str) -> list[str]:
+    if script == "test":
+        return _operator_panel_exec("vitest", ["run"])
+    if script == "lint":
+        local = _node_bin("eslint")
+        if local is not None:
+            return [local, "."]
+    return ["corepack", "pnpm", "--dir", "apps/operator-panel", script]
 
 
 def _json(path: Path) -> dict[str, Any]:
@@ -194,31 +228,26 @@ def run_gate(
     if not skip_ui:
         command_plan.extend(
             [
-                [
-                    "corepack",
-                    "pnpm",
-                    "--dir",
-                    "apps/operator-panel",
-                    "exec",
+                _operator_panel_exec(
                     "vitest",
-                    "run",
-                    "src/enterprise-workspace/EnterpriseWorkspaceView.test.tsx",
-                    "src/enterprise-workspace/AgentEnrollmentView.test.tsx",
-                    "src/routeRegistry.test.ts",
-                ],
-                ["corepack", "pnpm", "--dir", "apps/operator-panel", "lint"],
-                ["corepack", "pnpm", "--dir", "apps/operator-panel", "build"],
-                [
-                    "corepack",
-                    "pnpm",
-                    "--dir",
-                    "apps/operator-panel",
-                    "exec",
+                    [
+                        "run",
+                        "src/enterprise-workspace/EnterpriseWorkspaceView.test.tsx",
+                        "src/enterprise-workspace/AgentEnrollmentView.test.tsx",
+                        "src/routeRegistry.test.ts",
+                    ],
+                ),
+                _operator_panel_script("lint"),
+                _operator_panel_exec("tsc", ["-b"]),
+                _operator_panel_exec("vite", ["build"]),
+                _operator_panel_exec(
                     "playwright",
-                    "test",
-                    "e2e/enterprise-workspace.spec.ts",
-                    "--pass-with-no-tests",
-                ],
+                    [
+                        "test",
+                        "e2e/enterprise-workspace.spec.ts",
+                        "--pass-with-no-tests",
+                    ],
+                ),
             ]
         )
 

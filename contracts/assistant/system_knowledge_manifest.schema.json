@@ -1,0 +1,149 @@
+{
+  "$defs": {
+    "KnowledgeDomain": {
+      "enum": [
+        "control_plane",
+        "assistant",
+        "memory",
+        "provider",
+        "computer_use",
+        "deployment",
+        "security",
+        "ui"
+      ],
+      "title": "KnowledgeDomain",
+      "type": "string"
+    },
+    "KnowledgeSource": {
+      "additionalProperties": false,
+      "properties": {
+        "domain": {
+          "$ref": "#/$defs/KnowledgeDomain"
+        },
+        "hashSha256": {
+          "title": "Hashsha256",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/KnowledgeSourceKind"
+        },
+        "lastModified": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lastmodified"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "sourceId": {
+          "title": "Sourceid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "path",
+        "kind",
+        "domain",
+        "hashSha256"
+      ],
+      "title": "KnowledgeSource",
+      "type": "object"
+    },
+    "KnowledgeSourceKind": {
+      "enum": [
+        "markdown",
+        "json_schema",
+        "yaml_example",
+        "makefile",
+        "ts_source",
+        "py_cli"
+      ],
+      "title": "KnowledgeSourceKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "chunkCount": {
+      "minimum": 0,
+      "title": "Chunkcount",
+      "type": "integer"
+    },
+    "generatedAtUtc": {
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "manifestHash": {
+      "title": "Manifesthash",
+      "type": "string"
+    },
+    "profile": {
+      "title": "Profile",
+      "type": "string"
+    },
+    "repoSha": {
+      "title": "Reposha",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "assistant.system-knowledge-manifest/v1",
+      "default": "assistant.system-knowledge-manifest/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "sourceCount": {
+      "minimum": 0,
+      "title": "Sourcecount",
+      "type": "integer"
+    },
+    "sources": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/KnowledgeSource"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile",
+    "status",
+    "repoSha",
+    "sourceCount",
+    "chunkCount",
+    "manifestHash",
+    "generatedAtUtc"
+  ],
+  "title": "SystemKnowledgeManifest",
+  "type": "object"
+}

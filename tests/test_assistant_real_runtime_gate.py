@@ -8,7 +8,13 @@ from scripts import run_assistant_real_runtime_gate as gate
 def test_assistant_gate_is_conditional_with_setup_required_diagnostic(
     tmp_path: Path, monkeypatch
 ) -> None:
-    def fake_run(command: list[str], *, name: str, required: bool = True) -> dict[str, object]:
+    def fake_run(
+        command: list[str],
+        *,
+        name: str,
+        required: bool = True,
+        cwd: Path = gate.REPO_ROOT,
+    ) -> dict[str, object]:
         if name == "assistant_doctor":
             return {
                 "name": name,
@@ -47,7 +53,13 @@ def test_assistant_gate_is_conditional_with_setup_required_diagnostic(
 
 
 def test_assistant_gate_blocks_preview_fallback(tmp_path: Path, monkeypatch) -> None:
-    def fake_run(command: list[str], *, name: str, required: bool = True) -> dict[str, object]:
+    def fake_run(
+        command: list[str],
+        *,
+        name: str,
+        required: bool = True,
+        cwd: Path = gate.REPO_ROOT,
+    ) -> dict[str, object]:
         if name == "assistant_doctor":
             return {
                 "name": name,

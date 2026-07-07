@@ -8,6 +8,7 @@ import { Card } from '../primitives/Card';
 import { Icon } from '../primitives/Icon';
 import { StatusDot } from '../primitives/StatusDot';
 import type { PendingApprovalSummary, SystemHealthSummary, SystemHealthStatus } from '../shell/RightRail';
+import { AssistantKnowledgeSourcesCard } from './AssistantKnowledgeSourcesCard';
 
 export type AssistantRuntimeSummary = {
   selectedProvider: string;
@@ -336,6 +337,8 @@ export function AssistantRightRail({
               </dl>
             </div>
           </RailSection>
+
+          <AssistantKnowledgeSourcesCard sources={activeTurn?.assistantMessage.knowledgeSources ?? []} />
 
           <RailSection title={text.relatedArtifact}>
             {displayedArtifacts.length > 0 ? (

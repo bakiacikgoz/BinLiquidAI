@@ -12,6 +12,70 @@ class ProductCompleteInput(StrictModel):
         alias="assistantPreviewInProductMode",
     )
     fake_model_discovery: bool = Field(default=False, alias="fakeModelDiscovery")
+    assistant_system_knowledge_missing: bool = Field(
+        default=False,
+        alias="assistantSystemKnowledgeMissing",
+    )
+    assistant_system_knowledge_stale: bool = Field(
+        default=False,
+        alias="assistantSystemKnowledgeStale",
+    )
+    assistant_uncited_system_claim: bool = Field(
+        default=False,
+        alias="assistantUncitedSystemClaim",
+    )
+    assistant_generic_platform_answer: bool = Field(
+        default=False,
+        alias="assistantGenericPlatformAnswer",
+    )
+    assistant_knowledge_secret_leak: bool = Field(
+        default=False,
+        alias="assistantKnowledgeSecretLeak",
+    )
+    assistant_task_executed_without_proposal: bool = Field(
+        default=False,
+        alias="assistantTaskExecutedWithoutProposal",
+    )
+    assistant_task_submit_without_operator_confirmation: bool = Field(
+        default=False,
+        alias="assistantTaskSubmitWithoutOperatorConfirmation",
+    )
+    assistant_task_write_bypassed_approval: bool = Field(
+        default=False,
+        alias="assistantTaskWriteBypassedApproval",
+    )
+    assistant_task_destructive_allowed: bool = Field(
+        default=False,
+        alias="assistantTaskDestructiveAllowed",
+    )
+    assistant_task_unenrolled_agent_accepted: bool = Field(
+        default=False,
+        alias="assistantTaskUnenrolledAgentAccepted",
+    )
+    assistant_task_unknown_agent_accepted: bool = Field(
+        default=False,
+        alias="assistantTaskUnknownAgentAccepted",
+    )
+    assistant_task_cross_workspace_allowed: bool = Field(
+        default=False,
+        alias="assistantTaskCrossWorkspaceAllowed",
+    )
+    assistant_task_raw_secret_leak: bool = Field(
+        default=False,
+        alias="assistantTaskRawSecretLeak",
+    )
+    assistant_task_prompt_injection_executed: bool = Field(
+        default=False,
+        alias="assistantTaskPromptInjectionExecuted",
+    )
+    assistant_task_idempotency_conflict_accepted: bool = Field(
+        default=False,
+        alias="assistantTaskIdempotencyConflictAccepted",
+    )
+    assistant_task_sourceless_system_claim: bool = Field(
+        default=False,
+        alias="assistantTaskSourcelessSystemClaim",
+    )
     inert_primary_action: bool = Field(default=False, alias="inertPrimaryAction")
     enterprise_workspace_setup_bypass: bool = Field(
         default=False,
@@ -82,6 +146,112 @@ def build_product_complete_no_ship_register(
                 ),
             )
         )
+    if state.assistant_system_knowledge_missing:
+        items.append(
+            _blocker(
+                reason_code="ASSISTANT_SYSTEM_KNOWLEDGE_MISSING",
+                claim_id="assistant_system_knowledge",
+                resolution_path="Build and verify the local assistant system knowledge index.",
+            )
+        )
+    if state.assistant_system_knowledge_stale:
+        items.append(
+            _blocker(
+                reason_code="ASSISTANT_SYSTEM_KNOWLEDGE_STALE",
+                claim_id="assistant_system_knowledge",
+                resolution_path="Rebuild the knowledge manifest after source changes.",
+            )
+        )
+    if state.assistant_uncited_system_claim:
+        items.append(
+            _blocker(
+                reason_code="ASSISTANT_UNCITED_SYSTEM_CLAIM",
+                claim_id="assistant_system_knowledge",
+                resolution_path="Require local source citations for AegisOS platform claims.",
+            )
+        )
+    if state.assistant_generic_platform_answer:
+        items.append(
+            _blocker(
+                reason_code="ASSISTANT_GENERIC_PLATFORM_ANSWER",
+                claim_id="assistant_system_knowledge",
+                resolution_path="Block generic platform answers and ground usage in local sources.",
+            )
+        )
+    if state.assistant_knowledge_secret_leak:
+        items.append(
+            _blocker(
+                reason_code="ASSISTANT_KNOWLEDGE_SECRET_LEAK",
+                claim_id="assistant_system_knowledge",
+                resolution_path="Exclude or redact the leaking source and keep the gate failing.",
+            )
+        )
+    task_blockers = (
+        (
+            state.assistant_task_executed_without_proposal,
+            "ASSISTANT_TASK_EXECUTED_WITHOUT_PROPOSAL",
+            "Require a persisted AssistantTaskPlan before any task submission.",
+        ),
+        (
+            state.assistant_task_submit_without_operator_confirmation,
+            "ASSISTANT_TASK_SUBMIT_WITHOUT_OPERATOR_CONFIRMATION",
+            "Require confirmPlanHash and operator id before submit.",
+        ),
+        (
+            state.assistant_task_write_bypassed_approval,
+            "ASSISTANT_TASK_WRITE_BYPASSED_APPROVAL",
+            "Route external writes to approval-required status before execution.",
+        ),
+        (
+            state.assistant_task_destructive_allowed,
+            "ASSISTANT_TASK_DESTRUCTIVE_ALLOWED",
+            "Keep destructive assistant tasking denied and non-submittable.",
+        ),
+        (
+            state.assistant_task_unenrolled_agent_accepted,
+            "ASSISTANT_TASK_UNENROLLED_AGENT_ACCEPTED",
+            "Reject unenrolled agents before gateway submission.",
+        ),
+        (
+            state.assistant_task_unknown_agent_accepted,
+            "ASSISTANT_TASK_UNKNOWN_AGENT_ACCEPTED",
+            "Reject unknown agents before gateway submission.",
+        ),
+        (
+            state.assistant_task_cross_workspace_allowed,
+            "ASSISTANT_TASK_CROSS_WORKSPACE_ALLOWED",
+            "Enforce workspace binding during plan and submit.",
+        ),
+        (
+            state.assistant_task_raw_secret_leak,
+            "ASSISTANT_TASK_RAW_SECRET_LEAK",
+            "Redact task artifacts and keep raw prompts/secrets out of persistence.",
+        ),
+        (
+            state.assistant_task_prompt_injection_executed,
+            "ASSISTANT_TASK_PROMPT_INJECTION_EXECUTED",
+            "Treat LLM/user task text as untrusted and deny policy-bypass prompts.",
+        ),
+        (
+            state.assistant_task_idempotency_conflict_accepted,
+            "ASSISTANT_TASK_IDEMPOTENCY_CONFLICT_ACCEPTED",
+            "Reject changed payloads with reused idempotency keys.",
+        ),
+        (
+            state.assistant_task_sourceless_system_claim,
+            "ASSISTANT_TASK_SOURCELESS_SYSTEM_CLAIM",
+            "Cite local tasking docs and evidence refs for system claims.",
+        ),
+    )
+    for enabled, reason_code, resolution_path in task_blockers:
+        if enabled:
+            items.append(
+                _blocker(
+                    reason_code=reason_code,
+                    claim_id="assistant_governed_tasking",
+                    resolution_path=resolution_path,
+                )
+            )
     if state.inert_primary_action:
         items.append(
             _blocker(

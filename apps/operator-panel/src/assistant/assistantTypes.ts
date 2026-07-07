@@ -1,3 +1,5 @@
+import type { AssistantTaskPlan, AssistantTaskSubmissionResult } from './assistantTaskingTypes';
+
 export type AssistantTurnStatus =
   | 'idle'
   | 'starting'
@@ -13,6 +15,9 @@ export type AssistantStreamEventType =
   | 'router_decision'
   | 'policy_decision'
   | 'approval_pending'
+  | 'knowledge_sources'
+  | 'task_plan'
+  | 'task_submission'
   | 'expert_start'
   | 'expert_end'
   | 'audit_artifact'
@@ -41,7 +46,8 @@ export type AssistantContextAttachmentKind =
   | 'event_tail'
   | 'approval_summary'
   | 'artifact_summary'
-  | 'system_health';
+  | 'system_health'
+  | 'system_knowledge';
 
 export type AssistantSafeToolIntent =
   | 'inspect_run'
@@ -145,6 +151,13 @@ export interface AssistantMetrics {
   fallbackEvents?: string[];
 }
 
+export interface AssistantKnowledgeSourceRef {
+  path: string;
+  heading: string;
+  score: number;
+  snippet?: string;
+}
+
 export interface AssistantAssistantMessage {
   id: string;
   text: string;
@@ -154,6 +167,9 @@ export interface AssistantAssistantMessage {
   approval: AssistantApprovalSummary | null;
   referencedRuns: AssistantRunRef[];
   referencedArtifacts: AssistantArtifactRef[];
+  knowledgeSources?: AssistantKnowledgeSourceRef[];
+  taskPlan?: AssistantTaskPlan | null;
+  taskSubmission?: AssistantTaskSubmissionResult | null;
   metrics: AssistantMetrics | null;
   warning: string | null;
   error: AssistantUiError | null;

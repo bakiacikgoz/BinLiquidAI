@@ -88,6 +88,70 @@ describe('assistant mappers', () => {
     expect(awaitingApproval.turns[0].assistantMessage.approval?.detailLoaded).toBe(false);
   });
 
+  it('maps governed task plan and submission events into assistant message cards', () => {
+    const withPlan = mapCliAssistantEvent(
+      {
+        contractVersion: '2.0',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'task_plan',
+        sequence: 1,
+        timestampUtc: '2026-03-08T09:00:03Z',
+        data: {
+          proposalId: 'astp-1',
+          planHash: 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944',
+          status: 'planned',
+          intentKind: 'plan_agent_task',
+          taskSummary: 'Read external ticket queue',
+          riskClass: 'read_only',
+          policyPreview: {
+            decision: 'allow',
+            riskClass: 'read_only',
+            approvalRequired: false,
+            safeToSubmit: true,
+            reasonCode: 'ASSISTANT_TASK_READ_ONLY_ALLOWED',
+            blockedReasons: [],
+          },
+          approvalRequired: false,
+          submitMode: 'proposal_first',
+          evidenceExpectation: { mode: 'hash_only_redacted', expectedRefs: [], rawContentPersisted: false },
+          safeToSubmit: true,
+          blockedReasons: [],
+          sourceRefs: ['docs/ASSISTANT_GOVERNED_TASKING.md'],
+          createdAtUtc: '2026-03-08T09:00:03Z',
+        },
+      },
+      started(),
+    );
+    const withSubmission = mapCliAssistantEvent(
+      {
+        contractVersion: '2.0',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'task_submission',
+        sequence: 2,
+        timestampUtc: '2026-03-08T09:00:04Z',
+        data: {
+          proposalId: 'astp-1',
+          planHash: 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944',
+          status: 'accepted',
+          policyDecision: 'allow',
+          reasonCode: 'ASSISTANT_TASK_READ_ONLY_ALLOWED',
+          runId: 'agt-run-1',
+          nextActions: ['run.status'],
+          generatedAtUtc: '2026-03-08T09:00:04Z',
+        },
+      },
+      withPlan,
+    );
+
+    const message = withSubmission.turns[0].assistantMessage;
+    expect(message.taskPlan?.proposalId).toBe('astp-1');
+    expect(message.taskPlan?.policyPreview.decision).toBe('allow');
+    expect(message.taskSubmission?.runId).toBe('agt-run-1');
+    expect(message.referencedRuns[0]?.id).toBe('agt-run-1');
+  });
+
   it('keeps warning events non-blocking', () => {
     const warned = mapCliAssistantEvent(
       {

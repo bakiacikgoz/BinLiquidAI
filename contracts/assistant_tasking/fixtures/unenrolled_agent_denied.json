@@ -1,0 +1,77 @@
+{
+  "approvalRequired": false,
+  "blockedReasons": [
+    "ASSISTANT_TASK_UNENROLLED_AGENT_DENIED"
+  ],
+  "candidateAgents": [
+    {
+      "agentId": "external-agent",
+      "allowedSurfaces": [],
+      "blockedSurfaces": [
+        "external_gateway"
+      ],
+      "blockingReasons": [
+        "ASSISTANT_TASK_UNENROLLED_AGENT_DENIED"
+      ],
+      "declaredActions": [
+        "read",
+        "external_write"
+      ],
+      "enrolled": false,
+      "label": "external-agent",
+      "principalId": "principal-agent",
+      "qualificationStatus": "blocked",
+      "workspaceId": "pilot-workspace"
+    }
+  ],
+  "createdAtUtc": "2026-01-01T00:00:00Z",
+  "evidenceExpectation": {
+    "expectedRefs": [
+      "artifacts/assistant-tasking/proposals/astp_unenrolled_fixture.json"
+    ],
+    "mode": "hash_only_redacted",
+    "rawContentPersisted": false
+  },
+  "idempotencyKey": "assistant-task:astp_unenrolled_fixture",
+  "intentKind": "plan_agent_task",
+  "planHash": "sha256:726ea484bc783b4bcce82ea3bf899212b8d7e09792e05a1658b32aaf8dac79f6",
+  "policyPreview": {
+    "approvalRequired": false,
+    "blockedReasons": [
+      "ASSISTANT_TASK_UNENROLLED_AGENT_DENIED"
+    ],
+    "decision": "deny",
+    "reasonCode": "ASSISTANT_TASK_UNENROLLED_AGENT_DENIED",
+    "riskClass": "read_only",
+    "safeToSubmit": false
+  },
+  "proposalId": "astp_unenrolled_fixture",
+  "riskClass": "read_only",
+  "safeToSubmit": false,
+  "schemaVersion": "assistant-tasking.plan/v1",
+  "selectedAgent": {
+    "agentId": "external-agent",
+    "allowedSurfaces": [],
+    "blockedSurfaces": [
+      "external_gateway"
+    ],
+    "blockingReasons": [
+      "ASSISTANT_TASK_UNENROLLED_AGENT_DENIED"
+    ],
+    "declaredActions": [
+      "read",
+      "external_write"
+    ],
+    "enrolled": false,
+    "label": "external-agent",
+    "principalId": "principal-agent",
+    "qualificationStatus": "blocked",
+    "workspaceId": "pilot-workspace"
+  },
+  "sourceRefs": [
+    "docs/ASSISTANT_GOVERNED_TASKING.md"
+  ],
+  "status": "blocked",
+  "submitMode": "disabled_with_reason",
+  "taskSummary": "Fixture task for astp_unenrolled_fixture"
+}

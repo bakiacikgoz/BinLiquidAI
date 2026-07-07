@@ -2,6 +2,19 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import { previewAssistantProviderModels, previewAssistantStartTurn } from './assistant/assistantFixtures';
+import {
+  normalizeAssistantKnowledgeSearchResponse,
+  previewAssistantKnowledgeSearch,
+  type AssistantKnowledgeSearchResponse,
+} from './assistant/assistantSystemKnowledge';
+import {
+  normalizeAssistantTaskPlan,
+  normalizeAssistantTaskSubmissionResult,
+} from './assistant/assistantTaskingMappers';
+import type {
+  AssistantTaskPlan,
+  AssistantTaskSubmissionResult,
+} from './assistant/assistantTaskingTypes';
 import type {
   AssistantCancelTurnResponse,
   AssistantStartTurnOptions,
@@ -185,6 +198,19 @@ export interface ControlPlaneRunSubmitOptions {
   operatorId: string;
 }
 
+export interface AssistantTaskPlanOptions {
+  message: string;
+  operatorId?: string;
+  workspaceId?: string;
+  agentHint?: string;
+}
+
+export interface AssistantTaskSubmitOptions {
+  proposalId: string;
+  confirmPlanHash: string;
+  operatorId: string;
+}
+
 export interface ControlPlaneEvidenceExportOptions {
   runId: string;
   outputDir?: string;
@@ -274,6 +300,83 @@ async function callBridge<T>(command: string, args: Record<string, unknown>): Pr
 
 function withTimeout(settings: PanelSettings, timeoutMs: number): BridgeConfig {
   return toBridgeConfig(settings, timeoutMs);
+}
+
+function previewAssistantTaskPlan(message: string): AssistantTaskPlan {
+  return normalizeAssistantTaskPlan({
+    schemaVersion: 'assistant-tasking.plan/v1',
+    proposalId: 'astp_preview_write_fixture',
+    planHash: 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944',
+    status: 'planned',
+    intentKind: 'plan_agent_task',
+    selectedAgent: {
+      agentId: 'external-agent',
+      label: 'external-agent',
+      enrolled: true,
+      workspaceId: 'pilot-workspace',
+      principalId: 'principal-agent',
+      allowedSurfaces: ['external_gateway'],
+      blockedSurfaces: [],
+      declaredActions: ['read', 'external_write'],
+      qualificationStatus: 'ready',
+      blockingReasons: [],
+    },
+    candidateAgents: [
+      {
+        agentId: 'external-agent',
+        label: 'external-agent',
+        enrolled: true,
+        workspaceId: 'pilot-workspace',
+        principalId: 'principal-agent',
+        allowedSurfaces: ['external_gateway'],
+        blockedSurfaces: [],
+        declaredActions: ['read', 'external_write'],
+        qualificationStatus: 'ready',
+        blockingReasons: [],
+      },
+    ],
+    taskSummary: message || 'Preview governed assistant task',
+    riskClass: 'external_write',
+    policyPreview: {
+      decision: 'require_approval',
+      riskClass: 'external_write',
+      approvalRequired: true,
+      safeToSubmit: true,
+      reasonCode: 'ASSISTANT_TASK_WRITE_REQUIRES_APPROVAL',
+      blockedReasons: [],
+    },
+    approvalRequired: true,
+    submitMode: 'proposal_first',
+    idempotencyKey: 'assistant-task:astp_preview_write_fixture',
+    evidenceExpectation: {
+      mode: 'hash_only_redacted',
+      expectedRefs: ['artifacts/assistant-tasking/proposals/astp_preview_write_fixture.json'],
+      rawContentPersisted: false,
+    },
+    safeToSubmit: true,
+    blockedReasons: [],
+    sourceRefs: ['docs/ASSISTANT_GOVERNED_TASKING.md'],
+    createdAtUtc: '2026-01-01T00:00:00Z',
+  });
+}
+
+function previewAssistantTaskSubmission(options: AssistantTaskSubmitOptions): AssistantTaskSubmissionResult {
+  return normalizeAssistantTaskSubmissionResult({
+    schemaVersion: 'assistant-tasking.submission/v1',
+    proposalId: options.proposalId,
+    planHash: options.confirmPlanHash,
+    status: 'blocked_pending_approval',
+    policyDecision: 'require_approval',
+    reasonCode: 'ASSISTANT_TASK_WRITE_REQUIRES_APPROVAL',
+    runId: 'agt-preview-001',
+    approvalId: 'apr-preview-task-001',
+    evidenceRef: 'artifacts/assistant-tasking/submissions/agt-preview-001.json',
+    replayStatus: 'not_replayed',
+    idempotencyStatus: 'created',
+    blockedReasons: [],
+    nextActions: ['approval.show', 'approval.decide', 'approval.execute'],
+    generatedAtUtc: '2026-01-01T00:00:01Z',
+  });
 }
 
 export async function handshake(settings: PanelSettings): Promise<unknown> {
@@ -970,6 +1073,95 @@ export async function startAssistantTurn(
     fallbackProviderId: options.fallbackProviderId,
     model: options.model,
     hfModelId: options.hfModelId,
+  });
+}
+
+export async function searchAssistantSystemKnowledge(
+  settings: PanelSettings,
+  query: string,
+): Promise<AssistantKnowledgeSearchResponse> {
+  if (isBridgePreviewMode()) {
+    return previewAssistantKnowledgeSearch(query);
+  }
+  return normalizeAssistantKnowledgeSearchResponse(
+    await callBridge('bridge_assistant_knowledge_search', {
+      config: toBridgeConfig(settings, 30000),
+      query,
+      maxHits: 8,
+      maxContextChars: 8000,
+    }),
+  );
+}
+
+export async function planAssistantTask(
+  settings: PanelSettings,
+  options: AssistantTaskPlanOptions,
+): Promise<AssistantTaskPlan> {
+  if (isBridgePreviewMode()) {
+    return previewAssistantTaskPlan(options.message);
+  }
+  return normalizeAssistantTaskPlan(
+    await callBridge('bridge_assistant_task_plan', {
+      config: toBridgeConfig(settings, 30000),
+      message: options.message,
+      operatorId: options.operatorId,
+      workspaceId: options.workspaceId,
+      agentHint: options.agentHint,
+    }),
+  );
+}
+
+export async function submitAssistantTask(
+  settings: PanelSettings,
+  options: AssistantTaskSubmitOptions,
+): Promise<AssistantTaskSubmissionResult> {
+  if (isBridgePreviewMode()) {
+    return previewAssistantTaskSubmission(options);
+  }
+  return normalizeAssistantTaskSubmissionResult(
+    await callBridge('bridge_assistant_task_submit', {
+      config: toBridgeConfig(settings, 30000),
+      proposalId: options.proposalId,
+      confirmPlanHash: options.confirmPlanHash,
+      operatorId: options.operatorId,
+    }),
+  );
+}
+
+export async function getAssistantTaskStatus(settings: PanelSettings, proposalId: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    const plan = previewAssistantTaskPlan('Preview governed assistant task');
+    return {
+      schemaVersion: 'assistant-tasking.status/v1',
+      proposalId,
+      status: 'planned',
+      plan: { ...plan, proposalId },
+      submission: null,
+      evidenceRefs: plan.evidenceExpectation.expectedRefs,
+      blockingReasons: [],
+    };
+  }
+  return callBridge('bridge_assistant_task_status', {
+    config: toBridgeConfig(settings, 30000),
+    proposalId,
+  });
+}
+
+export async function explainAssistantTask(settings: PanelSettings, proposalId: string): Promise<unknown> {
+  if (isBridgePreviewMode()) {
+    return {
+      schemaVersion: 'assistant-tasking.status/v1',
+      proposalId,
+      status: 'planned',
+      plan: previewAssistantTaskPlan('Preview governed assistant task'),
+      submission: null,
+      evidenceRefs: ['artifacts/assistant-tasking/proposals/astp_preview_write_fixture.json'],
+      blockingReasons: [],
+    };
+  }
+  return callBridge('bridge_assistant_task_explain', {
+    config: toBridgeConfig(settings, 30000),
+    proposalId,
   });
 }
 

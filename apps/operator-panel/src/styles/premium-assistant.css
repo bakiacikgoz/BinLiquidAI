@@ -1730,6 +1730,8 @@
 .assistant-card-head,
 .assistant-action-preview,
 .assistant-approval-card,
+.assistant-task-proposal-card,
+.assistant-task-submit-card,
 .assistant-reference-card,
 .assistant-error-card {
   display: grid;
@@ -1743,6 +1745,8 @@
 
 .assistant-action-preview,
 .assistant-approval-card,
+.assistant-task-proposal-card,
+.assistant-task-submit-card,
 .assistant-reference-card,
 .assistant-error-card {
   padding: 16px;
@@ -1753,10 +1757,14 @@
 
 .assistant-surface-transcript .assistant-action-preview,
 .assistant-surface-transcript .assistant-approval-card,
+.assistant-surface-transcript .assistant-task-proposal-card,
+.assistant-surface-transcript .assistant-task-submit-card,
 .assistant-surface-transcript .assistant-reference-card,
 .assistant-surface-transcript .assistant-error-card,
 .assistant-surface-approval .assistant-action-preview,
 .assistant-surface-approval .assistant-approval-card,
+.assistant-surface-approval .assistant-task-proposal-card,
+.assistant-surface-approval .assistant-task-submit-card,
 .assistant-surface-approval .assistant-reference-card,
 .assistant-surface-approval .assistant-error-card {
   max-width: 720px;
@@ -1770,13 +1778,20 @@
   border-color: color-mix(in srgb, var(--assistant-blue) 34%, var(--assistant-line));
 }
 
+.assistant-task-proposal-card,
+.assistant-task-submit-card {
+  border-color: color-mix(in srgb, var(--assistant-green) 34%, var(--assistant-line));
+}
+
 .assistant-action-title,
+.assistant-task-title,
 .assistant-approval-body {
   align-items: flex-start;
   gap: 12px;
 }
 
 .assistant-action-title > .mc-icon,
+.assistant-task-title > .mc-icon,
 .assistant-approval-icon {
   flex: 0 0 auto;
   width: 38px;
@@ -1786,6 +1801,7 @@
 }
 
 .assistant-action-title span,
+.assistant-task-title span,
 .assistant-approval-body div {
   display: grid;
   gap: 4px;
@@ -1793,6 +1809,7 @@
 }
 
 .assistant-action-title strong,
+.assistant-task-title strong,
 .assistant-approval-body strong,
 .assistant-reference-row strong {
   color: var(--assistant-text);
@@ -1800,6 +1817,7 @@
 }
 
 .assistant-action-title em,
+.assistant-task-title em,
 .assistant-reference-row em {
   color: var(--assistant-muted);
   font-style: normal;
@@ -2369,7 +2387,9 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .assistant-action-metrics {
+  .assistant-action-metrics,
+  .assistant-task-policy-preview dl,
+  .assistant-task-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -2411,7 +2431,10 @@
   }
 
   .assistant-right-rail,
-  .assistant-action-metrics {
+  .assistant-action-metrics,
+  .assistant-task-policy-preview dl,
+  .assistant-task-metrics,
+  .assistant-task-agent-list li {
     grid-template-columns: 1fr;
   }
 
@@ -2494,8 +2517,181 @@
     grid-column: 1 / -1;
   }
 
-  .assistant-findings-panel dl div {
+.assistant-findings-panel dl div {
     grid-template-columns: 1fr;
     gap: 3px;
   }
+}
+
+.assistant-task-policy-preview {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--assistant-line);
+  border-radius: 7px;
+  background: var(--assistant-field);
+}
+
+.assistant-task-policy-preview > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.assistant-task-policy-preview > div:first-child span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 750;
+}
+
+.assistant-task-policy-preview dl,
+.assistant-task-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--assistant-line);
+}
+
+.assistant-task-policy-preview dl div,
+.assistant-task-metrics div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-right: 1px solid var(--assistant-line);
+}
+
+.assistant-task-policy-preview dl div:last-child,
+.assistant-task-metrics div:last-child {
+  border-right: 0;
+}
+
+.assistant-task-policy-preview dt,
+.assistant-task-metrics dt {
+  color: var(--assistant-muted);
+  font-size: 11px;
+}
+
+.assistant-task-policy-preview dd,
+.assistant-task-metrics dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--assistant-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.assistant-task-agent-list,
+.assistant-task-blockers,
+.assistant-task-next-actions,
+.assistant-task-policy-preview ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.assistant-task-agent-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 0;
+  border-top: 1px solid var(--assistant-line);
+}
+
+.assistant-task-agent-list li > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.assistant-task-agent-list strong,
+.assistant-task-agent-list span,
+.assistant-task-agent-list em {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assistant-task-agent-list span,
+.assistant-task-agent-list em,
+.assistant-task-blockers li,
+.assistant-task-next-actions li,
+.assistant-task-policy-preview li {
+  color: var(--assistant-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.assistant-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.assistant-task-actions span {
+  min-width: 0;
+  color: var(--assistant-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.assistant-knowledge-card {
+  display: grid;
+  gap: 12px;
+}
+
+.assistant-knowledge-card.compact {
+  margin-top: 12px;
+}
+
+.assistant-knowledge-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.assistant-knowledge-card-head > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.assistant-knowledge-source-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.assistant-knowledge-source-list li {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.assistant-knowledge-source-list strong,
+.assistant-knowledge-source-list span,
+.assistant-knowledge-source-list em {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assistant-knowledge-source-list span,
+.assistant-knowledge-source-list em {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: normal;
 }

@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "KnowledgeHit": {
+      "additionalProperties": false,
+      "properties": {
+        "chunkId": {
+          "title": "Chunkid",
+          "type": "string"
+        },
+        "commands": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "heading": {
+          "default": "",
+          "title": "Heading",
+          "type": "string"
+        },
+        "matchedTerms": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Matchedterms",
+          "type": "array"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "snippet": {
+          "maxLength": 1200,
+          "title": "Snippet",
+          "type": "string"
+        },
+        "sourceHash": {
+          "title": "Sourcehash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "chunkId",
+        "path",
+        "snippet",
+        "score",
+        "sourceHash"
+      ],
+      "title": "KnowledgeHit",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "answerRules": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Answerrules",
+      "type": "array"
+    },
+    "blockingReasons": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "contextText": {
+      "default": "",
+      "maxLength": 12000,
+      "title": "Contexttext",
+      "type": "string"
+    },
+    "identityBrief": {
+      "maxLength": 1500,
+      "title": "Identitybrief",
+      "type": "string"
+    },
+    "omittedSources": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Omittedsources",
+      "type": "array"
+    },
+    "sources": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/KnowledgeHit"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "available",
+        "unavailable",
+        "stale",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "identityBrief"
+  ],
+  "title": "AssistantSystemKnowledgeContext",
+  "type": "object"
+}

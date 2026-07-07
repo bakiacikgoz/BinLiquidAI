@@ -164,6 +164,62 @@ describe('bridge tauri contract', () => {
     );
   });
 
+  it('passes governed assistant tasking requests to the Tauri commands', async () => {
+    const { invoke, bridge } = await importBridgeWithInvoke({
+      schemaVersion: 'assistant-tasking.plan/v1',
+      proposalId: 'astp-tauri',
+      planHash: 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944',
+      status: 'planned',
+      policyPreview: {
+        decision: 'allow',
+        riskClass: 'read_only',
+        approvalRequired: false,
+        safeToSubmit: true,
+        reasonCode: 'ASSISTANT_TASK_READ_ONLY_ALLOWED',
+        blockedReasons: [],
+      },
+    });
+
+    await bridge.planAssistantTask(
+      { ...DEFAULT_SETTINGS, profile: 'enterprise' },
+      {
+        message: 'read the external system',
+        operatorId: 'operator-1',
+        workspaceId: 'pilot-workspace',
+        agentHint: 'external-agent',
+      },
+    );
+    await bridge.submitAssistantTask(
+      { ...DEFAULT_SETTINGS, profile: 'enterprise' },
+      {
+        proposalId: 'astp-tauri',
+        confirmPlanHash: 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944',
+        operatorId: 'operator-1',
+      },
+    );
+
+    expect(invoke).toHaveBeenNthCalledWith(
+      1,
+      'bridge_assistant_task_plan',
+      expect.objectContaining({
+        config: expect.objectContaining({ profile: 'enterprise', timeoutMs: 30000 }),
+        message: 'read the external system',
+        operatorId: 'operator-1',
+        workspaceId: 'pilot-workspace',
+        agentHint: 'external-agent',
+      }),
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      'bridge_assistant_task_submit',
+      expect.objectContaining({
+        proposalId: 'astp-tauri',
+        confirmPlanHash: 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944',
+        operatorId: 'operator-1',
+      }),
+    );
+  });
+
   it('passes assistant model discovery requests to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
       contractVersion: 'operator-panel.assistant-provider-models/v2',

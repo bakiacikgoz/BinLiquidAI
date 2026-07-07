@@ -9,6 +9,8 @@ const bridgeMocks = vi.hoisted(() => ({
   cancelAssistantTurn: vi.fn(),
   listenAssistantEvents: vi.fn(),
   isBridgePreviewMode: vi.fn(),
+  searchAssistantSystemKnowledge: vi.fn(),
+  submitAssistantTask: vi.fn(),
 }));
 
 vi.mock('../bridge', () => ({
@@ -16,6 +18,8 @@ vi.mock('../bridge', () => ({
   cancelAssistantTurn: bridgeMocks.cancelAssistantTurn,
   listenAssistantEvents: bridgeMocks.listenAssistantEvents,
   isBridgePreviewMode: bridgeMocks.isBridgePreviewMode,
+  searchAssistantSystemKnowledge: bridgeMocks.searchAssistantSystemKnowledge,
+  submitAssistantTask: bridgeMocks.submitAssistantTask,
 }));
 
 const emptyContext: AssistantContextSnapshot = {
@@ -45,6 +49,36 @@ describe('useAssistantSession runtime metadata', () => {
       status: 'cancelled',
     });
     bridgeMocks.isBridgePreviewMode.mockReturnValue(false);
+    bridgeMocks.searchAssistantSystemKnowledge.mockResolvedValue({
+      status: 'ready',
+      intent: 'agent_task',
+      blockingReasons: [],
+      context: {
+        status: 'available',
+        identityBrief: 'local knowledge',
+        answerRules: [],
+        sources: [],
+        contextText: '',
+        omittedSources: [],
+        blockingReasons: [],
+      },
+    });
+    bridgeMocks.submitAssistantTask.mockResolvedValue({
+      schemaVersion: 'assistant-tasking.submission/v1',
+      proposalId: 'astp-session',
+      planHash: 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944',
+      status: 'accepted',
+      policyDecision: 'allow',
+      reasonCode: 'ASSISTANT_TASK_READ_ONLY_ALLOWED',
+      runId: 'agt-session',
+      approvalId: null,
+      evidenceRef: null,
+      replayStatus: null,
+      idempotencyStatus: 'created',
+      blockedReasons: [],
+      nextActions: ['run.status'],
+      generatedAtUtc: '2026-03-08T09:00:00Z',
+    });
     vi.clearAllMocks();
   });
 
@@ -124,5 +158,63 @@ describe('useAssistantSession runtime metadata', () => {
     await waitFor(() => expect(result.current.state.status).toBe('cancelled'));
     expect(bridgeMocks.cancelAssistantTurn).toHaveBeenCalledWith(expect.any(Object), expect.stringMatching(/^assistant-turn-/));
     expect(result.current.state.error).toBeNull();
+  });
+
+  it('submits a task proposal with the confirmed plan hash', async () => {
+    const planHash = 'sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944';
+    const { result } = renderHook(() =>
+      useAssistantSession({ ...DEFAULT_SETTINGS, operatorId: 'operator-1' }, () => emptyContext),
+    );
+
+    await act(async () => {
+      await result.current.actions.send('Plan a governed task.');
+    });
+    await waitFor(() => expect(result.current.state.turns).toHaveLength(1));
+    const turn = result.current.state.turns[0];
+
+    act(() => {
+      result.current.actions.applyEvent({
+        contractVersion: '2.0',
+        assistantTurnId: turn.id,
+        sessionId: result.current.state.sessionId,
+        event: 'task_plan',
+        sequence: 2,
+        timestampUtc: '2026-03-08T09:00:00Z',
+        data: {
+          proposalId: 'astp-session',
+          planHash,
+          status: 'planned',
+          intentKind: 'plan_agent_task',
+          taskSummary: 'Read queue',
+          riskClass: 'read_only',
+          policyPreview: {
+            decision: 'allow',
+            riskClass: 'read_only',
+            approvalRequired: false,
+            safeToSubmit: true,
+            reasonCode: 'ASSISTANT_TASK_READ_ONLY_ALLOWED',
+            blockedReasons: [],
+          },
+          approvalRequired: false,
+          submitMode: 'proposal_first',
+          evidenceExpectation: { mode: 'hash_only_redacted', expectedRefs: [], rawContentPersisted: false },
+          safeToSubmit: true,
+          blockedReasons: [],
+          sourceRefs: [],
+          createdAtUtc: '2026-03-08T09:00:00Z',
+        },
+      });
+    });
+    await waitFor(() => expect(result.current.state.turns[0]?.assistantMessage.taskPlan?.proposalId).toBe('astp-session'));
+
+    await act(async () => {
+      await result.current.actions.submitTaskProposal('astp-session', planHash);
+    });
+
+    expect(bridgeMocks.submitAssistantTask).toHaveBeenCalledWith(
+      expect.objectContaining({ operatorId: 'operator-1' }),
+      { proposalId: 'astp-session', confirmPlanHash: planHash, operatorId: 'operator-1' },
+    );
+    await waitFor(() => expect(result.current.state.turns[0]?.assistantMessage.taskSubmission?.runId).toBe('agt-session'));
   });
 });

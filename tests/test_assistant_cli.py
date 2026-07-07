@@ -122,3 +122,71 @@ def test_assistant_turn_streams_contract_events(tmp_path: Path, monkeypatch) -> 
     assert all(event["contractVersion"] == "2.0" for event in events)
     assert all(event["assistantTurnId"] == "turn-1" for event in events)
     assert [event["sequence"] for event in events] == [1, 2]
+
+
+def test_assistant_knowledge_cli_build_search_and_doctor(tmp_path: Path) -> None:
+    build_result = runner.invoke(
+        app,
+        [
+            "assistant",
+            "knowledge",
+            "build",
+            "--profile",
+            "enterprise",
+            "--output-root",
+            str(tmp_path),
+            "--json",
+        ],
+    )
+
+    assert build_result.exit_code == 0, build_result.stdout
+    build_payload = json.loads(build_result.stdout)
+    assert build_payload["schemaVersion"] == "assistant.system-knowledge-manifest/v1"
+    assert build_payload["status"] == "ready"
+    assert build_payload["sourceCount"] > 0
+    assert build_payload["chunkCount"] > 0
+
+    search_result = runner.invoke(
+        app,
+        [
+            "assistant",
+            "knowledge",
+            "search",
+            "--profile",
+            "enterprise",
+            "--index-root",
+            str(tmp_path),
+            "--query",
+            "AgeisOs sisteminde nasıl bir agent'e görev verebilirim?",
+            "--include-context",
+            "--json",
+        ],
+    )
+    assert search_result.exit_code == 0, search_result.stdout
+    search_payload = json.loads(search_result.stdout)
+    assert search_payload["schemaVersion"] == "assistant.system-knowledge-search/v1"
+    assert search_payload["status"] == "ready"
+    assert search_payload["intent"] == "agent_task"
+    assert any(
+        hit["path"] == "docs/EXTERNAL_AGENT_GATEWAY_GUIDE.md"
+        for hit in search_payload["hits"]
+    )
+    assert search_payload["context"]["status"] == "available"
+
+    doctor_result = runner.invoke(
+        app,
+        [
+            "assistant",
+            "knowledge",
+            "doctor",
+            "--profile",
+            "enterprise",
+            "--output-root",
+            str(tmp_path),
+            "--json",
+        ],
+    )
+    assert doctor_result.exit_code == 0, doctor_result.stdout
+    doctor_payload = json.loads(doctor_result.stdout)
+    assert doctor_payload["schemaVersion"] == "assistant.system-knowledge-doctor/v1"
+    assert doctor_payload["status"] == "ready"

@@ -1,0 +1,73 @@
+{
+  "approvalRequired": false,
+  "blockedReasons": [
+    "ASSISTANT_TASK_DESTRUCTIVE_DENIED"
+  ],
+  "candidateAgents": [
+    {
+      "agentId": "external-agent",
+      "allowedSurfaces": [
+        "external_gateway"
+      ],
+      "blockedSurfaces": [],
+      "blockingReasons": [],
+      "declaredActions": [
+        "read",
+        "external_write"
+      ],
+      "enrolled": true,
+      "label": "external-agent",
+      "principalId": "principal-agent",
+      "qualificationStatus": "ready",
+      "workspaceId": "pilot-workspace"
+    }
+  ],
+  "createdAtUtc": "2026-01-01T00:00:00Z",
+  "evidenceExpectation": {
+    "expectedRefs": [
+      "artifacts/assistant-tasking/proposals/astp_destructive_fixture.json"
+    ],
+    "mode": "hash_only_redacted",
+    "rawContentPersisted": false
+  },
+  "idempotencyKey": "assistant-task:astp_destructive_fixture",
+  "intentKind": "plan_agent_task",
+  "planHash": "sha256:f0bc400896a351b197bf5d8c6730dd2fb602e1bcc1900742814b9a405ad64525",
+  "policyPreview": {
+    "approvalRequired": false,
+    "blockedReasons": [
+      "ASSISTANT_TASK_DESTRUCTIVE_DENIED"
+    ],
+    "decision": "deny",
+    "reasonCode": "ASSISTANT_TASK_DESTRUCTIVE_DENIED",
+    "riskClass": "destructive",
+    "safeToSubmit": false
+  },
+  "proposalId": "astp_destructive_fixture",
+  "riskClass": "destructive",
+  "safeToSubmit": false,
+  "schemaVersion": "assistant-tasking.plan/v1",
+  "selectedAgent": {
+    "agentId": "external-agent",
+    "allowedSurfaces": [
+      "external_gateway"
+    ],
+    "blockedSurfaces": [],
+    "blockingReasons": [],
+    "declaredActions": [
+      "read",
+      "external_write"
+    ],
+    "enrolled": true,
+    "label": "external-agent",
+    "principalId": "principal-agent",
+    "qualificationStatus": "ready",
+    "workspaceId": "pilot-workspace"
+  },
+  "sourceRefs": [
+    "docs/ASSISTANT_GOVERNED_TASKING.md"
+  ],
+  "status": "blocked",
+  "submitMode": "disabled_with_reason",
+  "taskSummary": "Fixture task for astp_destructive_fixture"
+}

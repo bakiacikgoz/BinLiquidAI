@@ -1,0 +1,503 @@
+{
+  "$defs": {
+    "AgentTaskCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "agentId": {
+          "title": "Agentid",
+          "type": "string"
+        },
+        "allowedSurfaces": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowedsurfaces",
+          "type": "array"
+        },
+        "blockedSurfaces": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedsurfaces",
+          "type": "array"
+        },
+        "blockingReasons": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockingreasons",
+          "type": "array"
+        },
+        "declaredActions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Declaredactions",
+          "type": "array"
+        },
+        "enrolled": {
+          "title": "Enrolled",
+          "type": "boolean"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "principalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Principalid"
+        },
+        "qualificationStatus": {
+          "default": "unknown",
+          "title": "Qualificationstatus",
+          "type": "string"
+        },
+        "workspaceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspaceid"
+        }
+      },
+      "required": [
+        "agentId",
+        "label",
+        "enrolled"
+      ],
+      "title": "AgentTaskCandidate",
+      "type": "object"
+    },
+    "AssistantTaskIntentKind": {
+      "enum": [
+        "ask_how_to",
+        "plan_agent_task",
+        "submit_agent_task",
+        "explain_run",
+        "unsupported_destructive",
+        "clarification_required"
+      ],
+      "title": "AssistantTaskIntentKind",
+      "type": "string"
+    },
+    "AssistantTaskPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalRequired": {
+          "title": "Approvalrequired",
+          "type": "boolean"
+        },
+        "blockedReasons": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedreasons",
+          "type": "array"
+        },
+        "candidateAgents": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AgentTaskCandidate"
+          },
+          "title": "Candidateagents",
+          "type": "array"
+        },
+        "createdAtUtc": {
+          "title": "Createdatutc",
+          "type": "string"
+        },
+        "evidenceExpectation": {
+          "$ref": "#/$defs/EvidenceExpectation"
+        },
+        "idempotencyKey": {
+          "title": "Idempotencykey",
+          "type": "string"
+        },
+        "intentKind": {
+          "$ref": "#/$defs/AssistantTaskIntentKind"
+        },
+        "planHash": {
+          "title": "Planhash",
+          "type": "string"
+        },
+        "policyPreview": {
+          "$ref": "#/$defs/PolicyPreview"
+        },
+        "proposalId": {
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "riskClass": {
+          "$ref": "#/$defs/AssistantTaskRiskClass"
+        },
+        "safeToSubmit": {
+          "title": "Safetosubmit",
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "const": "assistant-tasking.plan/v1",
+          "default": "assistant-tasking.plan/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "selectedAgent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentTaskCandidate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sourceRefs": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Sourcerefs",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/AssistantTaskPlanStatus"
+        },
+        "submitMode": {
+          "enum": [
+            "proposal_first",
+            "disabled_with_reason"
+          ],
+          "title": "Submitmode",
+          "type": "string"
+        },
+        "taskSummary": {
+          "title": "Tasksummary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposalId",
+        "planHash",
+        "status",
+        "intentKind",
+        "taskSummary",
+        "riskClass",
+        "policyPreview",
+        "approvalRequired",
+        "submitMode",
+        "idempotencyKey",
+        "evidenceExpectation",
+        "safeToSubmit",
+        "createdAtUtc"
+      ],
+      "title": "AssistantTaskPlan",
+      "type": "object"
+    },
+    "AssistantTaskPlanStatus": {
+      "enum": [
+        "planned",
+        "blocked",
+        "clarification_required"
+      ],
+      "title": "AssistantTaskPlanStatus",
+      "type": "string"
+    },
+    "AssistantTaskPolicyDecision": {
+      "enum": [
+        "allow",
+        "require_approval",
+        "deny",
+        "unknown"
+      ],
+      "title": "AssistantTaskPolicyDecision",
+      "type": "string"
+    },
+    "AssistantTaskRiskClass": {
+      "enum": [
+        "read_only",
+        "external_write",
+        "mutation",
+        "destructive",
+        "credential_sensitive",
+        "unknown"
+      ],
+      "title": "AssistantTaskRiskClass",
+      "type": "string"
+    },
+    "AssistantTaskSubmissionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approvalid"
+        },
+        "blockedReasons": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedreasons",
+          "type": "array"
+        },
+        "evidenceRef": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidenceref"
+        },
+        "generatedAtUtc": {
+          "title": "Generatedatutc",
+          "type": "string"
+        },
+        "idempotencyStatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Idempotencystatus"
+        },
+        "nextActions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Nextactions",
+          "type": "array"
+        },
+        "planHash": {
+          "title": "Planhash",
+          "type": "string"
+        },
+        "policyDecision": {
+          "$ref": "#/$defs/AssistantTaskPolicyDecision"
+        },
+        "proposalId": {
+          "title": "Proposalid",
+          "type": "string"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "replayStatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Replaystatus"
+        },
+        "runId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runid"
+        },
+        "schemaVersion": {
+          "const": "assistant-tasking.submission/v1",
+          "default": "assistant-tasking.submission/v1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/AssistantTaskSubmitStatus"
+        }
+      },
+      "required": [
+        "proposalId",
+        "planHash",
+        "status",
+        "policyDecision",
+        "reasonCode",
+        "generatedAtUtc"
+      ],
+      "title": "AssistantTaskSubmissionResult",
+      "type": "object"
+    },
+    "AssistantTaskSubmitStatus": {
+      "enum": [
+        "accepted",
+        "blocked_pending_approval",
+        "denied",
+        "invalid_request",
+        "unknown_agent"
+      ],
+      "title": "AssistantTaskSubmitStatus",
+      "type": "string"
+    },
+    "EvidenceExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedRefs": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Expectedrefs",
+          "type": "array"
+        },
+        "mode": {
+          "const": "hash_only_redacted",
+          "default": "hash_only_redacted",
+          "title": "Mode",
+          "type": "string"
+        },
+        "rawContentPersisted": {
+          "default": false,
+          "title": "Rawcontentpersisted",
+          "type": "boolean"
+        }
+      },
+      "title": "EvidenceExpectation",
+      "type": "object"
+    },
+    "PolicyPreview": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalRequired": {
+          "title": "Approvalrequired",
+          "type": "boolean"
+        },
+        "blockedReasons": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockedreasons",
+          "type": "array"
+        },
+        "decision": {
+          "$ref": "#/$defs/AssistantTaskPolicyDecision"
+        },
+        "reasonCode": {
+          "title": "Reasoncode",
+          "type": "string"
+        },
+        "riskClass": {
+          "$ref": "#/$defs/AssistantTaskRiskClass"
+        },
+        "safeToSubmit": {
+          "title": "Safetosubmit",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "decision",
+        "riskClass",
+        "approvalRequired",
+        "safeToSubmit",
+        "reasonCode"
+      ],
+      "title": "PolicyPreview",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "evidenceRefs": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidencerefs",
+      "type": "array"
+    },
+    "plan": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssistantTaskPlan"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "proposalId": {
+      "title": "Proposalid",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "assistant-tasking.status/v1",
+      "default": "assistant-tasking.status/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "submission": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssistantTaskSubmissionResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "proposalId",
+    "status"
+  ],
+  "title": "AssistantTaskStatus",
+  "type": "object"
+}

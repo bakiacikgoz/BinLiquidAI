@@ -1,0 +1,12 @@
+{
+  "blockingReasons": [
+    "ASSISTANT_KNOWLEDGE_NO_VERIFIED_HITS"
+  ],
+  "generatedAtUtc": "2026-01-01T00:00:00Z",
+  "hits": [],
+  "intent": "unknown",
+  "normalizedQuery": "unrelated sourdough bread timing",
+  "queryHash": "sha256:8d49af0e1fcc192685f0c20d84159dff052082be9894a032598a391513025e81",
+  "schemaVersion": "assistant.system-knowledge-search/v1",
+  "status": "no_hits"
+}

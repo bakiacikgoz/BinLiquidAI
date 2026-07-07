@@ -42,6 +42,8 @@ def test_product_complete_closure_gate_passes_when_required_checks_pass(
     assert report["noShipBlockers"] == []
     assert report["productReadiness"] == {
         "assistant": "pass",
+        "assistantSystemKnowledge": "pass",
+        "assistantTasking": "pass",
         "operatorPanel": "pass",
         "enterpriseWorkspace": "pass",
         "governedWorkflow": "pass",
@@ -81,6 +83,48 @@ def test_product_complete_closure_gate_blocks_required_failure(
     assert report["status"] == "fail"
     assert "PRODUCT_COMPLETE_CHECK_FAILED:assistant_real_runtime_gate" in report["noShipBlockers"]
     assert report["productReadiness"]["assistant"] == "fail"
+
+
+def test_product_complete_closure_gate_preserves_child_conditional_status(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(gate, "_git", _fake_git)
+
+    def fake_run(command: list[str], *, name: str, required: bool = True) -> dict[str, object]:
+        if name == "assistant_real_runtime_gate":
+            return {
+                "name": name,
+                "command": command,
+                "required": required,
+                "returnCode": 3,
+                "status": "conditional",
+                "reasonCode": "ASSISTANT_REAL_RUNTIME_GATE_CONDITIONAL",
+                "tail": [],
+                "json": {"status": "conditional", "noShipBlockers": []},
+            }
+        return {
+            "name": name,
+            "command": command,
+            "required": required,
+            "returnCode": 0,
+            "status": "pass",
+            "reasonCode": "OK",
+            "tail": [],
+        }
+
+    monkeypatch.setattr(gate, "_run", fake_run)
+
+    report = gate.run_product_complete_closure_gate(
+        output_root=tmp_path,
+        profile="enterprise",
+        skip_commands=False,
+    )
+
+    assert report["status"] == "pass"
+    assert report["productReadiness"]["assistant"] == "conditional"
+    assert report["conditionalNotes"] == ["Assistant real runtime gate has setup-required notes."]
+    assert report["noShipBlockers"] == []
 
 
 def test_product_complete_closure_gate_can_include_conditional_local_trial(

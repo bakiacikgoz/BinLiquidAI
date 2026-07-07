@@ -32,6 +32,18 @@ def _resolve(command: list[str]) -> list[str]:
     return command
 
 
+def _extract_json(text: str) -> dict[str, Any] | None:
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end < start:
+        return None
+    try:
+        parsed = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, Any]:
     started = time.monotonic()
     env = {**os.environ, "COREPACK_ENABLE_AUTO_PIN": "0"}
@@ -57,12 +69,21 @@ def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, A
             "reasonCode": "EXECUTABLE_MISSING",
             "tail": [str(exc)],
         }
+    parsed_json = _extract_json(result.stdout)
     status = "pass" if result.returncode == 0 else "fail"
     reason = "OK" if result.returncode == 0 else "COMMAND_FAILED"
     if name == "macos_local_trial_gate" and result.returncode == 3:
         status = "conditional"
         reason = "MACOS_LOCAL_TRIAL_CONDITIONAL"
-    return {
+    if (
+        parsed_json is not None
+        and result.returncode != 0
+        and parsed_json.get("status") == "conditional"
+        and not parsed_json.get("noShipBlockers")
+    ):
+        status = "conditional"
+        reason = f"{name.upper()}_CONDITIONAL"
+    payload = {
         "name": name,
         "command": command,
         "required": required,
@@ -72,6 +93,28 @@ def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, A
         "durationMs": int((time.monotonic() - started) * 1000),
         "tail": result.stdout.splitlines()[-30:],
     }
+    if parsed_json is not None:
+        payload["json"] = parsed_json
+    return payload
+
+
+def _operator_panel_static_command() -> list[str]:
+    suffix = ".cmd" if os.name == "nt" else ""
+    local = REPO_ROOT / "apps" / "operator-panel" / "node_modules" / ".bin" / f"tsx{suffix}"
+    if local.exists():
+        return [
+            str(local),
+            "apps/operator-panel/scripts/assert-no-inert-primary-actions.ts",
+        ]
+    return [
+        "corepack",
+        "pnpm",
+        "--dir",
+        "apps/operator-panel",
+        "exec",
+        "tsx",
+        "scripts/assert-no-inert-primary-actions.ts",
+    ]
 
 
 def _git(args: list[str]) -> str:
@@ -120,17 +163,37 @@ def build_command_plan(
             "required": True,
         },
         {
+            "name": "assistant_system_knowledge_gate",
+            "readiness": "assistantSystemKnowledge",
+            "command": [
+                "uv",
+                "run",
+                "python",
+                "scripts/run_assistant_system_knowledge_gate.py",
+                "--profile",
+                profile,
+                "--json",
+            ],
+            "required": True,
+        },
+        {
+            "name": "assistant_governed_tasking_gate",
+            "readiness": "assistantTasking",
+            "command": [
+                "uv",
+                "run",
+                "python",
+                "scripts/run_assistant_governed_tasking_gate.py",
+                "--profile",
+                profile,
+                "--json",
+            ],
+            "required": True,
+        },
+        {
             "name": "operator_panel_static",
             "readiness": "operatorPanel",
-            "command": [
-                "corepack",
-                "pnpm",
-                "--dir",
-                "apps/operator-panel",
-                "exec",
-                "tsx",
-                "scripts/assert-no-inert-primary-actions.ts",
-            ],
+            "command": _operator_panel_static_command(),
             "required": True,
         },
         {
@@ -224,6 +287,8 @@ def build_command_plan(
 def _empty_readiness() -> dict[str, str]:
     return {
         "assistant": "pass",
+        "assistantSystemKnowledge": "pass",
+        "assistantTasking": "pass",
         "operatorPanel": "pass",
         "enterpriseWorkspace": "pass",
         "governedWorkflow": "pass",
@@ -316,14 +381,14 @@ def _write_outputs(
 def _conditional_notes(checks: list[dict[str, Any]]) -> list[str]:
     notes: list[str] = []
     for check in checks:
-        if check["name"] != "macos_local_trial_gate":
-            continue
-        if check["status"] == "pass":
+        if check["name"] == "macos_local_trial_gate" and check["status"] == "pass":
             notes.append("macOS local trial gate passed.")
-        elif check["status"] == "conditional":
+        elif check["name"] == "macos_local_trial_gate" and check["status"] == "conditional":
             notes.append("macOS local trial has setup-required notes.")
-        elif check["status"] == "fail":
+        elif check["name"] == "macos_local_trial_gate" and check["status"] == "fail":
             notes.append("macOS local trial is blocked.")
+        elif check["name"] == "assistant_real_runtime_gate" and check["status"] == "conditional":
+            notes.append("Assistant real runtime gate has setup-required notes.")
     return notes
 
 

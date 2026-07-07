@@ -79,12 +79,23 @@ def _resolve(command: list[str]) -> list[str]:
     return command
 
 
+def _command_cwd(command: list[str]) -> Path:
+    if command:
+        local_bin = REPO_ROOT / "apps" / "operator-panel" / "node_modules" / ".bin"
+        try:
+            if Path(command[0]).resolve().parent == local_bin.resolve():
+                return REPO_ROOT / "apps" / "operator-panel"
+        except OSError:
+            pass
+    return REPO_ROOT
+
+
 def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, Any]:
     started = time.monotonic()
     try:
         result = subprocess.run(
             _resolve(command),
-            cwd=REPO_ROOT,
+            cwd=_command_cwd(command),
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -117,6 +128,29 @@ def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, A
         "reasonCode": reason,
         "tail": [_redact(line) for line in result.stdout.splitlines()[-30:]],
     }
+
+
+def _node_bin(name: str) -> str | None:
+    suffix = ".cmd" if os.name == "nt" else ""
+    candidate = REPO_ROOT / "apps" / "operator-panel" / "node_modules" / ".bin" / f"{name}{suffix}"
+    return str(candidate) if candidate.exists() else None
+
+
+def _operator_panel_exec(name: str, args: list[str]) -> list[str]:
+    local = _node_bin(name)
+    if local is not None:
+        return [local, *args]
+    return ["corepack", "pnpm", "--dir", "apps/operator-panel", "exec", name, *args]
+
+
+def _operator_panel_script(script: str) -> list[str]:
+    if script == "test":
+        return _operator_panel_exec("vitest", ["run"])
+    if script == "lint":
+        local = _node_bin("eslint")
+        if local is not None:
+            return [local, "."]
+    return ["corepack", "pnpm", "--dir", "apps/operator-panel", script]
 
 
 def _redact(value: str) -> str:
@@ -235,32 +269,30 @@ def build_command_plan(
         [
             {
                 "name": "operator_panel_test",
-                "command": ["corepack", "pnpm", "--dir", "apps/operator-panel", "test"],
+                "command": _operator_panel_script("test"),
                 "required": True,
             },
             {
                 "name": "operator_panel_lint",
-                "command": ["corepack", "pnpm", "--dir", "apps/operator-panel", "lint"],
+                "command": _operator_panel_script("lint"),
+                "required": True,
+            },
+            {
+                "name": "operator_panel_typecheck",
+                "command": _operator_panel_exec("tsc", ["-b"]),
                 "required": True,
             },
             {
                 "name": "operator_panel_build",
-                "command": ["corepack", "pnpm", "--dir", "apps/operator-panel", "build"],
+                "command": _operator_panel_exec("vite", ["build"]),
                 "required": True,
             },
             {
                 "name": "enterprise_workspace_e2e",
-                "command": [
-                    "corepack",
-                    "pnpm",
-                    "--dir",
-                    "apps/operator-panel",
-                    "exec",
+                "command": _operator_panel_exec(
                     "playwright",
-                    "test",
-                    "e2e/enterprise-workspace.spec.ts",
-                    "--pass-with-no-tests",
-                ],
+                    ["test", "e2e/enterprise-workspace.spec.ts", "--pass-with-no-tests"],
+                ),
                 "required": True,
             },
             {

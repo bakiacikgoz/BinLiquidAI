@@ -8,6 +8,10 @@ import type {
   AssistantTurn,
   AssistantUiError,
 } from './assistantTypes';
+import {
+  normalizeAssistantTaskPlan,
+  normalizeAssistantTaskSubmissionResult,
+} from './assistantTaskingMappers';
 
 type RecordValue = Record<string, unknown>;
 
@@ -91,6 +95,9 @@ export function createAssistantTurn(input: {
       approval: null,
       referencedRuns: [],
       referencedArtifacts: [],
+      knowledgeSources: [],
+      taskPlan: null,
+      taskSubmission: null,
       metrics: null,
       warning: null,
       error: null,
@@ -129,6 +136,9 @@ function normalizeEventName(value: unknown): AssistantStreamEventType {
     'router_decision',
     'policy_decision',
     'approval_pending',
+    'knowledge_sources',
+    'task_plan',
+    'task_submission',
     'expert_start',
     'expert_end',
     'audit_artifact',
@@ -183,6 +193,9 @@ export function mapCliAssistantEvent(
       timeline: [...item.assistantMessage.timeline],
       referencedRuns: [...item.assistantMessage.referencedRuns],
       referencedArtifacts: [...item.assistantMessage.referencedArtifacts],
+      knowledgeSources: [...(item.assistantMessage.knowledgeSources ?? [])],
+      taskPlan: item.assistantMessage.taskPlan ? { ...item.assistantMessage.taskPlan } : null,
+      taskSubmission: item.assistantMessage.taskSubmission ? { ...item.assistantMessage.taskSubmission } : null,
     },
   }));
   const turn = turns[turnIndex];
@@ -277,6 +290,54 @@ export function mapCliAssistantEvent(
         referencedArtifacts: [...previous.referencedArtifacts, artifact],
         error: null,
       };
+    }
+    case 'knowledge_sources': {
+      const sources = readArray(data, 'sources')
+        .map(asRecord)
+        .map((source) => ({
+          path: readString(source, 'path'),
+          heading: readString(source, 'heading'),
+          score: typeof source.score === 'number' ? source.score : 0,
+          snippet: readString(source, 'snippet') || undefined,
+        }))
+        .filter((source) => source.path);
+      turn.assistantMessage.knowledgeSources = sources;
+      appendTimeline(turn, event, {
+        tone: sources.length > 0 ? 'info' : 'warning',
+        title: 'Knowledge sources',
+        subtitle: sources.length > 0 ? `${sources.length} local sources attached` : 'No local knowledge sources found',
+        timestampUtc: event.timestampUtc,
+      });
+      return { ...previous, turns, error: null };
+    }
+    case 'task_plan': {
+      const plan = normalizeAssistantTaskPlan(data.plan ?? data);
+      turn.assistantMessage.taskPlan = plan;
+      appendTimeline(turn, event, {
+        tone: plan.safeToSubmit ? 'success' : 'warning',
+        title: 'Task proposal',
+        subtitle: `${plan.proposalId} ${plan.policyPreview.reasonCode}`,
+        timestampUtc: event.timestampUtc,
+      });
+      return { ...previous, turns, status: 'streaming', error: null };
+    }
+    case 'task_submission': {
+      const submission = normalizeAssistantTaskSubmissionResult(data.submission ?? data);
+      turn.assistantMessage.taskSubmission = submission;
+      if (submission.runId) {
+        turn.assistantMessage.referencedRuns.push({
+          id: submission.runId,
+          status: submission.status,
+          summary: submission.reasonCode,
+        });
+      }
+      appendTimeline(turn, event, {
+        tone: submission.status === 'accepted' ? 'success' : 'warning',
+        title: 'Task submission',
+        subtitle: `${submission.proposalId} ${submission.reasonCode}`,
+        timestampUtc: event.timestampUtc,
+      });
+      return { ...previous, turns, status: 'streaming', error: null };
     }
     case 'final': {
       const finalText = readString(data, 'final_text') || readString(data, 'text') || readString(data, 'content');

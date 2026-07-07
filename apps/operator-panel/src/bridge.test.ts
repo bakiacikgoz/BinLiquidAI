@@ -12,13 +12,16 @@ import {
   isPreviewAllowedForEnv,
   listAssistantModels,
   listRuns,
+  planAssistantTask,
   pauseComputerUseSession,
   readArtifact,
   resumeComputerUseSession,
   resolveConfig,
+  searchAssistantSystemKnowledge,
   showApproval,
   startAssistantTurn,
   stopComputerUseSession,
+  submitAssistantTask,
   submitComputerUseRun,
   submitTeamRun,
   tailEvents,
@@ -89,6 +92,34 @@ describe('bridge preview fallback', () => {
     expect(payload.assistantTurnId).toBe('turn-preview');
     expect(payload.sessionId).toBe('session-preview');
     expect(payload.processId).toBeNull();
+  });
+
+  it('returns preview assistant system knowledge sources', async () => {
+    const payload = await searchAssistantSystemKnowledge({ ...DEFAULT_SETTINGS }, 'AegisOS agent task');
+
+    expect(payload.contractVersion).toBe('operator-panel.assistant-system-knowledge/v1');
+    expect(payload.status).toBe('ready');
+    expect(payload.context.status).toBe('available');
+    expect(payload.context.sources[0]?.path).toBe('docs/AI_ASSISTANT_SYSTEM_KNOWLEDGE.md');
+  });
+
+  it('returns preview governed assistant task plan and submission payloads', async () => {
+    const plan = await planAssistantTask({ ...DEFAULT_SETTINGS }, { message: 'write external ticket' });
+    const submission = await submitAssistantTask(
+      { ...DEFAULT_SETTINGS },
+      {
+        proposalId: plan.proposalId,
+        confirmPlanHash: plan.planHash,
+        operatorId: 'operator-preview',
+      },
+    );
+
+    expect(plan.schemaVersion).toBe('assistant-tasking.plan/v1');
+    expect(plan.policyPreview.decision).toBe('require_approval');
+    expect(plan.safeToSubmit).toBe(true);
+    expect(submission.schemaVersion).toBe('assistant-tasking.submission/v1');
+    expect(submission.status).toBe('blocked_pending_approval');
+    expect(submission.approvalId).toBe('apr-preview-task-001');
   });
 
   it('returns preview assistant cancel payloads without a bridge process', async () => {

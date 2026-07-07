@@ -1166,6 +1166,192 @@ pub async fn bridge_assistant_provider_models(
 }
 
 #[tauri::command]
+pub async fn bridge_assistant_knowledge_search(
+    config: BridgeConfig,
+    query: String,
+    max_hits: Option<u16>,
+    max_context_chars: Option<u32>,
+) -> BridgeResult<Value> {
+    let query = match normalize_required_text(&query, "query", "assistant knowledge search") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let mut args = vec![
+        "assistant".to_string(),
+        "knowledge".to_string(),
+        "search".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--query".to_string(),
+        query,
+        "--max-hits".to_string(),
+        max_hits.unwrap_or(8).to_string(),
+        "--max-context-chars".to_string(),
+        max_context_chars.unwrap_or(8000).to_string(),
+        "--include-context".to_string(),
+        "--json".to_string(),
+    ];
+    match run_cli_json_owned(&config, std::mem::take(&mut args)).await {
+        Ok(mut value) => {
+            if let Some(object) = value.as_object_mut() {
+                object.insert(
+                    "contractVersion".to_string(),
+                    Value::String("operator-panel.assistant-system-knowledge/v1".to_string()),
+                );
+                if let Some(context) = object.get("context").and_then(Value::as_object) {
+                    if let Some(context_text) = context.get("contextText").cloned() {
+                        object.insert("contextText".to_string(), context_text);
+                    }
+                }
+            }
+            BridgeResult::ok(value)
+        }
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_assistant_task_plan(
+    config: BridgeConfig,
+    message: String,
+    operator_id: Option<String>,
+    workspace_id: Option<String>,
+    agent_hint: Option<String>,
+) -> BridgeResult<Value> {
+    let message = match normalize_required_text(&message, "message", "assistant task plan") {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let mut args = vec![
+        "assistant".to_string(),
+        "task".to_string(),
+        "plan".to_string(),
+        "--message".to_string(),
+        message,
+        "--profile".to_string(),
+        config.profile(),
+        "--root-dir".to_string(),
+        config.root_dir(),
+        "--json".to_string(),
+    ];
+    push_optional_arg(&mut args, "--operator-id", operator_id.as_deref());
+    push_optional_arg(&mut args, "--workspace-id", workspace_id.as_deref());
+    push_optional_arg(&mut args, "--agent-hint", agent_hint.as_deref());
+
+    match run_cli_json_owned(&config, args).await {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_assistant_task_submit(
+    config: BridgeConfig,
+    proposal_id: String,
+    confirm_plan_hash: String,
+    operator_id: String,
+) -> BridgeResult<Value> {
+    let proposal_id =
+        match normalize_required_text(&proposal_id, "proposal_id", "assistant task submit") {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
+    let confirm_plan_hash = match normalize_required_text(
+        &confirm_plan_hash,
+        "confirm_plan_hash",
+        "assistant task submit",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let operator_id =
+        match normalize_required_text(&operator_id, "operator_id", "assistant task submit") {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "assistant".to_string(),
+            "task".to_string(),
+            "submit".to_string(),
+            "--proposal-id".to_string(),
+            proposal_id,
+            "--confirm-plan-hash".to_string(),
+            confirm_plan_hash,
+            "--operator-id".to_string(),
+            operator_id,
+            "--profile".to_string(),
+            config.profile(),
+            "--root-dir".to_string(),
+            config.root_dir(),
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_assistant_task_status(
+    config: BridgeConfig,
+    proposal_id: String,
+) -> BridgeResult<Value> {
+    let proposal_id =
+        match normalize_required_text(&proposal_id, "proposal_id", "assistant task status") {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "assistant".to_string(),
+            "task".to_string(),
+            "status".to_string(),
+            "--proposal-id".to_string(),
+            proposal_id,
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_assistant_task_explain(
+    config: BridgeConfig,
+    proposal_id: String,
+) -> BridgeResult<Value> {
+    let proposal_id =
+        match normalize_required_text(&proposal_id, "proposal_id", "assistant task explain") {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
+    match run_cli_json_owned(
+        &config,
+        vec![
+            "assistant".to_string(),
+            "task".to_string(),
+            "explain".to_string(),
+            "--proposal-id".to_string(),
+            proposal_id,
+            "--json".to_string(),
+        ],
+    )
+    .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(error),
+    }
+}
+
+#[tauri::command]
 pub async fn bridge_auth_whoami(config: BridgeConfig) -> BridgeResult<Value> {
     match run_cli_json_owned(
         &config,
@@ -2091,8 +2277,8 @@ fn parse_assistant_json_line(
 fn normalize_assistant_event_name(value: &str) -> &str {
     match value {
         "status" | "token" | "router_decision" | "policy_decision" | "approval_pending"
-        | "expert_start" | "expert_end" | "audit_artifact" | "final" | "warning" | "error"
-        | "cancelled" => value,
+        | "knowledge_sources" | "task_plan" | "task_submission" | "expert_start"
+        | "expert_end" | "audit_artifact" | "final" | "warning" | "error" | "cancelled" => value,
         _ => "status",
     }
 }

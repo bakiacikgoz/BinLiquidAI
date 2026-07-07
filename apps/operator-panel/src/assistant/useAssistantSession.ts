@@ -4,7 +4,9 @@ import {
   cancelAssistantTurn,
   isBridgePreviewMode,
   listenAssistantEvents,
+  searchAssistantSystemKnowledge,
   startAssistantTurn,
+  submitAssistantTask,
 } from '../bridge';
 import {
   assistantRuntimeOptionsFromSettings,
@@ -12,6 +14,7 @@ import {
   type PanelSettings,
 } from '../settings';
 import { buildAssistantPrompt } from './assistantPromptBuilder';
+import type { AssistantSystemKnowledgeContext } from './assistantSystemKnowledge';
 import { previewAssistantEvents } from './assistantFixtures';
 import {
   createAssistantSession,
@@ -28,6 +31,22 @@ import type {
 } from './assistantTypes';
 
 const ASSISTANT_TURN_TIMEOUT_MS = 120_000;
+
+function unavailableSystemKnowledge(message: string): AssistantSystemKnowledgeContext {
+  return {
+    status: 'unavailable',
+    identityBrief:
+      'AegisOS/BinLiquid platform usage answers must be grounded in local system knowledge and visible runtime context.',
+    answerRules: [
+      'Do not guess AegisOS platform behavior without verified local sources.',
+      'Tell the operator to rebuild or inspect the local system knowledge index.',
+    ],
+    sources: [],
+    contextText: message,
+    omittedSources: [],
+    blockingReasons: ['ASSISTANT_KNOWLEDGE_UNAVAILABLE'],
+  };
+}
 
 export type AssistantContextSnapshot = {
   selectedRunId: string;
@@ -47,6 +66,7 @@ export type AssistantSessionActions = {
   newChat: () => void;
   regenerate: (turnId: string, runtimeSettings?: AssistantRuntimeSettings) => Promise<void>;
   cancel: () => Promise<void>;
+  submitTaskProposal: (proposalId: string, confirmPlanHash: string) => Promise<void>;
   applyEvent: (event: AssistantStreamEvent) => void;
   markApprovalDetailLoaded: (approvalId: string, detail: unknown) => void;
   appendSystemMessage: (message: string) => void;
@@ -178,6 +198,36 @@ export function useAssistantSession(
       setState(nextStateWithContext);
       stateRef.current = nextStateWithContext;
 
+      let systemKnowledge: AssistantSystemKnowledgeContext;
+      try {
+        const knowledgeResponse = await searchAssistantSystemKnowledge(settings, userMessage);
+        systemKnowledge = knowledgeResponse.context;
+        applyEvent({
+          contractVersion: '2.0',
+          assistantTurnId: turn.id,
+          sessionId: stateRef.current.sessionId,
+          event: 'knowledge_sources',
+          sequence: 0.5,
+          timestampUtc: new Date().toISOString(),
+          data: {
+            status: knowledgeResponse.status,
+            intent: knowledgeResponse.intent,
+            sources: knowledgeResponse.context.sources.map((source) => ({
+              path: source.path,
+              heading: source.heading,
+              score: source.score,
+              snippet: source.snippet,
+            })),
+            blockingReasons: knowledgeResponse.blockingReasons,
+          },
+        });
+      } catch (error) {
+        const normalized = normalizeAssistantError(error);
+        systemKnowledge = unavailableSystemKnowledge(
+          `Local AegisOS system knowledge is unavailable: ${normalized.code}. Suggested command: uv run binliquid assistant knowledge build --profile enterprise --json`,
+        );
+      }
+
       const prompt = buildAssistantPrompt({
         userMessage,
         session: stateRef.current,
@@ -186,6 +236,7 @@ export function useAssistantSession(
         selectedArtifacts: context.selectedArtifacts,
         pendingApproval: context.pendingApproval,
         systemHealth: context.systemHealth,
+        systemKnowledge,
         controls,
       });
 
@@ -262,6 +313,47 @@ export function useAssistantSession(
     });
   }, [applyEvent, clearTurnTimeout, settings]);
 
+  const submitTaskProposal = useCallback(
+    async (proposalId: string, confirmPlanHash: string) => {
+      const current = stateRef.current;
+      const turn = current.turns
+        .slice()
+        .reverse()
+        .find((item) => item.assistantMessage.taskPlan?.proposalId === proposalId);
+      if (!turn || !confirmPlanHash || !settings.operatorId.trim()) {
+        return;
+      }
+      try {
+        const submission = await submitAssistantTask(settings, {
+          proposalId,
+          confirmPlanHash,
+          operatorId: settings.operatorId.trim(),
+        });
+        applyEvent({
+          contractVersion: '2.0',
+          assistantTurnId: turn.id,
+          sessionId: current.sessionId,
+          event: 'task_submission',
+          sequence: turn.eventSequence + 1,
+          timestampUtc: new Date().toISOString(),
+          data: submission,
+        });
+      } catch (error) {
+        const normalized = normalizeAssistantError(error);
+        applyEvent({
+          contractVersion: '2.0',
+          assistantTurnId: turn.id,
+          sessionId: current.sessionId,
+          event: 'error',
+          sequence: turn.eventSequence + 1,
+          timestampUtc: new Date().toISOString(),
+          data: normalized,
+        });
+      }
+    },
+    [applyEvent, settings],
+  );
+
   const markApprovalDetailLoaded = useCallback((approvalId: string, detail: unknown) => {
     setState((previous) => ({
       ...previous,
@@ -323,6 +415,7 @@ export function useAssistantSession(
       newChat,
       regenerate,
       cancel,
+      submitTaskProposal,
       applyEvent,
       markApprovalDetailLoaded,
       appendSystemMessage,

@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "KnowledgeHit": {
+      "additionalProperties": false,
+      "properties": {
+        "chunkId": {
+          "title": "Chunkid",
+          "type": "string"
+        },
+        "commands": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "heading": {
+          "default": "",
+          "title": "Heading",
+          "type": "string"
+        },
+        "matchedTerms": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Matchedterms",
+          "type": "array"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "snippet": {
+          "maxLength": 1200,
+          "title": "Snippet",
+          "type": "string"
+        },
+        "sourceHash": {
+          "title": "Sourcehash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "chunkId",
+        "path",
+        "snippet",
+        "score",
+        "sourceHash"
+      ],
+      "title": "KnowledgeHit",
+      "type": "object"
+    },
+    "KnowledgeIntent": {
+      "enum": [
+        "platform_usage",
+        "agent_task",
+        "approval",
+        "run_evidence",
+        "provider",
+        "memory",
+        "computer_use",
+        "deployment",
+        "unknown"
+      ],
+      "title": "KnowledgeIntent",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blockingReasons": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockingreasons",
+      "type": "array"
+    },
+    "generatedAtUtc": {
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "hits": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/KnowledgeHit"
+      },
+      "title": "Hits",
+      "type": "array"
+    },
+    "intent": {
+      "$ref": "#/$defs/KnowledgeIntent"
+    },
+    "normalizedQuery": {
+      "title": "Normalizedquery",
+      "type": "string"
+    },
+    "queryHash": {
+      "title": "Queryhash",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "assistant.system-knowledge-search/v1",
+      "default": "assistant.system-knowledge-search/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "no_hits",
+        "stale",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "intent",
+    "queryHash",
+    "normalizedQuery",
+    "generatedAtUtc"
+  ],
+  "title": "KnowledgeSearchResult",
+  "type": "object"
+}

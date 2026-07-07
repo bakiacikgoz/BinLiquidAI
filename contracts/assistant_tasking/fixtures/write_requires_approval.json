@@ -1,0 +1,69 @@
+{
+  "approvalRequired": true,
+  "blockedReasons": [],
+  "candidateAgents": [
+    {
+      "agentId": "external-agent",
+      "allowedSurfaces": [
+        "external_gateway"
+      ],
+      "blockedSurfaces": [],
+      "blockingReasons": [],
+      "declaredActions": [
+        "read",
+        "external_write"
+      ],
+      "enrolled": true,
+      "label": "external-agent",
+      "principalId": "principal-agent",
+      "qualificationStatus": "ready",
+      "workspaceId": "pilot-workspace"
+    }
+  ],
+  "createdAtUtc": "2026-01-01T00:00:00Z",
+  "evidenceExpectation": {
+    "expectedRefs": [
+      "artifacts/assistant-tasking/proposals/astp_write_fixture.json"
+    ],
+    "mode": "hash_only_redacted",
+    "rawContentPersisted": false
+  },
+  "idempotencyKey": "assistant-task:astp_write_fixture",
+  "intentKind": "plan_agent_task",
+  "planHash": "sha256:99719f8157f65dbb65e653d28c371889ed9e81cbb843b6f24700d31e2b023944",
+  "policyPreview": {
+    "approvalRequired": true,
+    "blockedReasons": [],
+    "decision": "require_approval",
+    "reasonCode": "ASSISTANT_TASK_WRITE_REQUIRES_APPROVAL",
+    "riskClass": "external_write",
+    "safeToSubmit": true
+  },
+  "proposalId": "astp_write_fixture",
+  "riskClass": "external_write",
+  "safeToSubmit": true,
+  "schemaVersion": "assistant-tasking.plan/v1",
+  "selectedAgent": {
+    "agentId": "external-agent",
+    "allowedSurfaces": [
+      "external_gateway"
+    ],
+    "blockedSurfaces": [],
+    "blockingReasons": [],
+    "declaredActions": [
+      "read",
+      "external_write"
+    ],
+    "enrolled": true,
+    "label": "external-agent",
+    "principalId": "principal-agent",
+    "qualificationStatus": "ready",
+    "workspaceId": "pilot-workspace"
+  },
+  "sourceRefs": [
+    "docs/ASSISTANT_GOVERNED_TASKING.md"
+  ],
+  "status": "planned",
+  "submitMode": "proposal_first",
+  "taskSummary": "Fixture task for astp_write_fixture"
+}

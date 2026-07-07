@@ -30,6 +30,29 @@ def _resolve(command: list[str]) -> list[str]:
     return command
 
 
+def _vitest_command() -> list[str]:
+    suffix = ".cmd" if os.name == "nt" else ""
+    local = REPO_ROOT / "apps" / "operator-panel" / "node_modules" / ".bin" / f"vitest{suffix}"
+    if local.exists():
+        return [
+            str(local),
+            "run",
+            "src/assistant",
+            "src/components/assistant",
+        ]
+    return [
+        "corepack",
+        "pnpm",
+        "--dir",
+        "apps/operator-panel",
+        "exec",
+        "vitest",
+        "run",
+        "src/assistant",
+        "src/components/assistant",
+    ]
+
+
 def _extract_json(text: str) -> dict[str, Any] | None:
     start = text.find("{")
     end = text.rfind("}")
@@ -42,13 +65,19 @@ def _extract_json(text: str) -> dict[str, Any] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, Any]:
+def _run(
+    command: list[str],
+    *,
+    name: str,
+    required: bool = True,
+    cwd: Path = REPO_ROOT,
+) -> dict[str, Any]:
     started = time.monotonic()
     env = {**os.environ, "COREPACK_ENABLE_AUTO_PIN": "0"}
     try:
         result = subprocess.run(
             _resolve(command),
-            cwd=REPO_ROOT,
+            cwd=cwd,
             env=env,
             text=True,
             encoding="utf-8",
@@ -74,6 +103,9 @@ def _run(command: list[str], *, name: str, required: bool = True) -> dict[str, A
     if name == "assistant_doctor" and result.returncode == 3:
         status = "conditional"
         reason = "ASSISTANT_SETUP_REQUIRED_DIAGNOSTIC"
+    if name == "assistant_knowledge_doctor" and result.returncode == 3:
+        status = "conditional"
+        reason = "ASSISTANT_KNOWLEDGE_SETUP_REQUIRED_DIAGNOSTIC"
     payload = {
         "name": name,
         "command": command,
@@ -139,18 +171,24 @@ def build_command_plan(profile: str) -> list[dict[str, Any]]:
             "required": True,
         },
         {
-            "name": "assistant_frontend_tests",
+            "name": "assistant_knowledge_doctor",
             "command": [
-                "corepack",
-                "pnpm",
-                "--dir",
-                "apps/operator-panel",
-                "exec",
-                "vitest",
+                "uv",
                 "run",
-                "src/assistant",
-                "src/components/assistant",
+                "binliquid",
+                "assistant",
+                "knowledge",
+                "doctor",
+                "--profile",
+                profile,
+                "--json",
             ],
+            "required": False,
+        },
+        {
+            "name": "assistant_frontend_tests",
+            "command": _vitest_command(),
+            "cwd": REPO_ROOT / "apps" / "operator-panel",
             "required": True,
         },
         {
@@ -192,7 +230,12 @@ def run_assistant_gate(
     results: list[dict[str, Any]] = []
     if not skip_commands:
         for item in build_command_plan(profile):
-            result = _run(item["command"], name=item["name"], required=item["required"])
+            result = _run(
+                item["command"],
+                name=item["name"],
+                required=item["required"],
+                cwd=item.get("cwd", REPO_ROOT),
+            )
             results.append(result)
             if result["required"] and result["status"] != "pass":
                 break

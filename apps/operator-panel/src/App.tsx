@@ -1960,6 +1960,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}
             onExecute={(approvalId) => void onExecuteAssistantApproval(approvalId)}
             onRegenerate={(turnId) => void assistantSession.actions.regenerate(turnId, assistantRuntimeSettings)}
+            onSubmitTask={(proposalId, confirmPlanHash) =>
+              void assistantSession.actions.submitTaskProposal(proposalId, confirmPlanHash)
+            }
             onCancel={() => void onCancelAssistantTurn()}
             onOpenTerminal={openRunTerminalView}
           />

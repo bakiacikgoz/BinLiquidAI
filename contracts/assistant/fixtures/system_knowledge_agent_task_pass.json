@@ -1,0 +1,28 @@
+{
+  "blockingReasons": [],
+  "generatedAtUtc": "2026-01-01T00:00:00Z",
+  "hits": [
+    {
+      "chunkId": "docs/EXTERNAL_AGENT_GATEWAY_GUIDE.md#external-agent-gateway-guide",
+      "commands": [
+        "uv run binliquid control-plane agent register --spec examples/agents/local_stdio_agent.json --json",
+        "uv run binliquid external-agent gateway submit-v1-1 --request examples/external_agent/read_only_request.json --json"
+      ],
+      "heading": "External Agent Gateway Guide",
+      "matchedTerms": [
+        "agent",
+        "gateway",
+        "gorev"
+      ],
+      "path": "docs/EXTERNAL_AGENT_GATEWAY_GUIDE.md",
+      "score": 0.93,
+      "snippet": "Register the external agent in Control Plane, then submit governed requests through the external agent gateway. External writes require approval evidence.",
+      "sourceHash": "sha256:fixture-external-agent-gateway"
+    }
+  ],
+  "intent": "agent_task",
+  "normalizedQuery": "aegisos sisteminde nasil bir agent e gorev verebilirim",
+  "queryHash": "sha256:851146fac7cd687861805ef83f438d83599087e835acf9a229d4cab95456b385",
+  "schemaVersion": "assistant.system-knowledge-search/v1",
+  "status": "ready"
+}

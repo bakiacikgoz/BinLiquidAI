@@ -13,6 +13,8 @@ The gate aggregates:
 
 - Product scope and no-ship register.
 - Real assistant runtime diagnostics.
+- Assistant system knowledge grounding.
+- Assistant governed tasking gate.
 - Operator Panel route/action productization.
 - First-run readiness diagnostics.
 - Enterprise workspace onboarding.

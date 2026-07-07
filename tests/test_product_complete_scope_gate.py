@@ -14,6 +14,7 @@ def test_product_complete_no_ship_blocks_unsupported_claims() -> None:
     register = build_product_complete_no_ship_register(
         ProductCompleteInput(
             assistant_preview_in_product_mode=True,
+            assistant_task_destructive_allowed=True,
             fake_model_discovery=True,
             public_cloud_saas_claim=True,
             unrestricted_live_computer_use_claim=True,
@@ -23,8 +24,9 @@ def test_product_complete_no_ship_blocks_unsupported_claims() -> None:
 
     reason_codes = {item.reason_code for item in register.items}
     assert register.status == "blocked"
-    assert register.blocking_count == 5
+    assert register.blocking_count == 6
     assert "ASSISTANT_PREVIEW_IN_PRODUCT_MODE" in reason_codes
+    assert "ASSISTANT_TASK_DESTRUCTIVE_ALLOWED" in reason_codes
     assert "ASSISTANT_MODEL_DISCOVERY_FAKE" in reason_codes
     assert "PUBLIC_CLOUD_SAAS_OUT_OF_SCOPE" in reason_codes
     assert "COMPUTER_USE_UNQUALIFIED_CLAIM" in reason_codes

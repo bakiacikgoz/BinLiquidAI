@@ -1,0 +1,77 @@
+{
+  "approvalRequired": false,
+  "blockedReasons": [
+    "ASSISTANT_TASK_UNKNOWN_AGENT_DENIED"
+  ],
+  "candidateAgents": [
+    {
+      "agentId": "unknown-agent",
+      "allowedSurfaces": [],
+      "blockedSurfaces": [
+        "external_gateway"
+      ],
+      "blockingReasons": [
+        "ASSISTANT_TASK_UNENROLLED_AGENT_DENIED"
+      ],
+      "declaredActions": [
+        "read",
+        "external_write"
+      ],
+      "enrolled": false,
+      "label": "unknown-agent",
+      "principalId": "principal-agent",
+      "qualificationStatus": "blocked",
+      "workspaceId": "pilot-workspace"
+    }
+  ],
+  "createdAtUtc": "2026-01-01T00:00:00Z",
+  "evidenceExpectation": {
+    "expectedRefs": [
+      "artifacts/assistant-tasking/proposals/astp_unknown_fixture.json"
+    ],
+    "mode": "hash_only_redacted",
+    "rawContentPersisted": false
+  },
+  "idempotencyKey": "assistant-task:astp_unknown_fixture",
+  "intentKind": "plan_agent_task",
+  "planHash": "sha256:2910ebed6242b3be56d797244a6f54fb7831b8ffd18e27fc044f6f27832a6378",
+  "policyPreview": {
+    "approvalRequired": false,
+    "blockedReasons": [
+      "ASSISTANT_TASK_UNKNOWN_AGENT_DENIED"
+    ],
+    "decision": "deny",
+    "reasonCode": "ASSISTANT_TASK_UNKNOWN_AGENT_DENIED",
+    "riskClass": "unknown",
+    "safeToSubmit": false
+  },
+  "proposalId": "astp_unknown_fixture",
+  "riskClass": "unknown",
+  "safeToSubmit": false,
+  "schemaVersion": "assistant-tasking.plan/v1",
+  "selectedAgent": {
+    "agentId": "unknown-agent",
+    "allowedSurfaces": [],
+    "blockedSurfaces": [
+      "external_gateway"
+    ],
+    "blockingReasons": [
+      "ASSISTANT_TASK_UNENROLLED_AGENT_DENIED"
+    ],
+    "declaredActions": [
+      "read",
+      "external_write"
+    ],
+    "enrolled": false,
+    "label": "unknown-agent",
+    "principalId": "principal-agent",
+    "qualificationStatus": "blocked",
+    "workspaceId": "pilot-workspace"
+  },
+  "sourceRefs": [
+    "docs/ASSISTANT_GOVERNED_TASKING.md"
+  ],
+  "status": "blocked",
+  "submitMode": "disabled_with_reason",
+  "taskSummary": "Fixture task for astp_unknown_fixture"
+}

@@ -1,0 +1,18 @@
+{
+  "approvalId": null,
+  "blockedReasons": [
+    "ASSISTANT_TASK_IDEMPOTENCY_CONFLICT_ACCEPTED"
+  ],
+  "evidenceRef": null,
+  "generatedAtUtc": "2026-01-01T00:00:00Z",
+  "idempotencyStatus": null,
+  "nextActions": [],
+  "planHash": "sha256:a67b261f1605031e5f5b0032f8d20e35dcd3a827600e9c6e50f33391f0b66abc",
+  "policyDecision": "deny",
+  "proposalId": "astp_conflict_fixture",
+  "reasonCode": "ASSISTANT_TASK_IDEMPOTENCY_CONFLICT_ACCEPTED",
+  "replayStatus": null,
+  "runId": null,
+  "schemaVersion": "assistant-tasking.submission/v1",
+  "status": "invalid_request"
+}

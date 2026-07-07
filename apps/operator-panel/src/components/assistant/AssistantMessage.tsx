@@ -6,8 +6,11 @@ import { Card } from '../primitives/Card';
 import { Icon } from '../primitives/Icon';
 import { AssistantActionPreview } from './AssistantActionPreview';
 import { AssistantApprovalCard } from './AssistantApprovalCard';
+import { AssistantKnowledgeSourcesCard } from './AssistantKnowledgeSourcesCard';
 import { AssistantRunReferences } from './AssistantRunReferences';
 import { AssistantRunningState } from './AssistantRunningState';
+import { AssistantTaskProposalCard } from './AssistantTaskProposalCard';
+import { AssistantTaskSubmitResult } from './AssistantTaskSubmitResult';
 
 type MarkdownBlock =
   | { type: 'code'; code: string; language: string }
@@ -284,6 +287,7 @@ export function AssistantMessage({
   onReject,
   onExecute,
   onRegenerate,
+  onSubmitTask,
 }: {
   turn: AssistantTurn;
   approvalDisabled: boolean;
@@ -296,9 +300,13 @@ export function AssistantMessage({
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
+  onSubmitTask?: (proposalId: string, confirmPlanHash: string) => void;
 }) {
   const text = assistantUiText[locale];
   const message = turn.assistantMessage;
+  const knowledgeSources = message.knowledgeSources ?? [];
+  const taskPlan = message.taskPlan ?? null;
+  const taskSubmission = message.taskSubmission ?? null;
   const primaryRun = message.referencedRuns[0];
   const hasDetailedFinding = Boolean(primaryRun) && !message.proposedAction;
   const hasAssistantOutput = Boolean(
@@ -307,6 +315,8 @@ export function AssistantMessage({
       message.error ||
       message.proposedAction ||
       message.approval ||
+      taskPlan ||
+      taskSubmission ||
       message.referencedRuns.length > 0 ||
       message.referencedArtifacts.length > 0,
   );
@@ -374,6 +384,8 @@ export function AssistantMessage({
             </dl>
           </div>
         ) : null}
+        {taskPlan ? <AssistantTaskProposalCard plan={taskPlan} onSubmit={onSubmitTask} /> : null}
+        {taskSubmission ? <AssistantTaskSubmitResult submission={taskSubmission} /> : null}
         {message.proposedAction ? <AssistantActionPreview action={message.proposedAction} locale={locale} /> : null}
         {message.approval ? (
           <AssistantApprovalCard
@@ -390,6 +402,9 @@ export function AssistantMessage({
             onReject={onReject}
             onExecute={onExecute}
           />
+        ) : null}
+        {knowledgeSources.length > 0 ? (
+          <AssistantKnowledgeSourcesCard sources={knowledgeSources} compact />
         ) : null}
         <AssistantRunReferences
           runs={message.referencedRuns}

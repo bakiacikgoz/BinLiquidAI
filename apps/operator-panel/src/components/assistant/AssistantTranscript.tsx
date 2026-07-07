@@ -22,6 +22,7 @@ export function AssistantTranscript({
   onReject,
   onExecute,
   onRegenerate,
+  onSubmitTask,
 }: {
   turns: AssistantTurn[];
   approvalDisabled: boolean;
@@ -34,6 +35,7 @@ export function AssistantTranscript({
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
+  onSubmitTask?: (proposalId: string, confirmPlanHash: string) => void;
 }) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const isAtLatestRef = useRef(true);
@@ -172,6 +174,7 @@ export function AssistantTranscript({
               onReject={onReject}
               onExecute={onExecute}
               onRegenerate={onRegenerate}
+              onSubmitTask={onSubmitTask}
             />
           </div>
         ))}

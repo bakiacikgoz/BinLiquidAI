@@ -20,6 +20,44 @@ describe('assistant prompt builder', () => {
     expect(result.compiledPrompt).toContain('untrusted context');
   });
 
+  it('includes system knowledge before the user message', () => {
+    const result = buildAssistantPrompt({
+      userMessage: 'AgeisOs sisteminde nasıl bir agent görevlendiririm?',
+      session: createAssistantSession('session-test'),
+      selectedRunStatus: null,
+      selectedRunEvents: [],
+      selectedArtifacts: {},
+      pendingApproval: null,
+      systemHealth: null,
+      systemKnowledge: {
+        status: 'available',
+        identityBrief: 'AegisOS/BinLiquid is an Agent Control Plane.',
+        answerRules: ['Cite local sources.', 'Do not guess.'],
+        sources: [
+          {
+            chunkId: 'docs/AI_ASSISTANT_SYSTEM_KNOWLEDGE.md#agent',
+            path: 'docs/AI_ASSISTANT_SYSTEM_KNOWLEDGE.md',
+            heading: 'Giving An Agent A Task',
+            snippet: 'Register the agent and submit a governed request.',
+            score: 0.95,
+            matchedTerms: ['agent'],
+            commands: ['uv run binliquid control-plane agent register --json'],
+            sourceHash: 'hash',
+          },
+        ],
+        contextText: 'Source: docs/AI_ASSISTANT_SYSTEM_KNOWLEDGE.md',
+        omittedSources: [],
+        blockingReasons: [],
+      },
+    });
+
+    expect(result.compiledPrompt).toContain('## AegisOS Assistant identity');
+    expect(result.compiledPrompt).toContain('## AegisOS local system knowledge');
+    expect(result.compiledPrompt.indexOf('## AegisOS local system knowledge')).toBeLessThan(
+      result.compiledPrompt.indexOf('## User message'),
+    );
+  });
+
   it('redacts obvious secrets before compiling context', () => {
     const result = buildAssistantPrompt({
       userMessage: 'inspect sk-abc1234567890000',

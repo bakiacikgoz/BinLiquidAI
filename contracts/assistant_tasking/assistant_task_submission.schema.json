@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "AssistantTaskPolicyDecision": {
+      "enum": [
+        "allow",
+        "require_approval",
+        "deny",
+        "unknown"
+      ],
+      "title": "AssistantTaskPolicyDecision",
+      "type": "string"
+    },
+    "AssistantTaskSubmitStatus": {
+      "enum": [
+        "accepted",
+        "blocked_pending_approval",
+        "denied",
+        "invalid_request",
+        "unknown_agent"
+      ],
+      "title": "AssistantTaskSubmitStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approvalId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approvalid"
+    },
+    "blockedReasons": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockedreasons",
+      "type": "array"
+    },
+    "evidenceRef": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidenceref"
+    },
+    "generatedAtUtc": {
+      "title": "Generatedatutc",
+      "type": "string"
+    },
+    "idempotencyStatus": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Idempotencystatus"
+    },
+    "nextActions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Nextactions",
+      "type": "array"
+    },
+    "planHash": {
+      "title": "Planhash",
+      "type": "string"
+    },
+    "policyDecision": {
+      "$ref": "#/$defs/AssistantTaskPolicyDecision"
+    },
+    "proposalId": {
+      "title": "Proposalid",
+      "type": "string"
+    },
+    "reasonCode": {
+      "title": "Reasoncode",
+      "type": "string"
+    },
+    "replayStatus": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Replaystatus"
+    },
+    "runId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runid"
+    },
+    "schemaVersion": {
+      "const": "assistant-tasking.submission/v1",
+      "default": "assistant-tasking.submission/v1",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/AssistantTaskSubmitStatus"
+    }
+  },
+  "required": [
+    "proposalId",
+    "planHash",
+    "status",
+    "policyDecision",
+    "reasonCode",
+    "generatedAtUtc"
+  ],
+  "title": "AssistantTaskSubmissionResult",
+  "type": "object"
+}

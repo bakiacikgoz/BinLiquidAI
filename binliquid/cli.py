@@ -16,6 +16,22 @@ from benchmarks.run_ablation import run_ablation_benchmark, run_energy_benchmark
 from benchmarks.run_smoke import run_smoke_benchmark
 from benchmarks.run_team import run_team_benchmark
 from binliquid import __version__
+from binliquid.assistant_knowledge import (
+    DEFAULT_INDEX_ROOT,
+    KnowledgeSearchRequest,
+    build_system_knowledge_context,
+    build_system_knowledge_index,
+    doctor_system_knowledge,
+    search_system_knowledge,
+)
+from binliquid.assistant_tasking import (
+    AssistantTaskPlanRequest,
+    AssistantTaskSubmissionRequest,
+    explain_task,
+    plan_task,
+    status_task,
+    submit_task,
+)
 from binliquid.computer_use import ComputerUseMode
 from binliquid.computer_use.runtime import ComputerUseRunner, SessionCommand
 from binliquid.computer_use.vision_runtime.capability_resolver import (
@@ -319,6 +335,16 @@ provider_native_conformance_app = typer.Typer(
     help="Model provider native adapter conformance commands"
 )
 assistant_app = typer.Typer(help="Product assistant runtime commands")
+assistant_knowledge_app = typer.Typer(help="Assistant local system knowledge commands")
+assistant_task_app = typer.Typer(help="Assistant governed agent tasking commands")
+ASSISTANT_KNOWLEDGE_OUTPUT_ROOT_OPTION = typer.Option(
+    "--output-root",
+    help="Knowledge artifact output root",
+)
+ASSISTANT_KNOWLEDGE_INDEX_ROOT_OPTION = typer.Option(
+    "--index-root",
+    help="Knowledge artifact root",
+)
 setup_app = typer.Typer(help="First-run setup diagnostics")
 product_app = typer.Typer(help="Product-complete demo and smoke commands")
 product_demo_app = typer.Typer(help="Product-complete demo workflows")
@@ -435,6 +461,8 @@ provider_app.add_typer(provider_route_app, name="route")
 provider_app.add_typer(provider_native_app, name="native")
 provider_native_app.add_typer(provider_native_conformance_app, name="conformance")
 app.add_typer(assistant_app, name="assistant")
+assistant_app.add_typer(assistant_knowledge_app, name="knowledge")
+assistant_app.add_typer(assistant_task_app, name="task")
 app.add_typer(setup_app, name="setup")
 app.add_typer(product_app, name="product")
 product_app.add_typer(product_demo_app, name="demo")
@@ -1556,6 +1584,193 @@ def assistant_doctor(
         raise typer.Exit(code=3)
 
 
+@assistant_knowledge_app.command("build")
+def assistant_knowledge_build(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    output_root: Annotated[Path, ASSISTANT_KNOWLEDGE_OUTPUT_ROOT_OPTION] = DEFAULT_INDEX_ROOT,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Build the local, deterministic assistant system knowledge index."""
+    manifest = build_system_knowledge_index(
+        repo_root=_assistant_knowledge_repo_root(),
+        output_root=output_root,
+        profile=profile,
+    )
+    payload = manifest.model_dump(mode="json", by_alias=True, exclude={"sources"})
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] != "ready":
+        raise typer.Exit(code=1)
+
+
+@assistant_knowledge_app.command("search")
+def assistant_knowledge_search(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    query: str = typer.Option(..., "--query", help="Search query"),
+    index_root: Annotated[Path, ASSISTANT_KNOWLEDGE_INDEX_ROOT_OPTION] = DEFAULT_INDEX_ROOT,
+    max_hits: int = typer.Option(8, "--max-hits", help="Maximum search hits"),
+    max_context_chars: int = typer.Option(
+        8000,
+        "--max-context-chars",
+        help="Maximum context chars",
+    ),
+    include_context: bool = typer.Option(
+        False,
+        "--include-context",
+        help="Include prompt context pack",
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Search local assistant system knowledge without network access."""
+    request = KnowledgeSearchRequest(
+        query=query,
+        profile=profile,
+        maxHits=max_hits,
+        maxContextChars=max_context_chars,
+    )
+    result = search_system_knowledge(
+        request,
+        repo_root=_assistant_knowledge_repo_root(),
+        index_root=index_root,
+    )
+    payload = result.model_dump(mode="json", by_alias=True)
+    if include_context:
+        payload["context"] = build_system_knowledge_context(
+            result,
+            max_chars=max_context_chars,
+        ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+    if result.status == "no_hits":
+        raise typer.Exit(code=1)
+
+
+@assistant_knowledge_app.command("doctor")
+def assistant_knowledge_doctor(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    output_root: Annotated[Path, ASSISTANT_KNOWLEDGE_OUTPUT_ROOT_OPTION] = DEFAULT_INDEX_ROOT,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Diagnose local assistant system knowledge index readiness."""
+    payload = doctor_system_knowledge(
+        repo_root=_assistant_knowledge_repo_root(),
+        output_root=output_root,
+        profile=profile,
+    ).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] == "ready":
+        return
+    raise typer.Exit(code=3 if payload["status"] in {"missing", "stale"} else 1)
+
+
+@assistant_knowledge_app.command("explain")
+def assistant_knowledge_explain(
+    profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
+    topic: str = typer.Option(..., "--topic", help="Topic such as agent-task or provider"),
+    index_root: Annotated[Path, ASSISTANT_KNOWLEDGE_INDEX_ROOT_OPTION] = DEFAULT_INDEX_ROOT,
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Return grounded source context for a system knowledge topic."""
+    topic_query = topic.replace("-", " ")
+    result = search_system_knowledge(
+        KnowledgeSearchRequest(query=topic_query, profile=profile),
+        repo_root=_assistant_knowledge_repo_root(),
+        index_root=index_root,
+    )
+    context = build_system_knowledge_context(result)
+    payload = {
+        "schemaVersion": "assistant.system-knowledge-explain/v1",
+        "profile": profile,
+        "topic": topic,
+        "status": result.status,
+        "intent": result.intent,
+        "sources": [hit.model_dump(mode="json", by_alias=True) for hit in context.sources],
+        "context": context.model_dump(mode="json", by_alias=True),
+        "blockingReasons": result.blocking_reasons,
+    }
+    _emit_payload(payload, json_output=json_output)
+    if result.status == "blocked":
+        raise typer.Exit(code=3)
+    if result.status == "no_hits":
+        raise typer.Exit(code=1)
+
+
+@assistant_task_app.command("plan")
+def assistant_task_plan(
+    message: str = typer.Option(..., "--message", help="Operator tasking request"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    operator_id: str = typer.Option("operator-local", "--operator-id"),
+    workspace_id: str = typer.Option("pilot-workspace", "--workspace-id"),
+    agent_hint: str | None = typer.Option(None, "--agent-hint"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Create a proposal-first governed assistant task plan."""
+    plan = plan_task(
+        AssistantTaskPlanRequest(
+            profile=profile,
+            message=message,
+            operatorId=operator_id,
+            workspaceId=workspace_id,
+            agentHint=agent_hint,
+            rootDir=root_dir,
+        )
+    )
+    payload = plan.model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if plan.status != "planned":
+        raise typer.Exit(code=3)
+
+
+@assistant_task_app.command("submit")
+def assistant_task_submit(
+    proposal_id: str = typer.Option(..., "--proposal-id"),
+    confirm_plan_hash: str = typer.Option(..., "--confirm-plan-hash"),
+    operator_id: str = typer.Option(..., "--operator-id"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
+    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Submit a previously planned task only when the plan hash is confirmed."""
+    result = submit_task(
+        AssistantTaskSubmissionRequest(
+            proposalId=proposal_id,
+            confirmPlanHash=confirm_plan_hash,
+            operatorId=operator_id,
+            profile=profile,
+            rootDir=root_dir,
+        )
+    )
+    payload = result.model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if result.status in {"denied", "invalid_request", "unknown_agent"}:
+        raise typer.Exit(code=3)
+
+
+@assistant_task_app.command("status")
+def assistant_task_status(
+    proposal_id: str = typer.Option(..., "--proposal-id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Show proposal/submission status without raw task content."""
+    payload = status_task(proposal_id).model_dump(mode="json", by_alias=True)
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] == "missing":
+        raise typer.Exit(code=3)
+
+
+@assistant_task_app.command("explain")
+def assistant_task_explain(
+    proposal_id: str = typer.Option(..., "--proposal-id"),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
+) -> None:
+    """Explain task policy, source references, and evidence references."""
+    payload = explain_task(proposal_id)
+    _emit_payload(payload, json_output=json_output)
+    if payload["status"] == "missing":
+        raise typer.Exit(code=3)
+
+
 @assistant_app.command("turn")
 def assistant_turn(
     profile: str = typer.Option("enterprise", "--profile", help="Config profile"),
@@ -1931,6 +2146,13 @@ def _emit_payload(payload: dict[str, Any], *, json_output: bool) -> None:
     else:
         for key, value in payload.items():
             typer.echo(f"{key}={value}")
+
+
+def _assistant_knowledge_repo_root() -> Path:
+    cwd = Path.cwd()
+    if (cwd / "docs").exists() and (cwd / "binliquid").exists():
+        return cwd
+    return Path(__file__).resolve().parents[1]
 
 
 def _release_branch_exists(branch: str) -> bool:
