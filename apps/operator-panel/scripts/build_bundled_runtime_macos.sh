@@ -24,12 +24,12 @@ fi
 mkdir -p "${DIST_DIR}"
 
 if [[ -z "${WHEEL_PATH}" ]]; then
-  echo "[runtime] building binliquid wheel"
+  echo "[runtime] building ImperaOS wheel"
   (
     cd "${REPO_ROOT}"
     uv build --wheel --out-dir "${DIST_DIR}"
   )
-  WHEEL_PATH="$(ls -t "${DIST_DIR}"/binliquid-*.whl | head -n 1)"
+  WHEEL_PATH="$(ls -t "${DIST_DIR}"/imperaos-*.whl | head -n 1)"
 fi
 
 if [[ ! -f "${WHEEL_PATH}" ]]; then
@@ -66,8 +66,8 @@ if [[ ! -x "${RUNTIME_PYTHON}" ]]; then
   exit 5
 fi
 
-if ! "${RUNTIME_PYTHON}" -m binliquid --version >/dev/null; then
-  echo "[runtime] runtime validation failed: ${RUNTIME_PYTHON} -m binliquid --version" >&2
+if ! "${RUNTIME_PYTHON}" -m imperaos --version >/dev/null; then
+  echo "[runtime] runtime validation failed: ${RUNTIME_PYTHON} -m imperaos --version" >&2
   exit 6
 fi
 
@@ -75,13 +75,13 @@ if ! (
   cd /
   BINLIQUID_CONFIG_ROOT="${RUNTIME_DIR}/config" \
     BINLIQUID_PROVIDER_REGISTRY_PATH="${RUNTIME_DIR}/config/providers.example.toml" \
-    "${RUNTIME_PYTHON}" -m binliquid operator capabilities --json >/dev/null
+    "${RUNTIME_PYTHON}" -m imperaos operator capabilities --json >/dev/null
 ); then
   echo "[runtime] runtime validation failed: bundled operator capabilities from neutral cwd" >&2
   exit 9
 fi
 
-BINLIQUID_VERSION="$("${RUNTIME_PYTHON}" -m binliquid --version)"
+BINLIQUID_VERSION="$("${RUNTIME_PYTHON}" -m imperaos --version)"
 PYTHON_VERSION="$("${RUNTIME_PYTHON}" --version 2>&1)"
 WHEEL_SHA256="$(shasum -a 256 "${WHEEL_PATH}" | awk '{print $1}')"
 GIT_HEAD="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -102,8 +102,8 @@ Generated runtime bundle location for AegisOS Operator Panel.
 
 Release gate:
 1) python/bin/python is executable on macOS bundles
-2) python/bin/python -m binliquid --version passes
-3) RUNTIME_MANIFEST.txt records platform, arch, Python version, BinLiquid version, wheel hash, git evidence, and build time
+2) python/bin/python -m imperaos --version passes
+3) RUNTIME_MANIFEST.txt records platform, arch, Python version, ImperaOS version, wheel hash, git evidence, and build time
 
 Do not ship placeholder-only runtime contents.
 EOF

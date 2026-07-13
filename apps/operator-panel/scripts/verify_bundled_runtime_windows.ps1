@@ -101,9 +101,9 @@ if ($ActualPythonHash -ne ([string]$Manifest["python_exe_sha256"]).ToLowerInvari
   throw "[verify] python_exe_sha256 mismatch: expected $($Manifest["python_exe_sha256"]), got $ActualPythonHash"
 }
 
-$Version = (& $RuntimePython -m binliquid --version)
+$Version = (& $RuntimePython -m imperaos --version)
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Version)) {
-  throw "[verify] runtime validation failed: $RuntimePython -m binliquid --version"
+  throw "[verify] runtime validation failed: $RuntimePython -m imperaos --version"
 }
 
 Write-Output "[verify] runtime_dir=$ResolvedRuntimeDir"

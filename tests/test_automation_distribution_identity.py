@@ -6,6 +6,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 AUTOMATION_PATHS = (
     ROOT / "Makefile",
+    ROOT / "apps/operator-panel/scripts/build_bundled_runtime_macos.sh",
+    ROOT / "apps/operator-panel/scripts/build_bundled_runtime_windows.ps1",
+    ROOT / "apps/operator-panel/scripts/verify_bundled_runtime_macos.sh",
+    ROOT / "apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1",
     *sorted((ROOT / ".github" / "workflows").glob("*.yml")),
     *sorted((ROOT / ".github" / "workflows").glob("*.yaml")),
 )
@@ -14,6 +18,8 @@ REMOVED_AUTOMATION_REFERENCES = {
     "Python module": re.compile(r"\s-m\s+binliquid(?=\s|$)"),
     "compile target": re.compile(r"\bcompileall\s+binliquid(?=\s|$)"),
     "package directory": re.compile(r"(?<![.\w-])binliquid/"),
+    "wheel distribution": re.compile(r"\bbinliquid-[^\s\"']*\.whl\b", re.IGNORECASE),
+    "wheel branding": re.compile(r"\bbinliquid\s+wheel\b", re.IGNORECASE),
 }
 
 
