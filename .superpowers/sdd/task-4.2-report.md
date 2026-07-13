@@ -26,6 +26,11 @@ Post-review hardening commit:
 `a3e6ae2c3e32a5fb3c1823c4747061ebf32f907f` —
 `fix: harden serialized contract validation`
 
+Portable manifest validation commit:
+
+`5c72d35003c5c0398c9dae65fb6ffe036c1ac98b` -
+`fix: validate bundled runtime manifests portably`
+
 ## Post-review hardening
 
 Review found two fail-open edges, both corrected with behavior-first tests:
@@ -77,6 +82,69 @@ pass
 ```
 
 Changed Python Ruff, focused ESLint, and `git diff --check` also pass.
+
+## Portable manifest validation follow-up
+
+A second review identified that the platform-verifier evidence above depended
+on source assertions for duplicated PowerShell and shell implementations. The
+platform-specific exact-key and runtime-identity contract now has one portable,
+standard-library-only implementation:
+
+- `apps/operator-panel/scripts/validate_runtime_manifest.py` defines the exact
+  Windows and macOS key sets, rejects duplicate, blank, unexpected/former, and
+  missing keys, validates platform and architecture, and compares the canonical
+  manifest version with the actual bundled-runtime version supplied by the
+  caller;
+- both platform verifiers run that helper with their bundled Python executable
+  and the version returned by `python -m imperaos --version`;
+- the duplicated inline exact-key and version-comparison implementations were
+  removed, while platform-specific path, digest, and bundle checks remain.
+
+Follow-up RED evidence:
+
+```text
+uv run pytest tests/test_runtime_manifest_validator.py -q \
+  --basetemp C:\p42helperred
+10 failed
+```
+
+The valid Windows/macOS subprocess cases failed because the helper did not
+exist; invalid-case error assertions and both verifier-integration assertions
+also failed.
+
+Follow-up GREEN evidence:
+
+```text
+uv run pytest \
+  tests/test_runtime_manifest_validator.py \
+  tests/test_serialized_contract_identity.py \
+  tests/test_windows_release_gate.py -q \
+  --basetemp C:\p42helpergreen2
+48 passed
+
+uv run ruff check \
+  apps/operator-panel/scripts/validate_runtime_manifest.py \
+  tests/test_runtime_manifest_validator.py \
+  tests/test_serialized_contract_identity.py
+All checks passed!
+
+PowerShell AST parse
+pass
+
+git diff --check
+pass
+```
+
+The subprocess matrix covers valid Windows and macOS manifests plus duplicate,
+dynamically constructed former/extra, missing, blank, version-mismatch,
+platform-mismatch, and architecture-mismatch cases. Static ordering assertions
+remain supplemental and verify that each script captures the actual runtime
+version before invoking the helper.
+
+This environment has no bundled Windows runtime directory to exercise and is
+not macOS, so no claim is made that either complete platform bundle was launched
+by this follow-up. Git Bash is also unavailable; macOS shell validation remains
+covered by the focused source guard and the helper's subprocess behavior.
 
 ## TDD evidence
 
