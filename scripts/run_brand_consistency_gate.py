@@ -357,7 +357,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     write_reports(report, args.output_root)
     if args.print_json:
         print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2, sort_keys=True))
-    return int(args.mode != "inventory" and report.status == "fail")
+    if args.mode == "inventory":
+        return 0
+    if args.mode == "enforce":
+        return int(bool(report.findings))
+    return int(report.status == "fail")
 
 
 if __name__ == "__main__":

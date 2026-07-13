@@ -127,7 +127,7 @@ def test_inventory_normalizes_and_scans_tracked_paths_text_and_binary(tmp_path: 
     assert json.loads(result.stdout) == report
 
 
-def test_enforce_returns_one_only_for_blocking_findings(tmp_path: Path) -> None:
+def test_enforce_returns_one_for_blocking_or_manual_review_findings(tmp_path: Path) -> None:
     forbidden = _legacy("bin", "_", "liquid")
     blocking_repo = _tracked_repo(tmp_path / "blocking", {"settings.txt": forbidden})
     blocking = _run_gate(blocking_repo, tmp_path / "blocking-report", mode="enforce")
@@ -136,7 +136,7 @@ def test_enforce_returns_one_only_for_blocking_findings(tmp_path: Path) -> None:
 
     binary_repo = _tracked_repo(tmp_path / "binary", {"image.bin": b"\x00\x01\x02"})
     manual_only = _run_gate(binary_repo, tmp_path / "binary-report", mode="enforce")
-    assert manual_only.returncode == 0, manual_only.stderr
+    assert manual_only.returncode == 1, manual_only.stderr
     manual_report = _report(tmp_path / "binary-report")
     assert manual_report["status"] == "pass"
     assert manual_report["binaryMetadataMatchCount"] == 1
