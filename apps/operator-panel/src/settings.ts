@@ -46,7 +46,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   cliPath: '',
   bundledPythonPath: '',
   profile: 'balanced',
-  rootDir: '.binliquid/team/jobs',
+  rootDir: '.imperaos/team/jobs',
   operatorId: DEFAULT_OPERATOR_ID,
   locale: 'auto',
   remoteTelemetry: false,

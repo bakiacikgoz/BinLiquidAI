@@ -15,6 +15,7 @@ from imperaos.memory.models import (
     MemoryScopeFilter,
     MemoryVisibility,
 )
+from imperaos.runtime.paths import MEMORY_DB_PATH
 
 
 @dataclass(slots=True)
@@ -32,7 +33,7 @@ class MemoryStoreWriteStatus:
 class MemoryStoreV3:
     SCHEMA_VERSION = "memory.v3"
 
-    def __init__(self, db_path: str | Path = ".binliquid/memory.sqlite3"):
+    def __init__(self, db_path: str | Path = MEMORY_DB_PATH):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)

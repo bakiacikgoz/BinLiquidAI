@@ -16,6 +16,7 @@ from imperaos.control_plane.storage import ControlPlaneStore, canonical_json_has
 from imperaos.enterprise.identity import IdentityResolutionError, require_permission
 from imperaos.governance.approval_store import ApprovalStore
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 
 class ControlPlaneRunCoordinator:
@@ -24,7 +25,7 @@ class ControlPlaneRunCoordinator:
         *,
         config: RuntimeConfig,
         registry: AgentRegistry,
-        root_dir: str | Path = ".binliquid/control-plane",
+        root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
     ):
         self.config = config
         self.registry = registry

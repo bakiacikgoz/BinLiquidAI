@@ -19,6 +19,7 @@ from imperaos.control_plane.provider_runtime_workflows import (
     run_provider_workflow_proof,
 )
 from imperaos.control_plane.storage import canonical_json_hash, file_sha256
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 REQUIRED_BLOCKED_CLAIMS = (
     "public-desktop-installer",
@@ -85,7 +86,7 @@ def collect_target_evidence_rehearsal(
     *,
     session: TargetEvidenceSession | str | Path,
     output_root: str | Path,
-    state_root: str | Path = ".binliquid/control-plane",
+    state_root: str | Path = CONTROL_PLANE_STATE_ROOT,
     evidence_root: str | Path = "artifacts",
 ) -> TargetEvidenceBundle:
     _ = state_root

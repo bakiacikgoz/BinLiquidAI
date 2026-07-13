@@ -122,9 +122,9 @@ def _write_signing_material(root: Path) -> None:
     private_key = Ed25519PrivateKey.generate()
     private_raw = private_key.private_bytes_raw()
     public_raw = private_key.public_key().public_bytes_raw()
-    private_dir = root / ".binliquid" / "keys" / "private"
-    trusted_dir = root / ".binliquid" / "keys" / "trusted"
-    identity_dir = root / ".binliquid" / "identity"
+    private_dir = root / ".imperaos" / "enterprise" / "keys" / "private"
+    trusted_dir = root / ".imperaos" / "enterprise" / "keys" / "trusted"
+    identity_dir = root / ".imperaos" / "enterprise" / "identity"
     private_dir.mkdir(parents=True, exist_ok=True)
     trusted_dir.mkdir(parents=True, exist_ok=True)
     identity_dir.mkdir(parents=True, exist_ok=True)
@@ -164,7 +164,7 @@ def _write_signing_material(root: Path) -> None:
     ).decode("ascii")
     (private_dir / "current_key.json").write_text(json.dumps(private_payload), encoding="utf-8")
     (trusted_dir / f"{key_id}.json").write_text(json.dumps(public_payload), encoding="utf-8")
-    (root / ".binliquid" / "keys" / "manifest.json").write_text(
+    (root / ".imperaos" / "enterprise" / "keys" / "manifest.json").write_text(
         json.dumps({"schema_version": "1", "current_key_id": key_id, "revoked_keys": []}),
         encoding="utf-8",
     )

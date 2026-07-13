@@ -121,7 +121,7 @@ jobs:
 
       - name: Prepare enterprise fixture
         run: |
-          rm -rf .binliquid/keys .binliquid/identity
+          rm -rf .imperaos/enterprise/keys .imperaos/enterprise/identity
           rm -f artifacts/qualification_report.json artifacts/QUALIFICATION_REPORT.md
           uv run python scripts/prepare_enterprise_fixture.py --root .
 

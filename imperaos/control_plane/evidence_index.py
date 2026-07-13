@@ -13,13 +13,14 @@ from imperaos.control_plane.models import (
 )
 from imperaos.control_plane.storage import ControlPlaneStore, file_sha256
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 
 def build_evidence_index(
     *,
     config: RuntimeConfig,
     evidence_root: str | Path = "artifacts",
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> EvidenceIndexSnapshot:
     builder = EvidencePackBuilder(config=config, root_dir=root_dir)
     entries: list[EvidenceIndexEntry] = []

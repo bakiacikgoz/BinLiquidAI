@@ -77,6 +77,7 @@ from imperaos.release.gate_models import RcGateEvidenceSnapshot
 from imperaos.release.snapshot import build_rc_gate_evidence_snapshot
 from imperaos.release_decision.snapshot import build_rc_release_decision_snapshot
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 SNAPSHOT_CONTRACT_VERSION = "control-plane.snapshot/v1"
 STALE_AFTER_MS = 5 * 60 * 1000
@@ -134,7 +135,7 @@ def classify_data_source(
 
 def build_control_plane_snapshot(
     *,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
     profile: str = "enterprise",
     evidence_root: str | Path = "artifacts",
     include_debug: bool = False,

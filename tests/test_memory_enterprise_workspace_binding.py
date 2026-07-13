@@ -67,7 +67,7 @@ def test_memory_principal_resolver_denies_cross_workspace_without_membership(
 
 
 def _write_enterprise_membership(root: Path, *, workspace_id: str) -> None:
-    store = EnterpriseWorkspaceStore(root / ".binliquid" / "control-plane")
+    store = EnterpriseWorkspaceStore(root / ".imperaos" / "control-plane")
     store.write_organization(
         EnterpriseOrganization(
             organizationId="local-org",

@@ -2945,7 +2945,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                       onClick={() =>
                         void runOperation('qualification', () =>
                           runInstallRehearsal(settings, {
-                            targetRoot: '.binliquid/rehearsal/design-partner',
+                            targetRoot: '.imperaos/rehearsal/design-partner',
                             output: 'artifacts/install-rehearsal/report.json',
                             mode: 'source-cli',
                           }),

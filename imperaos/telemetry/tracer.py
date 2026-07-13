@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from imperaos.runtime.paths import ROUTER_DATASET_PATH, TRACE_STATE_ROOT
 from imperaos.schemas.models import TraceEvent
 
 
@@ -15,8 +16,8 @@ class Tracer:
         self,
         debug_mode: bool = False,
         privacy_mode: bool = True,
-        trace_dir: str = ".binliquid/traces",
-        router_dataset_path: str = ".binliquid/research/router_dataset.jsonl",
+        trace_dir: str = TRACE_STATE_ROOT,
+        router_dataset_path: str = ROUTER_DATASET_PATH,
         event_redactor: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     ):
         self._events: list[TraceEvent] = []

@@ -83,7 +83,7 @@ function makeSnapshot(overrides: Partial<ControlPlaneSnapshot> = {}): ControlPla
     },
     system: {
       profile: 'lite',
-      rootDir: '.binliquid/control-plane',
+      rootDir: '.imperaos/control-plane',
       coreVersion: '0.5.0',
       contractVersion: '2.0',
       health: {

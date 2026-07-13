@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
+
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$")
 SHA256_HEX_RE = re.compile(r"^[a-f0-9]{64}$")
 
@@ -334,7 +336,7 @@ def bootstrap_enterprise_workspace(
     *,
     config: Any,
     request: EnterpriseWorkspaceBootstrapRequest,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
     env: dict[str, str] | None = None,
 ) -> EnterpriseWorkspaceBootstrapResult:
     from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore

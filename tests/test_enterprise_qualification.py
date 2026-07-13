@@ -44,8 +44,8 @@ def _write_signing_material(
     private_raw = private_key.private_bytes_raw()
     public_raw = private_key.public_key().public_bytes_raw()
 
-    private_dir = root / ".binliquid" / "keys" / "private"
-    trusted_dir = root / ".binliquid" / "keys" / "trusted"
+    private_dir = root / ".imperaos" / "enterprise" / "keys" / "private"
+    trusted_dir = root / ".imperaos" / "enterprise" / "keys" / "trusted"
     private_dir.mkdir(parents=True, exist_ok=True)
     trusted_dir.mkdir(parents=True, exist_ok=True)
 
@@ -77,7 +77,7 @@ def _write_signing_material(
         json.dumps(public_payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    ((root / ".binliquid" / "keys") / "manifest.json").write_text(
+    ((root / ".imperaos" / "enterprise" / "keys") / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -109,7 +109,7 @@ def _write_identity_assertion(
         base64.b64decode(signing_material["private_key"])
     ).sign(canonical_payload_hash(payload).encode("utf-8"))
     payload["signature"] = base64.b64encode(signature).decode("ascii")
-    identity_dir = root / ".binliquid" / "identity"
+    identity_dir = root / ".imperaos" / "enterprise" / "identity"
     identity_dir.mkdir(parents=True, exist_ok=True)
     (identity_dir / "current_assertion.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),

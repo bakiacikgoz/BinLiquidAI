@@ -29,6 +29,7 @@ from imperaos.control_plane.registry import AgentRegistry
 from imperaos.control_plane.storage import ControlPlaneStore, canonical_json_hash
 from imperaos.governance.approval_store import ApprovalStore
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 EXTERNAL_GATEWAY_CONTRACT_VERSION = "control-plane.external-gateway/v1"
 EXTERNAL_GATEWAY_V1_1_CONTRACT_VERSION = "control-plane.external-gateway/v1.1"
@@ -42,7 +43,7 @@ class ExternalAgentGateway:
         *,
         config: RuntimeConfig,
         registry: AgentRegistry,
-        root_dir: str | Path = ".binliquid/control-plane",
+        root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
     ):
         self.config = config
         self.registry = registry
@@ -435,7 +436,7 @@ def submit_external_action_file(
     path: str | Path,
     config: RuntimeConfig,
     registry: AgentRegistry,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> ExternalActionResponse:
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -463,7 +464,7 @@ def submit_external_action_v1_1_file(
     path: str | Path,
     config: RuntimeConfig,
     registry: AgentRegistry,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> ExternalAgentV11Result:
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))

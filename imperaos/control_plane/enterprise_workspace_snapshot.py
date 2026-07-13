@@ -17,12 +17,13 @@ from imperaos.control_plane.enterprise_workspace import (
 )
 from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
 from imperaos.enterprise.identity import describe_actor
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 
 def build_enterprise_workspace_snapshot(
     *,
     config: Any,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
     env: dict[str, str] | None = None,
 ) -> EnterpriseWorkspaceSnapshot:
     store = EnterpriseWorkspaceStore(root_dir)

@@ -74,7 +74,7 @@ def _config(max_tool_calls: int = 1, max_recursion_depth: int = 2) -> RuntimeCon
         privacy_mode=True,
         enable_persistent_memory=False,
         web_enabled=False,
-        trace_dir=".binliquid/test-traces",
+        trace_dir=".imperaos/test-traces",
         limits=limits,
     )
 

@@ -42,7 +42,7 @@ ENTRYPOINT_COMMANDS = (
     ),
 )
 IGNORED_COPY_NAMES = {
-    ".binliquid",
+    ".imperaos",
     ".git",
     ".mypy_cache",
     ".pytest_cache",

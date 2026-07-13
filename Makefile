@@ -62,7 +62,7 @@ pilot-gate:
 
 enterprise-gate:
 	uv run pytest -q tests/test_enterprise_cli.py tests/test_enterprise_qualification.py
-	rm -rf .binliquid/keys .binliquid/identity
+	rm -rf .imperaos/enterprise/keys .imperaos/enterprise/identity
 	rm -f artifacts/qualification_report.json artifacts/QUALIFICATION_REPORT.md
 	uv run python scripts/prepare_enterprise_fixture.py --root .
 	uv run imperaos security baseline --profile enterprise --json
@@ -549,7 +549,7 @@ install-rehearsal-gate:
 	uv run python scripts/prepare_enterprise_fixture.py --root .
 	uv run imperaos control-plane install rehearsal \
 		--profile enterprise \
-		--target-root .binliquid/rehearsal/design-partner \
+		--target-root .imperaos/rehearsal/design-partner \
 		--mode source-cli \
 		--output artifacts/install-rehearsal/report.json \
 		--json
@@ -699,8 +699,8 @@ design-partner-rc-gate:
 	uv run python scripts/run_external_agent_gateway_smoke.py
 	uv run python scripts/evaluate_policy_pack_promotion.py
 	uv run python scripts/evaluate_evidence_index.py --profile enterprise --evidence-root artifacts/control-plane/evidence --select-latest-valid --staged-evidence-root artifacts/design-partner-rc/evidence-sample --root-dir artifacts/design-partner-rc/evidence-index/state --output artifacts/design-partner-rc/evidence_index.json
-	uv run python scripts/evaluate_reports_alerts.py --profile enterprise --root-dir .binliquid/control-plane --evidence-root artifacts --output-dir artifacts/design-partner-rc/reports-alerts-logs
-	uv run python scripts/generate_design_partner_rc_pack.py --profile enterprise --state-root .binliquid/control-plane --evidence-root artifacts --output artifacts/design-partner-rc --fail-on-conditional --json
+	uv run python scripts/evaluate_reports_alerts.py --profile enterprise --root-dir .imperaos/control-plane --evidence-root artifacts --output-dir artifacts/design-partner-rc/reports-alerts-logs
+	uv run python scripts/generate_design_partner_rc_pack.py --profile enterprise --state-root .imperaos/control-plane --evidence-root artifacts --output artifacts/design-partner-rc --fail-on-conditional --json
 	git diff --check
 
 ui-e2e-gate:

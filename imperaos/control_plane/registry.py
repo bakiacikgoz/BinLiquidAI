@@ -21,6 +21,7 @@ from imperaos.control_plane.models import (
     AgentStatus,
 )
 from imperaos.control_plane.storage import ControlPlaneStore, canonical_json_hash
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 REGISTRY_FILE = "agents.json"
 
@@ -42,7 +43,7 @@ def load_agent_spec(path: str | Path) -> AgentSpec:
 
 
 class AgentRegistry:
-    def __init__(self, *, root_dir: str | Path = ".binliquid/control-plane"):
+    def __init__(self, *, root_dir: str | Path = CONTROL_PLANE_STATE_ROOT):
         self.store = ControlPlaneStore(root_dir)
 
     @property

@@ -187,7 +187,7 @@ def test_team_validate_and_run(monkeypatch, tmp_path: Path) -> None:
     assert run.exit_code == 0
     payload = json.loads(run.stdout)
     assert payload["job"]["status"] == "completed"
-    checkpoint_db = tmp_path / ".binliquid" / "team" / "checkpoints.sqlite3"
+    checkpoint_db = tmp_path / ".imperaos" / "team" / "checkpoints.sqlite3"
     assert checkpoint_db.exists()
     with sqlite3.connect(checkpoint_db) as conn:
         row = conn.execute(
@@ -385,7 +385,7 @@ def test_team_resume_rejects_approved_but_not_executed_ticket(monkeypatch, tmp_p
 
 def test_team_list_returns_jobs_and_since_filter(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
-    root = tmp_path / ".binliquid" / "team" / "jobs"
+    root = tmp_path / ".imperaos" / "team" / "jobs"
     root.mkdir(parents=True, exist_ok=True)
 
     older = root / "job-old"
@@ -552,7 +552,7 @@ def test_team_run_accepts_explicit_job_id(monkeypatch, tmp_path: Path) -> None:
     assert run.exit_code == 0
     payload = json.loads(run.stdout)
     assert payload["job"]["job_id"] == "job-ui-custom"
-    assert (tmp_path / ".binliquid" / "team" / "jobs" / "job-ui-custom" / "status.json").exists()
+    assert (tmp_path / ".imperaos" / "team" / "jobs" / "job-ui-custom" / "status.json").exists()
 
 
 def test_operator_capabilities_exposes_workspace_parity_flags() -> None:

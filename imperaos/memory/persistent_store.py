@@ -9,6 +9,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from imperaos.runtime.paths import MEMORY_DB_PATH
+
 
 @dataclass(slots=True)
 class MemoryRecord:
@@ -44,7 +46,7 @@ class PersistentMemoryStore:
     """Local SQLite store for long-term memory candidates."""
     SCHEMA_VERSION = "2.0"
 
-    def __init__(self, db_path: str | Path = ".binliquid/memory.sqlite3"):
+    def __init__(self, db_path: str | Path = MEMORY_DB_PATH):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)

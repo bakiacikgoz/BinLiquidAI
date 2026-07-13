@@ -20,6 +20,7 @@ from imperaos.control_plane.models import (
 from imperaos.control_plane.storage import ControlPlaneStore, file_sha256
 from imperaos.enterprise.signing import build_integrity, verify_signed_artifact
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 MAX_EVIDENCE_AGE = timedelta(days=30)
 
@@ -29,7 +30,7 @@ class EvidencePackBuilder:
         self,
         *,
         config: RuntimeConfig,
-        root_dir: str | Path = ".binliquid/control-plane",
+        root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
     ):
         self.config = config
         self.store = ControlPlaneStore(root_dir)

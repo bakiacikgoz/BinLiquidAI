@@ -20,7 +20,7 @@ def test_control_plane_snapshot_exposes_rc_gate_evidence(tmp_path: Path) -> None
     run_release_gate_plan(plan=plan, repo_root=tmp_path, output_root=output_root)
 
     snapshot = build_control_plane_snapshot(
-        root_dir=tmp_path / ".binliquid" / "control-plane",
+        root_dir=tmp_path / ".imperaos" / "control-plane",
         evidence_root=tmp_path / "artifacts",
         profile="enterprise",
     )

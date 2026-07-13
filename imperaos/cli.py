@@ -274,6 +274,7 @@ from imperaos.release_decision.signoff import verify_human_signoffs, write_signo
 from imperaos.router.rule_router import RuleRouter
 from imperaos.router.sltc_router import SLTCRouter
 from imperaos.runtime.config import RuntimeConfig, redact_config_payload, resolve_runtime_config
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT, TEAM_ARTIFACT_ROOT, state_path
 from imperaos.runtime.platform import PlatformInfo, current_platform
 from imperaos.schemas.models import ExpertName
 from imperaos.team.continuation import (
@@ -1908,14 +1909,14 @@ def _parse_computer_use_runtime(runtime: str) -> str:
     return aliases[normalized]
 
 
-def _control_plane_registry(root_dir: str = ".binliquid/control-plane") -> AgentRegistry:
+def _control_plane_registry(root_dir: str = CONTROL_PLANE_STATE_ROOT) -> AgentRegistry:
     return AgentRegistry(root_dir=root_dir)
 
 
 def _control_plane_coordinator(
     *,
     profile: str,
-    root_dir: str = ".binliquid/control-plane",
+    root_dir: str = CONTROL_PLANE_STATE_ROOT,
 ) -> ControlPlaneRunCoordinator:
     config = RuntimeConfig.from_profile(profile)
     return ControlPlaneRunCoordinator(
@@ -1995,7 +1996,7 @@ def _control_plane_error(exc: ControlPlaneError, *, json_output: bool) -> None:
 def control_plane_doctor(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     root_dir: str = typer.Option(
-        ".binliquid/control-plane",
+        CONTROL_PLANE_STATE_ROOT,
         "--root-dir",
         help="Control Plane state root.",
     ),
@@ -2043,7 +2044,7 @@ def control_plane_doctor(
 def control_plane_snapshot(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     root_dir: str = typer.Option(
-        ".binliquid/control-plane",
+        CONTROL_PLANE_STATE_ROOT,
         "--root-dir",
         help="Control Plane state root.",
     ),
@@ -2071,7 +2072,7 @@ def control_plane_agent_register(
     spec: str = typer.Option(..., "--spec", help="AgentSpec YAML/JSON path"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     actor: str = typer.Option("cli:operator", "--actor", help="Registry actor"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     _ = profile
@@ -2086,7 +2087,7 @@ def control_plane_agent_register(
 
 @control_plane_agent_app.command("list")
 def control_plane_agent_list(
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     registry = build_agent_registry_v2(_control_plane_registry(root_dir))
@@ -2096,7 +2097,7 @@ def control_plane_agent_list(
 @control_plane_agent_app.command("show")
 def control_plane_agent_show(
     agent_id: str = typer.Option(..., "--agent-id", help="Agent ID"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
@@ -2112,7 +2113,7 @@ def control_plane_agent_disable(
     agent_id: str = typer.Option(..., "--agent-id", help="Agent ID"),
     reason: str = typer.Option(..., "--reason", help="Disable reason"),
     actor: str = typer.Option("cli:operator", "--actor", help="Registry actor"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
@@ -2127,7 +2128,7 @@ def control_plane_agent_disable(
 def control_plane_policy_simulate(
     agent_id: str = typer.Option(..., "--agent-id", help="Agent ID"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
@@ -2196,7 +2197,7 @@ def control_plane_policy_pack_diff(
 @control_plane_policy_app.command("pack-promote-dry-run")
 def control_plane_policy_pack_promote_dry_run(
     manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
@@ -2223,7 +2224,7 @@ def control_plane_run_submit(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     actor: str = typer.Option("cli:operator", "--actor", help="Submitting actor"),
     mode: str = typer.Option("supervised", "--mode", help="dry_run|supervised|execute"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
@@ -2250,7 +2251,7 @@ def control_plane_run_submit(
 def control_plane_run_status(
     run_id: str = typer.Option(..., "--run-id", help="Control Plane run ID"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
@@ -2271,7 +2272,7 @@ def control_plane_run_status(
 @control_plane_run_app.command("list")
 def control_plane_run_list(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     runs = _control_plane_coordinator(profile=profile, root_dir=root_dir).list_runs()
@@ -2291,7 +2292,7 @@ def control_plane_evidence_export(
         help="Evidence output directory.",
     ),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     force: bool = typer.Option(False, "--force", help="Overwrite existing evidence dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
@@ -2316,7 +2317,7 @@ def control_plane_evidence_export(
 def control_plane_evidence_verify(
     path: str = typer.Option(..., "--path", help="Evidence manifest path"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     result = EvidencePackBuilder(
@@ -2332,7 +2333,7 @@ def control_plane_evidence_verify(
 def control_plane_evidence_index(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     evidence_root: str = typer.Option("artifacts", "--evidence-root"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     index = build_evidence_index(
@@ -2439,7 +2440,7 @@ def control_plane_qualification_verify(
 def control_plane_install_rehearsal(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     target_root: str = typer.Option(
-        ".binliquid/rehearsal/design-partner",
+        state_path("rehearsal", "design-partner"),
         "--target-root",
         help="Dedicated rehearsal target root.",
     ),
@@ -2480,7 +2481,7 @@ def control_plane_external_agent_run(
     manifest: str = typer.Option(..., "--manifest", help="External agent manifest path."),
     request: str = typer.Option(..., "--request", help="External action request path."),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     response = run_external_agent_manifest(
@@ -2502,7 +2503,7 @@ def control_plane_admin_propose(
     ),
     input_path: str = typer.Option(..., "--input", help="Admin proposal payload JSON."),
     actor: str = typer.Option("enterprise-admin", "--actor", help="Actor id."),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     dry_run: bool = typer.Option(True, "--dry-run/--no-dry-run"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
@@ -2528,7 +2529,7 @@ def control_plane_admin_apply(
     proposal_id: str = typer.Option(..., "--proposal-id", help="Proposal id."),
     approval_id: str = typer.Option(..., "--approval-id", help="Approved approval id."),
     actor: str = typer.Option("enterprise-admin", "--actor", help="Actor id."),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
@@ -2547,7 +2548,7 @@ def control_plane_admin_apply(
 @control_plane_policy_pack_app.command("validate")
 def control_plane_policy_pack_lifecycle_validate(
     manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path."),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     record = validate_lifecycle_policy_pack(
@@ -2562,7 +2563,7 @@ def control_plane_policy_pack_lifecycle_validate(
 @control_plane_policy_pack_app.command("stage")
 def control_plane_policy_pack_lifecycle_stage(
     manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path."),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     record = stage_policy_pack(
@@ -2577,7 +2578,7 @@ def control_plane_policy_pack_lifecycle_stage(
 @control_plane_policy_pack_app.command("promote")
 def control_plane_policy_pack_lifecycle_promote(
     manifest: str = typer.Option(..., "--manifest", help="Policy pack manifest JSON path."),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
@@ -2594,7 +2595,7 @@ def control_plane_policy_pack_lifecycle_promote(
 @control_plane_policy_pack_app.command("rollback-plan")
 def control_plane_policy_pack_lifecycle_rollback_plan(
     policy_pack_id: str = typer.Option(..., "--policy-pack-id"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     try:
@@ -3542,7 +3543,7 @@ def enterprise_workspace_bootstrap_command(
     display_name: str = typer.Option(..., "--display-name", help="Workspace display name"),
     environment: str = typer.Option("pilot", "--environment", help="Workspace environment"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.enterprise_workspace import (
@@ -3568,7 +3569,7 @@ def enterprise_workspace_bootstrap_command(
 @enterprise_workspace_app.command("snapshot")
 def enterprise_workspace_snapshot_command(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.enterprise_workspace_snapshot import (
@@ -3584,7 +3585,7 @@ def enterprise_workspace_snapshot_command(
 
 @enterprise_workspace_app.command("list")
 def enterprise_workspace_list_command(
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
@@ -3605,7 +3606,7 @@ def enterprise_workspace_list_command(
 @enterprise_workspace_app.command("show")
 def enterprise_workspace_show_command(
     workspace_id: str = typer.Option(..., "--workspace-id", help="Workspace id"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
@@ -3652,7 +3653,7 @@ def enterprise_enrollment_token_create_command(
     ] = ...,
     ttl_minutes: int = typer.Option(15, "--ttl-minutes", help="Token TTL minutes"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.agent_enrollment import (
@@ -3685,7 +3686,7 @@ def enterprise_enrollment_token_revoke_command(
     token_id: str = typer.Option(..., "--token-id", help="Enrollment token id"),
     reason: str = typer.Option(..., "--reason", help="Revocation reason"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.agent_enrollment import revoke_enrollment_token
@@ -3707,7 +3708,7 @@ def enterprise_enrollment_token_revoke_command(
 @enterprise_enrollment_token_app.command("list")
 def enterprise_enrollment_token_list_command(
     workspace_id: str | None = typer.Option(None, "--workspace-id", help="Workspace id"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
@@ -3757,7 +3758,7 @@ def enterprise_enrollment_request_create_command(
 def enterprise_enrollment_request_import_command(
     path: Annotated[Path, typer.Option("--path", help="Enrollment request path")] = ...,
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.agent_enrollment import (
@@ -3783,7 +3784,7 @@ def enterprise_enrollment_request_import_command(
 def enterprise_enrollment_approve_command(
     request_id: str = typer.Option(..., "--request-id", help="Enrollment request id"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.agent_enrollment import approve_enrollment_request
@@ -3806,7 +3807,7 @@ def enterprise_enrollment_reject_command(
     request_id: str = typer.Option(..., "--request-id", help="Enrollment request id"),
     reason: str = typer.Option(..., "--reason", help="Rejection reason"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.agent_enrollment import reject_enrollment_request
@@ -3828,7 +3829,7 @@ def enterprise_enrollment_reject_command(
 @enterprise_enrollment_app.command("list")
 def enterprise_enrollment_list_command(
     workspace_id: str | None = typer.Option(None, "--workspace-id", help="Workspace id"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir", help="State root"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir", help="State root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
@@ -3853,7 +3854,7 @@ def enterprise_enrollment_list_command(
 @control_plane_reports_app.command("manifest")
 def control_plane_reports_manifest(
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     evidence_root: str = typer.Option("artifacts", "--evidence-root"),
     output_dir: str = typer.Option(
         "artifacts/design-partner-rc/reports-alerts-logs",
@@ -3880,7 +3881,7 @@ def control_plane_operations_dry_run(
     operation_id: str = typer.Option(..., "--operation-id", help="Operation ID"),
     actor_id: str = typer.Option("identity-disabled", "--actor-id", help="Actor ID"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     evidence_root: str = typer.Option("artifacts", "--evidence-root"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
@@ -3914,7 +3915,7 @@ def control_plane_adapter_evaluate(
 def control_plane_gateway_submit_action(
     input_path: str = typer.Option(..., "--input", help="ExternalActionRequest JSON path"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     response = submit_external_action_file(
@@ -3933,7 +3934,7 @@ def control_plane_gateway_submit_action(
 def control_plane_gateway_submit_v1_1(
     input_path: str = typer.Option(..., "--input", help="ExternalAgentRequest v1.1 JSON path"),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     response = submit_external_action_v1_1_file(
@@ -3957,7 +3958,7 @@ def control_plane_gateway_replay_v1_1(
         help="Expected canonical ExternalAgentRequest v1.1 hash.",
     ),
     profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
-    root_dir: str = typer.Option(".binliquid/control-plane", "--root-dir"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
     gateway = ExternalAgentGateway(
@@ -6375,7 +6376,7 @@ def team_validate(
 @team_app.command("list")
 def team_list(
     root_dir: str = typer.Option(
-        ".binliquid/team/jobs",
+        TEAM_ARTIFACT_ROOT,
         "--root-dir",
         help="Team artifact root directory",
     ),
@@ -6544,7 +6545,7 @@ def team_resume(
     spec: str = typer.Option(..., "--spec", help="Team spec path"),
     job_id: str = typer.Option(..., "--job-id", help="Blocked/escalated source job id"),
     root_dir: str = typer.Option(
-        ".binliquid/team/jobs",
+        TEAM_ARTIFACT_ROOT,
         "--root-dir",
         help="Source and destination team artifact root directory",
     ),
@@ -6702,7 +6703,7 @@ def team_resume(
 def team_status(
     job_id: str = typer.Option(..., "--job-id", help="Job id"),
     root_dir: str = typer.Option(
-        ".binliquid/team/jobs",
+        TEAM_ARTIFACT_ROOT,
         "--root-dir",
         help="Team artifact root directory",
     ),
@@ -6728,7 +6729,7 @@ def team_status(
 def team_logs(
     job_id: str = typer.Option(..., "--job-id", help="Job id"),
     root_dir: str = typer.Option(
-        ".binliquid/team/jobs",
+        TEAM_ARTIFACT_ROOT,
         "--root-dir",
         help="Team artifact root directory",
     ),
@@ -6746,7 +6747,7 @@ def team_logs(
 def team_replay(
     job_id: str = typer.Option(..., "--job-id", help="Job id"),
     root_dir: str = typer.Option(
-        ".binliquid/team/jobs",
+        TEAM_ARTIFACT_ROOT,
         "--root-dir",
         help="Team artifact root directory",
     ),
@@ -6772,7 +6773,7 @@ def team_artifacts(
     job_id: str = typer.Option(..., "--job-id", help="Job id"),
     export: str = typer.Option(..., "--export", help="Export directory"),
     root_dir: str = typer.Option(
-        ".binliquid/team/jobs",
+        TEAM_ARTIFACT_ROOT,
         "--root-dir",
         help="Team artifact root directory",
     ),
@@ -6816,7 +6817,7 @@ def team_pilot_check(
         help="Pilot gate mode: deterministic|live-provider",
     ),
     root_dir: str = typer.Option(
-        ".binliquid/team/pilot",
+        state_path("team", "pilot"),
         "--root-dir",
         help="Pilot gate artifact root directory",
     ),
@@ -7761,7 +7762,7 @@ def memory_runtime_policy_simulate(
         from imperaos.memory.runtime_policy_fixtures import build_memory_runtime_policy_fixture
 
         built = build_memory_runtime_policy_fixture(
-            Path(".binliquid/memory-runtime-policy-cli"),
+            Path(state_path("memory-runtime-policy-cli")),
             profile=profile,
             semantic_mode=semantic_mode,
             semantic_enabled=semantic_mode != "disabled",
@@ -8311,7 +8312,7 @@ def _echo_json(payload: object) -> None:
 @research_app.command("train-router")
 def research_train_router(
     dataset: str = typer.Option(
-        ".binliquid/research/router_dataset.jsonl",
+        state_path("research", "router_dataset.jsonl"),
         help="Dataset JSONL path",
     ),
     output_dir: str = typer.Option(
@@ -8329,7 +8330,7 @@ def research_train_router(
 @research_app.command("eval-router")
 def research_eval_router(
     dataset: str = typer.Option(
-        ".binliquid/research/router_dataset.jsonl",
+        state_path("research", "router_dataset.jsonl"),
         help="Dataset JSONL path",
     ),
     model: str = typer.Option(
@@ -8350,7 +8351,7 @@ def research_eval_router(
 @research_app.command("calibrate-router")
 def research_calibrate_router(
     dataset: str = typer.Option(
-        ".binliquid/research/router_dataset.jsonl",
+        state_path("research", "router_dataset.jsonl"),
         help="Dataset JSONL path",
     ),
     output_dir: str = typer.Option(

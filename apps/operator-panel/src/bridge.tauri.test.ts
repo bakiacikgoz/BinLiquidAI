@@ -50,7 +50,7 @@ describe('bridge tauri contract', () => {
       mode: 'external',
       cliPath: '/usr/local/bin/binliquid',
       profile: 'balanced',
-      rootDir: '.binliquid/team/jobs',
+      rootDir: '.imperaos/team/jobs',
     });
 
     expect(invoke).toHaveBeenCalledWith(
@@ -60,7 +60,7 @@ describe('bridge tauri contract', () => {
           mode: 'external',
           cliPath: '/usr/local/bin/binliquid',
           profile: 'balanced',
-          rootDir: '.binliquid/team/jobs',
+          rootDir: '.imperaos/team/jobs',
         }),
       }),
     );
@@ -253,7 +253,7 @@ describe('bridge tauri contract', () => {
     await bridge.runInstallRehearsal(
       { ...DEFAULT_SETTINGS, profile: 'enterprise' },
       {
-        targetRoot: '.binliquid/rehearsal/design-partner',
+        targetRoot: '.imperaos/rehearsal/design-partner',
         output: 'artifacts/install-rehearsal/report.json',
         mode: 'source-cli',
       },
@@ -266,7 +266,7 @@ describe('bridge tauri contract', () => {
           profile: 'enterprise',
           timeoutMs: 120000,
         }),
-        targetRoot: '.binliquid/rehearsal/design-partner',
+        targetRoot: '.imperaos/rehearsal/design-partner',
         output: 'artifacts/install-rehearsal/report.json',
         mode: 'source-cli',
       }),
@@ -415,14 +415,14 @@ describe('bridge tauri contract', () => {
   it('passes artifact read and run export args to the Tauri commands', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0' });
 
-    await bridge.readArtifact({ ...DEFAULT_SETTINGS, rootDir: '.binliquid/jobs' }, 'job-1', 'status.json', 4096);
+    await bridge.readArtifact({ ...DEFAULT_SETTINGS, rootDir: '.imperaos/jobs' }, 'job-1', 'status.json', 4096);
     await bridge.exportRunArtifacts({ ...DEFAULT_SETTINGS }, 'job-1', './exports/job-1');
 
     expect(invoke).toHaveBeenNthCalledWith(
       1,
       'bridge_read_artifact',
       expect.objectContaining({
-        rootDir: '.binliquid/jobs',
+        rootDir: '.imperaos/jobs',
         jobId: 'job-1',
         artifactName: 'status.json',
         maxBytes: 4096,

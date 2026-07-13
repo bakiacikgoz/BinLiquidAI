@@ -65,7 +65,7 @@ def test_enrollment_token_evidence_is_hash_only(tmp_path: Path, monkeypatch) -> 
     )
 
     assert result.raw_token is not None
-    evidence = (tmp_path / ".binliquid" / "control-plane" / result.evidence_ref).read_text(
+    evidence = (tmp_path / ".imperaos" / "control-plane" / result.evidence_ref).read_text(
         encoding="utf-8"
     )
     stored_token = EnterpriseWorkspaceStore().get_enrollment_token(result.token_id)

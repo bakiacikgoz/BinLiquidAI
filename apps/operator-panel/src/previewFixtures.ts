@@ -18,7 +18,7 @@ function cloneValue<T>(value: T): T {
 
 function replaceRootInValue(value: JsonValue, rootDir: string): JsonValue {
   if (typeof value === 'string') {
-    return value.replaceAll('.binliquid/team/jobs', rootDir);
+    return value.replaceAll('.imperaos/team/jobs', rootDir);
   }
   if (Array.isArray(value)) {
     return value.map((item) => replaceRootInValue(item, rootDir));
@@ -575,7 +575,7 @@ export function previewInstallRehearsal(targetRoot?: string, output?: string) {
     version: 'control-plane.install-rehearsal/v1',
     rehearsalId: 'rehearsal-preview',
     status: 'pass',
-    targetRoot: targetRoot || '.binliquid/rehearsal/design-partner',
+    targetRoot: targetRoot || '.imperaos/rehearsal/design-partner',
     outputPath: output || 'artifacts/install-rehearsal/report.json',
     supportBundleSafe: true,
     rollbackPlanPresent: true,

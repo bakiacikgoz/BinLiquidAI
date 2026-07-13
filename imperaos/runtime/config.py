@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from imperaos.runtime.paths import state_path
+
 
 class RuntimeLimits(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -74,7 +76,7 @@ class MemoryWorkspaceAuthorityConfig(BaseModel):
     mode: Literal["local"] = "local"
     default_workspace_id: str = "default"
     default_principal_id: str = "agent-local"
-    db_path: str = ".binliquid/workspace_memory.sqlite3"
+    db_path: str = state_path("workspace_memory.sqlite3")
     raw_content_persistence: bool = False
     network_listener_enabled: bool = False
     migration_apply_enabled: bool = False
@@ -118,7 +120,7 @@ class MemorySemanticConfig(BaseModel):
 class MemoryConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    db_path: str = ".binliquid/memory.sqlite3"
+    db_path: str = state_path("memory.sqlite3")
     v3_enabled: bool = False
     v3_authority_mode: Literal["local"] = "local"
     raw_prompt_persistence: bool = False
@@ -189,8 +191,8 @@ class GovernanceConfig(BaseModel):
     enabled: bool = True
     policy_path: str = "config/policies/default.toml"
     policy_fail_mode: Literal["fail_closed", "fail_open"] = "fail_closed"
-    approval_store_path: str = ".binliquid/governance/approvals.sqlite3"
-    audit_dir: str = ".binliquid/audit"
+    approval_store_path: str = state_path("governance", "approvals.sqlite3")
+    audit_dir: str = state_path("audit")
     pii_redaction_enabled: bool = True
     approval_ttl_seconds: int = Field(default=86400, ge=60)
     decision_engine_version: str = "v0.3"
@@ -203,8 +205,8 @@ class TeamRuntimeConfig(BaseModel):
     max_parallel_tasks: int = Field(default=4, ge=1, le=64)
     max_total_tasks: int = Field(default=64, ge=1)
     max_handoff_depth: int = Field(default=8, ge=1)
-    checkpoint_db_path: str = ".binliquid/team/checkpoints.sqlite3"
-    artifact_dir: str = ".binliquid/team/jobs"
+    checkpoint_db_path: str = state_path("team", "checkpoints.sqlite3")
+    artifact_dir: str = state_path("team", "jobs")
 
 
 class SecurityConfig(BaseModel):
@@ -222,9 +224,9 @@ class IdentityConfig(BaseModel):
     enabled: bool = False
     mode: Literal["disabled", "external_assertion", "break_glass_only"] = "disabled"
     required_for_mutations: bool = False
-    assertion_path: str = ".binliquid/identity/current_assertion.json"
-    break_glass_assertion_path: str = ".binliquid/identity/break_glass_assertion.json"
-    trusted_keys_dir: str = ".binliquid/keys/trusted"
+    assertion_path: str = state_path("identity", "current_assertion.json")
+    break_glass_assertion_path: str = state_path("identity", "break_glass_assertion.json")
+    trusted_keys_dir: str = state_path("keys", "trusted")
     allow_break_glass: bool = True
     max_clock_skew_seconds: int = Field(default=60, ge=0, le=600)
     permission_model_version: str = "1.0"
@@ -241,9 +243,9 @@ class KeyManagementConfig(BaseModel):
         "pkcs11_hsm",
     ] = "disabled"
     current_key_id: str | None = None
-    private_key_path: str = ".binliquid/keys/private/current_key.json"
-    trusted_public_keys_dir: str = ".binliquid/keys/trusted"
-    key_manifest_path: str = ".binliquid/keys/manifest.json"
+    private_key_path: str = state_path("keys", "private", "current_key.json")
+    trusted_public_keys_dir: str = state_path("keys", "trusted")
+    key_manifest_path: str = state_path("keys", "manifest.json")
     managed_signer_command: list[str] = Field(default_factory=list)
     allow_env_hmac_compat: bool = True
 
@@ -251,9 +253,9 @@ class KeyManagementConfig(BaseModel):
 class ObservabilityConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    metrics_dir: str = ".binliquid/metrics"
+    metrics_dir: str = state_path("metrics")
     file_snapshot_enabled: bool = True
-    prometheus_textfile_path: str = ".binliquid/metrics/binliquid.prom"
+    prometheus_textfile_path: str = state_path("metrics", "imperaos.prom")
     http_exporter_enabled: bool = False
     http_bind: str = "127.0.0.1:9464"
 
@@ -261,11 +263,11 @@ class ObservabilityConfig(BaseModel):
 class MaintenanceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    maintenance_flag_path: str = ".binliquid/maintenance.lock"
-    backup_dir: str = ".binliquid/backups"
-    restore_dir: str = ".binliquid/restores"
-    migration_dir: str = ".binliquid/migrations"
-    support_bundle_dir: str = ".binliquid/support"
+    maintenance_flag_path: str = state_path("maintenance.lock")
+    backup_dir: str = state_path("backups")
+    restore_dir: str = state_path("restores")
+    migration_dir: str = state_path("migrations")
+    support_bundle_dir: str = state_path("support")
 
 
 class ComputerUseRuntimeConfig(BaseModel):
@@ -384,8 +386,8 @@ class RuntimeConfig(BaseModel):
     provider_registry_enabled: bool = True
     provider_registry_path: str = "config/providers.toml"
     workspace_root: str = "."
-    trace_dir: str = ".binliquid/traces"
-    router_dataset_path: str = ".binliquid/research/router_dataset.jsonl"
+    trace_dir: str = state_path("traces")
+    router_dataset_path: str = state_path("research", "router_dataset.jsonl")
     limits: RuntimeLimits = Field(default_factory=RuntimeLimits)
     sltc: SLTCConfig = Field(default_factory=SLTCConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
@@ -458,10 +460,10 @@ class RuntimeConfig(BaseModel):
             provider_registry_enabled=app_data.get("provider_registry_enabled", True),
             provider_registry_path=app_data.get("provider_registry_path", "config/providers.toml"),
             workspace_root=app_data.get("workspace_root", "."),
-            trace_dir=app_data.get("trace_dir", ".binliquid/traces"),
+            trace_dir=app_data.get("trace_dir", state_path("traces")),
             router_dataset_path=app_data.get(
                 "router_dataset_path",
-                ".binliquid/research/router_dataset.jsonl",
+                state_path("research", "router_dataset.jsonl"),
             ),
             limits=RuntimeLimits(
                 expert_timeout_ms=limits_data.get("expert_timeout_ms", 2500),
@@ -485,7 +487,7 @@ class RuntimeConfig(BaseModel):
                 task_bias_overrides=sltc_data.get("task_bias_overrides", {}),
             ),
             memory=MemoryConfig(
-                db_path=memory_data.get("db_path", ".binliquid/memory.sqlite3"),
+                db_path=memory_data.get("db_path", state_path("memory.sqlite3")),
                 v3_enabled=memory_data.get("v3_enabled", False),
                 v3_authority_mode=memory_data.get("v3_authority_mode", "local"),
                 raw_prompt_persistence=memory_data.get("raw_prompt_persistence", False),
@@ -550,7 +552,7 @@ class RuntimeConfig(BaseModel):
                         "default_principal_id", "agent-local"
                     ),
                     db_path=memory_workspace_authority_data.get(
-                        "db_path", ".binliquid/workspace_memory.sqlite3"
+                        "db_path", state_path("workspace_memory.sqlite3")
                     ),
                     raw_content_persistence=memory_workspace_authority_data.get(
                         "raw_content_persistence", False
@@ -608,9 +610,9 @@ class RuntimeConfig(BaseModel):
                 policy_fail_mode=governance_data.get("policy_fail_mode", "fail_closed"),
                 approval_store_path=governance_data.get(
                     "approval_store_path",
-                    ".binliquid/governance/approvals.sqlite3",
+                    state_path("governance", "approvals.sqlite3"),
                 ),
-                audit_dir=governance_data.get("audit_dir", ".binliquid/audit"),
+                audit_dir=governance_data.get("audit_dir", state_path("audit")),
                 pii_redaction_enabled=governance_data.get("pii_redaction_enabled", True),
                 approval_ttl_seconds=governance_data.get("approval_ttl_seconds", 86400),
                 decision_engine_version=governance_data.get("decision_engine_version", "v0.3"),
@@ -622,9 +624,9 @@ class RuntimeConfig(BaseModel):
                 max_handoff_depth=team_data.get("max_handoff_depth", 8),
                 checkpoint_db_path=team_data.get(
                     "checkpoint_db_path",
-                    ".binliquid/team/checkpoints.sqlite3",
+                    state_path("team", "checkpoints.sqlite3"),
                 ),
-                artifact_dir=team_data.get("artifact_dir", ".binliquid/team/jobs"),
+                artifact_dir=team_data.get("artifact_dir", state_path("team", "jobs")),
             ),
             security=SecurityConfig(
                 mode=security_data.get("mode", "default"),
@@ -643,14 +645,14 @@ class RuntimeConfig(BaseModel):
                 mode=identity_data.get("mode", "disabled"),
                 required_for_mutations=identity_data.get("required_for_mutations", False),
                 assertion_path=identity_data.get(
-                    "assertion_path", ".binliquid/identity/current_assertion.json"
+                    "assertion_path", state_path("identity", "current_assertion.json")
                 ),
                 break_glass_assertion_path=identity_data.get(
                     "break_glass_assertion_path",
-                    ".binliquid/identity/break_glass_assertion.json",
+                    state_path("identity", "break_glass_assertion.json"),
                 ),
                 trusted_keys_dir=identity_data.get(
-                    "trusted_keys_dir", ".binliquid/keys/trusted"
+                    "trusted_keys_dir", state_path("keys", "trusted")
                 ),
                 allow_break_glass=identity_data.get("allow_break_glass", True),
                 max_clock_skew_seconds=identity_data.get("max_clock_skew_seconds", 60),
@@ -660,36 +662,36 @@ class RuntimeConfig(BaseModel):
                 provider=keys_data.get("provider", "disabled"),
                 current_key_id=keys_data.get("current_key_id"),
                 private_key_path=keys_data.get(
-                    "private_key_path", ".binliquid/keys/private/current_key.json"
+                    "private_key_path", state_path("keys", "private", "current_key.json")
                 ),
                 trusted_public_keys_dir=keys_data.get(
-                    "trusted_public_keys_dir", ".binliquid/keys/trusted"
+                    "trusted_public_keys_dir", state_path("keys", "trusted")
                 ),
                 key_manifest_path=keys_data.get(
-                    "key_manifest_path", ".binliquid/keys/manifest.json"
+                    "key_manifest_path", state_path("keys", "manifest.json")
                 ),
                 managed_signer_command=keys_data.get("managed_signer_command", []),
                 allow_env_hmac_compat=keys_data.get("allow_env_hmac_compat", True),
             ),
             observability=ObservabilityConfig(
-                metrics_dir=observability_data.get("metrics_dir", ".binliquid/metrics"),
+                metrics_dir=observability_data.get("metrics_dir", state_path("metrics")),
                 file_snapshot_enabled=observability_data.get("file_snapshot_enabled", True),
                 prometheus_textfile_path=observability_data.get(
                     "prometheus_textfile_path",
-                    ".binliquid/metrics/binliquid.prom",
+                    state_path("metrics", "imperaos.prom"),
                 ),
                 http_exporter_enabled=observability_data.get("http_exporter_enabled", False),
                 http_bind=observability_data.get("http_bind", "127.0.0.1:9464"),
             ),
             maintenance=MaintenanceConfig(
                 maintenance_flag_path=maintenance_data.get(
-                    "maintenance_flag_path", ".binliquid/maintenance.lock"
+                    "maintenance_flag_path", state_path("maintenance.lock")
                 ),
-                backup_dir=maintenance_data.get("backup_dir", ".binliquid/backups"),
-                restore_dir=maintenance_data.get("restore_dir", ".binliquid/restores"),
-                migration_dir=maintenance_data.get("migration_dir", ".binliquid/migrations"),
+                backup_dir=maintenance_data.get("backup_dir", state_path("backups")),
+                restore_dir=maintenance_data.get("restore_dir", state_path("restores")),
+                migration_dir=maintenance_data.get("migration_dir", state_path("migrations")),
                 support_bundle_dir=maintenance_data.get(
-                    "support_bundle_dir", ".binliquid/support"
+                    "support_bundle_dir", state_path("support")
                 ),
             ),
             computer_use=ComputerUseRuntimeConfig(
@@ -1004,7 +1006,9 @@ def _load_profile_payload(
         config_dir = root_dir / "config"
     elif config_root:
         configured = Path(config_root)
-        config_dir = configured if (configured / f"{profile}.toml").exists() else configured / "config"
+        config_dir = (
+            configured if (configured / f"{profile}.toml").exists() else configured / "config"
+        )
     else:
         config_dir = Path(__file__).resolve().parents[2] / "config"
     config_path = config_dir / f"{profile}.toml"

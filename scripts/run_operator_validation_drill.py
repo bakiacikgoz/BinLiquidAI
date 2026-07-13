@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from imperaos.runtime.paths import TEAM_ARTIFACT_ROOT
+
 SCHEMA_VERSION = "binliquid-operator-validation-drill/v1"
 ATTESTATION_SCHEMA_VERSION = "binliquid-non-developer-operator-attestation/v1"
 
@@ -57,7 +59,7 @@ def _default_commands() -> list[CommandSpec]:
         CommandSpec("operator_capabilities", [*base, "operator", "capabilities", "--json"]),
         CommandSpec(
             "team_list",
-            [*base, "team", "list", "--root-dir", ".binliquid/team/jobs", "--json"],
+            [*base, "team", "list", "--root-dir", TEAM_ARTIFACT_ROOT, "--json"],
         ),
         CommandSpec(
             "computer_use_doctor_all",

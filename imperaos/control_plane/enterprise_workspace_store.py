@@ -21,6 +21,7 @@ from imperaos.control_plane.enterprise_workspace import (
     utc_now,
 )
 from imperaos.control_plane.storage import ControlPlaneStore, canonical_json_hash
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 ModelT = TypeVar("ModelT", bound=StrictModel)
 
@@ -33,7 +34,7 @@ class StoreWriteResult(StrictModel):
 
 
 class EnterpriseWorkspaceStore:
-    def __init__(self, root_dir: str | Path = ".binliquid/control-plane") -> None:
+    def __init__(self, root_dir: str | Path = CONTROL_PLANE_STATE_ROOT) -> None:
         self.store = ControlPlaneStore(root_dir)
         self.base = "enterprise-workspace"
 

@@ -10,6 +10,7 @@ from imperaos.memory.runtime_policy import (
     MemoryRuntimePolicyEvaluationReport,
 )
 from imperaos.memory.runtime_policy_fixtures import build_memory_runtime_policy_fixture
+from imperaos.runtime.paths import state_path
 
 
 def run_policy_evaluation(
@@ -20,7 +21,7 @@ def run_policy_evaluation(
 ) -> MemoryRuntimePolicyEvaluationReport:
     cases = _load_cases(suite_path)
     fixture = build_memory_runtime_policy_fixture(
-        Path(".binliquid/memory-runtime-policy-gate"),
+        Path(state_path("memory-runtime-policy-gate")),
         profile=profile,
         semantic_mode="enforced",
         semantic_enabled=True,

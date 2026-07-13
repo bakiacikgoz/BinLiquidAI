@@ -5,12 +5,13 @@ from pathlib import Path
 from imperaos.control_plane.models import ReadinessReport
 from imperaos.enterprise.identity import describe_actor
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 
 def build_readiness_report(config: RuntimeConfig) -> ReadinessReport:
     checks = {
         "policy_available": Path(config.governance.policy_path).exists(),
-        "registry_available": Path(".binliquid/control-plane").exists(),
+        "registry_available": Path(CONTROL_PLANE_STATE_ROOT).exists(),
         "evidence_export_available": True,
         "claim_guard_available": True,
         "signing_configured": config.keys.provider != "disabled",

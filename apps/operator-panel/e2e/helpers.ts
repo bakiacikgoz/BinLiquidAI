@@ -42,7 +42,7 @@ const defaultSettings: E2eSettings = {
   cliPath: '',
   bundledPythonPath: '',
   profile: 'balanced',
-  rootDir: '.binliquid/e2e-preview/jobs',
+  rootDir: '.imperaos/e2e-preview/jobs',
   operatorId: '',
   locale: 'en',
   remoteTelemetry: false,

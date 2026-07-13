@@ -5,17 +5,19 @@ import json
 from pathlib import Path
 from typing import Any
 
+from imperaos.runtime.paths import TEAM_ARTIFACT_ROOT
 
-def _job_dir(job_id: str, root_dir: str | Path = ".binliquid/team/jobs") -> Path:
+
+def _job_dir(job_id: str, root_dir: str | Path = TEAM_ARTIFACT_ROOT) -> Path:
     return Path(root_dir) / job_id
 
 
-def load_job_status(job_id: str, root_dir: str | Path = ".binliquid/team/jobs") -> dict[str, Any]:
+def load_job_status(job_id: str, root_dir: str | Path = TEAM_ARTIFACT_ROOT) -> dict[str, Any]:
     path = _job_dir(job_id, root_dir) / "status.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_events(job_id: str, root_dir: str | Path = ".binliquid/team/jobs") -> list[dict[str, Any]]:
+def load_events(job_id: str, root_dir: str | Path = TEAM_ARTIFACT_ROOT) -> list[dict[str, Any]]:
     path = _job_dir(job_id, root_dir) / "events.jsonl"
     if not path.exists():
         return []
@@ -25,25 +27,25 @@ def load_events(job_id: str, root_dir: str | Path = ".binliquid/team/jobs") -> l
 
 def load_audit_envelope(
     job_id: str,
-    root_dir: str | Path = ".binliquid/team/jobs",
+    root_dir: str | Path = TEAM_ARTIFACT_ROOT,
 ) -> dict[str, Any]:
     path = _job_dir(job_id, root_dir) / "audit_envelope.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_task_runs(job_id: str, root_dir: str | Path = ".binliquid/team/jobs") -> dict[str, Any]:
+def load_task_runs(job_id: str, root_dir: str | Path = TEAM_ARTIFACT_ROOT) -> dict[str, Any]:
     path = _job_dir(job_id, root_dir) / "tasks.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_handoffs(job_id: str, root_dir: str | Path = ".binliquid/team/jobs") -> dict[str, Any]:
+def load_handoffs(job_id: str, root_dir: str | Path = TEAM_ARTIFACT_ROOT) -> dict[str, Any]:
     path = _job_dir(job_id, root_dir) / "handoffs.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def replay_job(
     job_id: str,
-    root_dir: str | Path = ".binliquid/team/jobs",
+    root_dir: str | Path = TEAM_ARTIFACT_ROOT,
     *,
     verify: bool = True,
 ) -> dict[str, Any]:

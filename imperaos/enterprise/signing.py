@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from pydantic import BaseModel, ConfigDict
 
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import enterprise_state_path
 
 
 class TrustedKey(BaseModel):
@@ -378,7 +379,7 @@ def _load_trusted_keys(
         or (
             config.keys.trusted_public_keys_dir
             if config is not None
-            else ".binliquid/keys/trusted"
+            else enterprise_state_path("keys", "trusted")
         )
     )
     resolved_manifest = Path(
@@ -386,7 +387,7 @@ def _load_trusted_keys(
         or (
             config.keys.key_manifest_path
             if config is not None
-            else ".binliquid/keys/manifest.json"
+            else enterprise_state_path("keys", "manifest.json")
         )
     )
     revoked: set[str] = set()

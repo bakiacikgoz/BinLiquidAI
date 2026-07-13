@@ -50,8 +50,8 @@ def _write_signing_material(
     private_raw = private_key.private_bytes_raw()
     public_raw = private_key.public_key().public_bytes_raw()
 
-    private_dir = root / ".binliquid" / "keys" / "private"
-    trusted_dir = root / ".binliquid" / "keys" / "trusted"
+    private_dir = root / ".imperaos" / "enterprise" / "keys" / "private"
+    trusted_dir = root / ".imperaos" / "enterprise" / "keys" / "trusted"
     private_dir.mkdir(parents=True, exist_ok=True)
     trusted_dir.mkdir(parents=True, exist_ok=True)
 
@@ -83,7 +83,7 @@ def _write_signing_material(
         json.dumps(public_payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    ((root / ".binliquid" / "keys") / "manifest.json").write_text(
+    ((root / ".imperaos" / "enterprise" / "keys") / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -116,7 +116,7 @@ def _write_identity_assertion(
         base64.b64decode(signing_material["private_key"])
     ).sign(canonical_payload_hash(payload).encode("utf-8"))
     payload["signature"] = base64.b64encode(signature).decode("ascii")
-    identity_dir = root / ".binliquid" / "identity"
+    identity_dir = root / ".imperaos" / "enterprise" / "identity"
     identity_dir.mkdir(parents=True, exist_ok=True)
     (identity_dir / "current_assertion.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -237,10 +237,19 @@ def test_enterprise_team_audit_and_backup_are_signed(tmp_path: Path) -> None:
             "keys": RuntimeConfig.from_profile("enterprise").keys.model_copy(
                 update={
                     "private_key_path": str(
-                        tmp_path / ".binliquid" / "keys" / "private" / "current_key.json"
+                        tmp_path
+                        / ".imperaos"
+                        / "enterprise"
+                        / "keys"
+                        / "private"
+                        / "current_key.json"
                     ),
-                    "trusted_public_keys_dir": str(tmp_path / ".binliquid" / "keys" / "trusted"),
-                    "key_manifest_path": str(tmp_path / ".binliquid" / "keys" / "manifest.json"),
+                    "trusted_public_keys_dir": str(
+                        tmp_path / ".imperaos" / "enterprise" / "keys" / "trusted"
+                    ),
+                    "key_manifest_path": str(
+                        tmp_path / ".imperaos" / "enterprise" / "keys" / "manifest.json"
+                    ),
                 }
             ),
             "maintenance": RuntimeConfig.from_profile("enterprise").maintenance.model_copy(

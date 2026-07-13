@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from imperaos.control_plane.errors import PathOutsideRoot, RegistryCorrupted
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 
 def canonical_json(value: Any) -> str:
@@ -34,7 +35,7 @@ def file_sha256(path: str | Path) -> str:
 
 
 class ControlPlaneStore:
-    def __init__(self, root_dir: str | Path = ".binliquid/control-plane"):
+    def __init__(self, root_dir: str | Path = CONTROL_PLANE_STATE_ROOT):
         self.root_dir = Path(root_dir)
         self.root_dir.mkdir(parents=True, exist_ok=True)
 

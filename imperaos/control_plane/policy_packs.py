@@ -15,6 +15,7 @@ from imperaos.control_plane.models import (
     RiskClass,
 )
 from imperaos.control_plane.storage import ControlPlaneStore, canonical_json_hash
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 UNSAFE_ALLOW_RISKS = {
     RiskClass.DESTRUCTIVE,
@@ -104,7 +105,7 @@ def diff_policy_packs(
 def promote_policy_pack_dry_run(
     *,
     manifest: PolicyPackManifest,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
     dry_run: bool = True,
 ) -> PolicyPackPromotionDryRun:
     validation = validate_policy_pack(manifest)

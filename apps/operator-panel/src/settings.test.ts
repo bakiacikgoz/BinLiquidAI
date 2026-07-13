@@ -37,7 +37,7 @@ describe('operator id validation', () => {
       JSON.stringify({
         mode: 'auto',
         profile: 'balanced',
-        rootDir: '.binliquid/team/jobs',
+        rootDir: '.imperaos/team/jobs',
         operatorId: '',
       }),
     );
@@ -49,7 +49,7 @@ describe('operator id validation', () => {
       JSON.stringify({
         mode: 'auto',
         profile: 'balanced',
-        rootDir: '.binliquid/team/jobs',
+        rootDir: '.imperaos/team/jobs',
       }),
     );
 
@@ -84,7 +84,7 @@ describe('assistant runtime settings', () => {
       JSON.stringify({
         mode: 'auto',
         profile: 'balanced',
-        rootDir: '.binliquid/team/jobs',
+        rootDir: '.imperaos/team/jobs',
       }),
     );
 

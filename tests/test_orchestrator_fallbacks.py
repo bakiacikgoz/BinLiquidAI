@@ -215,7 +215,7 @@ def _config(timeout_ms: int = 10, threshold: int = 3, cooldown_s: int = 300) -> 
         privacy_mode=True,
         enable_persistent_memory=False,
         web_enabled=False,
-        trace_dir=".binliquid/test-traces",
+        trace_dir=".imperaos/test-traces",
         limits=limits,
     )
 

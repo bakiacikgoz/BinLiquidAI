@@ -15,6 +15,7 @@ from imperaos.memory.models import (
     MemoryScopeFilter,
     MemoryVisibility,
 )
+from imperaos.runtime.paths import MEMORY_TURBOVEC_ROOT
 
 
 class TurboVecOptionalIndex:
@@ -26,7 +27,7 @@ class TurboVecOptionalIndex:
         enabled: bool = False,
         dim: int = 16,
         bits_per_coord: int = 4,
-        index_path: str | Path = ".binliquid/memory-turbovec",
+        index_path: str | Path = MEMORY_TURBOVEC_ROOT,
         dim_guard_max: int = 4096,
     ) -> None:
         self.enabled = enabled

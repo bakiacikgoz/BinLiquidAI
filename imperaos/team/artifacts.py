@@ -11,6 +11,7 @@ from uuid import uuid4
 from imperaos.contracts.version import OPERATOR_PANEL_CONTRACT_VERSION
 from imperaos.enterprise.signing import build_integrity, canonical_payload_hash
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import TEAM_ARTIFACT_ROOT
 from imperaos.team.models import (
     AuditEnvelope,
     AuditIntegrity,
@@ -35,7 +36,7 @@ class TeamArtifactPaths:
 def ensure_team_artifact_paths(
     *,
     job_id: str,
-    root_dir: str | Path = ".binliquid/team/jobs",
+    root_dir: str | Path = TEAM_ARTIFACT_ROOT,
 ) -> TeamArtifactPaths:
     base = Path(root_dir)
     job_dir = base / job_id

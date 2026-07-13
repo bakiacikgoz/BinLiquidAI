@@ -344,7 +344,7 @@ def test_team_runtime_payloads_match_frozen_contracts(monkeypatch, tmp_path: Pat
     assert replay_payload.job_id == job_id
 
     status_artifact = TeamStatusArtifactContract.model_validate_json(
-        (tmp_path / ".binliquid" / "team" / "jobs" / job_id / "status.json").read_text(
+        (tmp_path / ".imperaos" / "team" / "jobs" / job_id / "status.json").read_text(
             encoding="utf-8"
         )
     )

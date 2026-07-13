@@ -20,6 +20,7 @@ from imperaos.control_plane.enterprise_workspace import (
     stable_id,
     utc_now,
 )
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 
 class EnrollmentMemoryScope(StrictModel):
@@ -282,7 +283,7 @@ def create_enrollment_token(
     config: Any,
     actor: Any,
     request: AgentEnrollmentTokenCreateRequest,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> AgentEnrollmentTokenCreateResult:
     from imperaos.control_plane.enterprise_rbac import check_roles_for_permission
     from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
@@ -367,7 +368,7 @@ def revoke_enrollment_token(
     actor: Any,
     token_id: str,
     reason: str,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> AgentEnrollmentTokenRevokeResult:
     del config
     from imperaos.control_plane.enterprise_rbac import check_roles_for_permission
@@ -465,7 +466,7 @@ def import_enrollment_request(
     config: Any,
     actor: Any,
     request: AgentEnrollmentRequest,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> AgentEnrollmentImportResult:
     del config
     from imperaos.control_plane.enterprise_rbac import check_roles_for_permission
@@ -513,7 +514,7 @@ def approve_enrollment_request(
     config: Any,
     actor: Any,
     request_id: str,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> AgentEnrollmentDecision:
     del config
     from imperaos.control_plane.enterprise_rbac import check_roles_for_permission
@@ -621,7 +622,7 @@ def reject_enrollment_request(
     actor: Any,
     request_id: str,
     reason: str,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> AgentEnrollmentDecision:
     del config
     from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
@@ -654,7 +655,7 @@ def require_active_enrollment(
     *,
     agent_id: str,
     workspace_id: str | None = None,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
 ) -> EnrolledAgent:
     from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
 

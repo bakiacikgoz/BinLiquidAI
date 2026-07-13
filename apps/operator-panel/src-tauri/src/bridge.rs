@@ -120,7 +120,7 @@ impl BridgeConfig {
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
-            .unwrap_or(".binliquid/team/jobs")
+            .unwrap_or(".imperaos/team/jobs")
             .to_string()
     }
 }
@@ -1242,7 +1242,7 @@ pub async fn bridge_install_rehearsal(
         "--profile".to_string(),
         config.profile(),
         "--target-root".to_string(),
-        target_root.unwrap_or_else(|| ".binliquid/rehearsal/design-partner".to_string()),
+        target_root.unwrap_or_else(|| ".imperaos/rehearsal/design-partner".to_string()),
         "--mode".to_string(),
         mode.unwrap_or_else(|| "source-cli".to_string()),
         "--output".to_string(),
@@ -3486,7 +3486,7 @@ mod tests {
             contract_version: CONTRACT_VERSION.to_string(),
             job_id: "job-4".to_string(),
             profile: "balanced".to_string(),
-            root_dir: ".binliquid/team/jobs".to_string(),
+            root_dir: ".imperaos/team/jobs".to_string(),
             process_id: Some(4242),
         };
         let json = serde_json::to_value(payload).expect("serialize");

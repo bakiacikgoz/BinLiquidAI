@@ -7,6 +7,7 @@ from imperaos.control_plane.models import OperationDescriptor, OperationWorkflow
 from imperaos.control_plane.rbac_admin import check_permission
 from imperaos.control_plane.snapshot import build_control_plane_snapshot
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 
 def dry_run_operation(
@@ -14,7 +15,7 @@ def dry_run_operation(
     config: RuntimeConfig,
     operation_id: str,
     actor_id: str,
-    root_dir: str | Path = ".binliquid/control-plane",
+    root_dir: str | Path = CONTROL_PLANE_STATE_ROOT,
     evidence_root: str | Path = "artifacts",
     dry_run: bool = True,
 ) -> OperationWorkflowResult:

@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS, type PanelSettings } from '../settings';
 export const qaSettingsFixture: PanelSettings = {
   ...DEFAULT_SETTINGS,
   operatorId: 'qa-operator',
-  rootDir: '.binliquid/test-ui/jobs',
+  rootDir: '.imperaos/test-ui/jobs',
   debugRaw: false,
 };
 

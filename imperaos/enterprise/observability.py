@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
 
 
 def collect_metrics_snapshot(config: RuntimeConfig) -> dict[str, Any]:
@@ -146,7 +147,7 @@ def collect_metrics_snapshot(config: RuntimeConfig) -> dict[str, Any]:
 
 
 def _control_plane_metrics() -> dict[str, Any]:
-    root = Path(".binliquid/control-plane")
+    root = Path(CONTROL_PLANE_STATE_ROOT)
     agents_file = root / "agents.json"
     runs_root = root / "runs"
     agents_registered = 0
