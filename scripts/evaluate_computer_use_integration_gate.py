@@ -11,34 +11,34 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from binliquid import __version__
-from binliquid.computer_use.models import ComputerUseMode, RiskClass
-from binliquid.computer_use.vision_runtime.approval import validate_approval_snapshot
-from binliquid.computer_use.vision_runtime.models import (
+from imperaos import __version__
+from imperaos.computer_use.models import ComputerUseMode, RiskClass
+from imperaos.computer_use.vision_runtime.approval import validate_approval_snapshot
+from imperaos.computer_use.vision_runtime.models import (
     InputActionType,
     NormalizedBBox,
     SurfaceKind,
     VisionAction,
     VisionObservation,
 )
-from binliquid.computer_use.vision_runtime.policy import UniversalComputerUsePolicy
-from binliquid.computer_use.vision_runtime.replay import verify_replay
-from binliquid.contracts import OperatorCapabilitiesPayload
-from binliquid.runtime.config import ComputerUseRuntimeConfig, resolve_runtime_config
-from binliquid.runtime.platform import current_platform
+from imperaos.computer_use.vision_runtime.policy import UniversalComputerUsePolicy
+from imperaos.computer_use.vision_runtime.replay import verify_replay
+from imperaos.contracts import OperatorCapabilitiesPayload
+from imperaos.runtime.config import ComputerUseRuntimeConfig, resolve_runtime_config
+from imperaos.runtime.platform import current_platform
 
 SCHEMA_VERSION = "computer-use-integration-gate/v1"
 WINDOWS_NOT_QUALIFIED = "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
 ENTRYPOINT_COMMANDS = (
     ("console_version", ("uv", "run", "binliquid", "--version")),
-    ("module_version", ("uv", "run", "python", "-m", "binliquid", "--version")),
+    ("module_version", ("uv", "run", "python", "-m", "imperaos", "--version")),
     (
         "console_capabilities",
         ("uv", "run", "binliquid", "operator", "capabilities", "--json"),
     ),
     (
         "module_capabilities",
-        ("uv", "run", "python", "-m", "binliquid", "operator", "capabilities", "--json"),
+        ("uv", "run", "python", "-m", "imperaos", "operator", "capabilities", "--json"),
     ),
 )
 IGNORED_COPY_NAMES = {

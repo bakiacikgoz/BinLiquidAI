@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from binliquid.governance.runtime import GovernanceRuntime
-from binliquid.runtime.config import RuntimeConfig
-from binliquid.schemas.models import OrchestratorResult
-from binliquid.team.models import TeamSpec
-from binliquid.team.replay import replay_job
-from binliquid.team.supervisor import TeamSupervisor
+from imperaos.governance.runtime import GovernanceRuntime
+from imperaos.runtime.config import RuntimeConfig
+from imperaos.schemas.models import OrchestratorResult
+from imperaos.team.models import TeamSpec
+from imperaos.team.replay import replay_job
+from imperaos.team.supervisor import TeamSupervisor
 
 
 class _EnvelopeOrchestrator:

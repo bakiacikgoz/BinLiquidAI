@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from binliquid.computer_use import (
+from imperaos.computer_use import (
     BrowserAllowlistPolicy,
     BrowserTaskFamily,
     ComputerUseMode,
@@ -12,11 +12,11 @@ from binliquid.computer_use import (
     SessionRequest,
     TargetDescriptor,
 )
-from binliquid.computer_use.models import EvidenceEnvelope, PerceptionSource, SelectorContext
-from binliquid.computer_use.perception import build_perception_fingerprint, select_perception_source
-from binliquid.computer_use.planner import plan_browser_task
-from binliquid.governance.runtime import GovernanceRuntime
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.computer_use.models import EvidenceEnvelope, PerceptionSource, SelectorContext
+from imperaos.computer_use.perception import build_perception_fingerprint, select_perception_source
+from imperaos.computer_use.planner import plan_browser_task
+from imperaos.governance.runtime import GovernanceRuntime
+from imperaos.runtime.config import RuntimeConfig
 
 
 def _target(url: str = "https://ops.example.internal/queue") -> TargetDescriptor:

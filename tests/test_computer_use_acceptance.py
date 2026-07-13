@@ -13,8 +13,8 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from binliquid.computer_use import ComputerUseMode, ComputerUseRunner, SessionCommand
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.computer_use import ComputerUseMode, ComputerUseRunner, SessionCommand
+from imperaos.runtime.config import RuntimeConfig
 
 REAL_COMPUTER_USE_ENABLED = os.getenv("AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS") == "1"
 

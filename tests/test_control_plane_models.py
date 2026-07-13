@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from binliquid.control_plane.models import AgentSpec
-from binliquid.control_plane.registry import load_agent_spec
+from imperaos.control_plane.models import AgentSpec
+from imperaos.control_plane.registry import load_agent_spec
 
 
 def test_agent_spec_loads_example() -> None:

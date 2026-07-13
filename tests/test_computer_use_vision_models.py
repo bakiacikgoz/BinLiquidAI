@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from binliquid.computer_use.models import RiskClass
-from binliquid.computer_use.vision_runtime.models import (
+from imperaos.computer_use.models import RiskClass
+from imperaos.computer_use.vision_runtime.models import (
     InputActionType,
     NormalizedBBox,
     SurfaceKind,
@@ -13,7 +13,7 @@ from binliquid.computer_use.vision_runtime.models import (
     VisionObservation,
     VisionRunArtifact,
 )
-from binliquid.runtime.config import ComputerUseRuntimeConfig, RuntimeConfig, resolve_runtime_config
+from imperaos.runtime.config import ComputerUseRuntimeConfig, RuntimeConfig, resolve_runtime_config
 
 
 def test_computer_use_runtime_config_defaults_are_safe() -> None:

@@ -5,8 +5,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from binliquid.cli import app
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.cli import app
+from imperaos.runtime.config import RuntimeConfig
 
 runner = CliRunner()
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -82,7 +82,7 @@ def test_computer_use_doctor_reports_stale_evidence_from_resolver() -> None:
 
 
 def test_computer_use_doctor_reports_commit_mismatch_from_resolver(monkeypatch) -> None:
-    monkeypatch.setattr("binliquid.cli._current_git_sha", lambda: "fixture-commit")
+    monkeypatch.setattr("imperaos.cli._current_git_sha", lambda: "fixture-commit")
 
     result = runner.invoke(
         app,
@@ -108,7 +108,7 @@ def test_computer_use_doctor_reports_commit_mismatch_from_resolver(monkeypatch) 
 
 
 def test_computer_use_doctor_reports_platform_mismatch_from_resolver(monkeypatch) -> None:
-    monkeypatch.setattr("binliquid.cli._current_git_sha", lambda: "fixture-commit")
+    monkeypatch.setattr("imperaos.cli._current_git_sha", lambda: "fixture-commit")
 
     result = runner.invoke(
         app,
@@ -145,7 +145,7 @@ def test_computer_use_doctor_fails_closed_when_resolver_raises(monkeypatch) -> N
         raise RuntimeError("resolver unavailable")
 
     monkeypatch.setattr(
-        "binliquid.computer_use.vision_runtime.capability_resolver."
+        "imperaos.computer_use.vision_runtime.capability_resolver."
         "resolve_computer_use_capabilities",
         _raise_resolution_error,
     )

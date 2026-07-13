@@ -9,7 +9,7 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from binliquid.enterprise.signing import canonical_payload_hash
+from imperaos.enterprise.signing import canonical_payload_hash
 
 
 def main() -> None:

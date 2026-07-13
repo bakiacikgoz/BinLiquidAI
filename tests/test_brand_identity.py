@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator, ValidationError
+
+from imperaos.product_identity import PRODUCT_IDENTITY, load_product_identity
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 IDENTITY_PATH = REPO_ROOT / "branding" / "identity.json"
@@ -101,3 +104,41 @@ def test_typescript_identity_is_a_typed_frozen_view_of_canonical_json() -> None:
         for line in import_match.group("fields").splitlines()
     ]
     assert field_names == list(identity)
+
+
+def test_python_identity_is_a_typed_frozen_view_of_canonical_json() -> None:
+    assert load_product_identity() == PRODUCT_IDENTITY
+    assert PRODUCT_IDENTITY.to_canonical_dict() == _load_json(IDENTITY_PATH)
+
+
+def test_python_identity_is_immutable() -> None:
+    with pytest.raises(FrozenInstanceError):
+        PRODUCT_IDENTITY.slug = "changed"  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda identity: identity.pop("slug"), "missing fields"),
+        (lambda identity: identity.update({"extra": "value"}), "unexpected fields"),
+        (lambda identity: identity.update({"slug": 1}), "must be strings"),
+        (
+            lambda identity: identity.update(
+                {"pythonPackage": "".join(("bin", "liquid"))}
+            ),
+            "canonical values",
+        ),
+    ],
+)
+def test_python_identity_rejects_invalid_projections(
+    tmp_path: Path,
+    mutation,
+    message: str,
+) -> None:
+    invalid_identity = EXPECTED_IDENTITY.copy()
+    mutation(invalid_identity)
+    invalid_path = tmp_path / "identity.json"
+    invalid_path.write_text(json.dumps(invalid_identity), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        load_product_identity(invalid_path)

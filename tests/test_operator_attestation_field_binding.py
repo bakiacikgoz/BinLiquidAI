@@ -4,12 +4,12 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from binliquid.control_plane.field_evidence import (
+from imperaos.control_plane.field_evidence import (
     collect_field_evidence_bundle,
     prepare_field_evidence_session,
     validate_independent_operator_attestation,
 )
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.runtime.config import RuntimeConfig
 
 
 def test_operator_attestation_rejects_placeholder_operator(tmp_path: Path) -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from binliquid.runtime.config import redact_config_payload, resolve_runtime_config
+from imperaos.runtime.config import redact_config_payload, resolve_runtime_config
 
 
 def test_resolve_runtime_config_precedence_cli_wins_over_env_and_profile() -> None:

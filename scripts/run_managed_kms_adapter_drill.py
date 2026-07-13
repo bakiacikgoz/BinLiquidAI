@@ -13,14 +13,14 @@ from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from binliquid.enterprise.signing import (
+from imperaos.enterprise.signing import (
     fingerprint_public_key,
     key_status,
     rotate_plan,
     verify_signed_artifact,
     write_signed_json,
 )
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.runtime.config import RuntimeConfig
 
 SCHEMA_VERSION = "binliquid-managed-kms-adapter-drill/v1"
 

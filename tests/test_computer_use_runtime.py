@@ -7,9 +7,9 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from binliquid.computer_use.adapters import BrowserAdapter, FileDialogAdapter, WindowMetadata
-from binliquid.computer_use.adapters._macos import MacOSAutomationError
-from binliquid.computer_use.models import (
+from imperaos.computer_use.adapters import BrowserAdapter, FileDialogAdapter, WindowMetadata
+from imperaos.computer_use.adapters._macos import MacOSAutomationError
+from imperaos.computer_use.models import (
     BrowserTaskFamily,
     ComputerUseMode,
     ComputerUseReadinessStatus,
@@ -24,15 +24,15 @@ from binliquid.computer_use.models import (
     TargetDescriptor,
     VerificationResult,
 )
-from binliquid.computer_use.perception import build_perception_fingerprint
-from binliquid.computer_use.prompt_parser import parse_prompt_to_actions
-from binliquid.computer_use.runtime import (
+from imperaos.computer_use.perception import build_perception_fingerprint
+from imperaos.computer_use.prompt_parser import parse_prompt_to_actions
+from imperaos.computer_use.runtime import (
     ComputerUseRunner,
     RuntimeAdapters,
     SessionCommand,
     SessionControlBus,
 )
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.runtime.config import RuntimeConfig
 
 
 def _wait_until(predicate, timeout_s: float = 5.0) -> None:
@@ -1582,7 +1582,7 @@ def test_computer_use_readiness_report_flags_safari_javascript_blocker(
     )
 
     monkeypatch.setattr(
-        "binliquid.computer_use.runtime.current_platform",
+        "imperaos.computer_use.runtime.current_platform",
         lambda: SimpleNamespace(
             system="Darwin",
             label="macos",
@@ -1591,7 +1591,7 @@ def test_computer_use_readiness_report_flags_safari_javascript_blocker(
         ),
     )
     monkeypatch.setattr(
-        "binliquid.computer_use.runtime.shutil.which",
+        "imperaos.computer_use.runtime.shutil.which",
         lambda name: "/usr/bin/osascript" if name == "osascript" else None,
     )
 
@@ -1600,7 +1600,7 @@ def test_computer_use_readiness_report_flags_safari_javascript_blocker(
         stderr = ""
 
     monkeypatch.setattr(
-        "binliquid.computer_use.runtime.subprocess.run",
+        "imperaos.computer_use.runtime.subprocess.run",
         lambda *args, **kwargs: _Proc(),
     )
 
@@ -1617,7 +1617,7 @@ def test_computer_use_readiness_report_flags_safari_javascript_blocker(
         return ""
 
     monkeypatch.setattr(
-        "binliquid.computer_use.runtime.run_applescript",
+        "imperaos.computer_use.runtime.run_applescript",
         fake_run_applescript,
     )
 

@@ -11,8 +11,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from binliquid.control_plane.reports import build_reports_alerts_logs_manifest
-from binliquid.control_plane.snapshot import build_control_plane_snapshot
+from imperaos.control_plane.reports import build_reports_alerts_logs_manifest
+from imperaos.control_plane.snapshot import build_control_plane_snapshot
 
 
 def main() -> None:

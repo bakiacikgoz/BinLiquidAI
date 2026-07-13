@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from binliquid.memory.authority import build_memory_authority, proposal_from_cli
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.memory.authority import build_memory_authority, proposal_from_cli
+from imperaos.runtime.config import RuntimeConfig
 
 
 def main() -> None:

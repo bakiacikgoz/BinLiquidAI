@@ -3,18 +3,18 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from binliquid.control_plane.enterprise_workspace import (
+from imperaos.control_plane.enterprise_workspace import (
     EnterpriseOrganization,
     EnterprisePrincipal,
     EnterpriseWorkspace,
     EnterpriseWorkspaceMembership,
 )
-from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
-from binliquid.memory.principal_resolver import (
+from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+from imperaos.memory.principal_resolver import (
     AgentMemoryPrincipalResolver,
     PrincipalResolutionInput,
 )
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.runtime.config import RuntimeConfig
 
 NOW = datetime(2026, 6, 19, tzinfo=UTC)
 

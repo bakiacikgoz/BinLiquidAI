@@ -5,16 +5,16 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
-from binliquid.control_plane.agent_enrollment import (
+from imperaos.control_plane.agent_enrollment import (
     AgentEnrollmentTokenCreateRequest,
     create_enrollment_token,
 )
-from binliquid.control_plane.enterprise_workspace import (
+from imperaos.control_plane.enterprise_workspace import (
     EnterpriseWorkspaceBootstrapRequest,
     bootstrap_enterprise_workspace,
 )
-from binliquid.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.control_plane.enterprise_workspace_store import EnterpriseWorkspaceStore
+from imperaos.runtime.config import RuntimeConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,7 +50,7 @@ def test_enrollment_token_evidence_is_hash_only(tmp_path: Path, monkeypatch) -> 
             displayName="Pilot Workspace",
         ),
     )
-    from binliquid.enterprise.identity import resolve_actor_context
+    from imperaos.enterprise.identity import resolve_actor_context
 
     result = create_enrollment_token(
         config=config,

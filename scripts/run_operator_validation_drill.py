@@ -46,7 +46,7 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _default_commands() -> list[CommandSpec]:
     python_bin = sys.executable
-    base = [python_bin, "-m", "binliquid"]
+    base = [python_bin, "-m", "imperaos"]
     return [
         CommandSpec("version", [*base, "--version"], expect_json=False),
         CommandSpec(

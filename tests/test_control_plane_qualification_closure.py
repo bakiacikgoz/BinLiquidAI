@@ -8,15 +8,15 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from typer.testing import CliRunner
 
-from binliquid.cli import app
-from binliquid.control_plane.claim_guard import ClaimGuard
-from binliquid.control_plane.qualification_closure import (
+from imperaos.cli import app
+from imperaos.control_plane.claim_guard import ClaimGuard
+from imperaos.control_plane.qualification_closure import (
     generate_enterprise_hat_a_closure,
     verify_enterprise_hat_a_closure,
     write_pilot_qualification_fixture,
 )
-from binliquid.enterprise.signing import canonical_payload_hash
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.enterprise.signing import canonical_payload_hash
+from imperaos.runtime.config import RuntimeConfig
 
 runner = CliRunner()
 

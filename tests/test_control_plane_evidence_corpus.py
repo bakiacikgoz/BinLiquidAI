@@ -8,14 +8,14 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from typer.testing import CliRunner
 
-from binliquid.cli import app
-from binliquid.control_plane.evidence_corpus import (
+from imperaos.cli import app
+from imperaos.control_plane.evidence_corpus import (
     build_evidence_verification_corpus,
     verify_evidence_corpus,
 )
-from binliquid.control_plane.evidence_index import build_evidence_index
-from binliquid.enterprise.signing import canonical_payload_hash
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.control_plane.evidence_index import build_evidence_index
+from imperaos.enterprise.signing import canonical_payload_hash
+from imperaos.runtime.config import RuntimeConfig
 
 runner = CliRunner()
 

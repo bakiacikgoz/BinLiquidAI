@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from binliquid.model_providers.errors import ProviderPolicyError, ProviderSchemaError
-from binliquid.model_providers.models import (
+from imperaos.model_providers.errors import ProviderPolicyError, ProviderSchemaError
+from imperaos.model_providers.models import (
     ChatMessage,
     DataClass,
     ModelProviderRecord,
@@ -11,11 +11,11 @@ from binliquid.model_providers.models import (
     ProviderKind,
     ProviderPolicy,
 )
-from binliquid.model_providers.native.openai_responses import (
+from imperaos.model_providers.native.openai_responses import (
     build_openai_responses_payload,
     normalize_openai_responses_result,
 )
-from binliquid.model_providers.native.types import (
+from imperaos.model_providers.native.types import (
     ProviderRequestedTool,
     ProviderRequestedToolType,
     ProviderStoragePolicy,

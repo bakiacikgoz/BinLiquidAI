@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from binliquid.governance.runtime import GovernanceRuntime
-from binliquid.runtime.config import RuntimeConfig
+from imperaos.governance.runtime import GovernanceRuntime
+from imperaos.runtime.config import RuntimeConfig
 
 
 def _runtime(tmp_path) -> GovernanceRuntime:

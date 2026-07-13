@@ -8,8 +8,8 @@ import pytest
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
-from binliquid.cli import app
-from binliquid.contracts import (
+from imperaos.cli import app
+from imperaos.contracts import (
     ApprovalDetailPayloadContract,
     ApprovalPendingPayloadContract,
     AssistantStartTurnPayloadContract,
@@ -20,10 +20,10 @@ from binliquid.contracts import (
     RunSummaryPayloadContract,
     TeamStatusArtifactContract,
 )
-from binliquid.governance.runtime import GovernanceRuntime
-from binliquid.runtime.config import RuntimeConfig
-from binliquid.runtime.platform import current_platform
-from binliquid.schemas.models import OrchestratorResult
+from imperaos.governance.runtime import GovernanceRuntime
+from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.platform import current_platform
+from imperaos.schemas.models import OrchestratorResult
 
 runner = CliRunner()
 
@@ -305,7 +305,7 @@ def test_team_runtime_payloads_match_frozen_contracts(monkeypatch, tmp_path: Pat
     _write_spec(spec_path)
 
     monkeypatch.setattr(
-        "binliquid.cli._build_orchestrator",
+        "imperaos.cli._build_orchestrator",
         lambda *a, **k: _FakeTeamOrchestrator(),
     )
 
@@ -377,10 +377,10 @@ def test_approval_payloads_match_frozen_contracts(monkeypatch, tmp_path: Path) -
     )
     runtime = GovernanceRuntime(config=cfg)
 
-    monkeypatch.setattr("binliquid.cli.resolve_runtime_config", lambda *a, **k: (cfg, {}))
-    monkeypatch.setattr("binliquid.cli.RuntimeConfig.from_profile", lambda *_: cfg)
+    monkeypatch.setattr("imperaos.cli.resolve_runtime_config", lambda *a, **k: (cfg, {}))
+    monkeypatch.setattr("imperaos.cli.RuntimeConfig.from_profile", lambda *_: cfg)
     monkeypatch.setattr(
-        "binliquid.cli._build_orchestrator",
+        "imperaos.cli._build_orchestrator",
         lambda *a, **k: _ApprovalAwareFakeTeamOrchestrator(runtime),
     )
 

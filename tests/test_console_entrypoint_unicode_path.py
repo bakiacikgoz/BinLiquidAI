@@ -6,7 +6,7 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-from binliquid import __version__
+from imperaos import __version__
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -46,7 +46,7 @@ def test_editable_console_scripts_use_path_safe_exact_mode() -> None:
 def test_console_and_module_entrypoints_work_from_current_unicode_path() -> None:
     version_commands = [
         ["uv", "run", "binliquid", "--version"],
-        ["uv", "run", "python", "-m", "binliquid", "--version"],
+        ["uv", "run", "python", "-m", "imperaos", "--version"],
     ]
     for command in version_commands:
         result = _run(command)
@@ -55,7 +55,7 @@ def test_console_and_module_entrypoints_work_from_current_unicode_path() -> None
 
     capability_commands = [
         ["uv", "run", "binliquid", "operator", "capabilities", "--json"],
-        ["uv", "run", "python", "-m", "binliquid", "operator", "capabilities", "--json"],
+        ["uv", "run", "python", "-m", "imperaos", "operator", "capabilities", "--json"],
     ]
     for command in capability_commands:
         result = _run(command)

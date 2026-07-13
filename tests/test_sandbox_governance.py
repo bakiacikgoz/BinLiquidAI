@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from binliquid.governance.runtime import GovernanceRuntime
-from binliquid.runtime.config import RuntimeConfig
-from binliquid.tools.sandbox_runner import SandboxRunner
+from imperaos.governance.runtime import GovernanceRuntime
+from imperaos.runtime.config import RuntimeConfig
+from imperaos.tools.sandbox_runner import SandboxRunner
 
 CUSTOM_POLICY = """
 policy_schema_version = "1.0"

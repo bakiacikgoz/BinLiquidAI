@@ -6,11 +6,11 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from binliquid.cli import app
-from binliquid.governance.runtime import GovernanceRuntime
-from binliquid.runtime.config import RuntimeConfig
-from binliquid.runtime.platform import current_platform
-from binliquid.schemas.models import OrchestratorResult
+from imperaos.cli import app
+from imperaos.governance.runtime import GovernanceRuntime
+from imperaos.runtime.config import RuntimeConfig
+from imperaos.runtime.platform import current_platform
+from imperaos.schemas.models import OrchestratorResult
 
 runner = CliRunner()
 
@@ -164,7 +164,7 @@ def test_team_validate_and_run(monkeypatch, tmp_path: Path) -> None:
     _write_spec(spec_path)
 
     monkeypatch.setattr(
-        "binliquid.cli._build_orchestrator",
+        "imperaos.cli._build_orchestrator",
         lambda *a, **k: FakeTeamOrchestrator(),
     )
 
@@ -254,11 +254,11 @@ def test_team_resume_replays_approved_task_gate(monkeypatch, tmp_path: Path) -> 
     runtime = GovernanceRuntime(config=cfg)
 
     monkeypatch.setattr(
-        "binliquid.cli.resolve_runtime_config",
+        "imperaos.cli.resolve_runtime_config",
         lambda *a, **k: (cfg, {}),
     )
     monkeypatch.setattr(
-        "binliquid.cli._build_orchestrator",
+        "imperaos.cli._build_orchestrator",
         lambda *a, **k: ApprovalAwareFakeTeamOrchestrator(runtime),
     )
 
@@ -335,9 +335,9 @@ def test_team_resume_rejects_approved_but_not_executed_ticket(monkeypatch, tmp_p
     )
     runtime = GovernanceRuntime(config=cfg)
 
-    monkeypatch.setattr("binliquid.cli.resolve_runtime_config", lambda *a, **k: (cfg, {}))
+    monkeypatch.setattr("imperaos.cli.resolve_runtime_config", lambda *a, **k: (cfg, {}))
     monkeypatch.setattr(
-        "binliquid.cli._build_orchestrator",
+        "imperaos.cli._build_orchestrator",
         lambda *a, **k: ApprovalAwareFakeTeamOrchestrator(runtime),
     )
 
@@ -461,7 +461,7 @@ def test_team_replay_verify_reports_verified(monkeypatch, tmp_path: Path) -> Non
     _write_spec(spec_path)
 
     monkeypatch.setattr(
-        "binliquid.cli._build_orchestrator",
+        "imperaos.cli._build_orchestrator",
         lambda *a, **k: FakeTeamOrchestrator(),
     )
 
@@ -531,7 +531,7 @@ def test_team_run_accepts_explicit_job_id(monkeypatch, tmp_path: Path) -> None:
     _write_spec(spec_path)
 
     monkeypatch.setattr(
-        "binliquid.cli._build_orchestrator",
+        "imperaos.cli._build_orchestrator",
         lambda *a, **k: FakeTeamOrchestrator(),
     )
 

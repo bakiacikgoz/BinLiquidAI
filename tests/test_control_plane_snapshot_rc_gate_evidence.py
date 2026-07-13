@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from binliquid.control_plane.snapshot import build_control_plane_snapshot
-from binliquid.release.gate_plan import build_release_gate_plan
-from binliquid.release.gate_runner import run_release_gate_plan
+from imperaos.control_plane.snapshot import build_control_plane_snapshot
+from imperaos.release.gate_plan import build_release_gate_plan
+from imperaos.release.gate_runner import run_release_gate_plan
 
 
 def test_control_plane_snapshot_exposes_rc_gate_evidence(tmp_path: Path) -> None:

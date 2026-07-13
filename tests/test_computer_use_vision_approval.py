@@ -2,23 +2,23 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from binliquid.computer_use.models import RiskClass
-from binliquid.computer_use.vision_runtime.approval import (
+from imperaos.computer_use.models import RiskClass
+from imperaos.computer_use.vision_runtime.approval import (
     hash_json,
     validate_approval_snapshot,
     validate_vision_approval_resume,
 )
-from binliquid.computer_use.vision_runtime.models import (
+from imperaos.computer_use.vision_runtime.models import (
     InputActionType,
     NormalizedBBox,
     SurfaceKind,
     VisionAction,
     VisionObservation,
 )
-from binliquid.computer_use.vision_runtime.runtime import build_approval_snapshot
-from binliquid.governance.approval_store import ApprovalStore
-from binliquid.governance.models import ApprovalStatus
-from binliquid.runtime.config import ComputerUseRuntimeConfig
+from imperaos.computer_use.vision_runtime.runtime import build_approval_snapshot
+from imperaos.governance.approval_store import ApprovalStore
+from imperaos.governance.models import ApprovalStatus
+from imperaos.runtime.config import ComputerUseRuntimeConfig
 
 
 def _observation() -> VisionObservation:

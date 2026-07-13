@@ -3,22 +3,22 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from binliquid.computer_use.models import RiskClass
-from binliquid.computer_use.vision_runtime.drivers.macos import (
+from imperaos.computer_use.models import RiskClass
+from imperaos.computer_use.vision_runtime.drivers.macos import (
     DisplayBounds,
     MacOSInputExecutor,
     MacOSScreenCaptureProvider,
     MacOSVisionReadiness,
     normalized_bbox_center_to_pixel,
 )
-from binliquid.computer_use.vision_runtime.errors import VisionRuntimeError
-from binliquid.computer_use.vision_runtime.models import (
+from imperaos.computer_use.vision_runtime.errors import VisionRuntimeError
+from imperaos.computer_use.vision_runtime.models import (
     InputActionType,
     NormalizedBBox,
     VisionAction,
 )
-from binliquid.runtime.config import ComputerUseRuntimeConfig
-from binliquid.runtime.platform import PlatformInfo
+from imperaos.runtime.config import ComputerUseRuntimeConfig
+from imperaos.runtime.platform import PlatformInfo
 
 ACK = "I understand BinLiquid will control my macOS desktop only for local supervised fixtures."
 

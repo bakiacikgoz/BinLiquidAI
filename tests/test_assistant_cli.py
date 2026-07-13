@@ -5,7 +5,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from binliquid.cli import app
+from imperaos.cli import app
 
 runner = CliRunner()
 
@@ -35,7 +35,7 @@ def test_assistant_models_exposes_product_contract(monkeypatch) -> None:
             ],
         }
 
-    monkeypatch.setattr("binliquid.cli._provider_models_payload", fake_provider_models_payload)
+    monkeypatch.setattr("imperaos.cli._provider_models_payload", fake_provider_models_payload)
 
     result = runner.invoke(app, ["assistant", "models", "--profile", "enterprise", "--json"])
 
@@ -52,7 +52,7 @@ def test_assistant_models_exposes_product_contract(monkeypatch) -> None:
 
 def test_assistant_doctor_reports_model_discovery_without_fake_ready(monkeypatch) -> None:
     monkeypatch.setattr(
-        "binliquid.cli._provider_models_payload",
+        "imperaos.cli._provider_models_payload",
         lambda *, profile, requested_provider: {
             "profile": profile,
             "providers": [
@@ -97,7 +97,7 @@ def test_assistant_turn_streams_contract_events(tmp_path: Path, monkeypatch) -> 
             },
         ]
 
-    monkeypatch.setattr("binliquid.cli._assistant_turn_events", fake_events)
+    monkeypatch.setattr("imperaos.cli._assistant_turn_events", fake_events)
 
     result = runner.invoke(
         app,

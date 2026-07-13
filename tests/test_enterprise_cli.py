@@ -8,14 +8,14 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from typer.testing import CliRunner
 
-from binliquid.cli import app
-from binliquid.enterprise.maintenance import create_backup
-from binliquid.enterprise.signing import canonical_payload_hash, verify_signed_artifact
-from binliquid.governance.runtime import GovernanceRuntime
-from binliquid.runtime.config import RuntimeConfig
-from binliquid.schemas.models import OrchestratorResult
-from binliquid.team.models import TeamSpec
-from binliquid.team.supervisor import TeamSupervisor
+from imperaos.cli import app
+from imperaos.enterprise.maintenance import create_backup
+from imperaos.enterprise.signing import canonical_payload_hash, verify_signed_artifact
+from imperaos.governance.runtime import GovernanceRuntime
+from imperaos.runtime.config import RuntimeConfig
+from imperaos.schemas.models import OrchestratorResult
+from imperaos.team.models import TeamSpec
+from imperaos.team.supervisor import TeamSupervisor
 
 runner = CliRunner()
 

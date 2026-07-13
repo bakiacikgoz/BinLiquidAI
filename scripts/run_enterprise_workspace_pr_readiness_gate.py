@@ -450,7 +450,7 @@ def _risk_area(path: str) -> str:
         return "contracts"
     if path.startswith("apps/operator-panel/"):
         return "ui"
-    if path.startswith("binliquid/"):
+    if path.startswith("imperaos/"):
         return "backend"
     if path.startswith("docs/"):
         return "docs"
