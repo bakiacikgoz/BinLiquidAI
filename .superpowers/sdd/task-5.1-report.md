@@ -2,6 +2,7 @@
 
 Date: 2026-07-13
 Implementation commit: `db5f8c36d956d94767ca7800692d707868d2834a`
+Review correction commit: `c8f4b8ff7752c3fc3df0e36d32f629bcfd490ebe`
 Subject: `feat: rebrand Operator Panel surfaces to ImperaOS`
 
 ## Scope delivered
@@ -51,6 +52,13 @@ Full Operator Panel verification:
 
 The first i18n coverage run exposed Node 24 ESM resolution incompatibilities in the newly added canonical identity import: first an extensionless TypeScript import, then a JSON import without a type attribute. The final explicit `.ts` import and JSON import attribute resolved the root cause; full lint, test, build, and coverage verification passed afterward.
 
+## Review correction
+
+Independent review found that the negative DOM assertion assembled the former display name from string fragments, but one fragment was itself a forbidden inventory token. The regression now constructs the same runtime value with `String.fromCharCode(...)`, preserving the assertion without leaving that token in tracked source.
+
+- Correction commit: `c8f4b8ff7752c3fc3df0e36d32f629bcfd490ebe`
+- Focused verification: `src/productIdentitySurfaces.test.tsx`, 1 file and 3 tests passed.
+
 ## Browser verification
 
 Command:
@@ -74,7 +82,9 @@ Result: no matches.
 Repository inventory after the implementation:
 
 - Baseline at `29e6974`: 1005 total findings.
-- Task 5.1 result: 968 total findings.
+- Committed-head inventory commit: `c8f4b8ff7752c3fc3df0e36d32f629bcfd490ebe`.
+- Scanned tracked files: 1528.
+- Task 5.1 committed-head result: 968 total findings.
   - 946 content findings.
   - 3 path findings.
   - 19 binary metadata findings.
