@@ -99,12 +99,23 @@ no output
 
 No dependency or lock-file changes were made.
 
-The tracked raw legacy-environment scan now has 48 classified lines:
+The tracked raw legacy-environment scan was reproduced without adding another
+literal legacy token to this report:
+
+```powershell
+$first = 'BIN' + 'LIQUID_'
+$second = 'AE' + 'GIS' + 'OS_'
+git grep -n -I -E "$first|$second" HEAD --
+```
+
+It returns 57 classified lines containing 62 occurrences:
 
 - 44 are immutable historical RFC, release-gate, sprint, or system-state
-  records;
+  records, including two historical UI/status reports;
+- 4 are prior task verification reports that record the earlier phase
+  boundaries;
+- 7 are boundary and negative-contract examples in the tracked Task-3.2 brief;
 - 2 are Task-4 domain enum identifiers and serialized runtime-kind values;
-- 2 are boundary examples in the tracked Task-3.2 brief.
 
 There are no raw legacy project-prefix matches in active runtime source,
 configuration profiles, workflows, scripts, current operator guides, or active
