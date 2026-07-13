@@ -73,25 +73,25 @@ fi
 
 if ! (
   cd /
-  BINLIQUID_CONFIG_ROOT="${RUNTIME_DIR}/config" \
-    BINLIQUID_PROVIDER_REGISTRY_PATH="${RUNTIME_DIR}/config/providers.example.toml" \
+  IMPERAOS_CONFIG_ROOT="${RUNTIME_DIR}/config" \
+    IMPERAOS_PROVIDER_REGISTRY_PATH="${RUNTIME_DIR}/config/providers.example.toml" \
     "${RUNTIME_PYTHON}" -m imperaos operator capabilities --json >/dev/null
 ); then
   echo "[runtime] runtime validation failed: bundled operator capabilities from neutral cwd" >&2
   exit 9
 fi
 
-BINLIQUID_VERSION="$("${RUNTIME_PYTHON}" -m imperaos --version)"
+IMPERAOS_VERSION="$("${RUNTIME_PYTHON}" -m imperaos --version)"
 PYTHON_VERSION="$("${RUNTIME_PYTHON}" --version 2>&1)"
 WHEEL_SHA256="$(shasum -a 256 "${WHEEL_PATH}" | awk '{print $1}')"
 GIT_HEAD="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || echo unknown)"
-echo "${BINLIQUID_VERSION}"
+echo "${IMPERAOS_VERSION}"
 
 cat > "${RUNTIME_DIR}/RUNTIME_MANIFEST.txt" <<EOF
 platform=macos
 arch=${ARCH}
 python=${PYTHON_VERSION}
-binliquid_version=${BINLIQUID_VERSION}
+binliquid_version=${IMPERAOS_VERSION}
 wheel_sha256=${WHEEL_SHA256}
 git_head=${GIT_HEAD}
 built_at_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

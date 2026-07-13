@@ -24,7 +24,7 @@ from imperaos.model_providers.network import evaluate_provider_network
 from imperaos.model_providers.policy import GovernanceContext, evaluate_provider_policy
 from imperaos.model_providers.redaction import redact_provider_input
 
-LIVE_CANARY_ENV = "BINLIQUID_PROVIDER_LIVE_CANARY"
+LIVE_CANARY_ENV = "IMPERAOS_PROVIDER_LIVE_CANARY"
 CANARY_PROMPTS = {
     "public_smoke": "Return the word ok as JSON: {\"status\":\"ok\"}.",
     "internal_smoke": "Return a short readiness acknowledgement.",

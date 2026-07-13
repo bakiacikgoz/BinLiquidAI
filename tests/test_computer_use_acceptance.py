@@ -16,13 +16,13 @@ import pytest
 from imperaos.computer_use import ComputerUseMode, ComputerUseRunner, SessionCommand
 from imperaos.runtime.config import RuntimeConfig
 
-REAL_COMPUTER_USE_ENABLED = os.getenv("AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS") == "1"
+REAL_COMPUTER_USE_ENABLED = os.getenv("IMPERAOS_ENABLE_REAL_COMPUTER_USE_TESTS") == "1"
 
 
 def _real_computer_use_skip_reason() -> str | None:
     if sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED:
         return (
-            "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
+            "Enable with IMPERAOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
             "with Safari automation permissions."
         )
     try:
@@ -63,7 +63,7 @@ REAL_COMPUTER_USE_SKIP_REASON = _real_computer_use_skip_reason()
 def _real_local_computer_use_skip_reason() -> str | None:
     if sys.platform != "darwin" or not REAL_COMPUTER_USE_ENABLED:
         return (
-            "Enable with AEGISOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
+            "Enable with IMPERAOS_ENABLE_REAL_COMPUTER_USE_TESTS=1 on macOS "
             "with AppleScript automation permissions."
         )
     try:

@@ -139,13 +139,13 @@ class MacOSVisionReadiness:
 
         screen_recording = _env_permission_status(
             env,
-            "BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING",
-            "BINLIQUID_TEST_MACOS_SCREEN_RECORDING",
+            "IMPERAOS_COMPUTER_USE_MACOS_SCREEN_RECORDING",
+            "IMPERAOS_TEST_MACOS_SCREEN_RECORDING",
         )
         accessibility = _env_permission_status(
             env,
-            "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY",
-            "BINLIQUID_TEST_MACOS_ACCESSIBILITY",
+            "IMPERAOS_COMPUTER_USE_MACOS_ACCESSIBILITY",
+            "IMPERAOS_TEST_MACOS_ACCESSIBILITY",
         )
         provider = _evaluate_provider(self.config, which=which)
         capture = _evaluate_capture(
@@ -183,7 +183,7 @@ class MacOSVisionReadiness:
                 "The operator acknowledgment is present."
                 if opt_in["acknowledged"]
                 else "The operator acknowledgment is missing.",
-                "Set BINLIQUID_COMPUTER_USE_ACK for this supervised local fixture run.",
+                "Set IMPERAOS_COMPUTER_USE_ACK for this supervised local fixture run.",
             )
         )
         checks.append(
@@ -196,7 +196,7 @@ class MacOSVisionReadiness:
                 "The run is scoped to supervised local fixtures."
                 if opt_in["supervisedFixtureOnly"]
                 else "The run is not scoped to supervised local fixtures.",
-                "Set BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1.",
+                "Set IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1.",
             )
         )
         checks.append(
@@ -207,7 +207,7 @@ class MacOSVisionReadiness:
                 "Step approval is required for the run."
                 if opt_in["stepApprovalRequired"]
                 else "Step approval is not explicitly required for the run.",
-                "Set BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1.",
+                "Set IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1.",
             )
         )
         checks.append(
@@ -723,12 +723,12 @@ def _next_actions(blockers: list[str]) -> list[dict[str, Any]]:
             "Set the documented macOS live fixture opt-in values for one supervised run."
         ),
         "MACOS_LIVE_ACK_MISSING": (
-            "Set BINLIQUID_COMPUTER_USE_ACK to the documented acknowledgment string."
+            "Set IMPERAOS_COMPUTER_USE_ACK to the documented acknowledgment string."
         ),
         "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED": (
-            "Set BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1."
+            "Set IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1."
         ),
-        "MACOS_STEP_APPROVAL_REQUIRED": "Set BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1.",
+        "MACOS_STEP_APPROVAL_REQUIRED": "Set IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1.",
         "VISION_RUNTIME_DISABLED": "Enable computer_use.vision_enabled for the run.",
         "VISION_PROVIDER_UNAVAILABLE": "Configure a local Ollama vision model.",
         "VISION_PROVIDER_MODEL_NOT_CONFIGURED": "Set computer_use.vision_model for the run.",
@@ -797,8 +797,8 @@ class MacOSScreenCaptureProvider:
             )
         screen_recording = _env_permission_status(
             self.environment,
-            "BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING",
-            "BINLIQUID_TEST_MACOS_SCREEN_RECORDING",
+            "IMPERAOS_COMPUTER_USE_MACOS_SCREEN_RECORDING",
+            "IMPERAOS_TEST_MACOS_SCREEN_RECORDING",
         )
         if screen_recording == "missing":
             raise VisionRuntimeError(
@@ -892,8 +892,8 @@ class MacOSInputExecutor:
             return self._blocked(action, "MACOS_STEP_APPROVAL_REQUIRED", started)
         accessibility = _env_permission_status(
             self.environment,
-            "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY",
-            "BINLIQUID_TEST_MACOS_ACCESSIBILITY",
+            "IMPERAOS_COMPUTER_USE_MACOS_ACCESSIBILITY",
+            "IMPERAOS_TEST_MACOS_ACCESSIBILITY",
         )
         if accessibility == "missing":
             return self._blocked(

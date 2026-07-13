@@ -7,7 +7,7 @@ support a readiness or release claim.
 ## Goal
 
 Enterprise artifacts must be signed with asymmetric keys and verified against a trusted public key set.
-`BINLIQUID_AUDIT_SIGNING_KEY` remains a dev/pilot compatibility path only and is not acceptable for enterprise artifacts.
+`IMPERAOS_AUDIT_SIGNING_KEY` remains a dev/pilot compatibility path only and is not acceptable for enterprise artifacts.
 
 ## Provider Modes
 

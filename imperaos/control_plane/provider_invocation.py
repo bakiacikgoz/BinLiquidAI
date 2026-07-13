@@ -88,7 +88,7 @@ class ProviderInvocationCoordinator:
                 reasons=["PROVIDER_UNSUPPORTED"],
             )
         if request.runtime_mode == "canary_live":
-            if os.environ.get("BINLIQUID_PROVIDER_LIVE_CANARY_OPT_IN") != "1":
+            if os.environ.get("IMPERAOS_PROVIDER_LIVE_CANARY_OPT_IN") != "1":
                 return self._write_blocked(
                     request,
                     invocation_id=invocation_id,
@@ -235,8 +235,8 @@ def _invocation_id(request: ProviderInvocationRequest) -> str:
 
 def _credential_env_name(provider_kind: str) -> str:
     if provider_kind == "anthropic_messages":
-        return "BINLIQUID_ANTHROPIC_API_KEY"
-    return "BINLIQUID_OPENAI_API_KEY"
+        return "IMPERAOS_ANTHROPIC_API_KEY"
+    return "IMPERAOS_OPENAI_API_KEY"
 
 
 def _offline_fixture_response(provider_kind: str, model: str) -> dict[str, Any]:

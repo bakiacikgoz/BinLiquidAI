@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from imperaos.product_identity import PRODUCT_IDENTITY
 from imperaos.runtime.paths import state_path
 
 
@@ -380,7 +381,7 @@ class RuntimeConfig(BaseModel):
     memory_ttl_days: int = Field(default=30, ge=1)
     fast_path_regret_window: int = Field(default=2, ge=1, le=10)
     fast_path_regret_threshold: float = Field(default=0.2, ge=0.0, le=1.0)
-    env_prefix: str = "BINLIQUID"
+    env_prefix: Literal["IMPERAOS"] = PRODUCT_IDENTITY.env_prefix
     web_enabled: bool = False
     remote_providers_enabled: bool = False
     provider_registry_enabled: bool = True
@@ -454,7 +455,7 @@ class RuntimeConfig(BaseModel):
             memory_ttl_days=app_data.get("memory_ttl_days", 30),
             fast_path_regret_window=app_data.get("fast_path_regret_window", 2),
             fast_path_regret_threshold=app_data.get("fast_path_regret_threshold", 0.2),
-            env_prefix=app_data.get("env_prefix", "BINLIQUID"),
+            env_prefix=app_data.get("env_prefix", PRODUCT_IDENTITY.env_prefix),
             web_enabled=app_data.get("web_enabled", False),
             remote_providers_enabled=app_data.get("remote_providers_enabled", False),
             provider_registry_enabled=app_data.get("provider_registry_enabled", True),
@@ -974,7 +975,7 @@ def resolve_runtime_config(
     profile_payload = _load_profile_payload(profile=profile, root_dir=root_dir, env=env)
     _deep_merge(base, profile_payload, source="profile", source_map=source_map)
 
-    env_payload = _build_env_payload(env=env, env_prefix=str(base.get("env_prefix", "BINLIQUID")))
+    env_payload = _build_env_payload(env=env, env_prefix=PRODUCT_IDENTITY.env_prefix)
     _deep_merge(base, env_payload, source="env", source_map=source_map)
 
     cli_payload = _build_cli_payload(cli_overrides or {})
@@ -1001,7 +1002,8 @@ def _load_profile_payload(
     env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     values = env or os.environ
-    config_root = str(values.get("BINLIQUID_CONFIG_ROOT") or "").strip()
+    config_root_key = f"{PRODUCT_IDENTITY.env_prefix}_CONFIG_ROOT"
+    config_root = str(values.get(config_root_key) or "").strip()
     if root_dir is not None:
         config_dir = root_dir / "config"
     elif config_root:

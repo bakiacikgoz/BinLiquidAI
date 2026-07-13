@@ -51,7 +51,7 @@ def generate_canary_evidence(
             evidence_root=str(output_dir),
         ),
         registry=registry,
-        env={"BINLIQUID_PROVIDER_LIVE_CANARY": "1"},
+        env={"IMPERAOS_PROVIDER_LIVE_CANARY": "1"},
         evidence_root=output_dir,
     )
     router_decision = recommend_provider_shadow(

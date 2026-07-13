@@ -214,9 +214,9 @@ function toBridgeConfig(settings: PanelSettings, timeoutMs = 15000): BridgeConfi
     profile: settings.profile,
     rootDir: settings.rootDir,
     env: {
-      BINLIQUID_PROFILE_NAME: settings.profile,
-      BINLIQUID_TEAM_ARTIFACT_DIR: settings.rootDir,
-      ...(remoteProvidersEnabled ? { BINLIQUID_REMOTE_PROVIDERS_ENABLED: 'true' } : {}),
+      IMPERAOS_PROFILE_NAME: settings.profile,
+      IMPERAOS_TEAM_ARTIFACT_DIR: settings.rootDir,
+      ...(remoteProvidersEnabled ? { IMPERAOS_REMOTE_PROVIDERS_ENABLED: 'true' } : {}),
       ...(openAiApiKey ? { OPENAI_API_KEY: openAiApiKey } : {}),
       ...(deepSeekApiKey ? { DEEPSEEK_API_KEY: deepSeekApiKey } : {}),
     },

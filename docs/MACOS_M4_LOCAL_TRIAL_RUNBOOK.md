@@ -131,8 +131,8 @@ Expected local trial posture:
 Optional live macOS computer-use testing is separate from this runbook's default flow. It requires explicit opt-in, Screen Recording, Accessibility, provider readiness, and replay evidence. The required env names are documented here only; this runbook does not generate real tokens:
 
 ```bash
-export BINLIQUID_COMPUTER_USE_LIVE_OPT_IN=<exact-required-token>
-export BINLIQUID_COMPUTER_USE_LIVE_MACOS=1
+export IMPERAOS_COMPUTER_USE_LIVE_OPT_IN=<exact-required-token>
+export IMPERAOS_COMPUTER_USE_LIVE_MACOS=1
 ```
 
 Do not enable live computer-use during the first local trial unless you are intentionally running the separate qualification flow.

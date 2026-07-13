@@ -6,7 +6,7 @@
 : CI-friendly mock qualification using `benchmarks/tasks/computer_use_vision/smoke_tasks.jsonl`.
 
 `live`
-: Opt-in macOS local qualification. It requires `BINLIQUID_COMPUTER_USE_LIVE_MACOS=1`, `BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1`, `BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1`, `BINLIQUID_COMPUTER_USE_ACK`, Screen Recording, Accessibility, `macos_live_enabled=true`, and a configured local vision provider.
+: Opt-in macOS local qualification. It requires `IMPERAOS_COMPUTER_USE_LIVE_MACOS=1`, `IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1`, `IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1`, `IMPERAOS_COMPUTER_USE_ACK`, Screen Recording, Accessibility, `macos_live_enabled=true`, and a configured local vision provider.
 
 ## Report Contract
 
@@ -64,10 +64,10 @@ uv run python scripts/evaluate_computer_use_platform_matrix.py --profile balance
 Live macOS qualification is intentionally skipped unless explicitly opted in:
 
 ```bash
-BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 \
-BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1 \
-BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1 \
-BINLIQUID_COMPUTER_USE_ACK="I understand BinLiquid will control my macOS desktop only for local supervised fixtures." \
+IMPERAOS_COMPUTER_USE_LIVE_MACOS=1 \
+IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1 \
+IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1 \
+IMPERAOS_COMPUTER_USE_ACK="I understand BinLiquid will control my macOS desktop only for local supervised fixtures." \
 uv run binliquid computer-use qualification run \
   --platform macos \
   --suite live-fixture-smoke \

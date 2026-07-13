@@ -40,7 +40,7 @@ def test_public_cloud_confidential_denied_before_adapter(tmp_path) -> None:
             evidence_root=str(tmp_path),
         ),
         registry=_registry(),
-        env={"BINLIQUID_PROVIDER_LIVE_CANARY": "1"},
+        env={"IMPERAOS_PROVIDER_LIVE_CANARY": "1"},
         evidence_root=tmp_path,
     )
 

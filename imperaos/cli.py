@@ -4245,7 +4245,7 @@ def provider_canary_run(
     allow_live: bool = typer.Option(
         False,
         "--allow-live",
-        help="Allow live provider call when BINLIQUID_PROVIDER_LIVE_CANARY=1 is also set",
+        help="Allow live provider call when IMPERAOS_PROVIDER_LIVE_CANARY=1 is also set",
     ),
     evidence_root: Path = PROVIDER_CANARY_EVIDENCE_ROOT_OPTION,
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),

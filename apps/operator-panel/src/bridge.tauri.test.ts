@@ -89,7 +89,9 @@ describe('bridge tauri contract', () => {
       expect.objectContaining({
         config: expect.objectContaining({
           env: expect.objectContaining({
-            BINLIQUID_REMOTE_PROVIDERS_ENABLED: 'true',
+            IMPERAOS_PROFILE_NAME: 'balanced',
+            IMPERAOS_TEAM_ARTIFACT_DIR: DEFAULT_SETTINGS.rootDir,
+            IMPERAOS_REMOTE_PROVIDERS_ENABLED: 'true',
             OPENAI_API_KEY: 'sk-openai',
             DEEPSEEK_API_KEY: 'sk-deepseek',
           }),

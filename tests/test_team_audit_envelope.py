@@ -101,7 +101,7 @@ def test_team_audit_envelope_signature_when_key_configured(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("BINLIQUID_AUDIT_SIGNING_KEY", "test-signing-key")
+    monkeypatch.setenv("IMPERAOS_AUDIT_SIGNING_KEY", "test-signing-key")
     cfg = RuntimeConfig.from_profile("default")
     cfg = cfg.model_copy(
         update={

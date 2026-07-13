@@ -57,16 +57,16 @@ The selected model must be present in `ollama list`, accept image input, and ret
 Run live qualification only on a prepared, supervised local desktop:
 
 ```bash
-BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 \
-BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1 \
-BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1 \
-BINLIQUID_COMPUTER_USE_ACK="I understand BinLiquid will control my macOS desktop only for local supervised fixtures." \
-BINLIQUID_COMPUTER_USE_VISION_ENABLED=1 \
-BINLIQUID_COMPUTER_USE_VISION_PROVIDER=ollama \
-BINLIQUID_COMPUTER_USE_VISION_MODEL=<local-vision-model> \
-BINLIQUID_COMPUTER_USE_MACOS_LIVE_ENABLED=1 \
-BINLIQUID_COMPUTER_USE_MACOS_CAPTURE_BACKEND=screencapture \
-BINLIQUID_COMPUTER_USE_MACOS_INPUT_BACKEND=quartz \
+IMPERAOS_COMPUTER_USE_LIVE_MACOS=1 \
+IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1 \
+IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1 \
+IMPERAOS_COMPUTER_USE_ACK="I understand BinLiquid will control my macOS desktop only for local supervised fixtures." \
+IMPERAOS_COMPUTER_USE_VISION_ENABLED=1 \
+IMPERAOS_COMPUTER_USE_VISION_PROVIDER=ollama \
+IMPERAOS_COMPUTER_USE_VISION_MODEL=<local-vision-model> \
+IMPERAOS_COMPUTER_USE_MACOS_LIVE_ENABLED=1 \
+IMPERAOS_COMPUTER_USE_MACOS_CAPTURE_BACKEND=screencapture \
+IMPERAOS_COMPUTER_USE_MACOS_INPUT_BACKEND=quartz \
 uv run binliquid computer-use qualification run \
   --platform macos \
   --suite live-fixture-smoke \

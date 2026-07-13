@@ -58,13 +58,13 @@ def security_posture(config: RuntimeConfig) -> dict[str, Any]:
         Path(config.identity.trusted_keys_dir).exists(),
         "identity trust store must exist",
     )
-    if os.getenv("BINLIQUID_AUDIT_SIGNING_KEY", "").strip():
-        warnings.append("BINLIQUID_AUDIT_SIGNING_KEY compatibility secret is set")
+    if os.getenv("IMPERAOS_AUDIT_SIGNING_KEY", "").strip():
+        warnings.append("IMPERAOS_AUDIT_SIGNING_KEY compatibility secret is set")
         if config.keys.provider in {"disabled", "env_hmac"}:
             errors.append("env HMAC compatibility mode is not allowed in enterprise profile")
             checks["env_hmac_compat"] = {
                 "status": "fail",
-                "detail": "enterprise artifacts must not rely on BINLIQUID_AUDIT_SIGNING_KEY",
+                "detail": "enterprise artifacts must not rely on IMPERAOS_AUDIT_SIGNING_KEY",
             }
         else:
             checks["env_hmac_compat"] = {

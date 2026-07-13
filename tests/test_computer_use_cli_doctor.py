@@ -61,7 +61,7 @@ def test_computer_use_doctor_reports_stale_evidence_from_resolver() -> None:
         app,
         ["computer-use", "doctor", "--profile", "balanced", "--platform", "macos", "--json"],
         env={
-            "BINLIQUID_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
+            "IMPERAOS_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
                 REPO_ROOT
                 / "contracts"
                 / "computer_use"
@@ -88,7 +88,7 @@ def test_computer_use_doctor_reports_commit_mismatch_from_resolver(monkeypatch) 
         app,
         ["computer-use", "doctor", "--profile", "balanced", "--platform", "macos", "--json"],
         env={
-            "BINLIQUID_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
+            "IMPERAOS_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
                 REPO_ROOT
                 / "contracts"
                 / "computer_use"
@@ -114,13 +114,13 @@ def test_computer_use_doctor_reports_platform_mismatch_from_resolver(monkeypatch
         app,
         ["computer-use", "doctor", "--profile", "balanced", "--platform", "all", "--json"],
         env={
-            "BINLIQUID_COMPUTER_USE_VISION_ENABLED": "1",
-            "BINLIQUID_COMPUTER_USE_VISION_PROVIDER": "ollama",
-            "BINLIQUID_COMPUTER_USE_VISION_MODEL": "llava",
-            "BINLIQUID_COMPUTER_USE_MACOS_LIVE_ENABLED": "1",
-            "BINLIQUID_COMPUTER_USE_MACOS_CAPTURE_BACKEND": "screencapture",
-            "BINLIQUID_COMPUTER_USE_MACOS_INPUT_BACKEND": "quartz",
-            "BINLIQUID_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
+            "IMPERAOS_COMPUTER_USE_VISION_ENABLED": "1",
+            "IMPERAOS_COMPUTER_USE_VISION_PROVIDER": "ollama",
+            "IMPERAOS_COMPUTER_USE_VISION_MODEL": "llava",
+            "IMPERAOS_COMPUTER_USE_MACOS_LIVE_ENABLED": "1",
+            "IMPERAOS_COMPUTER_USE_MACOS_CAPTURE_BACKEND": "screencapture",
+            "IMPERAOS_COMPUTER_USE_MACOS_INPUT_BACKEND": "quartz",
+            "IMPERAOS_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
                 REPO_ROOT
                 / "contracts"
                 / "computer_use"
@@ -170,7 +170,7 @@ def test_computer_use_doctor_capability_output_does_not_leak_raw_screenshot_fiel
         app,
         ["computer-use", "doctor", "--profile", "balanced", "--platform", "macos", "--json"],
         env={
-            "BINLIQUID_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
+            "IMPERAOS_COMPUTER_USE_MACOS_QUALIFICATION_REPORT": str(
                 REPO_ROOT
                 / "contracts"
                 / "computer_use"
@@ -418,9 +418,9 @@ def test_macos_live_qualification_run_blocks_without_acknowledgment(tmp_path) ->
             "--json",
         ],
         env={
-            "BINLIQUID_COMPUTER_USE_LIVE_MACOS": "1",
-            "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY": "1",
-            "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL": "1",
+            "IMPERAOS_COMPUTER_USE_LIVE_MACOS": "1",
+            "IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY": "1",
+            "IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL": "1",
         },
     )
 

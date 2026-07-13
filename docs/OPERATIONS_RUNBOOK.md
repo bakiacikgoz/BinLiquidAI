@@ -222,13 +222,13 @@ Retain these artifacts for every pilot check and pilot rehearsal:
 The supported hard stop for this slice is disabling Team Runtime entirely:
 
 ```bash
-BINLIQUID_TEAM_ENABLED=false uv run binliquid team run --spec examples/team/restricted_pilot.yaml --once "pilot disable check" --profile restricted --json
+IMPERAOS_TEAM_ENABLED=false uv run binliquid team run --spec examples/team/restricted_pilot.yaml --once "pilot disable check" --profile restricted --json
 ```
 
 Expected result: the command fails with Team Runtime disabled and no new team delegation starts.
 
 Operational fallback for this slice is the core single-agent runtime, not a degraded team mode.
-`BINLIQUID_TEAM_MAX_PARALLEL_TASKS=1` may help diagnosis, but it is not a rollback mechanism.
+`IMPERAOS_TEAM_MAX_PARALLEL_TASKS=1` may help diagnosis, but it is not a rollback mechanism.
 If bounded concurrency repeatedly falls back to serialized execution, treat that as a pilot warning. If drift/conflict repeats in the same workload, force serial diagnosis first; if it persists, disable Team Runtime entirely.
 
 ### Stop Conditions
@@ -295,7 +295,7 @@ uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readine
 
 ### Kill-Switch And Safe Fallback
 
-- disable Team Runtime entirely with `BINLIQUID_TEAM_ENABLED=false`
+- disable Team Runtime entirely with `IMPERAOS_TEAM_ENABLED=false`
 - keep enterprise CLI controls read-only until identity and signing checks return to `pass`
 - do not claim GA readiness while `ga readiness` is `yellow` or `red`
 - do not promote enterprise deployment claims without a signed `qualification_report.json`

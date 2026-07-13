@@ -36,7 +36,7 @@ jobs:
 
       - name: Provider governance gates
         env:
-          BINLIQUID_PROVIDER_LIVE_CANARY_OPT_IN: "0"
+          IMPERAOS_PROVIDER_LIVE_CANARY_OPT_IN: "0"
         run: |
           make provider-native-gate
           make provider-runtime-gate

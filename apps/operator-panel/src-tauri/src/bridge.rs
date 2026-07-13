@@ -2504,14 +2504,14 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
     command.env("PYTHONNOUSERSITE", "1");
     command.env("PYTHONDONTWRITEBYTECODE", "1");
     if let Some(config_dir) = bundled_config_dir(resolved) {
-        command.env("BINLIQUID_CONFIG_ROOT", &config_dir);
+        command.env("IMPERAOS_CONFIG_ROOT", &config_dir);
         let provider_registry = config_dir.join("providers.toml");
         let provider_registry_example = config_dir.join("providers.example.toml");
         if provider_registry.exists() {
-            command.env("BINLIQUID_PROVIDER_REGISTRY_PATH", provider_registry);
+            command.env("IMPERAOS_PROVIDER_REGISTRY_PATH", provider_registry);
         } else if provider_registry_example.exists() {
             command.env(
-                "BINLIQUID_PROVIDER_REGISTRY_PATH",
+                "IMPERAOS_PROVIDER_REGISTRY_PATH",
                 provider_registry_example,
             );
         }
@@ -2525,7 +2525,7 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
 }
 
 fn is_allowed_cli_env_key(key: &str) -> bool {
-    key.starts_with("BINLIQUID_")
+    key.starts_with("IMPERAOS_")
         || matches!(
             key,
             "OPENAI_API_KEY" | "DEEPSEEK_API_KEY" | "ANTHROPIC_API_KEY" | "COMPANY_LLM_API_KEY"
@@ -3641,6 +3641,21 @@ mod tests {
         } else {
             assert_eq!(path_separator(), ":");
         }
+    }
+
+    #[test]
+    fn cli_env_allowlist_uses_only_canonical_project_prefix() {
+        let legacy_product_key = format!("{}_MODEL_NAME", ["BIN", "LIQUID"].concat());
+        let former_product_key = format!("{}_MODEL_NAME", ["AEGIS", "OS"].concat());
+
+        assert!(is_allowed_cli_env_key("IMPERAOS_MODEL_NAME"));
+        assert!(is_allowed_cli_env_key("OPENAI_API_KEY"));
+        assert!(is_allowed_cli_env_key("DEEPSEEK_API_KEY"));
+        assert!(is_allowed_cli_env_key("ANTHROPIC_API_KEY"));
+        assert!(is_allowed_cli_env_key("COMPANY_LLM_API_KEY"));
+        assert!(!is_allowed_cli_env_key(&legacy_product_key));
+        assert!(!is_allowed_cli_env_key(&former_product_key));
+        assert!(!is_allowed_cli_env_key("PYTHONPATH"));
     }
 
     #[test]

@@ -301,7 +301,7 @@ uv run python -m binliquid provider native conformance run --profile enterprise 
 Show model override source:
 
 ```bash
-BINLIQUID_MODEL_NAME=qwen3.5:4b uv run binliquid config resolve --profile balanced --json
+IMPERAOS_MODEL_NAME=qwen3.5:4b uv run binliquid config resolve --profile balanced --json
 ```
 
 ---
@@ -615,7 +615,7 @@ Default posture:
 - sensitive surfaces fail closed
 - enterprise artifacts require asymmetric signing
 
-`BINLIQUID_AUDIT_SIGNING_KEY` is compatibility-only and is not acceptable for enterprise artifact signing.
+`IMPERAOS_AUDIT_SIGNING_KEY` is compatibility-only and is not acceptable for enterprise artifact signing.
 
 ---
 

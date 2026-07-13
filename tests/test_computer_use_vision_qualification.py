@@ -47,4 +47,4 @@ def test_live_qualification_blocks_without_opt_in(tmp_path: Path) -> None:
     )
 
     assert report["status"] == "skipped"
-    assert report["blocking_reasons"] == ["BINLIQUID_ENABLE_REAL_VISION_COMPUTER_USE_TESTS_NOT_SET"]
+    assert report["blocking_reasons"] == ["IMPERAOS_ENABLE_REAL_VISION_COMPUTER_USE_TESTS_NOT_SET"]

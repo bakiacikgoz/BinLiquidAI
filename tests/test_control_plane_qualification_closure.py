@@ -120,7 +120,7 @@ def test_dev_hmac_does_not_satisfy_enterprise_ready(
     tmp_path: Path,
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("BINLIQUID_AUDIT_SIGNING_KEY", "dev-only")
+    monkeypatch.setenv("IMPERAOS_AUDIT_SIGNING_KEY", "dev-only")
     base = RuntimeConfig.from_profile("lite")
     config = base.model_copy(update={"profile_name": "enterprise"})
     report = write_pilot_qualification_fixture(

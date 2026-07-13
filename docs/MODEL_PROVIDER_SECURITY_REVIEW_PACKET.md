@@ -5,7 +5,7 @@ Scope: Model Provider Governance V1.1 canary and policy-aware routing shadow mod
 Security claims:
 
 - Remote providers remain disabled by default.
-- Live canaries require both CLI `--allow-live` and `BINLIQUID_PROVIDER_LIVE_CANARY=1`.
+- Live canaries require both CLI `--allow-live` and `IMPERAOS_PROVIDER_LIVE_CANARY=1`.
 - Default CI uses offline fixtures only and performs no external provider calls.
 - Public cloud providers cannot receive confidential, regulated, secret, credential,
   payment, or raw PII data classes.

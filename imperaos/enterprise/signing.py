@@ -157,7 +157,7 @@ def verify_signed_artifact(
             "key_id": integrity.key_id,
         }
     if integrity.signature_mode == "env_hmac_compat":
-        key = os.getenv("BINLIQUID_AUDIT_SIGNING_KEY", "").strip()
+        key = os.getenv("IMPERAOS_AUDIT_SIGNING_KEY", "").strip()
         if not key:
             return {
                 "path": str(source),
@@ -347,9 +347,9 @@ def _sign_hash(*, hash_value: str, config: RuntimeConfig, purpose: str) -> dict[
     if provider == "env_hmac" or (
         provider == "disabled"
         and config.keys.allow_env_hmac_compat
-        and os.getenv("BINLIQUID_AUDIT_SIGNING_KEY", "").strip()
+        and os.getenv("IMPERAOS_AUDIT_SIGNING_KEY", "").strip()
     ):
-        key = os.getenv("BINLIQUID_AUDIT_SIGNING_KEY", "").strip()
+        key = os.getenv("IMPERAOS_AUDIT_SIGNING_KEY", "").strip()
         if not key:
             return None
         digest = hashlib.sha256((key + hash_value).encode("utf-8")).hexdigest()

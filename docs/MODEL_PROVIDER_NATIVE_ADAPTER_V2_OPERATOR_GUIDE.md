@@ -94,8 +94,8 @@ Do not run a live OpenAI Responses canary unless all of these are true:
 - evidence output path is isolated for review
 - the result is treated as canary evidence, not production approval
 
-Do not run a live Anthropic Messages canary unless `BINLIQUID_PROVIDER_LIVE_CANARY=1`,
-`BINLIQUID_ANTHROPIC_LIVE_CANARY=1`, explicit CLI live intent, budget checks, and host
+Do not run a live Anthropic Messages canary unless `IMPERAOS_PROVIDER_LIVE_CANARY=1`,
+`IMPERAOS_ANTHROPIC_LIVE_CANARY=1`, explicit CLI live intent, budget checks, and host
 allowlist checks all pass.
 
 ## Blockers

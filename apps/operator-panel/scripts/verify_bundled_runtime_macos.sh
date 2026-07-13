@@ -26,8 +26,8 @@ test -f "${RUNTIME_DIR}/config/providers.example.toml"
 "${RUNTIME_PYTHON}" -m imperaos --version >/dev/null
 (
   cd /
-  BINLIQUID_CONFIG_ROOT="${RUNTIME_DIR}/config" \
-    BINLIQUID_PROVIDER_REGISTRY_PATH="${RUNTIME_DIR}/config/providers.example.toml" \
+  IMPERAOS_CONFIG_ROOT="${RUNTIME_DIR}/config" \
+    IMPERAOS_PROVIDER_REGISTRY_PATH="${RUNTIME_DIR}/config/providers.example.toml" \
     "${RUNTIME_PYTHON}" -m imperaos operator capabilities --json >/dev/null
 )
 file "${RUNTIME_PYTHON}"

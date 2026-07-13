@@ -89,14 +89,14 @@ def run_vision_qualification(
     normalized_mode = mode.strip().lower()
     if normalized_mode == "live":
         values = env if env is not None else os.environ
-        if values.get("BINLIQUID_ENABLE_REAL_VISION_COMPUTER_USE_TESTS") != "1":
+        if values.get("IMPERAOS_ENABLE_REAL_VISION_COMPUTER_USE_TESTS") != "1":
             report = _report(
                 config=config,
                 mode="live",
                 suite=suite,
                 status="skipped",
                 task_count=0,
-                blocking_reasons=["BINLIQUID_ENABLE_REAL_VISION_COMPUTER_USE_TESTS_NOT_SET"],
+                blocking_reasons=["IMPERAOS_ENABLE_REAL_VISION_COMPUTER_USE_TESTS_NOT_SET"],
             )
             _write_report(output_root, report)
             return report
@@ -723,8 +723,8 @@ def _macos_live_readiness(
 ) -> dict[str, Any]:
     opt_in = macos_opt_in_state(env)
     permissions = {
-        "screenRecording": _env_state(env, "BINLIQUID_COMPUTER_USE_MACOS_SCREEN_RECORDING"),
-        "accessibility": _env_state(env, "BINLIQUID_COMPUTER_USE_MACOS_ACCESSIBILITY"),
+        "screenRecording": _env_state(env, "IMPERAOS_COMPUTER_USE_MACOS_SCREEN_RECORDING"),
+        "accessibility": _env_state(env, "IMPERAOS_COMPUTER_USE_MACOS_ACCESSIBILITY"),
         "inputMonitoring": "not_required",
     }
     provider = _macos_provider_readiness(config, env)
@@ -785,19 +785,19 @@ def _macos_live_readiness(
 
 
 def macos_opt_in_state(env: Mapping[str, str]) -> dict[str, Any]:
-    live_flag = env.get("BINLIQUID_COMPUTER_USE_LIVE_MACOS") == "1"
-    legacy_ack = env.get("BINLIQUID_COMPUTER_USE_LIVE_OPT_IN") == MACOS_LIVE_OPT_IN_VALUE
-    explicit_ack = env.get("BINLIQUID_COMPUTER_USE_ACK") == MACOS_LIVE_ACK_VALUE
-    supervised_fixture_only = env.get("BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY") == "1"
-    step_approval_required = env.get("BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL") == "1"
+    live_flag = env.get("IMPERAOS_COMPUTER_USE_LIVE_MACOS") == "1"
+    legacy_ack = env.get("IMPERAOS_COMPUTER_USE_LIVE_OPT_IN") == MACOS_LIVE_OPT_IN_VALUE
+    explicit_ack = env.get("IMPERAOS_COMPUTER_USE_ACK") == MACOS_LIVE_ACK_VALUE
+    supervised_fixture_only = env.get("IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY") == "1"
+    step_approval_required = env.get("IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL") == "1"
     source = "env" if any(
         key in env
         for key in (
-            "BINLIQUID_COMPUTER_USE_LIVE_MACOS",
-            "BINLIQUID_COMPUTER_USE_LIVE_OPT_IN",
-            "BINLIQUID_COMPUTER_USE_ACK",
-            "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
-            "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
+            "IMPERAOS_COMPUTER_USE_LIVE_MACOS",
+            "IMPERAOS_COMPUTER_USE_LIVE_OPT_IN",
+            "IMPERAOS_COMPUTER_USE_ACK",
+            "IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
+            "IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
         )
     ) else "none"
     timestamp = (
@@ -812,9 +812,9 @@ def macos_opt_in_state(env: Mapping[str, str]) -> dict[str, Any]:
         "liveMacos": live_flag,
         "acknowledged": legacy_ack or explicit_ack,
         "ackSource": (
-            "BINLIQUID_COMPUTER_USE_ACK"
+            "IMPERAOS_COMPUTER_USE_ACK"
             if explicit_ack
-            else "BINLIQUID_COMPUTER_USE_LIVE_OPT_IN"
+            else "IMPERAOS_COMPUTER_USE_LIVE_OPT_IN"
             if legacy_ack
             else "none"
         ),
@@ -925,16 +925,16 @@ def _macos_input_readiness(
 def _macos_next_actions(blockers: list[str]) -> list[dict[str, Any]]:
     descriptions = {
         "MACOS_LIVE_OPT_IN_MISSING": (
-            "Set BINLIQUID_COMPUTER_USE_LIVE_MACOS=1 for this one supervised run."
+            "Set IMPERAOS_COMPUTER_USE_LIVE_MACOS=1 for this one supervised run."
         ),
         "MACOS_LIVE_ACK_MISSING": (
-            "Set BINLIQUID_COMPUTER_USE_ACK to the documented acknowledgment string."
+            "Set IMPERAOS_COMPUTER_USE_ACK to the documented acknowledgment string."
         ),
         "MACOS_SUPERVISED_FIXTURE_ONLY_REQUIRED": (
-            "Set BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1."
+            "Set IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY=1."
         ),
         "MACOS_STEP_APPROVAL_REQUIRED": (
-            "Set BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1."
+            "Set IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL=1."
         ),
         "VISION_RUNTIME_DISABLED": "Enable computer_use.vision_enabled for the supervised run.",
         "VISION_PROVIDER_UNAVAILABLE": "Configure a local Ollama vision model; do not auto-pull.",
@@ -1222,25 +1222,25 @@ def _write_phase4e_artifacts(
 def _phase4d_flag_inventory() -> dict[str, str]:
     return {
         "vision_enabled_key": "computer_use.vision_enabled",
-        "vision_enabled_env": "BINLIQUID_COMPUTER_USE_VISION_ENABLED",
+        "vision_enabled_env": "IMPERAOS_COMPUTER_USE_VISION_ENABLED",
         "vision_provider_key": "computer_use.vision_provider",
-        "vision_provider_env": "BINLIQUID_COMPUTER_USE_VISION_PROVIDER",
+        "vision_provider_env": "IMPERAOS_COMPUTER_USE_VISION_PROVIDER",
         "vision_model_key": "computer_use.vision_model",
-        "vision_model_env": "BINLIQUID_COMPUTER_USE_VISION_MODEL",
+        "vision_model_env": "IMPERAOS_COMPUTER_USE_VISION_MODEL",
         "macos_live_enabled_key": "computer_use.macos_live_enabled",
-        "macos_live_enabled_env": "BINLIQUID_COMPUTER_USE_MACOS_LIVE_ENABLED",
+        "macos_live_enabled_env": "IMPERAOS_COMPUTER_USE_MACOS_LIVE_ENABLED",
         "macos_capture_backend_key": "computer_use.macos_capture_backend",
-        "macos_capture_backend_env": "BINLIQUID_COMPUTER_USE_MACOS_CAPTURE_BACKEND",
+        "macos_capture_backend_env": "IMPERAOS_COMPUTER_USE_MACOS_CAPTURE_BACKEND",
         "macos_input_backend_key": "computer_use.macos_input_backend",
-        "macos_input_backend_env": "BINLIQUID_COMPUTER_USE_MACOS_INPUT_BACKEND",
-        "live_opt_in_env": "BINLIQUID_COMPUTER_USE_LIVE_MACOS",
-        "legacy_live_opt_in_env": "BINLIQUID_COMPUTER_USE_LIVE_OPT_IN",
-        "live_ack_env": "BINLIQUID_COMPUTER_USE_ACK",
-        "supervised_fixture_only_env": "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
-        "step_approval_env": "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
+        "macos_input_backend_env": "IMPERAOS_COMPUTER_USE_MACOS_INPUT_BACKEND",
+        "live_opt_in_env": "IMPERAOS_COMPUTER_USE_LIVE_MACOS",
+        "legacy_live_opt_in_env": "IMPERAOS_COMPUTER_USE_LIVE_OPT_IN",
+        "live_ack_env": "IMPERAOS_COMPUTER_USE_ACK",
+        "supervised_fixture_only_env": "IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
+        "step_approval_env": "IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
         "raw_screenshot_persistence_key": "computer_use.raw_screenshot_persistence",
         "raw_screenshot_persistence_env": (
-            "BINLIQUID_COMPUTER_USE_RAW_SCREENSHOT_PERSISTENCE"
+            "IMPERAOS_COMPUTER_USE_RAW_SCREENSHOT_PERSISTENCE"
         ),
     }
 
@@ -1249,74 +1249,74 @@ def _phase4e_flag_inventory() -> dict[str, Any]:
     return {
         "vision_enabled": {
             "key": "computer_use.vision_enabled",
-            "env": "BINLIQUID_COMPUTER_USE_VISION_ENABLED",
+            "env": "IMPERAOS_COMPUTER_USE_VISION_ENABLED",
             "source": "config/env/cli",
             "default": False,
         },
         "vision_provider": {
             "key": "computer_use.vision_provider",
-            "env": "BINLIQUID_COMPUTER_USE_VISION_PROVIDER",
+            "env": "IMPERAOS_COMPUTER_USE_VISION_PROVIDER",
             "source": "config/env/cli",
             "default": "none",
         },
         "vision_model": {
             "key": "computer_use.vision_model",
-            "env": "BINLIQUID_COMPUTER_USE_VISION_MODEL",
+            "env": "IMPERAOS_COMPUTER_USE_VISION_MODEL",
             "source": "config/env/cli",
             "default": None,
         },
         "macos_live_enabled": {
             "key": "computer_use.macos_live_enabled",
-            "env": "BINLIQUID_COMPUTER_USE_MACOS_LIVE_ENABLED",
+            "env": "IMPERAOS_COMPUTER_USE_MACOS_LIVE_ENABLED",
             "source": "config/env/cli",
             "default": False,
         },
         "macos_capture_backend": {
             "key": "computer_use.macos_capture_backend",
-            "env": "BINLIQUID_COMPUTER_USE_MACOS_CAPTURE_BACKEND",
+            "env": "IMPERAOS_COMPUTER_USE_MACOS_CAPTURE_BACKEND",
             "source": "config/env/cli",
             "default": "disabled",
         },
         "macos_input_backend": {
             "key": "computer_use.macos_input_backend",
-            "env": "BINLIQUID_COMPUTER_USE_MACOS_INPUT_BACKEND",
+            "env": "IMPERAOS_COMPUTER_USE_MACOS_INPUT_BACKEND",
             "source": "config/env/cli",
             "default": "disabled",
         },
         "one_run_live_opt_in": {
-            "env": "BINLIQUID_COMPUTER_USE_LIVE_MACOS",
+            "env": "IMPERAOS_COMPUTER_USE_LIVE_MACOS",
             "source": "env",
             "required_for_live": True,
         },
         "live_ack": {
-            "env": "BINLIQUID_COMPUTER_USE_ACK",
+            "env": "IMPERAOS_COMPUTER_USE_ACK",
             "source": "env",
             "required_for_live": True,
         },
         "legacy_live_ack": {
-            "env": "BINLIQUID_COMPUTER_USE_LIVE_OPT_IN",
+            "env": "IMPERAOS_COMPUTER_USE_LIVE_OPT_IN",
             "source": "env",
             "required_for_live": False,
         },
         "supervised_fixture_only": {
-            "env": "BINLIQUID_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
+            "env": "IMPERAOS_COMPUTER_USE_SUPERVISED_FIXTURE_ONLY",
             "source": "env",
             "required_for_live": True,
         },
         "step_approval_required": {
-            "env": "BINLIQUID_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
+            "env": "IMPERAOS_COMPUTER_USE_REQUIRE_STEP_APPROVAL",
             "source": "env/config",
             "config_key": "computer_use.macos_require_step_approval",
             "required_for_live": True,
         },
         "raw_screenshot_persistence": {
             "key": "computer_use.raw_screenshot_persistence",
-            "env": "BINLIQUID_COMPUTER_USE_RAW_SCREENSHOT_PERSISTENCE",
+            "env": "IMPERAOS_COMPUTER_USE_RAW_SCREENSHOT_PERSISTENCE",
             "source": "config/env/cli",
             "default": False,
         },
         "ollama_model_pull_opt_in": {
-            "env": "BINLIQUID_ALLOW_OLLAMA_MODEL_PULL",
+            "env": "IMPERAOS_ALLOW_OLLAMA_MODEL_PULL",
             "source": "env",
             "required_for_live": False,
             "default": False,

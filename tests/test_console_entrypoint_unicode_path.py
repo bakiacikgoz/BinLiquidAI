@@ -16,7 +16,7 @@ runner = CliRunner()
 
 
 def _entrypoint_env() -> dict[str, str]:
-    env = {key: value for key, value in os.environ.items() if not key.startswith("BINLIQUID_")}
+    env = {key: value for key, value in os.environ.items() if not key.startswith("IMPERAOS_")}
     env.pop("VIRTUAL_ENV", None)
     env["NO_COLOR"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"

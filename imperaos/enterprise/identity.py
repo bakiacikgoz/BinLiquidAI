@@ -104,7 +104,7 @@ def resolve_actor_context(
         return None
 
     paths = []
-    assertion_path = env_map.get("BINLIQUID_IDENTITY_ASSERTION_PATH")
+    assertion_path = env_map.get("IMPERAOS_IDENTITY_ASSERTION_PATH")
     if assertion_path:
         paths.append((Path(assertion_path), False))
     configured = str(config.identity.assertion_path).strip()
@@ -113,7 +113,7 @@ def resolve_actor_context(
         if candidate.exists():
             paths.append((candidate, False))
     if config.identity.allow_break_glass:
-        break_glass_env = env_map.get("BINLIQUID_BREAK_GLASS_ASSERTION_PATH")
+        break_glass_env = env_map.get("IMPERAOS_BREAK_GLASS_ASSERTION_PATH")
         if break_glass_env:
             paths.append((Path(break_glass_env), True))
         break_glass_path = Path(config.identity.break_glass_assertion_path)
