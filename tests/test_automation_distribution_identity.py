@@ -10,6 +10,7 @@ AUTOMATION_PATHS = (
     ROOT / "apps/operator-panel/scripts/build_bundled_runtime_windows.ps1",
     ROOT / "apps/operator-panel/scripts/verify_bundled_runtime_macos.sh",
     ROOT / "apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1",
+    ROOT / "apps/operator-panel/scripts/windows_installer_smoke.ps1",
     *sorted((ROOT / ".github" / "workflows").glob("*.yml")),
     *sorted((ROOT / ".github" / "workflows").glob("*.yaml")),
 )
@@ -20,6 +21,7 @@ REMOVED_AUTOMATION_REFERENCES = {
     "package directory": re.compile(r"(?<![.\w-])binliquid/"),
     "wheel distribution": re.compile(r"\bbinliquid-[^\s\"']*\.whl\b", re.IGNORECASE),
     "wheel branding": re.compile(r"\bbinliquid\s+wheel\b", re.IGNORECASE),
+    "distribution artifact": re.compile(r"\bbinliquid-version\.txt\b", re.IGNORECASE),
 }
 
 
