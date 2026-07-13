@@ -27,8 +27,8 @@ class StrictModel(BaseModel):
 
 
 class RuntimeKind(StrEnum):
-    BINLIQUID_CORE = "binliquid_core"
-    BINLIQUID_TEAM = "binliquid_team"
+    IMPERAOS_CORE = "imperaos_core"
+    IMPERAOS_TEAM = "imperaos_team"
     EXTERNAL_STDIO = "external_stdio"
     EXTERNAL_HTTP = "external_http"
     COMPUTER_USE_ADAPTER = "computer_use_adapter"

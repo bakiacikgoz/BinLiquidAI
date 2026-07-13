@@ -668,7 +668,7 @@ export function previewControlPlaneAgentList() {
       {
         agent_id: 'governed-ops',
         display_name: 'Governed Ops Agent',
-        runtime_kind: 'binliquid_team',
+        runtime_kind: 'imperaos_team',
         agent_type: 'internal',
         status: 'registered',
         readiness: 'policy_simulated',

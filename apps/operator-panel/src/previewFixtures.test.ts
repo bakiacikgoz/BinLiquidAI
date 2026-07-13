@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   previewArtifact,
   previewConfigResolve,
+  previewControlPlaneAgentList,
   previewControlPlaneSnapshot,
   previewHandshake,
   previewIdentity,
@@ -14,6 +15,12 @@ import {
 import { DEFAULT_SETTINGS } from './settings';
 
 describe('preview runtime paths', () => {
+  it('uses the canonical ImperaOS team runtime kind', () => {
+    const agentList = previewControlPlaneAgentList();
+
+    expect(agentList.agents[0].runtime_kind).toBe('imperaos_team');
+  });
+
   it('serializes fixtures without legacy state paths and replaces the team root', () => {
     const legacyStateRoot = ['.', 'bin', 'liquid'].join('');
     const customRoot = '.imperaos/custom-preview/jobs';

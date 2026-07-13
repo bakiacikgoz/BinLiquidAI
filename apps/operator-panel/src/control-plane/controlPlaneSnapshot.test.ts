@@ -113,7 +113,7 @@ function makeSnapshot(overrides: Partial<ControlPlaneSnapshot> = {}): ControlPla
       {
         agentId: 'governed-ops',
         displayName: 'Governed Ops',
-        runtimeKind: 'binliquid_team',
+        runtimeKind: 'imperaos_team',
         agentType: 'internal',
         status: 'registered',
         readiness: 'policy_simulated',

@@ -57,7 +57,7 @@
       "policyPackId": "active-runtime-policy",
       "readiness": "policy_simulated",
       "riskProfile": "guarded",
-      "runtimeKind": "binliquid_team",
+      "runtimeKind": "imperaos_team",
       "status": "registered"
     }
   ],
