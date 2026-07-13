@@ -1,0 +1,160 @@
+# Task 2.2 Implementation Report
+
+## Outcome
+
+The Python distribution, package build, installed CLI, and active Python runtime
+invocations now publish under the ImperaOS identity. The implementation commit is:
+
+`fdd8f24a853375d477434ba131e8c1e57ce10ea2`
+
+Its exact subject is `build: publish runtime under ImperaOS identity`.
+
+## Changed files
+
+- Distribution/build: `pyproject.toml`, `uv.lock`, `hatch_build.py`.
+- Runtime identity and CLI: `imperaos/product_identity.py`, `imperaos/cli.py`.
+- Active drill command arrays: `imperaos/control_plane/pilot_ops_drill.py`.
+- Active script invocations: `scripts/demo_governance_v03.sh`,
+  `scripts/evaluate_computer_use_integration_gate.py`,
+  `scripts/run_control_plane_demo.py`,
+  `scripts/run_qualification_soak_supervised.sh`,
+  `scripts/run_rc_evidence_orchestrator_gate.py`, and
+  `scripts/run_rc_release_decision_gate.py`.
+- Tests: `tests/test_console_entrypoint_unicode_path.py` and
+  `tests/test_distribution_wheel.py`.
+
+The implementation commit contains 14 files, 235 insertions, and 96 deletions.
+
+## TDD evidence
+
+### Initial RED
+
+Focused command:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q `
+  tests/test_console_entrypoint_unicode_path.py `
+  tests/test_distribution_wheel.py `
+  tests/test_brand_identity.py `
+  --basetemp C:\tmp\i22-red
+```
+
+Observed exit code `1`: 6 expected failures and 10 passes. The failures proved the
+old project name, absent `imperaos` console launcher, old root/version help, old wheel
+name and console entrypoints, and missing packaged identity resource.
+
+Two additional test-first diagnostic cycles covered build integration:
+
+- Exact editable mode plus the force-included resource initially exposed a physical
+  namespace package that shadowed Hatch's editable redirect outside the repository.
+  The focused test returned 2 failures and 1 pass before the wheel-only editable
+  force-include override.
+- Bare `uv build` exposed Hatch's unbounded default sdist scan of ignored Rust
+  incremental output. The explicit sdist selection test failed with `KeyError:
+  'sdist'` before the minimal sdist configuration was added.
+
+### GREEN
+
+The focused acceptance rerun returned exit code `0`:
+
+```text
+................                                                         [100%]
+16 passed in 7.30s
+```
+
+The tests exercise both build-hook branches through behavior: Unicode-path editable
+console/module execution covers the `editable` build, while real wheel construction
+and inspection cover the standard build.
+
+## Distribution metadata and lock
+
+- Project name: `imperaos`.
+- Version retained: `0.4.1`.
+- Description: `ImperaOS governed AI workforce operating platform`.
+- Author: `ImperaOS Contributors`.
+- Only project script: `imperaos = imperaos.cli:app`.
+- Hatch packages: `imperaos`, `benchmarks`, `research`, and `scripts`; `config`
+  remains included.
+- `branding/identity.json` is force-included as `imperaos/identity.json` from the
+  single canonical source file.
+- `hatch_build.py` prevents that wheel resource from creating an editable namespace
+  package that shadows `imperaos.cli`; exact editable mode remains enabled.
+- The explicit sdist selection makes bare `uv build` deterministic without including
+  frontend/Tauri build output.
+
+`uv lock` resolved 75 packages. The lock diff only removes the editable root package
+record `binliquid==0.4.1` and adds the equivalent `imperaos==0.4.1` record. Dependency
+constraints, resolved dependency versions, extras, and hashes are unchanged.
+
+## Wheel inspection
+
+Bare `uv build` completed successfully and produced:
+
+- `dist/imperaos-0.4.1.tar.gz`
+- `dist/imperaos-0.4.1-py3-none-any.whl`
+
+Archive inspection confirmed:
+
+- `imperaos/` package present;
+- no `binliquid/` package;
+- `imperaos/identity.json` present and byte-identical to
+  `branding/identity.json`;
+- the sole console entrypoint is `imperaos = imperaos.cli:app`;
+- wheel metadata reports the approved name, version, summary, and author.
+
+Generated `dist/` artifacts were removed after verification and are not committed.
+
+## Clean external install
+
+The wheel was installed non-editably into a fresh `C:\tmp\i22venv` virtual
+environment. All probes ran from `C:\tmp\i22run`, with `PYTHONPATH` cleared:
+
+| Probe | Result |
+|---|---|
+| `python -m imperaos --version` | `0.4.1`, exit 0 |
+| `imperaos --version` | `0.4.1`, exit 0 |
+| identity slug probe | `imperaos`, exit 0 |
+| import origin | `C:\tmp\i22venv\Lib\site-packages\imperaos\__init__.py` |
+| `binliquid.exe` present | false |
+| `aegis.exe` present | false |
+
+## Verification
+
+| Check | Result |
+|---|---|
+| `uv lock --check` | exit 0; lock current |
+| `uv sync --python 3.11 --extra dev` | exit 0; 75 packages resolved |
+| Focused metadata/CLI/wheel/identity tests | 16 passed |
+| Full Python suite with `--basetemp C:\t\f` | 852 passed, 9 skipped, exit 0 |
+| Ruff on every changed Python file | all checks passed |
+| Bare `uv build` | sdist and wheel built successfully |
+| Active removed-CLI invocation guard in `imperaos/`, `scripts/`, `tests/` | 0 matches |
+| `git diff --check` | exit 0 |
+
+A longer final base-temp spelling reproduced six pre-existing Windows deep-path
+failures. A single failing case passed under `C:\t\r`, and the complete suite passed
+under the required genuinely short base temp `C:\t\f`; no product-code change was
+made for that environmental path-length condition.
+
+## Brand inventory delta
+
+Inventory mode exited `0`; audit status remains `fail` because later rebrand tasks
+own the deferred contracts and surfaces.
+
+| Metric | Task 2.1 | Task 2.2 | Delta |
+|---|---:|---:|---:|
+| Findings | 1,666 | 1,616 | -50 |
+| Legacy content matches | 1,644 | 1,594 | -50 |
+| Legacy path matches | 3 | 3 | 0 |
+| Binary metadata matches | 19 | 19 | 0 |
+| Built artifact matches | 0 | 0 | 0 |
+| Scanned files | 1,505 | 1,505 | 0 |
+
+## Deliberately deferred legacy tokens
+
+The task intentionally preserves all deferred contracts, including `.binliquid`
+state roots, `BINLIQUID_*` environment lookups, `binliquid_` metric names,
+`binliquid_core`/`binliquid_team` runtime kinds, `aegis-*` team identifiers,
+legacy schema/manifest values, provider metadata keys, and signed or historical
+evidence. Frontend/Tauri packages and resource directories, workflows, docs, and
+other later-task surfaces were not rebranded here.
