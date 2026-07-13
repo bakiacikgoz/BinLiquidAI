@@ -59,17 +59,17 @@ class PilotOpsDrillReport(StrictModel):
 
 
 SAFE_DRILL_STEPS = (
-    ("config-resolve", ["binliquid", "config", "resolve"]),
-    ("control-plane-doctor", ["binliquid", "control-plane", "doctor"]),
-    ("security-baseline", ["binliquid", "security", "baseline"]),
-    ("identity-whoami", ["binliquid", "auth", "whoami"]),
-    ("metrics-snapshot", ["binliquid", "metrics", "snapshot"]),
-    ("control-plane-snapshot", ["binliquid", "control-plane", "snapshot"]),
-    ("claim-guard-verify", ["binliquid", "control-plane", "claims", "verify"]),
+    ("config-resolve", ["imperaos", "config", "resolve"]),
+    ("control-plane-doctor", ["imperaos", "control-plane", "doctor"]),
+    ("security-baseline", ["imperaos", "security", "baseline"]),
+    ("identity-whoami", ["imperaos", "auth", "whoami"]),
+    ("metrics-snapshot", ["imperaos", "metrics", "snapshot"]),
+    ("control-plane-snapshot", ["imperaos", "control-plane", "snapshot"]),
+    ("claim-guard-verify", ["imperaos", "control-plane", "claims", "verify"]),
     (
         "governed-pilot-workflow-verify",
         [
-            "binliquid",
+            "imperaos",
             "pilot",
             "workflow",
             "verify",
@@ -78,11 +78,11 @@ SAFE_DRILL_STEPS = (
             "--no-strict",
         ],
     ),
-    ("field-evidence-verify", ["binliquid", "pilot", "field", "verify"]),
+    ("field-evidence-verify", ["imperaos", "pilot", "field", "verify"]),
     (
         "evidence-pack-verify",
         [
-            "binliquid",
+            "imperaos",
             "control-plane",
             "evidence",
             "verify",
@@ -90,11 +90,11 @@ SAFE_DRILL_STEPS = (
             "artifacts/evidence-pack/manifest.json",
         ],
     ),
-    ("support-bundle-export", ["binliquid", "support", "bundle", "export"]),
+    ("support-bundle-export", ["imperaos", "support", "bundle", "export"]),
     (
         "handoff-pack-build-verify",
         [
-            "binliquid",
+            "imperaos",
             "release",
             "handoff",
             "verify",
@@ -219,8 +219,8 @@ def _deterministic_runner(output_root: Path) -> CommandRunner:
         _ = timeout
         joined = " ".join(command)
         conditional_steps = {
-            "binliquid auth whoami",
-            "binliquid pilot field verify",
+            "imperaos auth whoami",
+            "imperaos pilot field verify",
         }
         if any(joined.startswith(step) for step in conditional_steps):
             return 3, f"{joined}: conditional in deterministic drill", ""

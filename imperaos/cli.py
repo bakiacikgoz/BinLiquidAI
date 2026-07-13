@@ -290,7 +290,7 @@ from imperaos.telemetry.tracer import Tracer
 from research.sltc_experiments.eval_router import evaluate_router_model
 from research.sltc_experiments.train_router import calibrate_router_params, train_router_model
 
-app = typer.Typer(help="BinLiquidAI CLI")
+app = typer.Typer(help="ImperaOS CLI")
 benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
 memory_index_app = typer.Typer(help="Memory index commands")
@@ -533,7 +533,7 @@ def app_callback(
     version: bool = typer.Option(
         False,
         "--version",
-        help="Show BinLiquid core version and exit.",
+        help="Show ImperaOS version and exit.",
         callback=_version_callback,
         is_eager=True,
     ),
@@ -1211,7 +1211,7 @@ def _assistant_doctor_contract(*, profile: str, provider: str) -> dict[str, obje
         if available
         else [
             "Install or start a local provider such as Ollama, or configure a governed provider.",
-            "Run `binliquid assistant models --profile enterprise --json` after setup.",
+            "Run `imperaos assistant models --profile enterprise --json` after setup.",
         ],
         "generatedAtUtc": _assistant_utc_now(),
     }
@@ -4987,7 +4987,7 @@ def chat(
         _run_once(once)
         return
 
-    typer.echo("BinLiquid chat başlatıldı. Çıkmak için /exit yazın.")
+    typer.echo("ImperaOS chat başlatıldı. Çıkmak için /exit yazın.")
     while True:
         user_text = typer.prompt("you")
         if user_text.strip().lower() in {"/exit", "exit", "quit", "/quit"}:
@@ -6211,7 +6211,7 @@ def computer_use_run(
         typer.echo(f"job_id={effective_job_id} status={job_status}")
         if blocked_by_preflight:
             typer.echo(f"reason_code={runtime_preflight.get('reasonCode', 'UNKNOWN')}")
-            typer.echo("hint=Run: binliquid computer-use doctor --json")
+            typer.echo("hint=Run: imperaos computer-use doctor --json")
 
 
 @computer_use_app.command("pause")

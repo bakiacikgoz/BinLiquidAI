@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo "[1/5] Triggering a governance-protected request"
-uv run binliquid chat \
+uv run imperaos chat \
   --profile default \
   --once "python kodunu düzelt ve test et" \
   --json > /tmp/binliquid_v03_demo.json
@@ -28,12 +28,12 @@ fi
 echo "approval_id=$APPROVAL_ID"
 
 echo "[3/5] Pending approvals"
-uv run binliquid approval pending --json
+uv run imperaos approval pending --json
 
 echo "[4/5] Approve ticket"
-uv run binliquid approval decide --id "$APPROVAL_ID" --approve --actor demo-operator --reason "demo approval"
+uv run imperaos approval decide --id "$APPROVAL_ID" --approve --actor demo-operator --reason "demo approval"
 
 echo "[5/5] Execute approved ticket"
-uv run binliquid approval execute --id "$APPROVAL_ID" --actor demo-operator
+uv run imperaos approval execute --id "$APPROVAL_ID" --actor demo-operator
 
 echo "Demo completed."

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from importlib import resources
 from pathlib import Path
 from typing import Final
 
@@ -57,8 +58,15 @@ class ProductIdentity:
 def load_product_identity(path: str | Path | None = None) -> ProductIdentity:
     """Load and validate the repository's canonical product identity."""
 
-    identity_path = _CANONICAL_IDENTITY_PATH if path is None else Path(path)
-    payload = json.loads(identity_path.read_text(encoding="utf-8"))
+    if path is None:
+        packaged_identity = resources.files("imperaos").joinpath("identity.json")
+        try:
+            identity_text = packaged_identity.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            identity_text = _CANONICAL_IDENTITY_PATH.read_text(encoding="utf-8")
+    else:
+        identity_text = Path(path).read_text(encoding="utf-8")
+    payload = json.loads(identity_text)
     if not isinstance(payload, dict):
         raise ValueError("product identity must be a JSON object")
 

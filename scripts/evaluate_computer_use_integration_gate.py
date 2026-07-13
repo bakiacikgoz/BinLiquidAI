@@ -30,11 +30,11 @@ from imperaos.runtime.platform import current_platform
 SCHEMA_VERSION = "computer-use-integration-gate/v1"
 WINDOWS_NOT_QUALIFIED = "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
 ENTRYPOINT_COMMANDS = (
-    ("console_version", ("uv", "run", "binliquid", "--version")),
+    ("console_version", ("uv", "run", "imperaos", "--version")),
     ("module_version", ("uv", "run", "python", "-m", "imperaos", "--version")),
     (
         "console_capabilities",
-        ("uv", "run", "binliquid", "operator", "capabilities", "--json"),
+        ("uv", "run", "imperaos", "operator", "capabilities", "--json"),
     ),
     (
         "module_capabilities",
@@ -273,7 +273,7 @@ def _evaluate_entrypoint_path_matrix(
 
 def _evaluate_operator_contract(repo: Path) -> dict[str, Any]:
     probe = run_command(
-        ("uv", "run", "binliquid", "operator", "capabilities", "--json"),
+        ("uv", "run", "imperaos", "operator", "capabilities", "--json"),
         cwd=repo,
         timeout_s=180,
     )
