@@ -10,6 +10,7 @@ import type {
 } from './assistantTypes';
 
 type RecordValue = Record<string, unknown>;
+const OPERATOR_PANEL_CONTRACT_VERSION = '3.0';
 
 function asRecord(value: unknown): RecordValue {
   return typeof value === 'object' && value !== null ? (value as RecordValue) : {};
@@ -140,10 +141,14 @@ function normalizeEventName(value: unknown): AssistantStreamEventType {
   return allowed.includes(raw as AssistantStreamEventType) ? (raw as AssistantStreamEventType) : 'status';
 }
 
-export function normalizeAssistantStreamEvent(value: unknown): AssistantStreamEvent {
+export function normalizeAssistantStreamEvent(value: unknown): AssistantStreamEvent | null {
   const record = asRecord(value);
+  const contractVersion = readString(record, 'contractVersion');
+  if (contractVersion !== OPERATOR_PANEL_CONTRACT_VERSION) {
+    return null;
+  }
   return {
-    contractVersion: readString(record, 'contractVersion', '3.0'),
+    contractVersion,
     assistantTurnId: readString(record, 'assistantTurnId'),
     sessionId: readString(record, 'sessionId'),
     event: normalizeEventName(record.event),
@@ -164,10 +169,13 @@ export function extractApprovalIdFromEvent(event: AssistantStreamEvent): string 
 }
 
 export function mapCliAssistantEvent(
-  rawEvent: AssistantStreamEvent,
+  rawEvent: unknown,
   previous: AssistantSessionState,
 ): AssistantSessionState {
   const event = normalizeAssistantStreamEvent(rawEvent);
+  if (event === null) {
+    return previous;
+  }
   const activeTurnId = previous.activeTurnId ?? event.assistantTurnId;
   const turnIndex = previous.turns.findIndex((item) => item.id === activeTurnId || item.id === event.assistantTurnId);
   if (turnIndex < 0) {

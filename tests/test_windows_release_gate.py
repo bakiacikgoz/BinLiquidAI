@@ -302,6 +302,23 @@ def test_runtime_manifest_python_path_mismatch_blocks_public_release():
     assert_blocked(report, "runtime_manifest_python_path_mismatch")
 
 
+def test_runtime_manifest_rejects_extra_former_version_key():
+    former_version_key = "bin" + "liquid_version"
+    report = evaluate(
+        manifest=runtime_manifest(**{former_version_key: "0.4.1"}),
+    )
+
+    assert_blocked(report, "runtime_manifest_invalid")
+
+
+def test_runtime_manifest_rejects_duplicate_canonical_key():
+    manifest = runtime_manifest() + "imperaos_version=0.4.1\n"
+
+    report = evaluate(manifest=manifest)
+
+    assert_blocked(report, "runtime_manifest_invalid")
+
+
 def test_bundle_hashes_missing_blocks_public_release():
     report = gate.evaluate_gate(
         release_status=loaded_json(release_status()),

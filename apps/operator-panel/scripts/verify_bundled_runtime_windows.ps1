@@ -26,6 +26,9 @@ function Read-RuntimeManifest {
     }
     $key = $line.Substring(0, $separator)
     $value = $line.Substring($separator + 1)
+    if ($values.ContainsKey($key)) {
+      throw "[verify] duplicate manifest key: $key"
+    }
     $values[$key] = $value
   }
   return $values
@@ -54,6 +57,22 @@ function Assert-Sha256 {
   }
 }
 
+function Assert-ExactManifestKeys {
+  param(
+    [hashtable]$Manifest,
+    [string[]]$AllowedKeys
+  )
+
+  if ($Manifest.Count -ne $AllowedKeys.Count) {
+    throw "[verify] manifest key set mismatch"
+  }
+  foreach ($key in $Manifest.Keys) {
+    if ($AllowedKeys -notcontains $key) {
+      throw "[verify] unexpected manifest key: $key"
+    }
+  }
+}
+
 $ResolvedRuntimeDir = (Resolve-Path -LiteralPath $RuntimeDir).Path
 $ManifestPath = Join-Path $ResolvedRuntimeDir "RUNTIME_MANIFEST.txt"
 $RuntimePython = Join-Path $ResolvedRuntimeDir "python\Scripts\python.exe"
@@ -67,7 +86,7 @@ if (-not (Test-Path -LiteralPath $RuntimePython -PathType Leaf)) {
 
 $Manifest = Read-RuntimeManifest -Path $ManifestPath
 
-@(
+$AllowedManifestKeys = @(
   "platform",
   "arch",
   "python",
@@ -78,7 +97,9 @@ $Manifest = Read-RuntimeManifest -Path $ManifestPath
   "python_exe_sha256",
   "uv_lock_sha256",
   "git_sha"
-) | ForEach-Object { Assert-ManifestValue -Manifest $Manifest -Key $_ }
+)
+Assert-ExactManifestKeys -Manifest $Manifest -AllowedKeys $AllowedManifestKeys
+$AllowedManifestKeys | ForEach-Object { Assert-ManifestValue -Manifest $Manifest -Key $_ }
 
 if ($Manifest["platform"] -ne "windows") {
   throw "[verify] expected platform=windows, got $($Manifest["platform"])"
@@ -101,12 +122,17 @@ if ($ActualPythonHash -ne ([string]$Manifest["python_exe_sha256"]).ToLowerInvari
   throw "[verify] python_exe_sha256 mismatch: expected $($Manifest["python_exe_sha256"]), got $ActualPythonHash"
 }
 
-$Version = (& $RuntimePython -m imperaos --version)
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Version)) {
+$VersionOutput = @(& $RuntimePython -m imperaos --version)
+if ($LASTEXITCODE -ne 0 -or $VersionOutput.Count -eq 0) {
   throw "[verify] runtime validation failed: $RuntimePython -m imperaos --version"
+}
+$ActualVersion = ($VersionOutput -join "`n").Trim()
+$ManifestVersion = ([string]$Manifest["imperaos_version"]).Trim()
+if ([string]::IsNullOrWhiteSpace($ActualVersion) -or $ActualVersion -ne $ManifestVersion) {
+  throw "[verify] imperaos_version mismatch: expected $ManifestVersion, got $ActualVersion"
 }
 
 Write-Output "[verify] runtime_dir=$ResolvedRuntimeDir"
-Write-Output "[verify] imperaos_version=$($Version.Trim())"
+Write-Output "[verify] imperaos_version=$ActualVersion"
 Write-Output "[verify] python_exe_sha256=$ActualPythonHash"
 Write-Output "[verify] manifest=pass"

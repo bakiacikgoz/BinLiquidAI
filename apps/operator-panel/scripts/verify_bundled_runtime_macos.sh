@@ -23,7 +23,7 @@ test -x "${RUNTIME_PYTHON}"
 test -f "${RUNTIME_DIR}/config/balanced.toml"
 test -f "${RUNTIME_DIR}/config/providers.example.toml"
 
-"${RUNTIME_PYTHON}" -m imperaos --version >/dev/null
+RUNTIME_VERSION="$("${RUNTIME_PYTHON}" -m imperaos --version)"
 (
   cd /
   IMPERAOS_CONFIG_ROOT="${RUNTIME_DIR}/config" \
@@ -32,6 +32,28 @@ test -f "${RUNTIME_DIR}/config/providers.example.toml"
 )
 file "${RUNTIME_PYTHON}"
 
+if ! awk -F= '
+  BEGIN {
+    allowed["platform"] = 1
+    allowed["arch"] = 1
+    allowed["python"] = 1
+    allowed["imperaos_version"] = 1
+    allowed["wheel_sha256"] = 1
+    allowed["git_head"] = 1
+    allowed["built_at_utc"] = 1
+    expected_count = 7
+  }
+  NF < 2 || $1 == "" || length(substr($0, index($0, "=") + 1)) == 0 { exit 1 }
+  !($1 in allowed) || seen[$1]++ { exit 1 }
+  END {
+    if (NR != expected_count) exit 1
+    for (key in allowed) if (!seen[key]) exit 1
+  }
+' "${MANIFEST}"; then
+  echo "[runtime-verify] manifest key set mismatch" >&2
+  exit 4
+fi
+
 grep -q "^platform=macos$" "${MANIFEST}"
 grep -q "^arch=${ARCH}$" "${MANIFEST}"
 grep -q "^python=Python " "${MANIFEST}"
@@ -39,6 +61,12 @@ grep -q "^imperaos_version=" "${MANIFEST}"
 grep -q "^wheel_sha256=[0-9a-f]\\{64\\}$" "${MANIFEST}"
 grep -q "^git_head=" "${MANIFEST}"
 grep -q "^built_at_utc=" "${MANIFEST}"
+
+MANIFEST_VERSION="$(awk -F= '$1 == "imperaos_version" { print substr($0, index($0, "=") + 1) }' "${MANIFEST}")"
+if [[ "${RUNTIME_VERSION}" != "${MANIFEST_VERSION}" ]]; then
+  echo "[runtime-verify] imperaos_version mismatch: expected ${MANIFEST_VERSION}, got ${RUNTIME_VERSION}" >&2
+  exit 4
+fi
 
 if grep -q "${HOME}" "${MANIFEST}"; then
   echo "[runtime-verify] manifest leaks user home path" >&2

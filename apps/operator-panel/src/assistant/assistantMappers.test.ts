@@ -5,6 +5,7 @@ import {
   createAssistantTurn,
   extractApprovalIdFromEvent,
   mapCliAssistantEvent,
+  normalizeAssistantStreamEvent,
   startAssistantTurnLocally,
 } from './assistantMappers';
 
@@ -20,6 +21,27 @@ function started() {
 }
 
 describe('assistant mappers', () => {
+  it.each([
+    ['missing', undefined],
+    ['former', ['2', '0'].join('.')],
+  ])('drops %s contract versions without mutating state', (_label, contractVersion) => {
+    const state = started();
+    const rawEvent = {
+      ...(contractVersion ? { contractVersion } : {}),
+      assistantTurnId: 'turn-test',
+      sessionId: 'session-test',
+      event: 'token',
+      sequence: 1,
+      timestampUtc: '2026-03-08T09:00:01Z',
+      data: { text: 'must not be appended' },
+    };
+
+    expect(normalizeAssistantStreamEvent(rawEvent)).toBeNull();
+    expect(mapCliAssistantEvent(rawEvent as never, state)).toBe(state);
+    expect(state.turns[0].assistantMessage.text).toBe('');
+    expect(state.turns[0].eventSequence).toBe(0);
+  });
+
   it('appends token events and ignores duplicate sequences', () => {
     const state = started();
     const withToken = mapCliAssistantEvent(
