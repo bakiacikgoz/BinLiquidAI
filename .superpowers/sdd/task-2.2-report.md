@@ -268,3 +268,58 @@ The final tracked-state metrics are:
 | Binary metadata matches | 19 | 19 | 0 |
 | Built artifact matches | 0 | 0 | 0 |
 | Scanned files | 1,509 | 1,509 | 0 |
+
+## Final transitive Windows installer-smoke correction
+
+Controller review traced the Windows clean-smoke workflow into its installer-smoke
+script and found three remaining runtime probes plus a distribution-facing version
+artifact name. The correction is committed as:
+
+`211bb6962ca7aac75001b1adc8e3ec2940576795`
+
+with subject `fix: update installer smoke for ImperaOS runtime`.
+
+`windows_installer_smoke.ps1` now executes all version, capability, and doctor probes
+with `-m imperaos` and writes `imperaos-version.txt`. The bundled resource lookup at
+`resources\binliquid-runtime` remains unchanged as required.
+
+### Final correction TDD and verification
+
+The automation regression was first extended to include the installer-smoke script
+and its version-artifact name. RED reported four classified violations across three
+lines: three legacy module probes and the legacy filename on the version-probe line.
+The preserved resource path did not match. After the minimal script edit, GREEN
+returned one passing guard test.
+
+| Check | Result |
+|---|---|
+| Static automation regression | 1 passed |
+| Windows installer-smoke PowerShell parse | pass, zero AST parse errors |
+| Windows release workflow static tests | 6 passed |
+| Focused Task 2.2 aggregate | 17 passed |
+| Full Python suite, `--basetemp C:\t\j` | 853 passed, 9 skipped, exit 0 in 92.9 seconds |
+| Ruff on the changed Python test | all checks passed |
+| `uv lock --check` | exit 0; 75 packages resolved, lock unchanged/current |
+| Bare `uv build` | `imperaos-0.4.1` sdist and wheel built successfully |
+| `git diff --check` | exit 0 |
+
+A comprehensive guard enumerated 138 tracked files under `Makefile`, `.github/**`,
+`apps/operator-panel/scripts/**`, and `scripts/**`. It found zero occurrences of the
+four removed active forms: `-m binliquid`, `uv run binliquid`, `binliquid-*.whl`, or
+`compileall binliquid`. Generated `dist/` artifacts were removed afterward.
+
+### Final tracked-state inventory
+
+Inventory mode exits 0; its audit status remains intentionally `fail` for deferred
+rebrand work. Before this report section was added, the implementation-only state
+contained 1,539 findings and 1,517 content matches. The literal regression patterns
+documented above are themselves inventory-visible, producing the final counts below.
+
+| Metric | Prior report | Final | Delta |
+|---|---:|---:|---:|
+| Findings | 1,541 | 1,542 | +1 |
+| Legacy content matches | 1,519 | 1,520 | +1 |
+| Legacy path matches | 3 | 3 | 0 |
+| Binary metadata matches | 19 | 19 | 0 |
+| Built artifact matches | 0 | 0 | 0 |
+| Scanned files | 1,509 | 1,509 | 0 |
