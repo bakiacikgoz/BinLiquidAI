@@ -14,9 +14,11 @@ contract without introducing spelling or casing variants.
 ## Technical identifiers
 
 - Use lowercase `imperaos` for the slug, Python distribution, Python package, and CLI command.
-- Use uppercase `IMPERAOS` as the environment-variable prefix. Environment variables begin
-  with `IMPERAOS_` followed by the setting name.
-- Use `.imperaos` for the state root and `imperaos-runtime` for the runtime resource directory.
+- The canonical `envPrefix` value stores the stem `IMPERAOS` without a trailing underscore.
+  Rendered environment keys use `IMPERAOS_<SUFFIX>`.
+- The canonical `stateRoot` value stores the root `.imperaos` without a trailing slash.
+  Child paths render beneath it as `.imperaos/...`.
+- Use `imperaos-runtime` for the runtime resource directory.
 - Use `imperaos_` as the metric prefix.
 - Use `com.imperaos.operatorpanel` as the operator bundle identifier.
 - Use `imperaos.com` for the product domain and `bakiacikgoz/ImperaOS` for the repository.
