@@ -86,7 +86,7 @@ expected before the later rebrand tasks finish.
 | Findings | 3,851 | 1,666 | -2,185 |
 | Legacy content matches | 3,543 | 1,644 | -1,899 |
 | Legacy path matches | 289 | 3 | -286 |
-| Scanned files | 1,503 | 1,504 | +1 |
+| Scanned files | 1,503 | 1,505 | +2 |
 
 ## Known Task 2.2 dependency
 
