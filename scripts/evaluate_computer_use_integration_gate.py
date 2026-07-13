@@ -41,8 +41,11 @@ ENTRYPOINT_COMMANDS = (
         ("uv", "run", "python", "-m", "imperaos", "operator", "capabilities", "--json"),
     ),
 )
+LEGACY_STATE_ROOT_NAME = "." + "bin" + "liquid"
+CURRENT_STATE_ROOT_NAME = ".imperaos"
 IGNORED_COPY_NAMES = {
-    ".imperaos",
+    LEGACY_STATE_ROOT_NAME,
+    CURRENT_STATE_ROOT_NAME,
     ".git",
     ".mypy_cache",
     ".pytest_cache",

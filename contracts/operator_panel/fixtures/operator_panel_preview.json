@@ -52,7 +52,7 @@
     "coreVersion": "0.6.0-preview",
     "contractVersion": "2.0",
     "profile": "balanced",
-    "rootDir": ".binliquid/team/jobs",
+    "rootDir": ".imperaos/team/jobs",
     "mode": "auto",
     "capabilities": {
       "coreVersion": "0.6.0-preview",
@@ -257,7 +257,7 @@
     "contractVersion": "2.0",
     "jobId": "job-ui-preview-1",
     "profile": "balanced",
-    "rootDir": ".binliquid/team/jobs",
+    "rootDir": ".imperaos/team/jobs",
     "processId": 4242
   },
   "approvalPending": {
@@ -400,7 +400,7 @@
   "runSummary": {
     "contract_version": "2.0",
     "status": "ok",
-    "root_dir": ".binliquid/team/jobs",
+    "root_dir": ".imperaos/team/jobs",
     "count": 3,
     "items": [
       {
@@ -411,8 +411,8 @@
         "request": "Inspect operator queue health",
         "created_at": "2026-03-08T09:10:00Z",
         "finished_at": "",
-        "audit_envelope_path": ".binliquid/team/jobs/run_20260308_0910/audit_envelope.json",
-        "job_dir": ".binliquid/team/jobs/run_20260308_0910"
+        "audit_envelope_path": ".imperaos/team/jobs/run_20260308_0910/audit_envelope.json",
+        "job_dir": ".imperaos/team/jobs/run_20260308_0910"
       },
       {
         "job_id": "run_20260308_0838",
@@ -422,8 +422,8 @@
         "request": "Resume a privileged replay path",
         "created_at": "2026-03-08T08:38:00Z",
         "finished_at": "",
-        "audit_envelope_path": ".binliquid/team/jobs/run_20260308_0838/audit_envelope.json",
-        "job_dir": ".binliquid/team/jobs/run_20260308_0838"
+        "audit_envelope_path": ".imperaos/team/jobs/run_20260308_0838/audit_envelope.json",
+        "job_dir": ".imperaos/team/jobs/run_20260308_0838"
       },
       {
         "job_id": "run_20260307_2214",
@@ -433,8 +433,8 @@
         "request": "Export previous audit envelope",
         "created_at": "2026-03-07T22:14:00Z",
         "finished_at": "2026-03-07T22:26:00Z",
-        "audit_envelope_path": ".binliquid/team/jobs/run_20260307_2214/audit_envelope.json",
-        "job_dir": ".binliquid/team/jobs/run_20260307_2214"
+        "audit_envelope_path": ".imperaos/team/jobs/run_20260307_2214/audit_envelope.json",
+        "job_dir": ".imperaos/team/jobs/run_20260307_2214"
       }
     ],
     "errors": []
@@ -472,8 +472,8 @@
         "finished_at": null
       }
     ],
-    "audit_envelope_path": ".binliquid/team/jobs/run_20260308_0910/audit_envelope.json",
-    "job_dir": ".binliquid/team/jobs/run_20260308_0910",
+    "audit_envelope_path": ".imperaos/team/jobs/run_20260308_0910/audit_envelope.json",
+    "job_dir": ".imperaos/team/jobs/run_20260308_0910",
     "resume_outcomes": [],
     "continuation": {}
   },
@@ -566,8 +566,8 @@
           "finished_at": null
         }
       ],
-      "audit_envelope_path": ".binliquid/team/jobs/run_20260308_0910/audit_envelope.json",
-      "job_dir": ".binliquid/team/jobs/run_20260308_0910",
+      "audit_envelope_path": ".imperaos/team/jobs/run_20260308_0910/audit_envelope.json",
+      "job_dir": ".imperaos/team/jobs/run_20260308_0910",
       "resume_outcomes": [],
       "continuation": {}
     },
@@ -721,7 +721,7 @@
       "model_name": "qwen3.5:4b",
       "hf_model_id": "Qwen/Qwen3.5-4B-Instruct",
       "team": {
-        "artifact_dir": ".binliquid/team/jobs"
+        "artifact_dir": ".imperaos/team/jobs"
       }
     },
     "source_map": {
@@ -743,7 +743,7 @@
         "roles": ["platform_admin"],
         "permissions": ["runtime.run", "runtime.resume", "support.export"],
         "auth_mode": "external_assertion",
-        "assertion_path": ".binliquid/identity/current_assertion.json",
+        "assertion_path": ".imperaos/identity/current_assertion.json",
         "key_id": "enterprise-signing-current",
         "expires_at": "2026-03-08T10:35:00Z",
         "is_break_glass": false

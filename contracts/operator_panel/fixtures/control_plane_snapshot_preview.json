@@ -1163,7 +1163,7 @@
       "status": "partial"
     },
     "profile": "enterprise",
-    "rootDir": ".binliquid/control-plane",
+    "rootDir": ".imperaos/control-plane",
     "sourceMap": {
       "agents": "preview fixture",
       "approvals": "preview fixture",
