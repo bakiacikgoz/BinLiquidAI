@@ -30,7 +30,7 @@ const emptyContext: AssistantContextSnapshot = {
 describe('useAssistantSession runtime metadata', () => {
   beforeEach(() => {
     bridgeMocks.startAssistantTurn.mockResolvedValue({
-      contractVersion: '2.0',
+      contractVersion: '3.0',
       assistantTurnId: 'turn-test',
       sessionId: 'session-test',
       processId: null,
@@ -38,7 +38,7 @@ describe('useAssistantSession runtime metadata', () => {
     });
     bridgeMocks.listenAssistantEvents.mockResolvedValue(() => undefined);
     bridgeMocks.cancelAssistantTurn.mockResolvedValue({
-      contractVersion: '2.0',
+      contractVersion: '3.0',
       assistantTurnId: 'turn-test',
       sessionId: 'session-test',
       processId: null,

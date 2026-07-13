@@ -7,7 +7,7 @@ import type {
 import type { AssistantProviderModelsResponse } from './modelDiscovery';
 import { createAssistantSession, createAssistantTurn } from './assistantMappers';
 
-const CONTRACT_VERSION = '2.0';
+const CONTRACT_VERSION = '3.0';
 const FIXTURE_SESSION_ID = 'assistant-preview-session';
 const FIXTURE_TURN_ID = 'assistant-preview-turn';
 

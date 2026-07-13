@@ -1236,7 +1236,7 @@ def _assistant_event_payload(
         "tool_proposal": "tool_proposal",
     }.get(event, "delta")
     return {
-        "contractVersion": "2.0",
+        "contractVersion": OPERATOR_PANEL_CONTRACT_VERSION,
         "assistantTurnId": turn_id,
         "sessionId": session_id,
         "event": normalized,
@@ -5086,7 +5086,7 @@ def _team_init_template(template_name: str) -> str:
     if normalized == "balanced":
         return """version: "1"
 team:
-  team_id: "aegis-team"
+  team_id: "imperaos-team"
   supervisor_policy: "sequential_then_parallel"
   agents:
     - agent_id: "agent-intake"
@@ -5123,7 +5123,7 @@ tasks: []
     if normalized in {"regulated", "restricted"}:
         return """version: "1"
 team:
-  team_id: "aegis-regulated-team"
+  team_id: "imperaos-regulated-team"
   supervisor_policy: "sequential_then_parallel"
   agents:
     - agent_id: "agent-intake"

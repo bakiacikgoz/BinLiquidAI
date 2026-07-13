@@ -91,7 +91,7 @@ cat > "${RUNTIME_DIR}/RUNTIME_MANIFEST.txt" <<EOF
 platform=macos
 arch=${ARCH}
 python=${PYTHON_VERSION}
-binliquid_version=${IMPERAOS_VERSION}
+imperaos_version=${IMPERAOS_VERSION}
 wheel_sha256=${WHEEL_SHA256}
 git_head=${GIT_HEAD}
 built_at_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

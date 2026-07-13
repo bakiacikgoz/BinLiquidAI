@@ -120,7 +120,7 @@ def build_openai_responses_payload(
         payload["text"] = {
             "format": {
                 "type": "json_schema",
-                "name": "aegisos_provider_response",
+                "name": "imperaos_provider_response",
                 "strict": True,
                 "schema": request.json_schema,
             }

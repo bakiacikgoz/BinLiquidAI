@@ -20,7 +20,7 @@ def test_computer_use_doctor_reports_all_platforms_without_enabling_live_executi
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["contract_version"] == "2.0"
+    assert payload["contract_version"] == "3.0"
     assert payload["runtime"] == "computer_use_vision"
     assert set(payload["platforms"]) == {"macos", "windows", "linux"}
     assert payload["platforms"]["windows"]["liveEnabled"] is False

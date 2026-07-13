@@ -119,6 +119,6 @@ def test_assistant_turn_streams_contract_events(tmp_path: Path, monkeypatch) -> 
     assert result.exit_code == 0, result.stdout
     events = [json.loads(line) for line in result.stdout.splitlines()]
     assert [event["event"] for event in events] == ["delta", "final"]
-    assert all(event["contractVersion"] == "2.0" for event in events)
+    assert all(event["contractVersion"] == "3.0" for event in events)
     assert all(event["assistantTurnId"] == "turn-1" for event in events)
     assert [event["sequence"] for event in events] == [1, 2]

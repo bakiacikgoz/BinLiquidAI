@@ -26,7 +26,7 @@ export const approvalTicketFixture = {
 };
 
 export const runSummaryFixture = {
-  contract_version: '2.0',
+  contract_version: '3.0',
   runs: [
     {
       job_id: 'run_qa_1',

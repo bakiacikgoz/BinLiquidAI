@@ -1646,7 +1646,7 @@ def test_computer_use_doctor_classifies_surface_mismatch(monkeypatch, tmp_path: 
                 "job": {
                     "job_id": job_id,
                     "case_id": f"case-{job_id}",
-                    "team_id": "aegis-computer-use",
+                    "team_id": "imperaos-computer-use",
                     "status": "failed",
                 },
                 "computer_use": {

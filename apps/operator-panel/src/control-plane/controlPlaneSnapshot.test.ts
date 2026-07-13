@@ -85,7 +85,7 @@ function makeSnapshot(overrides: Partial<ControlPlaneSnapshot> = {}): ControlPla
       profile: 'lite',
       rootDir: '.imperaos/control-plane',
       coreVersion: '0.5.0',
-      contractVersion: '2.0',
+      contractVersion: '3.0',
       health: {
         status: 'partial',
         confidence: 'medium',

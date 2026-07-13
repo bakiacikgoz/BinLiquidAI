@@ -24,7 +24,7 @@ describe('assistant mappers', () => {
     const state = started();
     const withToken = mapCliAssistantEvent(
       {
-        contractVersion: '2.0',
+        contractVersion: '3.0',
         assistantTurnId: 'turn-test',
         sessionId: 'session-test',
         event: 'token',
@@ -36,7 +36,7 @@ describe('assistant mappers', () => {
     );
     const duplicate = mapCliAssistantEvent(
       {
-        contractVersion: '2.0',
+        contractVersion: '3.0',
         assistantTurnId: 'turn-test',
         sessionId: 'session-test',
         event: 'token',
@@ -53,7 +53,7 @@ describe('assistant mappers', () => {
   it('marks final events as completed with metrics', () => {
     const completed = mapCliAssistantEvent(
       {
-        contractVersion: '2.0',
+        contractVersion: '3.0',
         assistantTurnId: 'turn-test',
         sessionId: 'session-test',
         event: 'final',
@@ -72,7 +72,7 @@ describe('assistant mappers', () => {
 
   it('maps approval pending events into guarded approval state', () => {
     const event = {
-      contractVersion: '2.0',
+      contractVersion: '3.0',
       assistantTurnId: 'turn-test',
       sessionId: 'session-test',
       event: 'approval_pending' as const,
@@ -91,7 +91,7 @@ describe('assistant mappers', () => {
   it('keeps warning events non-blocking', () => {
     const warned = mapCliAssistantEvent(
       {
-        contractVersion: '2.0',
+        contractVersion: '3.0',
         assistantTurnId: 'turn-test',
         sessionId: 'session-test',
         event: 'warning',
@@ -109,7 +109,7 @@ describe('assistant mappers', () => {
   it('maps cancelled events into a non-error terminal state', () => {
     const cancelled = mapCliAssistantEvent(
       {
-        contractVersion: '2.0',
+        contractVersion: '3.0',
         assistantTurnId: 'turn-test',
         sessionId: 'session-test',
         event: 'cancelled',

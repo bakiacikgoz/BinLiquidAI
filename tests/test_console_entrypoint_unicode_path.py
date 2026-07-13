@@ -84,7 +84,7 @@ def test_console_and_module_entrypoints_work_from_current_unicode_path() -> None
         result = _run(command)
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        assert payload["contractVersion"] == "2.0"
+        assert payload["contractVersion"] == "3.0"
         assert payload["features"]["computerUseVisionRuntime"]["enabled"] is False
 
 

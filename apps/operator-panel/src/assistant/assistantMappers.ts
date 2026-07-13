@@ -143,7 +143,7 @@ function normalizeEventName(value: unknown): AssistantStreamEventType {
 export function normalizeAssistantStreamEvent(value: unknown): AssistantStreamEvent {
   const record = asRecord(value);
   return {
-    contractVersion: readString(record, 'contractVersion', '2.0'),
+    contractVersion: readString(record, 'contractVersion', '3.0'),
     assistantTurnId: readString(record, 'assistantTurnId'),
     sessionId: readString(record, 'sessionId'),
     event: normalizeEventName(record.event),

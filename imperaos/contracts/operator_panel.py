@@ -208,7 +208,7 @@ class OperatorCommandCapabilitiesContract(ContractModel):
 
 class OperatorCapabilitiesPayload(ContractModel):
     core_version: str = Field(alias="coreVersion")
-    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    contract_version: Literal["3.0"] = Field(alias="contractVersion")
     profiles: list[str]
     preview_mode: bool | None = Field(default=None, alias="previewMode")
     features: OperatorFeatureFlagsContract
@@ -248,7 +248,7 @@ class BridgeHandshakeContract(ContractModel):
     ui_version: str = Field(alias="uiVersion")
     core_version: str = Field(alias="coreVersion")
     profile: str
-    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    contract_version: Literal["3.0"] = Field(alias="contractVersion")
     capabilities: OperatorCapabilitiesPayload
     doctor: dict[str, Any]
     root_dir: str = Field(alias="rootDir")
@@ -256,7 +256,7 @@ class BridgeHandshakeContract(ContractModel):
 
 
 class SpawnedRunPayloadContract(ContractModel):
-    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    contract_version: Literal["3.0"] = Field(alias="contractVersion")
     job_id: str = Field(alias="jobId")
     profile: str
     root_dir: str = Field(alias="rootDir")
@@ -264,7 +264,7 @@ class SpawnedRunPayloadContract(ContractModel):
 
 
 class AssistantStartTurnPayloadContract(ContractModel):
-    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    contract_version: Literal["3.0"] = Field(alias="contractVersion")
     assistant_turn_id: str = Field(alias="assistantTurnId")
     session_id: str = Field(alias="sessionId")
     process_id: int | None = Field(alias="processId")
@@ -272,7 +272,7 @@ class AssistantStartTurnPayloadContract(ContractModel):
 
 
 class AssistantStreamEventPayloadContract(ContractModel):
-    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    contract_version: Literal["3.0"] = Field(alias="contractVersion")
     assistant_turn_id: str = Field(alias="assistantTurnId")
     session_id: str = Field(alias="sessionId")
     event: Literal[
@@ -294,12 +294,12 @@ class AssistantStreamEventPayloadContract(ContractModel):
 
 
 class ApprovalPendingPayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     pending: list[ApprovalTicket] = Field(default_factory=list)
 
 
 class ApprovalDetailPayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     approval_id: str
     status: str
     execution_status: str
@@ -319,7 +319,7 @@ class RunSummaryItemContract(ContractModel):
 
 
 class RunSummaryPayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     status: str
     root_dir: str
     count: int
@@ -328,7 +328,7 @@ class RunSummaryPayloadContract(ContractModel):
 
 
 class TeamStatusArtifactContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     job: JobRun
     tasks: list[TaskRun] = Field(default_factory=list)
     audit_envelope_path: str | None = None
@@ -339,7 +339,7 @@ class TeamStatusArtifactContract(ContractModel):
 
 
 class RunReplayPayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     job_id: str
     status: str | None = None
     team_id: str | None = None
@@ -362,7 +362,7 @@ class RunReplayPayloadContract(ContractModel):
 
 
 class ReadArtifactPayloadContract(ContractModel):
-    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    contract_version: Literal["3.0"] = Field(alias="contractVersion")
     artifact_name: str = Field(alias="artifactName")
     payload: dict[str, Any] = Field(default_factory=dict)
     truncated: bool
@@ -370,7 +370,7 @@ class ReadArtifactPayloadContract(ContractModel):
 
 
 class TailEventsPayloadContract(ContractModel):
-    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    contract_version: Literal["3.0"] = Field(alias="contractVersion")
     events: list[TeamEvent] = Field(default_factory=list)
     next_cursor: int = Field(alias="nextCursor")
     reset: bool
@@ -379,7 +379,7 @@ class TailEventsPayloadContract(ContractModel):
 
 
 class ConfigResolvePayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     profile: str
     status: str
     resolved: dict[str, Any] = Field(default_factory=dict)
@@ -387,7 +387,7 @@ class ConfigResolvePayloadContract(ContractModel):
 
 
 class AuthWhoAmIPayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     identity_enabled: bool
     verified: bool
     actor: dict[str, Any] | None = None
@@ -396,7 +396,7 @@ class AuthWhoAmIPayloadContract(ContractModel):
 
 
 class AuthCheckPayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     permission: str
     allowed: bool
     actor: dict[str, Any] | None = None
@@ -405,7 +405,7 @@ class AuthCheckPayloadContract(ContractModel):
 
 
 class SecurityBaselinePayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     profile: str
     overall_status: str
     checks: dict[str, Any] = Field(default_factory=dict)
@@ -417,7 +417,7 @@ class SecurityBaselinePayloadContract(ContractModel):
 
 
 class KeyStatusPayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     provider: str
     current_key_id: str | None = None
     private_key_path: str
@@ -433,7 +433,7 @@ class KeyStatusPayloadContract(ContractModel):
 
 
 class SupportBundleExportPayloadContract(ContractModel):
-    contract_version: Literal["2.0"]
+    contract_version: Literal["3.0"]
     bundle_dir: str
     archive_path: str
     manifest_path: str
@@ -491,7 +491,7 @@ class PreviewFixtureAssistantContract(ContractModel):
 
 
 class PreviewFixtureBundleContract(ContractModel):
-    contract_version: Literal["2.0"] = Field(alias="contractVersion")
+    contract_version: Literal["3.0"] = Field(alias="contractVersion")
     assistant: PreviewFixtureAssistantContract | None = None
     handshake: BridgeHandshakeContract
     submit_team_run: SpawnedRunPayloadContract = Field(alias="submitTeamRun")

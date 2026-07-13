@@ -197,7 +197,7 @@ def _start_site_server(site_dir: Path) -> tuple[ThreadingHTTPServer, threading.T
 
 
 def _start_auth_site_server() -> tuple[ThreadingHTTPServer, threading.Thread]:
-    session_cookie = "aegis_session=pilot"
+    session_cookie = "imperaos_session=pilot"
 
     class _AuthSiteHandler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args) -> None:  # noqa: A003

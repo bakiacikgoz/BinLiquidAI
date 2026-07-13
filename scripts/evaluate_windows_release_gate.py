@@ -161,7 +161,7 @@ def validate_runtime_manifest(
 
     required_keys = {
         "arch",
-        "binliquid_version",
+        "imperaos_version",
         "created_at_utc",
         "git_sha",
         "platform",

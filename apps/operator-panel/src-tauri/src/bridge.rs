@@ -12,7 +12,7 @@ use tokio::process::Command;
 use tokio::process::{ChildStderr, ChildStdout};
 use tokio::sync::Mutex;
 
-const CONTRACT_VERSION: &str = "2.0";
+const CONTRACT_VERSION: &str = "3.0";
 const DEFAULT_TIMEOUT_MS: u64 = 15_000;
 const DEFAULT_MAX_BYTES: usize = 256 * 1024;
 const DEFAULT_MAX_LINES: usize = 500;
@@ -3270,6 +3270,11 @@ mod tests {
                 .expect_err("invalid");
         assert_eq!(invalid.code, "INVALID_INPUT");
         assert!(!invalid.retryable);
+    }
+
+    #[test]
+    fn operator_panel_contract_version_is_3_0() {
+        assert_eq!(CONTRACT_VERSION, "3.0");
     }
 
     #[test]

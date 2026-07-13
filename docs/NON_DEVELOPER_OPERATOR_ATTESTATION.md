@@ -58,7 +58,7 @@ when:
 - all evidence checks pass;
 - the attestation file is valid JSON;
 - `schema_version` is
-  `binliquid-non-developer-operator-attestation/v1`;
+  `imperaos-non-developer-operator-attestation/v2`;
 - required operator fields are non-empty;
 - `signed_at_utc` is a valid UTC timestamp ending in `Z`;
 - the attestation booleans are explicitly `true`.

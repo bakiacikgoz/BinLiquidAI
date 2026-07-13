@@ -89,7 +89,7 @@ def doctor(**overrides):
 def runtime_manifest(**overrides) -> str:
     values = {
         "arch": "x86_64",
-        "binliquid_version": "0.4.1",
+        "imperaos_version": "0.4.1",
         "created_at_utc": "2026-05-04T00:00:00Z",
         "git_sha": "d" * 40,
         "platform": "windows",

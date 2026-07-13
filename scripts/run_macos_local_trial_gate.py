@@ -83,7 +83,7 @@ def _run_command(command: list[str]) -> tuple[int, str]:
 def build_command_plan(profile: str, *, full: bool = False) -> list[dict[str, Any]]:
     plan = [
         {
-            "name": "binliquid_version",
+            "name": "imperaos_version",
             "command": ["uv", "run", "python", "-m", "imperaos", "--version"],
             "required": True,
         },

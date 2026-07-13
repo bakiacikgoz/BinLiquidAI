@@ -1495,7 +1495,7 @@ end tell
     ) -> None:
         recorder = EventRecorder(
             paths=paths,
-            team_id=str(job_payload.get("team_id") or "aegis-computer-use"),
+            team_id=str(job_payload.get("team_id") or "imperaos-computer-use"),
             case_id=str(
                 job_payload.get("case_id")
                 or f"case-{job_payload.get('job_id') or 'unknown'}"
@@ -1888,7 +1888,7 @@ end tell
         events: list[TeamEvent] = []
         recorder = EventRecorder(
             paths=paths,
-            team_id="aegis-computer-use",
+            team_id="imperaos-computer-use",
             case_id=case_id or f"case-{job_id}",
             job_id=job_id,
             sink=events,
@@ -1905,7 +1905,7 @@ end tell
         job = JobRun(
             job_id=job_id,
             case_id=case_id or f"case-{job_id}",
-            team_id="aegis-computer-use",
+            team_id="imperaos-computer-use",
             request=prompt,
             status=JobStatus.RUNNING,
         )
@@ -2493,7 +2493,7 @@ end tell
             or {
                 "job_id": job_id,
                 "case_id": f"case-{job_id}",
-                "team_id": "aegis-computer-use",
+                "team_id": "imperaos-computer-use",
                 "status": JobStatus.RUNNING.value,
             }
         )

@@ -161,8 +161,8 @@ class FieldEvidenceVerificationResult(StrictModel):
 
 
 class OperatorAttestationBinding(StrictModel):
-    schema_version: Literal["binliquid-non-developer-operator-attestation/v1"] = Field(
-        default="binliquid-non-developer-operator-attestation/v1",
+    schema_version: Literal["imperaos-non-developer-operator-attestation/v2"] = Field(
+        default="imperaos-non-developer-operator-attestation/v2",
         alias="schemaVersion",
     )
     session_id: str = Field(alias="sessionId")
@@ -676,7 +676,7 @@ def write_attestation_template(
     release_pack_id: str = "design-partner-rc-v1",
 ) -> Path:
     payload = {
-        "schemaVersion": "binliquid-non-developer-operator-attestation/v1",
+        "schemaVersion": "imperaos-non-developer-operator-attestation/v2",
         "sessionId": session.session_id,
         "releasePackId": release_pack_id,
         "targetEnvironmentLabelHash": session.target_environment.environment_label_hash,

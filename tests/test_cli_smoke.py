@@ -271,7 +271,7 @@ def test_operator_capabilities_contract() -> None:
     result = runner.invoke(app, ["operator", "capabilities", "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["contractVersion"] == "2.0"
+    assert payload["contractVersion"] == "3.0"
     assert payload["commands"]["teamListJson"] is True
     assert payload["commands"]["approvalShowJson"] is True
     assert payload["commands"]["securityBaselineJson"] is True

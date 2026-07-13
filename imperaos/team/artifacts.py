@@ -21,6 +21,8 @@ from imperaos.team.models import (
     TeamEvent,
 )
 
+AUDIT_ENVELOPE_CONTRACT_VERSION = "2.0"
+
 
 @dataclass(slots=True)
 class TeamArtifactPaths:
@@ -206,7 +208,7 @@ def write_audit_envelope(
 
     prev_hash = _read_prev_chain_hash(paths.root_dir)
     envelope_wo_integrity = {
-        "contract_version": OPERATOR_PANEL_CONTRACT_VERSION,
+        "contract_version": AUDIT_ENVELOPE_CONTRACT_VERSION,
         "envelope_version": "3",
         "event_schema_version": "3",
         "handoff_schema_version": "3",
@@ -234,7 +236,7 @@ def write_audit_envelope(
         prev_hash=prev_hash,
     )
     envelope = AuditEnvelope(
-        contract_version=OPERATOR_PANEL_CONTRACT_VERSION,
+        contract_version=AUDIT_ENVELOPE_CONTRACT_VERSION,
         envelope_version="3",
         event_schema_version="3",
         handoff_schema_version="3",

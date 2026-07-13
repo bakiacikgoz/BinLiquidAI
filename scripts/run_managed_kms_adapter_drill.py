@@ -22,7 +22,7 @@ from imperaos.enterprise.signing import (
 )
 from imperaos.runtime.config import RuntimeConfig
 
-SCHEMA_VERSION = "binliquid-managed-kms-adapter-drill/v1"
+SCHEMA_VERSION = "imperaos-managed-kms-adapter-drill/v2"
 
 
 def _now_iso() -> str:

@@ -12,8 +12,8 @@ from typing import Any
 
 from imperaos.runtime.paths import TEAM_ARTIFACT_ROOT
 
-SCHEMA_VERSION = "binliquid-operator-validation-drill/v1"
-ATTESTATION_SCHEMA_VERSION = "binliquid-non-developer-operator-attestation/v1"
+SCHEMA_VERSION = "imperaos-operator-validation-drill/v2"
+ATTESTATION_SCHEMA_VERSION = "imperaos-non-developer-operator-attestation/v2"
 
 
 @dataclass(frozen=True)

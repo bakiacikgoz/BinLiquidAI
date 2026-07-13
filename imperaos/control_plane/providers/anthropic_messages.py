@@ -46,7 +46,7 @@ class AnthropicMessagesAdapter:
                 }
             ],
             "tools": native_tools,
-            "metadata": {"binliquid_retention": "hash_only_store_false"},
+            "metadata": {"imperaos_retention": "hash_only_store_false"},
         }
         return NativeRequestEnvelope(
             providerKind=self.kind,

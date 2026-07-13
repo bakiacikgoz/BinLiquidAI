@@ -104,7 +104,7 @@ export function useAssistantSession(
           return;
         }
         applyEvent({
-          contractVersion: '2.0',
+          contractVersion: '3.0',
           assistantTurnId: turnId,
           sessionId,
           event: 'error',
@@ -211,7 +211,7 @@ export function useAssistantSession(
         setState((previous) =>
           mapCliAssistantEvent(
             {
-              contractVersion: '2.0',
+              contractVersion: '3.0',
               assistantTurnId: turn.id,
               sessionId: previous.sessionId,
               event: 'error',
@@ -250,7 +250,7 @@ export function useAssistantSession(
     await cancelAssistantTurn(settings, active.id);
     clearTurnTimeout(active.id);
     applyEvent({
-      contractVersion: '2.0',
+      contractVersion: '3.0',
       assistantTurnId: active.id,
       sessionId: stateRef.current.sessionId,
       event: 'cancelled',

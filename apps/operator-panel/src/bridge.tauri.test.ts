@@ -40,7 +40,7 @@ describe('bridge tauri contract', () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
       uiVersion: '0.5.0-beta.1',
       coreVersion: '0.4.1',
-      contractVersion: '2.0',
+      contractVersion: '3.0',
       capabilities: {},
       doctor: {},
     });
@@ -102,7 +102,7 @@ describe('bridge tauri contract', () => {
 
   it('passes assistant provider and model options to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
-      contractVersion: '2.0',
+      contractVersion: '3.0',
       assistantTurnId: 'turn-tauri',
       sessionId: 'session-tauri',
       processId: 42,
@@ -149,7 +149,7 @@ describe('bridge tauri contract', () => {
 
   it('passes assistant cancel requests to the Tauri command', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
-      contractVersion: '2.0',
+      contractVersion: '3.0',
       assistantTurnId: 'turn-tauri',
       sessionId: 'session-tauri',
       processId: 42,
@@ -195,7 +195,7 @@ describe('bridge tauri contract', () => {
   });
 
   it('passes config resolve provider and model overrides to the Tauri command', async () => {
-    const { invoke, bridge } = await importBridgeWithInvoke({ contract_version: '2.0', status: 'ok' });
+    const { invoke, bridge } = await importBridgeWithInvoke({ contract_version: '3.0', status: 'ok' });
 
     await bridge.resolveConfig(
       { ...DEFAULT_SETTINGS, profile: 'balanced' },
@@ -303,7 +303,7 @@ describe('bridge tauri contract', () => {
   });
 
   it('passes team submit model metadata and run identifiers to the Tauri command', async () => {
-    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0', jobId: 'job-live' });
+    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '3.0', jobId: 'job-live' });
 
     await bridge.submitTeamRun(
       { ...DEFAULT_SETTINGS },
@@ -336,7 +336,7 @@ describe('bridge tauri contract', () => {
   });
 
   it('passes approval decide and execute actor args to the Tauri commands', async () => {
-    const { invoke, bridge } = await importBridgeWithInvoke({ contract_version: '2.0' });
+    const { invoke, bridge } = await importBridgeWithInvoke({ contract_version: '3.0' });
 
     await bridge.decideApproval({ ...DEFAULT_SETTINGS }, 'apr-1', false, 'qa-operator', 'operator rejected');
     await bridge.executeApproval({ ...DEFAULT_SETTINGS }, 'apr-1', 'qa-operator');
@@ -362,7 +362,7 @@ describe('bridge tauri contract', () => {
   });
 
   it('passes computer-use submit and control args to the Tauri commands', async () => {
-    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0', jobId: 'job-cu' });
+    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '3.0', jobId: 'job-cu' });
 
     await bridge.submitComputerUseRun(
       { ...DEFAULT_SETTINGS },
@@ -415,7 +415,7 @@ describe('bridge tauri contract', () => {
   });
 
   it('passes artifact read and run export args to the Tauri commands', async () => {
-    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '2.0' });
+    const { invoke, bridge } = await importBridgeWithInvoke({ contractVersion: '3.0' });
 
     await bridge.readArtifact({ ...DEFAULT_SETTINGS, rootDir: '.imperaos/jobs' }, 'job-1', 'status.json', 4096);
     await bridge.exportRunArtifacts({ ...DEFAULT_SETTINGS }, 'job-1', './exports/job-1');

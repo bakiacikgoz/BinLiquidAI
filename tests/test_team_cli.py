@@ -433,7 +433,7 @@ def test_team_list_returns_jobs_and_since_filter(monkeypatch, tmp_path: Path) ->
     listed = runner.invoke(app, ["team", "list", "--root-dir", str(root), "--json"])
     assert listed.exit_code == 0
     listed_payload = json.loads(listed.stdout)
-    assert listed_payload["contract_version"] == "2.0"
+    assert listed_payload["contract_version"] == "3.0"
     assert listed_payload["count"] == 2
     assert [item["job_id"] for item in listed_payload["items"]] == ["job-new", "job-old"]
 
@@ -486,7 +486,7 @@ def test_team_replay_verify_reports_verified(monkeypatch, tmp_path: Path) -> Non
     )
     assert replay.exit_code == 0
     replay_payload = json.loads(replay.stdout)
-    assert replay_payload["contract_version"] == "2.0"
+    assert replay_payload["contract_version"] == "3.0"
     assert replay_payload["verified"] is True
     assert replay_payload["checks"]["event_count"] >= 1
     assert isinstance(replay_payload["trace_refs"], list)
@@ -559,7 +559,7 @@ def test_operator_capabilities_exposes_workspace_parity_flags() -> None:
     result = runner.invoke(app, ["operator", "capabilities", "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["contractVersion"] == "2.0"
+    assert payload["contractVersion"] == "3.0"
     assert payload["features"]["operatorWorkflowParity"] is True
     assert payload["features"]["enterpriseOpsParity"] is True
     computer_use = payload["features"]["computerUsePilot"]

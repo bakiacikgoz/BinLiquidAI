@@ -71,7 +71,7 @@ $Manifest = Read-RuntimeManifest -Path $ManifestPath
   "platform",
   "arch",
   "python",
-  "binliquid_version",
+  "imperaos_version",
   "created_at_utc",
   "source_wheel",
   "source_wheel_sha256",
@@ -107,6 +107,6 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Version)) {
 }
 
 Write-Output "[verify] runtime_dir=$ResolvedRuntimeDir"
-Write-Output "[verify] binliquid_version=$($Version.Trim())"
+Write-Output "[verify] imperaos_version=$($Version.Trim())"
 Write-Output "[verify] python_exe_sha256=$ActualPythonHash"
 Write-Output "[verify] manifest=pass"

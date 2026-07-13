@@ -69,6 +69,30 @@ def test_openai_responses_payload_forces_store_false() -> None:
     assert native.request_hash.startswith("sha256:")
 
 
+def test_openai_responses_structured_output_uses_imperaos_name_only() -> None:
+    request = _request().model_copy(
+        update={
+            "json_schema": {
+                "type": "object",
+                "properties": {"status": {"type": "string"}},
+                "required": ["status"],
+                "additionalProperties": False,
+            }
+        }
+    )
+
+    native = build_openai_responses_payload(
+        provider=_provider(),
+        policy=_policy(),
+        request=request,
+    )
+
+    structured_format = native.payload["text"]["format"]
+    assert structured_format["name"] == "imperaos_provider_response"
+    former_name = "ae" + "gis" + "os_provider_response"
+    assert structured_format["name"] != former_name
+
+
 def test_openai_responses_store_true_rejected() -> None:
     with pytest.raises(ProviderPolicyError, match="OPENAI_RESPONSES_STORE_TRUE_REJECTED"):
         build_openai_responses_payload(

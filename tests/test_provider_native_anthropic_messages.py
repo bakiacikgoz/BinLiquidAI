@@ -37,7 +37,10 @@ def test_anthropic_messages_request_builder_uses_messages_contract_without_raw_p
     assert request.raw_persistence is False
     assert request.native_payload["messages"][0]["role"] == "user"
     assert request.native_payload["messages"][0]["content"][0]["type"] == "text"
-    assert request.native_payload["metadata"]["binliquid_retention"] == "hash_only_store_false"
+    metadata = request.native_payload["metadata"]
+    assert metadata["imperaos_retention"] == "hash_only_store_false"
+    former_key = "bin" + "liquid_retention"
+    assert former_key not in metadata
     assert request.native_payload["tools"][0]["execution_mode"] == "proposal_only"
     assert request.tool_policy.server_tools_policy == "denied"
     assert request.retention_policy.evidence_mode == "hash_only"

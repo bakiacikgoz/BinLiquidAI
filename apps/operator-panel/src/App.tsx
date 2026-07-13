@@ -518,7 +518,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const controlRegistry = asRecord(asRecord(computerUseState).registry);
   const runStatusValue = readString(runJob, 'status');
   const isComputerUseRun =
-    Object.keys(runComputerUse).length > 0 || readString(runJob, 'team_id') === 'aegis-computer-use';
+    Object.keys(runComputerUse).length > 0 || readString(runJob, 'team_id') === 'imperaos-computer-use';
   const linkedApprovals = pendingApprovals.filter(
     (item) => readString(asRecord(item), 'run_id') === selectedRunId,
   );
@@ -969,7 +969,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             job_id: jobId,
             request: taskForm.request,
             status: 'running',
-            team_id: 'aegis-computer-use',
+            team_id: 'imperaos-computer-use',
           },
           computer_use: {
             mode,
