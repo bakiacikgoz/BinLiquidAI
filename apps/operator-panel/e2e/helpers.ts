@@ -102,7 +102,7 @@ export async function gotoOperatorPanel(page: Page, settings: Partial<E2eSetting
   );
 
   await page.goto('/');
-  await expect(page).toHaveTitle('operator-panel');
+  await expect(page).toHaveTitle('ImperaOS Operator Panel');
   await expect(page.locator('#root')).toContainText('Mission Control');
   await expect(page.locator('.pill-preview')).toHaveText('Preview');
   await expectFrameworkOverlayAbsent(page);
