@@ -156,5 +156,60 @@ The task intentionally preserves all deferred contracts, including `.binliquid`
 state roots, `BINLIQUID_*` environment lookups, `binliquid_` metric names,
 `binliquid_core`/`binliquid_team` runtime kinds, `aegis-*` team identifiers,
 legacy schema/manifest values, provider metadata keys, and signed or historical
-evidence. Frontend/Tauri packages and resource directories, workflows, docs, and
-other later-task surfaces were not rebranded here.
+evidence. Frontend/Tauri packages and resource directories, docs, and other
+later-task surfaces were not rebranded here; active workflow automation is covered
+by the post-review correction below.
+
+## Post-review automation correction
+
+Independent review identified one Important omission: active Makefile and GitHub
+Actions automation still invoked the removed console/module name or watched the old
+Python package directory. The correction is committed as:
+
+`ac81712da4dce8914a788de48e11c99d44183ba6`
+
+with subject `fix: update automation for ImperaOS CLI`.
+
+The correction updates 76 active references across `Makefile` and eight workflow
+files, covering direct `uv run` console calls, `python -m` calls, bundled-runtime
+module probes, the compile target, and Python package-directory filters/arguments.
+It deliberately leaves `.binliquid` state paths, `BINLIQUID_*` environment keys,
+and `binliquid-runtime` Tauri resource directories unchanged.
+
+### Review-fix TDD and verification
+
+The new `tests/test_automation_distribution_identity.py` regression test scans
+`Makefile` and all workflow YAML files for only four active categories. Its RED run
+returned one failing test with 76 enumerated violations. After the automation update:
+
+| Check | Result |
+|---|---|
+| Static automation regression | 1 passed |
+| Existing workflow/static tests | 15 passed |
+| Focused Task 2.2 tests | 17 passed |
+| Full Python suite, `--basetemp C:\t\g` | 853 passed, 9 skipped |
+| Ruff on the changed Python test | all checks passed |
+| `uv lock --check` | exit 0; unchanged/current |
+| Bare `uv build` | sdist and wheel built successfully |
+| `git diff --check` | exit 0 |
+
+Generated `dist/` artifacts were removed again after the review verification.
+
+### Final inventory after review fix
+
+The final inventory was rerun after the regression test and review fix were tracked.
+Inventory mode exits 0; the audit remains intentionally `fail` for deferred work.
+
+| Metric | Original Task 2.2 report | Post-review | Delta |
+|---|---:|---:|---:|
+| Findings | 1,616 | 1,554 | -62 |
+| Legacy content matches | 1,594 | 1,532 | -62 |
+| Legacy path matches | 3 | 3 | 0 |
+| Binary metadata matches | 19 | 19 | 0 |
+| Built artifact matches | 0 | 0 | 0 |
+| Scanned files | 1,505 | 1,509 | +4 |
+
+The net inventory delta includes the newly tracked build hook, distribution test,
+Task 2.2 report, and automation regression test; the regression's literal detection
+patterns are themselves inventory-visible. The active automation guard nevertheless
+reports zero executable/module/package-directory violations.
