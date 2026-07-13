@@ -213,3 +213,58 @@ The net inventory delta includes the newly tracked build hook, distribution test
 Task 2.2 report, and automation regression test; the regression's literal detection
 patterns are themselves inventory-visible. The active automation guard nevertheless
 reports zero executable/module/package-directory violations.
+
+## Second-review bundled-runtime correction
+
+A second independent review found four workflow-called bundled-runtime scripts that
+still selected the removed wheel distribution and executed the removed Python module.
+The correction is committed as:
+
+`d25378de064e26c7213c60dc64503c8b9aeb716b`
+
+with subject `fix: update bundled runtime for ImperaOS wheel`.
+
+The build scripts now select `imperaos-*.whl`, report ImperaOS wheel names, and
+validate the bundled runtime with `-m imperaos`. The macOS and Windows verification
+scripts use the same module probe. Their generated release-gate hints also show the
+working ImperaOS module command.
+
+The correction deliberately preserves the resource directory `binliquid-runtime`,
+the manifest field `binliquid_version`, and the `BINLIQUID_*` environment-variable
+contract, along with every other identifier deferred to later rebrand tasks.
+
+### Second-review TDD and verification
+
+The existing automation regression was extended first to scan the four runtime
+scripts and detect old wheel globs/wording plus old module commands. Its RED run
+failed with 17 enumerated violations: two wheel globs, three wheel-branding messages,
+and twelve module probes or hints. None of the deliberately preserved identifiers
+matched. After the minimal script edits, the guard passed.
+
+| Check | Result |
+|---|---|
+| Static automation regression | 1 passed |
+| Workflow/static aggregate | 14 passed |
+| Focused Task 2.2 aggregate | 17 passed |
+| Windows runtime-script PowerShell parse | pass, zero AST parse errors |
+| Full Python suite, `--basetemp C:\t\i` | 853 passed, 9 skipped, exit 0 in 81.8 seconds |
+| Ruff on the changed Python test | all checks passed |
+| `uv lock --check` | exit 0; 75 packages resolved, lock unchanged/current |
+| Bare `uv build` | `imperaos-0.4.1` sdist and wheel built successfully |
+| `git diff --check` | exit 0 |
+
+The generated `dist/` directory was removed after verification.
+
+### Final inventory after second review
+
+Inventory mode exits 0 and the audit remains intentionally `fail` for deferred work.
+The final tracked-state metrics are:
+
+| Metric | First review | Second review | Delta |
+|---|---:|---:|---:|
+| Findings | 1,554 | 1,541 | -13 |
+| Legacy content matches | 1,532 | 1,519 | -13 |
+| Legacy path matches | 3 | 3 | 0 |
+| Binary metadata matches | 19 | 19 | 0 |
+| Built artifact matches | 0 | 0 | 0 |
+| Scanned files | 1,509 | 1,509 | 0 |
