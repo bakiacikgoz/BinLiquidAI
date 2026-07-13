@@ -85,6 +85,39 @@ Inventory mode intentionally remains `status=fail` for later rebrand work.
 The implementation commit alone had 1,269 findings and 1,247 content matches; the single
 deferred-token documentation line above is inventory-visible in this report.
 
+## Review remediation
+
+Review follow-up commit `4bbbae47ce564808ccbaa4b6721b1e97b6c91391` updates the two
+active Operator Panel preview fixtures to the canonical state root and makes integration
+gate repository copies exclude both the retired and current state-root directories.
+
+The fixes were test-driven:
+
+1. The new Vitest serialization regression first failed because preview payloads still
+   contained the retired root. After the fixture update, the focused test passed and also
+   proved a custom team root is substituted into run summary/detail payloads.
+2. The Python copy sentinel first failed because the retired state directory was copied.
+   After extending the ignore set, the selected copy test passed; the retired spelling is
+   assembled from parts in both production and test code.
+
+Review verification:
+
+| Check | Result |
+|---|---|
+| Operator Panel preview/settings/bridge/app/control-plane Vitest selection | 40 passed |
+| Runtime/config/platform/integration/contracts Python selection | 56 passed |
+| Complete Python suite with `--basetemp C:\\p31rev` | 886 passed, 9 skipped; exit 0 in 80.46s |
+| Ruff on the changed Python script and test | all checks passed |
+| Rust | not rerun; no Rust source or manifest changed |
+| `git diff --check` and staged deferred-token guard | pass |
+| Active state-path guard including contract fixtures | pass |
+| Worktree state-root presence after scoped cleanup | false |
+
+The committed review inventory is 1,254 total findings: 1,232 content, 3 path,
+19 binary metadata, 0 built artifacts, across 1,513 scanned files. Relative to the
+pre-review Task 3.1 state, this is 16 fewer total/content findings and one additional
+scanned regression-test file; relative to the 1,542 baseline it is a reduction of 288.
+
 ## Final repository state
 
 After the report commit, `git status --short` produced no output. Both worktree state-root
