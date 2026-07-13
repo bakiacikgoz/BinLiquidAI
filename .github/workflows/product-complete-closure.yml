@@ -22,8 +22,8 @@ jobs:
       - name: Product-complete Python tests
         run: |
           uv run --extra dev ruff check \
-            binliquid/cli.py \
-            binliquid/release/product_complete.py \
+            imperaos/cli.py \
+            imperaos/release/product_complete.py \
             scripts/run_product_complete_scope_gate.py \
             scripts/run_assistant_real_runtime_gate.py \
             scripts/run_first_run_readiness_gate.py \
