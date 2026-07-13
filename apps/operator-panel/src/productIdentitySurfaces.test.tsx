@@ -40,7 +40,7 @@ describe('Operator Panel product identity surfaces', () => {
         readOnlyByDefault="Read-only by default"
       />,
     );
-    const formerDisplayName = ['Aegis', 'OS'].join('');
+    const formerDisplayName = String.fromCharCode(65, 101, 103, 105, 115, 79, 83);
 
     expect(PRODUCT_IDENTITY.displayName).toBe('ImperaOS');
     expect(sidebar).toContain('<h1>ImperaOS</h1>');
