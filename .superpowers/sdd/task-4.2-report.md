@@ -21,6 +21,63 @@ Implementation commit:
 `22f1f186449d4e91b3b9556aa66278b2eddf433f` —
 `refactor: migrate serialized contracts to ImperaOS`
 
+Post-review hardening commit:
+
+`a3e6ae2c3e32a5fb3c1823c4747061ebf32f907f` —
+`fix: harden serialized contract validation`
+
+## Post-review hardening
+
+Review found two fail-open edges, both corrected with behavior-first tests:
+
+- Windows release-gate manifests now reject duplicate, unknown, extra, blank,
+  and former version keys through an exact allowed-key set. Windows and macOS
+  platform verifiers enforce their exact platform-specific key sets and compare
+  the manifest `imperaos_version` with the actual bundled
+  `python -m imperaos --version` output.
+- Assistant stream normalization no longer defaults a missing contract version.
+  Missing or non-`3.0` events normalize to `null`; the mapper returns the exact
+  previous state object before cloning or mutation.
+
+Review RED evidence:
+
+```text
+uv run pytest \
+  tests/test_windows_release_gate.py::test_runtime_manifest_rejects_extra_former_version_key \
+  tests/test_windows_release_gate.py::test_runtime_manifest_rejects_duplicate_canonical_key \
+  tests/test_serialized_contract_identity.py::test_platform_verifiers_enforce_exact_keys_and_runtime_version_match -q
+3 failed
+
+corepack pnpm@10.29.2 exec vitest run src/assistant/assistantMappers.test.ts
+5 passed; 2 failed
+```
+
+The release gate accepted both invalid manifests. The mapper converted a
+missing version to `3.0` and accepted the dynamically constructed former
+version.
+
+Review GREEN evidence:
+
+```text
+uv run pytest tests/test_windows_release_gate.py \
+  tests/test_serialized_contract_identity.py -q
+38 passed
+
+corepack pnpm@10.29.2 exec vitest run \
+  src/assistant/assistantMappers.test.ts \
+  src/assistant/useAssistantSession.test.tsx \
+  src/bridge.test.ts src/bridge.tauri.test.ts
+4 files passed; 36 tests passed
+
+corepack pnpm@10.29.2 build
+exit 0
+
+PowerShell AST parse and function-definition-before-invocation guard
+pass
+```
+
+Changed Python Ruff, focused ESLint, and `git diff --check` also pass.
+
 ## TDD evidence
 
 Tests were changed before production code.
@@ -169,8 +226,11 @@ Unrelated generic `2.0` values were deliberately preserved:
 ## Historical preservation and scans
 
 The preflight task-specific inventory contained 217 candidate lines across 68
-files. Final tracked former branded-contract scan has seven residual lines in
-five files only:
+files. That scan and the final residual scan explicitly exclude
+`.superpowers/sdd/**` prior task briefs/reports to avoid classifying immutable,
+self-referential process records as active product contracts. Within the
+operational tracked tree, the final former branded-contract scan has seven
+residual lines in five files only:
 
 - two generated attestation-schema lines assigned to Task 4.3;
 - five immutable Windows release/finalization/signed evidence report lines.
