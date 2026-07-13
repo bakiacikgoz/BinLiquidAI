@@ -8,6 +8,7 @@ import {
   isOperatorIdValid,
   loadSettings,
   resolveLocale,
+  saveSettings,
   validateAssistantRuntimeSettings,
 } from './settings';
 
@@ -16,6 +17,19 @@ beforeEach(() => {
 });
 
 describe('operator id validation', () => {
+  it('uses only the canonical ImperaOS browser settings namespace', () => {
+    const formerKey = ['aegis', 'os.operator.settings.v1'].join('');
+    localStorage.setItem(formerKey, JSON.stringify({ ...DEFAULT_SETTINGS, profile: 'strict' }));
+
+    expect(SETTINGS_KEY).toBe('imperaos.operator.settings.v1');
+    expect(loadSettings().profile).toBe(DEFAULT_SETTINGS.profile);
+
+    const nextSettings = { ...DEFAULT_SETTINGS, profile: 'fast' };
+    saveSettings(nextSettings);
+    expect(JSON.parse(localStorage.getItem('imperaos.operator.settings.v1') ?? '{}')).toEqual(nextSettings);
+    expect(localStorage.getItem(formerKey)).not.toBeNull();
+  });
+
   it('accepts expected format', () => {
     expect(isOperatorIdValid('ops-team_01')).toBe(true);
   });

@@ -1,3 +1,5 @@
+import { PRODUCT_IDENTITY } from './productIdentity';
+
 export type CoreMode = 'auto' | 'external' | 'bundled';
 export type LocaleMode = 'auto' | 'en' | 'tr';
 export type UpdaterMode = 'off' | 'manual' | 'auto';
@@ -30,7 +32,7 @@ export interface PanelSettings {
   assistantDeepSeekApiKey: string;
 }
 
-export const SETTINGS_KEY = 'aegisos.operator.settings.v1';
+export const SETTINGS_KEY = `${PRODUCT_IDENTITY.slug}.operator.settings.v1`;
 
 export const DEFAULT_ASSISTANT_RUNTIME_SETTINGS: AssistantRuntimeSettings = {
   assistantProvider: '',

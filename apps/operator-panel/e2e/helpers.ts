@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SETTINGS_KEY = 'aegisos.operator.settings.v1';
+const SETTINGS_KEY = 'imperaos.operator.settings.v1';
 const REPO_ROOT = findRepoRoot(process.cwd());
 
 type E2eSettings = {

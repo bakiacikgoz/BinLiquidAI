@@ -57,7 +57,7 @@ describe('bridge preview fallback', () => {
       submitComputerUseRun(
         { ...DEFAULT_SETTINGS },
         {
-          request: 'open "https://preview.aegis.local/form"',
+          request: 'open "https://preview.imperaos.local/form"',
           mode: 'step_approval',
           runtime: 'vision-first',
         },

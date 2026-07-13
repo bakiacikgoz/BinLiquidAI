@@ -403,7 +403,7 @@ function approvalRequiredState(): AssistantSessionState {
   turn.assistantMessage.proposedAction = {
     id: 'click_start_button',
     title: 'Click preview form start button',
-    target: 'safari:Aegis Preview Form / #start',
+    target: 'safari:ImperaOS Preview Form / #start',
     risk: 'medium',
     dryRunSummary: 'Dry-run verified that the target is visible. Execution remains approval-gated.',
     commandPreview: 'computer-use action click --target #start',

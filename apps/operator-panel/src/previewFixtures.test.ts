@@ -11,10 +11,24 @@ import {
   previewRunReplay,
   previewRunSummary,
   previewSubmitResponse,
+  previewTailEvents,
 } from './previewFixtures';
 import { DEFAULT_SETTINGS } from './settings';
 
 describe('preview runtime paths', () => {
+  it('uses ImperaOS preview hosts, windows, and team identifiers', () => {
+    const settings = { ...DEFAULT_SETTINGS, rootDir: '.imperaos/preview/jobs' };
+    const serialized = JSON.stringify([previewRunDetail(settings), previewTailEvents()]);
+    const formerHost = ['preview.', 'aegis', '.local'].join('');
+    const formerWindowTitle = ['Aegis', ' Preview Form'].join('');
+
+    expect(serialized).toContain('imperaos-computer-use');
+    expect(serialized).toContain('https://preview.imperaos.local/form');
+    expect(serialized).toContain('ImperaOS Preview Form');
+    expect(serialized).not.toContain(formerHost);
+    expect(serialized).not.toContain(formerWindowTitle);
+  });
+
   it('uses the canonical ImperaOS team runtime kind', () => {
     const agentList = previewControlPlaneAgentList();
 

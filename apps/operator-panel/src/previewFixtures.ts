@@ -95,7 +95,7 @@ function previewComputerUseStatus(settings: PanelSettings, jobId?: string) {
   };
   job.job_id = resolvedJobId;
   job.team_id = 'imperaos-computer-use';
-  job.request = job.request || 'open "https://preview.aegis.local/form"\nclick "#start"\ntype "Preview operator" into "#name"';
+  job.request = job.request || 'open "https://preview.imperaos.local/form"\nclick "#start"\ntype "Preview operator" into "#name"';
   job.status = 'blocked';
   runPayload.computer_use = {
     mode: 'step_approval',
@@ -103,9 +103,9 @@ function previewComputerUseStatus(settings: PanelSettings, jobId?: string) {
     lifecycle_state: 'awaiting_approval',
     stage: 'require_approval',
     active_action: 'click',
-    current_url: 'https://preview.aegis.local/form',
+    current_url: 'https://preview.imperaos.local/form',
     active_app: 'browser:safari',
-    active_window: 'safari:Aegis Preview Form',
+    active_window: 'safari:ImperaOS Preview Form',
     pending_approval_id: 'apr_20260308_device_action',
     paused: true,
     stopped: false,
@@ -116,7 +116,7 @@ function previewComputerUseStatus(settings: PanelSettings, jobId?: string) {
     last_control_command: lastControlCommand,
     last_control_result: lastControlResult,
     last_processed_command_id: 'ctrl-preview-resume',
-    last_verified_effect: 'Open https://preview.aegis.local/form.',
+    last_verified_effect: 'Open https://preview.imperaos.local/form.',
     last_error: null,
     last_verification_result: {
       verified: true,
@@ -135,17 +135,17 @@ function previewComputerUseStatus(settings: PanelSettings, jobId?: string) {
       last_known_status: 'blocked',
       execution_state: 'awaiting_approval',
       active_window: {
-        window_identity: 'safari:Aegis Preview Form',
+        window_identity: 'safari:ImperaOS Preview Form',
         app_identity: 'browser:safari',
         surface_kind: 'browser',
         focused: true,
       },
       open_windows: [],
       active_application_identity: 'browser:safari',
-      active_surface: 'browser:safari:https://preview.aegis.local/form',
-      focused_window_title: 'Aegis Preview Form',
-      current_url: 'https://preview.aegis.local/form',
-      browser_tab_title: 'Aegis Preview Form',
+      active_surface: 'browser:safari:https://preview.imperaos.local/form',
+      focused_window_title: 'ImperaOS Preview Form',
+      current_url: 'https://preview.imperaos.local/form',
+      browser_tab_title: 'ImperaOS Preview Form',
       observed_targets: [],
       visible_target_set: ['#start', '#name', '#resume'],
       changed_resources: [],
@@ -158,7 +158,7 @@ function previewComputerUseStatus(settings: PanelSettings, jobId?: string) {
       },
       filesystem_result_set: [],
       last_completed_action: 'open_url',
-      last_verified_effect: 'Open https://preview.aegis.local/form.',
+      last_verified_effect: 'Open https://preview.imperaos.local/form.',
       last_verification_result: {
         verified: true,
         summary: 'Verified the preview form URL before requesting approval.',
@@ -401,8 +401,8 @@ export function previewTailEvents() {
       status_after: 'running',
       data: {
         action_id: 'open_url',
-        current_url: 'https://preview.aegis.local/form',
-        window_identity: 'safari:Aegis Preview Form',
+        current_url: 'https://preview.imperaos.local/form',
+        window_identity: 'safari:ImperaOS Preview Form',
       },
     },
     {

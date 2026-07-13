@@ -6,9 +6,9 @@ import { DEFAULT_ASSISTANT_RUNTIME_SETTINGS } from '../../settings';
 import { AssistantView, type AssistantViewCopy } from './AssistantView';
 
 const copy: AssistantViewCopy = {
-  title: 'AegisOS Assistant',
+  title: 'ImperaOS Assistant',
   subtitle: 'Ask about systems, runs, logs, policies, approvals, and artifacts.',
-  welcomeTitle: 'Welcome to AegisOS Assistant',
+  welcomeTitle: 'Welcome to ImperaOS Assistant',
   badgeLabel: 'Governed assistant',
   newChat: 'New Chat',
   messageLabel: 'Message',
@@ -54,7 +54,7 @@ describe('AssistantView', () => {
       <AssistantView copy={copy} state={getAssistantFixture('welcome')} {...requiredActionProps} />,
     );
 
-    expect(html).toContain('Welcome to AegisOS Assistant');
+    expect(html).toContain('Welcome to ImperaOS Assistant');
     expect(html).toContain('Read-only by default');
     expect(html).toContain('Referenced runs');
     expect(html).not.toContain('Summarize recent errors');

@@ -1,4 +1,4 @@
-import canonicalProductIdentity from "../../../branding/identity.json";
+import canonicalProductIdentity from "../../../branding/identity.json" with { type: "json" };
 
 export type ProductIdentity = Readonly<{
   displayName: string;
