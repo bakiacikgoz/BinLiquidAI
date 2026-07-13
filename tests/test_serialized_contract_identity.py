@@ -52,7 +52,7 @@ def test_runtime_manifest_scripts_use_only_imperaos_version_field() -> None:
         assert former_field not in source, path
 
 
-def test_platform_verifiers_enforce_exact_keys_and_runtime_version_match() -> None:
+def test_platform_verifiers_delegate_after_reading_actual_runtime_version() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     windows_source = (
         repo_root / "apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1"
@@ -61,10 +61,9 @@ def test_platform_verifiers_enforce_exact_keys_and_runtime_version_match() -> No
         repo_root / "apps/operator-panel/scripts/verify_bundled_runtime_macos.sh"
     ).read_text(encoding="utf-8")
 
-    assert "Assert-ExactManifestKeys" in windows_source
-    assert windows_source.index("function Assert-ExactManifestKeys") < windows_source.index(
-        "Assert-ExactManifestKeys -Manifest"
+    assert windows_source.index("$ActualVersion =") < windows_source.index(
+        "& $RuntimePython $ManifestValidator"
     )
-    assert "$ActualVersion -ne $ManifestVersion" in windows_source
-    assert "manifest key set mismatch" in macos_source
-    assert '[[ "${RUNTIME_VERSION}" != "${MANIFEST_VERSION}" ]]' in macos_source
+    assert macos_source.index('RUNTIME_VERSION="$(') < macos_source.index(
+        '"${RUNTIME_PYTHON}" "${MANIFEST_VALIDATOR}"'
+    )
