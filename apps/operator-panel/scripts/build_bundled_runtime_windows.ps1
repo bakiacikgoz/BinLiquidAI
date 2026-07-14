@@ -44,7 +44,7 @@ function Get-FileSha256 {
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $ScriptDir "..\..\..")).Path
 $AppDir = Join-Path $RepoRoot "apps\operator-panel"
-$RuntimeDir = Join-Path $AppDir "src-tauri\resources\binliquid-runtime"
+$RuntimeDir = Join-Path $AppDir "src-tauri\resources\imperaos-runtime"
 $RuntimeParent = Split-Path -Parent $RuntimeDir
 $RuntimePythonDir = Join-Path $RuntimeDir "python"
 $RuntimePython = Join-Path $RuntimePythonDir "Scripts\python.exe"
@@ -128,10 +128,11 @@ $manifest = @(
   "uv_lock_sha256=$UvLockHash",
   "git_sha=$GitSha"
 )
-$manifest | Set-Content -LiteralPath (Join-Path $RuntimeDir "RUNTIME_MANIFEST.txt") -Encoding utf8
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllLines((Join-Path $RuntimeDir "RUNTIME_MANIFEST.txt"), $manifest, $Utf8NoBom)
 
 @"
-Generated Windows runtime bundle for AegisOS Operator Panel.
+Generated Windows runtime bundle for ImperaOS Operator Panel.
 
 Release gate:
 1) python/Scripts/python.exe exists

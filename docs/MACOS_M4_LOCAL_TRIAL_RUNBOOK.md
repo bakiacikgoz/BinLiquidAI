@@ -107,8 +107,8 @@ make macos-bundled-runtime-gate
 This builds and verifies:
 
 ```text
-apps/operator-panel/src-tauri/resources/binliquid-runtime/RUNTIME_MANIFEST.txt
-apps/operator-panel/src-tauri/resources/binliquid-runtime/python/bin/python
+apps/operator-panel/src-tauri/resources/imperaos-runtime/RUNTIME_MANIFEST.txt
+apps/operator-panel/src-tauri/resources/imperaos-runtime/python/bin/python
 ```
 
 Generated runtime contents are build artifacts and should not be committed.
@@ -118,7 +118,7 @@ Generated runtime contents are build artifacts and should not be committed.
 Default local trial must keep live desktop automation closed:
 
 ```bash
-uv run python -m binliquid computer-use doctor --json
+uv run python -m imperaos computer-use doctor --json
 ```
 
 Expected local trial posture:

@@ -212,7 +212,7 @@ jobs:
 
       - name: Verify bundled runtime gate
         run: |
-          RUNTIME_ROOT="apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          RUNTIME_ROOT="apps/operator-panel/src-tauri/resources/imperaos-runtime"
           test -f "${RUNTIME_ROOT}/RUNTIME_MANIFEST.txt"
           test -f "${RUNTIME_ROOT}/README.txt"
           test -x "${RUNTIME_ROOT}/python/bin/python"

@@ -92,9 +92,9 @@ Treat `conditional` as expected until real human sign-off files verify. Do not p
 - [ ] `pnpm --dir apps/operator-panel build` PASS on Windows
 - [ ] `cargo test -q --manifest-path apps/operator-panel/src-tauri/Cargo.toml` PASS on Windows
 - [ ] `pwsh apps/operator-panel/scripts/build_bundled_runtime_windows.ps1 -Arch x64` PASS
-- [ ] `pwsh apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1 -RuntimeDir apps/operator-panel/src-tauri/resources/binliquid-runtime` PASS
-- [ ] `apps/operator-panel/src-tauri/resources/binliquid-runtime/python/Scripts/python.exe -m binliquid --version` PASS
-- [ ] `apps/operator-panel/src-tauri/resources/binliquid-runtime/RUNTIME_MANIFEST.txt` exists and includes SHA256 evidence
+- [ ] `pwsh apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1 -RuntimeDir apps/operator-panel/src-tauri/resources/imperaos-runtime` PASS
+- [ ] `apps/operator-panel/src-tauri/resources/imperaos-runtime/python/Scripts/python.exe -m imperaos --version` PASS
+- [ ] `apps/operator-panel/src-tauri/resources/imperaos-runtime/RUNTIME_MANIFEST.txt` exists and includes SHA256 evidence
 - [ ] `pnpm --dir apps/operator-panel exec tauri build --debug --no-bundle` PASS
 - [ ] Windows CI uploads `artifacts/windows-ci-evidence/**`
 - [ ] Windows release workflow writes `windows-release-status.json`

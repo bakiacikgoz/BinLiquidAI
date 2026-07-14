@@ -32,7 +32,7 @@
       "dmg"
     ],
     "resources": [
-      "resources/binliquid-runtime/"
+      "resources/imperaos-runtime/"
     ],
     "icon": [
       "icons/32x32.png",

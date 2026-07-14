@@ -115,7 +115,7 @@ jobs:
       - name: Verify bundled runtime
         shell: pwsh
         run: |
-          $runtime = "apps/operator-panel/src-tauri/resources/binliquid-runtime"
+          $runtime = "apps/operator-panel/src-tauri/resources/imperaos-runtime"
           pwsh apps/operator-panel/scripts/verify_bundled_runtime_windows.ps1 -RuntimeDir $runtime |
             Tee-Object -FilePath artifacts/windows-ci-evidence/runtime_verify.txt
           Copy-Item "$runtime/RUNTIME_MANIFEST.txt" artifacts/windows-ci-evidence/runtime_manifest.txt
@@ -126,8 +126,8 @@ jobs:
           $items = @(
             "apps/operator-panel/src-tauri/tauri.conf.json",
             "apps/operator-panel/src-tauri/tauri.windows.conf.json",
-            "apps/operator-panel/src-tauri/resources/binliquid-runtime/RUNTIME_MANIFEST.txt",
-            "apps/operator-panel/src-tauri/resources/binliquid-runtime/python/Scripts/python.exe"
+            "apps/operator-panel/src-tauri/resources/imperaos-runtime/RUNTIME_MANIFEST.txt",
+            "apps/operator-panel/src-tauri/resources/imperaos-runtime/python/Scripts/python.exe"
           )
           $hashes = foreach ($item in $items) {
             if (Test-Path -LiteralPath $item -PathType Leaf) {

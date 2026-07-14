@@ -2372,9 +2372,9 @@ fn default_bundled_python_path() -> Option<PathBuf> {
 
 fn bundled_python_relative_path() -> &'static str {
     if cfg!(windows) {
-        "binliquid-runtime/python/Scripts/python.exe"
+        "imperaos-runtime/python/Scripts/python.exe"
     } else {
-        "binliquid-runtime/python/bin/python"
+        "imperaos-runtime/python/bin/python"
     }
 }
 
@@ -3506,9 +3506,9 @@ mod tests {
     fn bundled_python_relative_path_matches_platform() {
         let path = bundled_python_relative_path();
         if cfg!(windows) {
-            assert_eq!(path, "binliquid-runtime/python/Scripts/python.exe");
+            assert_eq!(path, "imperaos-runtime/python/Scripts/python.exe");
         } else {
-            assert_eq!(path, "binliquid-runtime/python/bin/python");
+            assert_eq!(path, "imperaos-runtime/python/bin/python");
         }
     }
 

@@ -199,7 +199,7 @@ if ($AppExe) {
     }
   }
 
-  $resourceRoot = Join-Path (Split-Path -Parent $AppExe) "resources\binliquid-runtime"
+  $resourceRoot = Join-Path (Split-Path -Parent $AppExe) "resources\imperaos-runtime"
   $runtimePython = Join-Path $resourceRoot "python\Scripts\python.exe"
   if (Test-Path -LiteralPath $runtimePython -PathType Leaf) {
     & $runtimePython -m imperaos --version | Set-Content -LiteralPath (Join-Path $OutputDir "imperaos-version.txt")

@@ -4,7 +4,7 @@ set -euo pipefail
 ARCH="${1:-$(uname -m)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-RUNTIME_DIR="${REPO_ROOT}/apps/operator-panel/src-tauri/resources/binliquid-runtime"
+RUNTIME_DIR="${REPO_ROOT}/apps/operator-panel/src-tauri/resources/imperaos-runtime"
 MANIFEST="${RUNTIME_DIR}/RUNTIME_MANIFEST.txt"
 RUNTIME_PYTHON="${RUNTIME_DIR}/python/bin/python"
 MANIFEST_VALIDATOR="${SCRIPT_DIR}/validate_runtime_manifest.py"

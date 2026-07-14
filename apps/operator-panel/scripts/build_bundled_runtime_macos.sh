@@ -5,7 +5,7 @@ ARCH="${1:-$(uname -m)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 APP_DIR="${REPO_ROOT}/apps/operator-panel"
-RUNTIME_DIR="${APP_DIR}/src-tauri/resources/binliquid-runtime"
+RUNTIME_DIR="${APP_DIR}/src-tauri/resources/imperaos-runtime"
 DIST_DIR="${REPO_ROOT}/dist"
 PYTHON_BIN="${PYTHON_BIN:-python3.11}"
 WHEEL_PATH="${WHEEL_PATH:-}"
@@ -98,7 +98,7 @@ built_at_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EOF
 
 cat > "${RUNTIME_DIR}/README.txt" <<'EOF'
-Generated runtime bundle location for AegisOS Operator Panel.
+Generated runtime bundle location for ImperaOS Operator Panel.
 
 Release gate:
 1) python/bin/python is executable on macOS bundles
