@@ -58,12 +58,22 @@ def _binary_review_manifest(entries: list[tuple[str, str]]) -> str:
     )
 
 
+def _artifact_review_manifest(entries: list[tuple[str, str]]) -> str:
+    return json.dumps(
+        {
+            "schemaVersion": "imperaos.reviewed-built-artifacts/v1",
+            "artifacts": [{"path": path, "sha256": sha256} for path, sha256 in entries],
+        }
+    )
+
+
 def _run_gate(
     repo: Path,
     output_root: Path,
     *,
     mode: str,
     artifact_roots: tuple[Path, ...] = (),
+    reviewed_artifact_manifest: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     assert GIT is not None, "git is required for the brand consistency gate tests"
@@ -81,6 +91,8 @@ def _run_gate(
     ]
     for artifact_root in artifact_roots:
         command.extend(("--artifact-root", str(artifact_root)))
+    if reviewed_artifact_manifest is not None:
+        command.extend(("--reviewed-artifact-manifest", str(reviewed_artifact_manifest)))
     return subprocess.run(command, capture_output=True, text=True, env=env)
 
 
@@ -252,10 +264,95 @@ def test_artifact_mode_scans_untracked_build_outputs(tmp_path: Path) -> None:
     assert report["status"] == "fail"
     assert report["builtArtifactMatchCount"] == 3
     assert all(item["kind"] == "built_artifact" for item in report["findings"])
-    assert {item["classification"] for item in report["findings"]} == {
-        "blocking",
-        "manual_review",
-    }
+    assert {item["classification"] for item in report["findings"]} == {"blocking"}
+
+
+def test_artifact_mode_fails_closed_until_binary_hash_is_reviewed(tmp_path: Path) -> None:
+    repo = _tracked_repo(tmp_path, {"README.md": "ImperaOS"})
+    artifact_root = tmp_path / "dist"
+    artifact_root.mkdir()
+    binary = b"\x00\x01\x02"
+    (artifact_root / "application.bin").write_bytes(binary)
+
+    unknown_output = tmp_path / "unknown-report"
+    unknown = _run_gate(
+        repo,
+        unknown_output,
+        mode="artifacts",
+        artifact_roots=(artifact_root,),
+    )
+
+    assert unknown.returncode == 1
+    unknown_report = _report(unknown_output)
+    assert unknown_report["status"] == "fail"
+    assert unknown_report["findings"][0]["token"] == "<unreviewed-built-artifact>"
+
+    manifest = tmp_path / "reviewed-artifacts.json"
+    manifest.write_text(
+        _artifact_review_manifest(
+            [("dist/application.bin", hashlib.sha256(binary).hexdigest())]
+        ),
+        encoding="utf-8",
+    )
+    reviewed_output = tmp_path / "reviewed-report"
+    reviewed = _run_gate(
+        repo,
+        reviewed_output,
+        mode="artifacts",
+        artifact_roots=(artifact_root,),
+        reviewed_artifact_manifest=manifest,
+    )
+
+    assert reviewed.returncode == 0, reviewed.stderr
+    reviewed_report = _report(reviewed_output)
+    assert reviewed_report["status"] == "pass"
+    assert reviewed_report["findings"] == []
+
+
+def test_artifact_mode_blocks_drift_stale_and_invalid_review_entries(tmp_path: Path) -> None:
+    repo = _tracked_repo(tmp_path, {"README.md": "ImperaOS"})
+    artifact_root = tmp_path / "dist"
+    artifact_root.mkdir()
+    (artifact_root / "application.bin").write_bytes(b"\x00\x01\x02")
+
+    cases = (
+        (
+            "drift",
+            _artifact_review_manifest(
+                [("dist/application.bin", hashlib.sha256(b"different").hexdigest())]
+            ),
+            "<reviewed-built-artifact-mismatch>",
+        ),
+        (
+            "stale",
+            _artifact_review_manifest(
+                [("dist/missing.bin", hashlib.sha256(b"missing").hexdigest())]
+            ),
+            "<stale-reviewed-built-artifact>",
+        ),
+        (
+            "invalid",
+            json.dumps({"schemaVersion": "invalid", "artifacts": []}),
+            "<invalid-reviewed-artifact-manifest>",
+        ),
+    )
+
+    for name, manifest_content, expected_token in cases:
+        manifest = tmp_path / f"{name}.json"
+        manifest.write_text(manifest_content, encoding="utf-8")
+        output_root = tmp_path / f"{name}-report"
+        result = _run_gate(
+            repo,
+            output_root,
+            mode="artifacts",
+            artifact_roots=(artifact_root,),
+            reviewed_artifact_manifest=manifest,
+        )
+
+        assert result.returncode == 1
+        report = _report(output_root)
+        assert report["status"] == "fail"
+        assert any(item["token"] == expected_token for item in report["findings"])
 
 
 def test_report_schema_is_strict_and_accepts_generated_report(tmp_path: Path) -> None:

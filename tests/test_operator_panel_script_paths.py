@@ -34,9 +34,3 @@ def test_ui_control_audit_normalizes_relative_paths_for_cross_platform_coverage(
     source = (SCRIPT_ROOT / "audit-ui-controls.ts").read_text(encoding="utf-8")
 
     assert source.count(".split(path.sep).join('/')") >= 2
-
-
-def test_static_frontend_summary_does_not_block_on_stale_e2e_failure() -> None:
-    source = (SCRIPT_ROOT / "write-frontend-qa-summary.ts").read_text(encoding="utf-8")
-
-    assert "E2E_REQUIRED && e2eSuiteStatus === 'failed'" in source

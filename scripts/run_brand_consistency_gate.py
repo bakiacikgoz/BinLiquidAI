@@ -43,6 +43,7 @@ FORBIDDEN_TOKENS = tuple(
 )
 REVIEWED_BINARY_ASSETS_PATH = "branding/reviewed_binary_assets.json"
 REVIEWED_BINARY_ASSETS_SCHEMA_VERSION = "imperaos.reviewed-binary-assets/v1"
+REVIEWED_BUILT_ARTIFACTS_SCHEMA_VERSION = "imperaos.reviewed-built-artifacts/v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +164,44 @@ def _binary_review_finding(
     )
 
 
+def _artifact_review_finding(
+    *,
+    path: str,
+    token: str,
+    sha256: str | None,
+) -> BrandAuditFinding:
+    return BrandAuditFinding(
+        path=path,
+        kind="built_artifact",
+        token=token,
+        line=None,
+        classification="blocking",
+        sha256=sha256,
+    )
+
+
+def _valid_review_entry(
+    *,
+    relative_path: object,
+    sha256: object,
+    reviewed: dict[str, str],
+    reserved_path: str | None = None,
+) -> bool:
+    return bool(
+        isinstance(relative_path, str)
+        and relative_path
+        and "\\" not in relative_path
+        and not PurePosixPath(relative_path).is_absolute()
+        and not any(part in {"", ".", ".."} for part in relative_path.split("/"))
+        and relative_path != reserved_path
+        and relative_path not in reviewed
+        and isinstance(sha256, str)
+        and len(sha256) == 64
+        and sha256 == sha256.lower()
+        and all(character in "0123456789abcdef" for character in sha256)
+    )
+
+
 def _load_reviewed_binary_assets(
     root: Path,
     tracked_paths: tuple[str, ...],
@@ -204,21 +243,16 @@ def _load_reviewed_binary_assets(
             break
         relative_path = entry.get("path")
         sha256 = entry.get("sha256")
-        if (
-            not isinstance(relative_path, str)
-            or not relative_path
-            or "\\" in relative_path
-            or PurePosixPath(relative_path).is_absolute()
-            or any(part in {"", ".", ".."} for part in relative_path.split("/"))
-            or relative_path == REVIEWED_BINARY_ASSETS_PATH
-            or relative_path in reviewed
-            or not isinstance(sha256, str)
-            or len(sha256) != 64
-            or sha256 != sha256.lower()
-            or any(character not in "0123456789abcdef" for character in sha256)
+        if not _valid_review_entry(
+            relative_path=relative_path,
+            sha256=sha256,
+            reviewed=reviewed,
+            reserved_path=REVIEWED_BINARY_ASSETS_PATH,
         ):
             reviewed = {}
             break
+        assert isinstance(relative_path, str)
+        assert isinstance(sha256, str)
         reviewed[relative_path] = sha256
 
     if not reviewed and payload["assets"]:
@@ -226,6 +260,71 @@ def _load_reviewed_binary_assets(
             _binary_review_finding(
                 path=REVIEWED_BINARY_ASSETS_PATH,
                 token="<invalid-binary-review-manifest>",
+                sha256=_sha256(data),
+            )
+        ]
+    return reviewed, []
+
+
+def _load_reviewed_built_artifacts(
+    manifest_path: Path | None,
+) -> tuple[dict[str, str], list[BrandAuditFinding]]:
+    if manifest_path is None:
+        return {}, []
+
+    manifest_path = manifest_path.resolve()
+    try:
+        data = manifest_path.read_bytes()
+    except OSError:
+        return {}, [
+            _artifact_review_finding(
+                path=manifest_path.name,
+                token="<invalid-reviewed-artifact-manifest>",
+                sha256=None,
+            )
+        ]
+    try:
+        payload = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        payload = None
+
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != {"schemaVersion", "artifacts"}
+        or payload.get("schemaVersion") != REVIEWED_BUILT_ARTIFACTS_SCHEMA_VERSION
+        or not isinstance(payload.get("artifacts"), list)
+    ):
+        return {}, [
+            _artifact_review_finding(
+                path=manifest_path.name,
+                token="<invalid-reviewed-artifact-manifest>",
+                sha256=_sha256(data),
+            )
+        ]
+
+    reviewed: dict[str, str] = {}
+    for entry in payload["artifacts"]:
+        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
+            reviewed = {}
+            break
+        relative_path = entry.get("path")
+        sha256 = entry.get("sha256")
+        if not _valid_review_entry(
+            relative_path=relative_path,
+            sha256=sha256,
+            reviewed=reviewed,
+        ):
+            reviewed = {}
+            break
+        assert isinstance(relative_path, str)
+        assert isinstance(sha256, str)
+        reviewed[relative_path] = sha256
+
+    if not reviewed and payload["artifacts"]:
+        return {}, [
+            _artifact_review_finding(
+                path=manifest_path.name,
+                token="<invalid-reviewed-artifact-manifest>",
                 sha256=_sha256(data),
             )
         ]
@@ -353,9 +452,11 @@ def audit_built_artifacts(
     *,
     forbidden_tokens: tuple[str, ...] = FORBIDDEN_TOKENS,
     repo_root: Path | None = None,
+    reviewed_artifact_manifest: Path | None = None,
 ) -> BrandAuditReport:
     tokens = _normalized_tokens(forbidden_tokens)
-    findings: list[BrandAuditFinding] = []
+    reviewed_artifacts, findings = _load_reviewed_built_artifacts(reviewed_artifact_manifest)
+    reviewed_seen: set[str] = set()
     scanned_file_count = 0
     for requested_root in roots:
         root = Path(requested_root).resolve()
@@ -378,14 +479,20 @@ def audit_built_artifacts(
                     )
                 )
             if _is_binary(data):
+                digest = _sha256(data)
+                expected_digest = reviewed_artifacts.get(relative_path)
+                if expected_digest == digest:
+                    reviewed_seen.add(relative_path)
+                    continue
                 findings.append(
-                    BrandAuditFinding(
+                    _artifact_review_finding(
                         path=relative_path,
-                        kind="built_artifact",
-                        token="<binary>",
-                        line=None,
-                        classification="manual_review",
-                        sha256=_sha256(data),
+                        token=(
+                            "<reviewed-built-artifact-mismatch>"
+                            if expected_digest is not None
+                            else "<unreviewed-built-artifact>"
+                        ),
+                        sha256=digest,
                     )
                 )
                 continue
@@ -402,6 +509,20 @@ def audit_built_artifacts(
                             sha256=_sha256(data),
                         )
                     )
+    for relative_path, expected_digest in reviewed_artifacts.items():
+        if relative_path not in reviewed_seen and not any(
+            finding.path == relative_path
+            and finding.token == "<reviewed-built-artifact-mismatch>"
+            for finding in findings
+        ):
+            findings.append(
+                _artifact_review_finding(
+                    path=relative_path,
+                    token="<stale-reviewed-built-artifact>",
+                    sha256=expected_digest,
+                )
+            )
+
     return _make_report(
         findings,
         scanned_file_count=scanned_file_count,
@@ -455,6 +576,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--artifact-root", action="append", default=[], type=Path)
+    parser.add_argument("--reviewed-artifact-manifest", type=Path)
     parser.add_argument("--json", action="store_true", dest="print_json")
     return parser
 
@@ -465,10 +587,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.mode == "artifacts":
         if not args.artifact_root:
             parser.error("--artifact-root is required in artifacts mode")
-        report = audit_built_artifacts(args.artifact_root, repo_root=args.repo_root)
+        report = audit_built_artifacts(
+            args.artifact_root,
+            repo_root=args.repo_root,
+            reviewed_artifact_manifest=args.reviewed_artifact_manifest,
+        )
     else:
         if args.artifact_root:
             parser.error("--artifact-root is only valid in artifacts mode")
+        if args.reviewed_artifact_manifest:
+            parser.error("--reviewed-artifact-manifest is only valid in artifacts mode")
         report = audit_tracked_brand_usage(args.repo_root)
     write_reports(report, args.output_root)
     if args.print_json:
