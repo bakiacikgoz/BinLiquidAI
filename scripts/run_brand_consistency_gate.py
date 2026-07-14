@@ -9,7 +9,7 @@ import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 FindingKind = Literal["content", "path", "binary_metadata", "built_artifact"]
@@ -41,6 +41,8 @@ FORBIDDEN_TOKENS = tuple(
         key=lambda value: (-len(value), value),
     )
 )
+REVIEWED_BINARY_ASSETS_PATH = "branding/reviewed_binary_assets.json"
+REVIEWED_BINARY_ASSETS_SCHEMA_VERSION = "imperaos.reviewed-binary-assets/v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +147,91 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _binary_review_finding(
+    *,
+    path: str,
+    token: str,
+    sha256: str | None,
+) -> BrandAuditFinding:
+    return BrandAuditFinding(
+        path=path,
+        kind="binary_metadata",
+        token=token,
+        line=None,
+        classification="blocking",
+        sha256=sha256,
+    )
+
+
+def _load_reviewed_binary_assets(
+    root: Path,
+    tracked_paths: tuple[str, ...],
+) -> tuple[dict[str, str], list[BrandAuditFinding]]:
+    if REVIEWED_BINARY_ASSETS_PATH not in tracked_paths:
+        return {}, []
+
+    manifest_path = root / REVIEWED_BINARY_ASSETS_PATH
+    data = manifest_path.read_bytes()
+    try:
+        payload = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {}, [
+            _binary_review_finding(
+                path=REVIEWED_BINARY_ASSETS_PATH,
+                token="<invalid-binary-review-manifest>",
+                sha256=_sha256(data),
+            )
+        ]
+
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != {"schemaVersion", "assets"}
+        or payload.get("schemaVersion") != REVIEWED_BINARY_ASSETS_SCHEMA_VERSION
+        or not isinstance(payload.get("assets"), list)
+    ):
+        return {}, [
+            _binary_review_finding(
+                path=REVIEWED_BINARY_ASSETS_PATH,
+                token="<invalid-binary-review-manifest>",
+                sha256=_sha256(data),
+            )
+        ]
+
+    reviewed: dict[str, str] = {}
+    for entry in payload["assets"]:
+        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
+            reviewed = {}
+            break
+        relative_path = entry.get("path")
+        sha256 = entry.get("sha256")
+        if (
+            not isinstance(relative_path, str)
+            or not relative_path
+            or "\\" in relative_path
+            or PurePosixPath(relative_path).is_absolute()
+            or any(part in {"", ".", ".."} for part in relative_path.split("/"))
+            or relative_path == REVIEWED_BINARY_ASSETS_PATH
+            or relative_path in reviewed
+            or not isinstance(sha256, str)
+            or len(sha256) != 64
+            or sha256 != sha256.lower()
+            or any(character not in "0123456789abcdef" for character in sha256)
+        ):
+            reviewed = {}
+            break
+        reviewed[relative_path] = sha256
+
+    if not reviewed and payload["assets"]:
+        return {}, [
+            _binary_review_finding(
+                path=REVIEWED_BINARY_ASSETS_PATH,
+                token="<invalid-binary-review-manifest>",
+                sha256=_sha256(data),
+            )
+        ]
+    return reviewed, []
+
+
 def _make_report(
     findings: Sequence[BrandAuditFinding],
     *,
@@ -185,6 +272,10 @@ def audit_tracked_brand_usage(
     tokens = _normalized_tokens(forbidden_tokens)
     findings: list[BrandAuditFinding] = []
     tracked_paths = _tracked_paths(root)
+    reviewed_binary_assets, review_findings = _load_reviewed_binary_assets(
+        root, tracked_paths
+    )
+    findings.extend(review_findings)
     for relative_path in tracked_paths:
         path_token = _first_match(relative_path, tokens)
         if path_token is not None:
@@ -200,6 +291,9 @@ def audit_tracked_brand_usage(
 
         data = (root / relative_path).read_bytes()
         if _is_binary(data):
+            digest = _sha256(data)
+            if reviewed_binary_assets.get(relative_path) == digest:
+                continue
             findings.append(
                 BrandAuditFinding(
                     path=relative_path,
@@ -207,7 +301,7 @@ def audit_tracked_brand_usage(
                     token="<binary>",
                     line=None,
                     classification="manual_review",
-                    sha256=_sha256(data),
+                    sha256=digest,
                 )
             )
             continue
@@ -224,6 +318,28 @@ def audit_tracked_brand_usage(
                         classification="blocking",
                     )
                 )
+
+    tracked_path_set = set(tracked_paths)
+    for relative_path, expected_sha256 in reviewed_binary_assets.items():
+        if relative_path not in tracked_path_set:
+            findings.append(
+                _binary_review_finding(
+                    path=relative_path,
+                    token="<stale-binary-review>",
+                    sha256=expected_sha256,
+                )
+            )
+            continue
+        data = (root / relative_path).read_bytes()
+        actual_sha256 = _sha256(data)
+        if not _is_binary(data) or actual_sha256 != expected_sha256:
+            findings.append(
+                _binary_review_finding(
+                    path=relative_path,
+                    token="<binary-review-mismatch>",
+                    sha256=actual_sha256,
+                )
+            )
 
     return _make_report(
         findings,

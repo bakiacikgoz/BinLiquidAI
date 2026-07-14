@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import struct
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ICON_ROOT = REPO_ROOT / "apps" / "operator-panel" / "src-tauri" / "icons"
+REVIEW_MANIFEST = REPO_ROOT / "branding" / "reviewed_binary_assets.json"
 
 PNG_DIMENSIONS = {
     "32x32.png": (32, 32),
@@ -85,6 +88,19 @@ def test_generated_tauri_icon_set_has_expected_formats_and_dimensions() -> None:
 
     assert (ICON_ROOT / "icon.ico").read_bytes().startswith(b"\x00\x00\x01\x00")
     assert _icns_chunk_types(ICON_ROOT / "icon.icns") == ICNS_CHUNK_TYPES
+
+
+def test_review_manifest_hash_pins_the_complete_desktop_icon_set() -> None:
+    manifest = json.loads(REVIEW_MANIFEST.read_text(encoding="utf-8"))
+    reviewed = {item["path"]: item["sha256"] for item in manifest["assets"]}
+    expected_names = {*PNG_DIMENSIONS, "icon.ico", "icon.icns"}
+
+    assert manifest["schemaVersion"] == "imperaos.reviewed-binary-assets/v1"
+    assert set(reviewed) == {
+        f"apps/operator-panel/src-tauri/icons/{name}" for name in expected_names
+    }
+    for relative, expected_sha256 in reviewed.items():
+        assert hashlib.sha256((REPO_ROOT / relative).read_bytes()).hexdigest() == expected_sha256
 
 
 def test_unreferenced_former_identity_screenshots_are_removed() -> None:

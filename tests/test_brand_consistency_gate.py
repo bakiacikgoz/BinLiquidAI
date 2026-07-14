@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -13,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "run_brand_consistency_gate.py"
 SCHEMA = REPO_ROOT / "contracts" / "rebrand" / "brand_audit_report.schema.json"
 GIT = shutil.which("git")
+REVIEW_MANIFEST = "branding/reviewed_binary_assets.json"
 
 
 def _legacy(*parts: str) -> str:
@@ -45,6 +47,15 @@ def _tracked_repo(tmp_path: Path, files: dict[str, str | bytes]) -> Path:
     _git(repo, "add", ".")
     _git(repo, "commit", "--quiet", "-m", "fixture")
     return repo
+
+
+def _binary_review_manifest(entries: list[tuple[str, str]]) -> str:
+    return json.dumps(
+        {
+            "schemaVersion": "imperaos.reviewed-binary-assets/v1",
+            "assets": [{"path": path, "sha256": sha256} for path, sha256 in entries],
+        }
+    )
 
 
 def _run_gate(
@@ -140,6 +151,78 @@ def test_enforce_returns_one_for_blocking_or_manual_review_findings(tmp_path: Pa
     manual_report = _report(tmp_path / "binary-report")
     assert manual_report["status"] == "pass"
     assert manual_report["binaryMetadataMatchCount"] == 1
+
+
+def test_enforce_accepts_hash_pinned_reviewed_binary(tmp_path: Path) -> None:
+    binary = b"\x00\x01\x02"
+    digest = hashlib.sha256(binary).hexdigest()
+    repo = _tracked_repo(
+        tmp_path,
+        {
+            "image.bin": binary,
+            REVIEW_MANIFEST: _binary_review_manifest([("image.bin", digest)]),
+        },
+    )
+
+    result = _run_gate(repo, tmp_path / "report", mode="enforce")
+
+    assert result.returncode == 0, result.stderr
+    report = _report(tmp_path / "report")
+    assert report["status"] == "pass"
+    assert report["binaryMetadataMatchCount"] == 0
+    assert report["findings"] == []
+
+
+def test_enforce_blocks_reviewed_binary_hash_drift(tmp_path: Path) -> None:
+    expected = hashlib.sha256(b"\x00\x01\x02").hexdigest()
+    repo = _tracked_repo(
+        tmp_path,
+        {
+            "image.bin": b"\x00\x01\x03",
+            REVIEW_MANIFEST: _binary_review_manifest([("image.bin", expected)]),
+        },
+    )
+
+    result = _run_gate(repo, tmp_path / "report", mode="enforce")
+
+    assert result.returncode == 1
+    report = _report(tmp_path / "report")
+    assert report["status"] == "fail"
+    assert {item["classification"] for item in report["findings"]} == {
+        "blocking",
+        "manual_review",
+    }
+    assert any(item["token"] == "<binary-review-mismatch>" for item in report["findings"])
+
+
+def test_enforce_blocks_stale_reviewed_binary_entry(tmp_path: Path) -> None:
+    digest = hashlib.sha256(b"missing").hexdigest()
+    repo = _tracked_repo(
+        tmp_path,
+        {REVIEW_MANIFEST: _binary_review_manifest([("missing.bin", digest)])},
+    )
+
+    result = _run_gate(repo, tmp_path / "report", mode="enforce")
+
+    assert result.returncode == 1
+    report = _report(tmp_path / "report")
+    assert report["status"] == "fail"
+    assert report["binaryMetadataMatchCount"] == 1
+    assert report["findings"][0]["token"] == "<stale-binary-review>"
+
+
+def test_enforce_blocks_invalid_review_manifest(tmp_path: Path) -> None:
+    repo = _tracked_repo(
+        tmp_path,
+        {REVIEW_MANIFEST: '{"schemaVersion":"invalid","assets":[]}'},
+    )
+
+    result = _run_gate(repo, tmp_path / "report", mode="enforce")
+
+    assert result.returncode == 1
+    report = _report(tmp_path / "report")
+    assert report["status"] == "fail"
+    assert report["findings"][0]["token"] == "<invalid-binary-review-manifest>"
 
 
 def test_artifact_mode_scans_untracked_build_outputs(tmp_path: Path) -> None:
