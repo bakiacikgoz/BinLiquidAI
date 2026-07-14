@@ -2306,7 +2306,7 @@ fn resolve_cli_command(
     if mode == CoreMode::External {
         return Ok(ResolvedCli {
             mode,
-            program: cli_path.unwrap_or_else(|| "binliquid".to_string()),
+            program: cli_path.unwrap_or_else(|| "imperaos".to_string()),
             prefix_args: vec![],
         });
     }
@@ -2325,7 +2325,7 @@ fn resolve_cli_command(
         return Ok(ResolvedCli {
             mode,
             program: python.to_string_lossy().to_string(),
-            prefix_args: vec!["-m".to_string(), "binliquid".to_string()],
+            prefix_args: vec!["-m".to_string(), "imperaos".to_string()],
         });
     }
 
@@ -2341,13 +2341,13 @@ fn resolve_cli_command(
         return Ok(ResolvedCli {
             mode: CoreMode::Bundled,
             program: path.to_string_lossy().to_string(),
-            prefix_args: vec!["-m".to_string(), "binliquid".to_string()],
+            prefix_args: vec!["-m".to_string(), "imperaos".to_string()],
         });
     }
 
     Ok(ResolvedCli {
         mode: CoreMode::External,
-        program: "binliquid".to_string(),
+        program: "imperaos".to_string(),
         prefix_args: vec![],
     })
 }
@@ -2510,10 +2510,7 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
         if provider_registry.exists() {
             command.env("IMPERAOS_PROVIDER_REGISTRY_PATH", provider_registry);
         } else if provider_registry_example.exists() {
-            command.env(
-                "IMPERAOS_PROVIDER_REGISTRY_PATH",
-                provider_registry_example,
-            );
+            command.env("IMPERAOS_PROVIDER_REGISTRY_PATH", provider_registry_example);
         }
     }
 
@@ -2552,25 +2549,30 @@ fn bundled_config_dir(resolved: &ResolvedCli) -> Option<PathBuf> {
     }
 }
 
+fn macos_runtime_workdir(base: &Path) -> PathBuf {
+    base.join("com.imperaos.operatorpanel").join("runtime")
+}
+
+fn windows_runtime_workdir(base: &Path) -> PathBuf {
+    base.join("ImperaOS Operator Panel").join("runtime")
+}
+
+fn unix_runtime_workdir(base: &Path) -> PathBuf {
+    base.join("imperaos-operator-panel").join("runtime")
+}
+
 fn default_cli_workdir() -> Option<PathBuf> {
     if cfg!(target_os = "macos") {
         let home = std::env::var_os("HOME")?;
-        return Some(
-            PathBuf::from(home)
-                .join("Library")
-                .join("Application Support")
-                .join("com.aegisos.operatorpanel")
-                .join("runtime"),
-        );
+        let base = PathBuf::from(home)
+            .join("Library")
+            .join("Application Support");
+        return Some(macos_runtime_workdir(&base));
     }
     if cfg!(windows) {
         if let Some(base) = std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("APPDATA"))
         {
-            return Some(
-                PathBuf::from(base)
-                    .join("AegisOS Operator Panel")
-                    .join("runtime"),
-            );
+            return Some(windows_runtime_workdir(&PathBuf::from(base)));
         }
     }
     let base = std::env::var_os("XDG_DATA_HOME")
@@ -2578,7 +2580,7 @@ fn default_cli_workdir() -> Option<PathBuf> {
         .or_else(|| {
             std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share"))
         })?;
-    Some(base.join("aegisos-operator-panel").join("runtime"))
+    Some(unix_runtime_workdir(&base))
 }
 
 fn configure_cli_workdir(command: &mut Command) {
@@ -3322,7 +3324,7 @@ mod tests {
     fn assistant_command_args_include_stdio_json_stream_once() {
         let config = BridgeConfig {
             mode: Some("external".to_string()),
-            cli_path: Some("binliquid".to_string()),
+            cli_path: Some("imperaos".to_string()),
             bundled_python_path: None,
             profile: Some("balanced".to_string()),
             root_dir: None,
@@ -3371,7 +3373,7 @@ mod tests {
     #[test]
     fn assistant_command_preview_redacts_user_message() {
         let preview = format_assistant_command_preview(
-            "binliquid",
+            "imperaos",
             &[],
             &[
                 "chat".to_string(),
@@ -3545,7 +3547,7 @@ mod tests {
         fs::write(&bundled, "placeholder").expect("python");
         let config = BridgeConfig {
             mode: Some("auto".to_string()),
-            cli_path: Some("binliquid-custom".to_string()),
+            cli_path: Some("imperaos-custom".to_string()),
             bundled_python_path: Some(bundled.to_string_lossy().to_string()),
             profile: Some("balanced".to_string()),
             root_dir: None,
@@ -3555,7 +3557,7 @@ mod tests {
 
         let external = resolve_cli_command(&config, None).expect("external");
         assert_eq!(external.mode, CoreMode::External);
-        assert_eq!(external.program, "binliquid-custom");
+        assert_eq!(external.program, "imperaos-custom");
 
         let bundled_config = BridgeConfig {
             cli_path: None,
@@ -3563,7 +3565,7 @@ mod tests {
         };
         let bundled = resolve_cli_command(&bundled_config, None).expect("bundled");
         assert_eq!(bundled.mode, CoreMode::Bundled);
-        assert_eq!(bundled.prefix_args, vec!["-m", "binliquid"]);
+        assert_eq!(bundled.prefix_args, vec!["-m", "imperaos"]);
     }
 
     #[test]
@@ -3575,7 +3577,7 @@ mod tests {
         fs::write(&python, "placeholder").expect("python");
         let config = BridgeConfig {
             mode: Some("auto".to_string()),
-            cli_path: Some("binliquid-custom".to_string()),
+            cli_path: Some("imperaos-custom".to_string()),
             bundled_python_path: None,
             profile: Some("balanced".to_string()),
             root_dir: None,
@@ -3586,7 +3588,7 @@ mod tests {
         let resolved = resolve_cli_command(&config, Some(&resource_dir)).expect("external");
 
         assert_eq!(resolved.mode, CoreMode::External);
-        assert_eq!(resolved.program, "binliquid-custom");
+        assert_eq!(resolved.program, "imperaos-custom");
     }
 
     #[test]
@@ -3610,7 +3612,7 @@ mod tests {
 
         assert_eq!(resolved.mode, CoreMode::Bundled);
         assert_eq!(resolved.program, python.to_string_lossy());
-        assert_eq!(resolved.prefix_args, vec!["-m", "binliquid"]);
+        assert_eq!(resolved.prefix_args, vec!["-m", "imperaos"]);
     }
 
     #[test]
@@ -3636,7 +3638,43 @@ mod tests {
 
         assert_eq!(resolved.mode, CoreMode::Bundled);
         assert_eq!(resolved.program, python.to_string_lossy());
-        assert_eq!(resolved.prefix_args, vec!["-m", "binliquid"]);
+        assert_eq!(resolved.prefix_args, vec!["-m", "imperaos"]);
+    }
+
+    #[test]
+    fn resolve_cli_command_external_fallback_uses_imperaos() {
+        let config = BridgeConfig {
+            mode: Some("external".to_string()),
+            cli_path: None,
+            bundled_python_path: None,
+            profile: Some("balanced".to_string()),
+            root_dir: None,
+            env: HashMap::new(),
+            timeout_ms: None,
+        };
+
+        let resolved = resolve_cli_command(&config, None).expect("external fallback");
+        assert_eq!(resolved.mode, CoreMode::External);
+        assert_eq!(resolved.program, "imperaos");
+        assert!(resolved.prefix_args.is_empty());
+    }
+
+    #[test]
+    fn desktop_runtime_workdirs_use_only_imperaos_identity() {
+        let base = Path::new("data-root");
+
+        assert_eq!(
+            macos_runtime_workdir(base),
+            base.join("com.imperaos.operatorpanel").join("runtime")
+        );
+        assert_eq!(
+            windows_runtime_workdir(base),
+            base.join("ImperaOS Operator Panel").join("runtime")
+        );
+        assert_eq!(
+            unix_runtime_workdir(base),
+            base.join("imperaos-operator-panel").join("runtime")
+        );
     }
 
     #[test]
@@ -3669,11 +3707,11 @@ mod tests {
         let root = dir.path().join("jobs");
         fs::create_dir_all(&root).expect("mkdir");
         let script = if cfg!(windows) {
-            let path = dir.path().join("fake-binliquid.cmd");
+            let path = dir.path().join("fake-imperaos.cmd");
             fs::write(&path, "@echo off\r\nping -n 2 127.0.0.1 >nul\r\n").expect("script");
             path
         } else {
-            let path = dir.path().join("fake-binliquid.sh");
+            let path = dir.path().join("fake-imperaos.sh");
             fs::write(&path, "#!/bin/sh\nsleep 1\n").expect("script");
             path
         };

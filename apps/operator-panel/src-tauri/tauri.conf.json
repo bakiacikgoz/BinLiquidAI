@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "AegisOS Operator Panel",
+  "productName": "ImperaOS Operator Panel",
   "version": "0.5.0-beta.1",
-  "identifier": "com.aegisos.operatorpanel",
+  "identifier": "com.imperaos.operatorpanel",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AegisOS Operator Panel",
+        "title": "ImperaOS Operator Panel",
         "width": 1480,
         "height": 920,
         "minWidth": 1200,
