@@ -201,21 +201,21 @@ def write_prometheus_textfile(snapshot: dict[str, Any], destination: str | Path)
     path = Path(destination)
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        f"binliquid_approval_pending {snapshot['approval_queue']['pending']}",
+        f"imperaos_approval_pending {snapshot['approval_queue']['pending']}",
         (
-            "binliquid_approval_oldest_age_seconds "
+            "imperaos_approval_oldest_age_seconds "
             f"{snapshot['approval_queue']['oldest_pending_age_s']}"
         ),
-        f"binliquid_audit_inconsistency_total {snapshot['audit']['audit_inconsistency_count']}",
-        f"binliquid_replay_verify_failure_total {snapshot['audit']['replay_verify_failure_count']}",
-        f"binliquid_memory_conflict_total {snapshot['concurrency']['memory_conflict_count']}",
-        f"binliquid_fallback_mode_total {snapshot['concurrency']['fallback_mode_count']}",
+        f"imperaos_audit_inconsistency_total {snapshot['audit']['audit_inconsistency_count']}",
+        f"imperaos_replay_verify_failure_total {snapshot['audit']['replay_verify_failure_count']}",
+        f"imperaos_memory_conflict_total {snapshot['concurrency']['memory_conflict_count']}",
+        f"imperaos_fallback_mode_total {snapshot['concurrency']['fallback_mode_count']}",
         (
-            "binliquid_control_plane_agents_registered "
+            "imperaos_control_plane_agents_registered "
             f"{snapshot['control_plane']['control_plane_agents_registered']}"
         ),
         (
-            "binliquid_control_plane_claims_blocked "
+            "imperaos_control_plane_claims_blocked "
             f"{snapshot['control_plane']['control_plane_claims_blocked']}"
         ),
     ]

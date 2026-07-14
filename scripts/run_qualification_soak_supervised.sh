@@ -222,7 +222,7 @@ if [[ "${LAUNCHD}" -eq 1 ]]; then
     exit 64
   fi
   mkdir -p "${RUN_DIR}"
-  LAUNCHD_LABEL="com.binliquid.qualification-soak.${RUN_ID//[^A-Za-z0-9]/-}"
+  LAUNCHD_LABEL="com.imperaos.qualification-soak.${RUN_ID//[^A-Za-z0-9]/-}"
   PLIST_PATH="${RUN_DIR}/${LAUNCHD_LABEL}.plist"
   LAUNCHD_STDOUT_PATH="${RUN_DIR}/launchd.stdout.log"
   LAUNCHD_STDERR_PATH="${RUN_DIR}/launchd.stderr.log"

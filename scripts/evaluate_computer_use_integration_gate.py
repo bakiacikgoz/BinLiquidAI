@@ -240,12 +240,12 @@ def _evaluate_entrypoint_path_matrix(
     temp_results: dict[str, Any] = {}
 
     if mode == "all":
-        with tempfile.TemporaryDirectory(prefix="binliquid_gate_") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="imperaos_gate_") as temp_dir:
             temp_root = Path(temp_dir)
             temp_root_report = str(temp_root)
             copy_targets = [
-                ("temp_ascii", temp_root / "binliquid-gate-ascii"),
-                ("temp_space", temp_root / "BinLiquid Gate Space"),
+                ("temp_ascii", temp_root / "imperaos-gate-ascii"),
+                ("temp_space", temp_root / "ImperaOS Gate Space"),
                 ("temp_unicode", temp_root / "Masaustu Test Alani"),
                 ("temp_unicode_native", temp_root / "Masa\u00fcst\u00fc Test Alan\u0131"),
             ]

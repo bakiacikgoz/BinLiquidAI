@@ -115,7 +115,7 @@ Live monitor:
 
 ```bash
 scripts/watch_qualification_soak.sh \
-  --run-dir /private/tmp/binliquid_soak_final72h-YYYYMMDDTHHMMSSZ/artifacts/qualification/supervisor/final72h-YYYYMMDDTHHMMSSZ
+  --run-dir /private/tmp/imperaos_soak_final72h-YYYYMMDDTHHMMSSZ/artifacts/qualification/supervisor/final72h-YYYYMMDDTHHMMSSZ
 ```
 
 Do not claim final-GA pass until the long soak completes and the resulting
