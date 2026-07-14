@@ -66,7 +66,7 @@ def test_resolve_runtime_config_uses_explicit_config_root(tmp_path: Path) -> Non
 
 def test_resolve_runtime_config_ignores_legacy_project_prefixes() -> None:
     legacy_product_prefix = "BIN" + "LIQUID"
-    former_product_prefix = "AEGIS" + "OS"
+    former_product_prefix = "AE" + "GIS" + "OS"
 
     cfg, source_map = resolve_runtime_config(
         profile="lite",

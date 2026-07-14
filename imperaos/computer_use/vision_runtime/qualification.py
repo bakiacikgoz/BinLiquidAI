@@ -696,7 +696,7 @@ def _macos_qualification_report(
 
 MACOS_LIVE_OPT_IN_VALUE = "I_UNDERSTAND_THIS_CONTROLS_MY_MAC"
 MACOS_LIVE_ACK_VALUE = (
-    "I understand BinLiquid will control my macOS desktop only for local supervised fixtures."
+    "I understand ImperaOS will control my macOS desktop only for local supervised fixtures."
 )
 
 MACOS_LIVE_FIXTURE_IDS = (
@@ -1006,7 +1006,7 @@ def _write_local_fixture_suite(fixture_root: Path) -> dict[str, Path]:
         f"""<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
-<title>BinLiquid Local Fixture</title>
+<title>ImperaOS Local Fixture</title>
 <body>
   <label>Nonce <input id="nonce" value=""></label>
   <label><input id="confirm" type="checkbox"> Local only</label>
@@ -1356,7 +1356,7 @@ def _macos_permission_subjects() -> list[str]:
     return [
         "Terminal.app or the terminal app running uv/python",
         "Visual Studio Code if launching the runtime from VS Code",
-        "BinLiquid operator shell if bundled",
+        "ImperaOS operator shell if bundled",
     ]
 
 
@@ -1364,7 +1364,7 @@ def _macos_permission_manual_instructions() -> list[str]:
     return [
         (
             "Open System Settings -> Privacy & Security -> Screen Recording and "
-            "grant access to the process that runs BinLiquid."
+            "grant access to the process that runs ImperaOS."
         ),
         (
             "Open System Settings -> Privacy & Security -> Accessibility and "

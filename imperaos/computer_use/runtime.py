@@ -512,7 +512,7 @@ class ComputerUseRunner:
                     if platform_ok
                     else "Computer-use pilot currently requires macOS."
                 ),
-                remediation="Run AegisOS computer-use on a macOS pilot machine.",
+                remediation="Run ImperaOS computer-use on a macOS pilot machine.",
                 details={
                     "platform": platform_info.system,
                     "platform_label": platform_info.label,

@@ -3689,7 +3689,7 @@ mod tests {
     #[test]
     fn cli_env_allowlist_uses_only_canonical_project_prefix() {
         let legacy_product_key = format!("{}_MODEL_NAME", ["BIN", "LIQUID"].concat());
-        let former_product_key = format!("{}_MODEL_NAME", ["AEGIS", "OS"].concat());
+        let former_product_key = format!("{}_MODEL_NAME", ["AE", "GIS", "OS"].concat());
 
         assert!(is_allowed_cli_env_key("IMPERAOS_MODEL_NAME"));
         assert!(is_allowed_cli_env_key("OPENAI_API_KEY"));

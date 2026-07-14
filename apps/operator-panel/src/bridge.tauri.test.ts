@@ -48,7 +48,7 @@ describe('bridge tauri contract', () => {
     await bridge.handshake({
       ...DEFAULT_SETTINGS,
       mode: 'external',
-      cliPath: '/usr/local/bin/binliquid',
+      cliPath: '/usr/local/bin/imperaos',
       profile: 'balanced',
       rootDir: '.imperaos/team/jobs',
     });
@@ -58,7 +58,7 @@ describe('bridge tauri contract', () => {
       expect.objectContaining({
         config: expect.objectContaining({
           mode: 'external',
-          cliPath: '/usr/local/bin/binliquid',
+          cliPath: '/usr/local/bin/imperaos',
           profile: 'balanced',
           rootDir: '.imperaos/team/jobs',
         }),

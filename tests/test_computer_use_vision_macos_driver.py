@@ -20,7 +20,7 @@ from imperaos.computer_use.vision_runtime.models import (
 from imperaos.runtime.config import ComputerUseRuntimeConfig
 from imperaos.runtime.platform import PlatformInfo
 
-ACK = "I understand BinLiquid will control my macOS desktop only for local supervised fixtures."
+ACK = "I understand ImperaOS will control my macOS desktop only for local supervised fixtures."
 
 
 def _live_env(**updates: str) -> dict[str, str]:

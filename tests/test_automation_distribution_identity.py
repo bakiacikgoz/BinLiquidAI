@@ -14,14 +14,30 @@ AUTOMATION_PATHS = (
     *sorted((ROOT / ".github" / "workflows").glob("*.yml")),
     *sorted((ROOT / ".github" / "workflows").glob("*.yaml")),
 )
+FORMER_DISTRIBUTION = "bin" + "liquid"
 REMOVED_AUTOMATION_REFERENCES = {
-    "console CLI": re.compile(r"\buv\s+run\s+binliquid(?=\s|$)"),
-    "Python module": re.compile(r"\s-m\s+binliquid(?=\s|$)"),
-    "compile target": re.compile(r"\bcompileall\s+binliquid(?=\s|$)"),
-    "package directory": re.compile(r"(?<![.\w-])binliquid/"),
-    "wheel distribution": re.compile(r"\bbinliquid-[^\s\"']*\.whl\b", re.IGNORECASE),
-    "wheel branding": re.compile(r"\bbinliquid\s+wheel\b", re.IGNORECASE),
-    "distribution artifact": re.compile(r"\bbinliquid-version\.txt\b", re.IGNORECASE),
+    "console CLI": re.compile(
+        rf"\buv\s+run\s+{re.escape(FORMER_DISTRIBUTION)}(?=\s|$)"
+    ),
+    "Python module": re.compile(
+        rf"\s-m\s+{re.escape(FORMER_DISTRIBUTION)}(?=\s|$)"
+    ),
+    "compile target": re.compile(
+        rf"\bcompileall\s+{re.escape(FORMER_DISTRIBUTION)}(?=\s|$)"
+    ),
+    "package directory": re.compile(
+        rf"(?<![.\w-]){re.escape(FORMER_DISTRIBUTION)}/"
+    ),
+    "wheel distribution": re.compile(
+        rf"\b{re.escape(FORMER_DISTRIBUTION)}-[^\s\"']*\.whl\b",
+        re.IGNORECASE,
+    ),
+    "wheel branding": re.compile(
+        rf"\b{re.escape(FORMER_DISTRIBUTION)}\s+wheel\b", re.IGNORECASE
+    ),
+    "distribution artifact": re.compile(
+        rf"\b{re.escape(FORMER_DISTRIBUTION)}-version\.txt\b", re.IGNORECASE
+    ),
 }
 
 

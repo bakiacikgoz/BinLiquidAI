@@ -408,7 +408,7 @@ def test_real_safari_upload_acceptance(tmp_path: Path) -> None:
                 [
                     'launch "Safari"',
                     f'open "http://127.0.0.1:{server.server_port}/index.html"',
-                    'type "Aegis Operator" into "#name"',
+                    'type "ImperaOS Operator" into "#name"',
                     'select "operator" in "#role"',
                     f'upload "{upload_path}" to "#upload"',
                 ]
@@ -491,7 +491,7 @@ def test_real_safari_surface_drift_acceptance(tmp_path: Path) -> None:
                     prompt="\n".join(
                         [
                             f'open "http://127.0.0.1:{server.server_port}/index.html"',
-                            'type "Aegis Operator" into "#name"',
+                            'type "ImperaOS Operator" into "#name"',
                             'wait "2.0"',
                             'type "This step should fail after drift" into "#notes"',
                         ]
@@ -710,7 +710,7 @@ def test_real_safari_pause_resume_acceptance(tmp_path: Path) -> None:
                         [
                             'launch "Safari"',
                             f'open "http://127.0.0.1:{server.server_port}/index.html"',
-                            'type "Aegis Operator" into "#name"',
+                            'type "ImperaOS Operator" into "#name"',
                             'wait "2.0"',
                             'type "Recovered after pause" into "#name"',
                         ]

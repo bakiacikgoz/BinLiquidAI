@@ -19,8 +19,8 @@ describe('preview runtime paths', () => {
   it('uses ImperaOS preview hosts, windows, and team identifiers', () => {
     const settings = { ...DEFAULT_SETTINGS, rootDir: '.imperaos/preview/jobs' };
     const serialized = JSON.stringify([previewRunDetail(settings), previewTailEvents()]);
-    const formerHost = ['preview.', 'aegis', '.local'].join('');
-    const formerWindowTitle = ['Aegis', ' Preview Form'].join('');
+    const formerHost = ['preview.', 'ae', 'gis', '.local'].join('');
+    const formerWindowTitle = ['Ae', 'gis', ' Preview Form'].join('');
 
     expect(serialized).toContain('imperaos-computer-use');
     expect(serialized).toContain('https://preview.imperaos.local/form');

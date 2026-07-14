@@ -809,7 +809,7 @@
     "support": {
       "contract_version": "3.0",
       "bundle_dir": "./support/support-20260308093500",
-      "archive_path": "./support/aegisos-support.zip",
+      "archive_path": "./support/imperaos-support.zip",
       "manifest_path": "./support/support-20260308093500/support_bundle_manifest.json",
       "file_count": 4
     },

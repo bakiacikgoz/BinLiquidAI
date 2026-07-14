@@ -13,7 +13,7 @@ export const bridgeErrorPayloadFixture: BridgeErrorPayload = {
   code: 'CLI_FAILED',
   message: 'Command failed',
   stderrPreview: 'redacted stderr preview',
-  command: 'binliquid ...',
+  command: 'imperaos ...',
   retryable: true,
 };
 

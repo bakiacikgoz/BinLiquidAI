@@ -36,7 +36,7 @@ CANONICAL_IDENTITIES = (
 
 
 def _former_brand_tokens() -> tuple[str, str]:
-    return ("bin" + "liquid", "aegis" + "os")
+    return ("bin" + "liquid", "ae" + "gis" + "os")
 
 
 def _assert_no_former_brand(text: str) -> None:

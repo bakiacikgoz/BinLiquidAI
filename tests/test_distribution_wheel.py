@@ -47,7 +47,8 @@ def test_wheel_uses_imperaos_distribution_and_package(built_wheel: Path) -> None
     assert metadata["Summary"] == "ImperaOS governed AI workforce operating platform"
     assert metadata["Author"] == "ImperaOS Contributors"
     assert any(name.startswith("imperaos/") for name in names)
-    assert not any(name.startswith("binliquid/") for name in names)
+    former_package = "bin" + "liquid"
+    assert not any(name.startswith(f"{former_package}/") for name in names)
 
 
 def test_wheel_exposes_only_imperaos_console_script(built_wheel: Path) -> None:

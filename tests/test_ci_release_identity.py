@@ -9,7 +9,7 @@ CLEAN_SMOKE = WORKFLOW_ROOT / "operator-panel-windows-clean-smoke.yml"
 WINDOWS_SMOKE = ROOT / "apps/operator-panel/scripts/windows_installer_smoke.ps1"
 MACOS_CODESIGN = ROOT / "apps/operator-panel/scripts/codesign_notarize_macos.sh"
 
-FORMER_BRANDS = (("aegis" + "os").casefold(), ("bin" + "liquid").casefold())
+FORMER_BRANDS = (("ae" + "gis" + "os").casefold(), ("bin" + "liquid").casefold())
 
 
 def _read(path: Path) -> str:

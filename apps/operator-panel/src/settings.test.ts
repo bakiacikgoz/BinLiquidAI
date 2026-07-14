@@ -18,7 +18,7 @@ beforeEach(() => {
 
 describe('operator id validation', () => {
   it('uses only the canonical ImperaOS browser settings namespace', () => {
-    const formerKey = ['aegis', 'os.operator.settings.v1'].join('');
+    const formerKey = ['ae', 'gis', 'os.operator.settings.v1'].join('');
     localStorage.setItem(formerKey, JSON.stringify({ ...DEFAULT_SETTINGS, profile: 'strict' }));
 
     expect(SETTINGS_KEY).toBe('imperaos.operator.settings.v1');

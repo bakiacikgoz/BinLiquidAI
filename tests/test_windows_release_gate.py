@@ -95,7 +95,7 @@ def runtime_manifest(**overrides) -> str:
         "platform": "windows",
         "python": "python/Scripts/python.exe",
         "python_exe_sha256": SHA_B,
-        "source_wheel": "binliquid-0.4.1-py3-none-any.whl",
+        "source_wheel": "imperaos-0.4.1-py3-none-any.whl",
         "source_wheel_sha256": SHA_A,
         "uv_lock_sha256": SHA_C,
     }

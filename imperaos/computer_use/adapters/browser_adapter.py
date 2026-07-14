@@ -667,7 +667,7 @@ end tell
         )
         request = Request(
             str(payload.get("href") or ""),
-            headers={"User-Agent": "AegisOS/real-acceptance"},
+            headers={"User-Agent": "ImperaOS/real-acceptance"},
         )
         with urlopen(request, timeout=self._wait_timeout_s) as response:
             content = response.read()

@@ -623,7 +623,7 @@ def _permission_subject() -> dict[str, str]:
         "process": executable.name or "python",
         "binary": str(executable),
         "note": (
-            "Grant the app or terminal process that launches BinLiquid; this command "
+            "Grant the app or terminal process that launches ImperaOS; this command "
             "does not grant permissions."
         ),
     }
@@ -633,7 +633,7 @@ def _permission_subjects() -> list[str]:
     return [
         "Terminal.app or the terminal app running uv/python",
         "Visual Studio Code if launching the runtime from VS Code",
-        "BinLiquid operator shell if bundled",
+        "ImperaOS operator shell if bundled",
     ]
 
 
@@ -641,7 +641,7 @@ def _permission_manual_instructions() -> list[str]:
     return [
         (
             "Open System Settings -> Privacy & Security -> Screen Recording and "
-            "grant access to the process that runs BinLiquid."
+            "grant access to the process that runs ImperaOS."
         ),
         (
             "Open System Settings -> Privacy & Security -> Accessibility and "

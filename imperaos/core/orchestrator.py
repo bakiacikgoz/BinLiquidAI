@@ -437,7 +437,7 @@ class Orchestrator:
                 )
                 final_text = self._generate_with_timeout(
                     prompt="\n\n".join(prompt_pieces),
-                    system="You are BinLiquid assistant in product mode.",
+                    system="You are ImperaOS assistant in product mode.",
                 )
             except Exception as exc:  # noqa: BLE001
                 llm_error = str(exc)
@@ -677,7 +677,7 @@ class Orchestrator:
                 chunks: list[str] = []
                 for token in self._llm.generate_stream(
                     prompt=prompt,
-                    system="You are BinLiquid assistant in product mode.",
+                    system="You are ImperaOS assistant in product mode.",
                     json_mode=False,
                 ):
                     if not token:
@@ -689,12 +689,12 @@ class Orchestrator:
                 if not final_text:
                     final_text = self._generate_with_timeout(
                         prompt=prompt,
-                        system="You are BinLiquid assistant in product mode.",
+                        system="You are ImperaOS assistant in product mode.",
                     )
             else:
                 final_text = self._generate_with_timeout(
                     prompt=prompt,
-                    system="You are BinLiquid assistant in product mode.",
+                    system="You are ImperaOS assistant in product mode.",
                 )
         except Exception as exc:  # noqa: BLE001
             llm_error = str(exc)
@@ -1059,7 +1059,7 @@ class Orchestrator:
         if memory_section:
             pieces.append(memory_section)
         pieces.append(
-            "You are BinLiquid response synthesizer. "
+            "You are ImperaOS response synthesizer. "
             "Use the expert evidence to answer clearly and cite uncertainty when needed.\n"
             f"User input: {user_input}\n"
             f"Expert name: {expert_result.expert_name.value}\n"
