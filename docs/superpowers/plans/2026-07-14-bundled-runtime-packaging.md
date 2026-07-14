@@ -267,8 +267,8 @@ foreach ($path in $paths) {
 Run Bash syntax checks:
 
 ```powershell
-& 'C:\Users\duzey\AppData\Local\CodexTools\MinGit\bin\bash.exe' -n apps/operator-panel/scripts/build_bundled_runtime_macos.sh
-& 'C:\Users\duzey\AppData\Local\CodexTools\MinGit\bin\bash.exe' -n apps/operator-panel/scripts/verify_bundled_runtime_macos.sh
+& 'C:\Program Files\Git\bin\bash.exe' -n apps/operator-panel/scripts/build_bundled_runtime_macos.sh
+& 'C:\Program Files\Git\bin\bash.exe' -n apps/operator-panel/scripts/verify_bundled_runtime_macos.sh
 ```
 
 Run YAML parsing for the five changed workflows:
