@@ -169,7 +169,7 @@ def run_drill(
     trusted_dir = output_root / "trusted_public_keys"
     trusted_dir.mkdir(parents=True)
 
-    with tempfile.TemporaryDirectory(prefix="binliquid-managed-kms-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="imperaos-managed-kms-") as tmp:
         tmp_dir = Path(tmp)
         current_key = _generate_key(key_id)
         next_key = _generate_key(next_key_id)

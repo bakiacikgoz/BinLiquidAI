@@ -27,7 +27,7 @@ def main() -> None:
             actor="governance-gate",
             scope="organization",
             owner_type="org",
-            owner="binliquid",
+            owner="imperaos",
             visibility="organization",
             text="organization policy memory",
             role="Research Analyst Agent",

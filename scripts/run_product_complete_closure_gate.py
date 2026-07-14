@@ -354,7 +354,7 @@ def render_markdown(report: dict[str, Any]) -> str:
 def render_pr_body(report: dict[str, Any]) -> str:
     return (
         "## Summary\n"
-        "- Product-complete closure gate for BinLiquid / AegisOS.\n"
+        "- Product-complete closure gate for ImperaOS.\n"
         "- Scope: self-hosted single-organization enterprise Agent Control Plane.\n\n"
         "## Validation\n"
         f"- Closure gate: `{report['status']}`\n"

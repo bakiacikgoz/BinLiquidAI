@@ -42,7 +42,7 @@ def redact_audit_payload(
     *,
     pii_patterns: list[str] | None = None,
 ) -> dict[str, Any]:
-    secret = os.getenv("IMPERAOS_AUDIT_SECRET", "binliquid-dev-secret")
+    secret = os.getenv("IMPERAOS_AUDIT_SECRET", "imperaos-dev-secret")
     patterns = [re.compile(pattern, flags=re.IGNORECASE) for pattern in (pii_patterns or [])]
     return _redact_obj(data, salt=secret, patterns=patterns, mode="audit", key_path=())
 

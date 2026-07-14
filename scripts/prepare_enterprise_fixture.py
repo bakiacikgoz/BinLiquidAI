@@ -60,7 +60,7 @@ def main() -> None:
     identity_dir.mkdir(parents=True, exist_ok=True)
 
     private_seed = hashlib.sha256(
-        f"binliquid-enterprise-fixture:{args.key_id}".encode()
+        f"imperaos-enterprise-fixture:{args.key_id}".encode()
     ).digest()
     private_key = Ed25519PrivateKey.from_private_bytes(private_seed)
     private_raw = private_key.private_bytes_raw()
