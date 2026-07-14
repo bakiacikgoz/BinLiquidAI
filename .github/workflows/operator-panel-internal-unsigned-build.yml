@@ -65,8 +65,8 @@ jobs:
           RUNTIME_ROOT="apps/operator-panel/src-tauri/resources/imperaos-runtime"
           mkdir -p "${STAGE_ROOT}/resources"
           install -m 755 \
-            apps/operator-panel/src-tauri/target/debug/aegisos_operator_panel \
-            "${STAGE_ROOT}/aegisos_operator_panel"
+            apps/operator-panel/src-tauri/target/debug/imperaos_operator_panel \
+            "${STAGE_ROOT}/imperaos_operator_panel"
           cp -R "${RUNTIME_ROOT}" "${STAGE_ROOT}/resources/imperaos-runtime"
 
       - name: Write internal unsigned evidence
@@ -191,7 +191,7 @@ jobs:
           $stageRoot = "artifacts/operator-panel-internal-unsigned/windows-x64"
           $runtimeRoot = "apps/operator-panel/src-tauri/resources/imperaos-runtime"
           New-Item -ItemType Directory -Force -Path "$stageRoot/resources" | Out-Null
-          Copy-Item -LiteralPath "apps/operator-panel/src-tauri/target/debug/aegisos_operator_panel.exe" -Destination "$stageRoot/aegisos_operator_panel.exe" -Force
+          Copy-Item -LiteralPath "apps/operator-panel/src-tauri/target/debug/imperaos_operator_panel.exe" -Destination "$stageRoot/imperaos_operator_panel.exe" -Force
           Copy-Item -LiteralPath $runtimeRoot -Destination "$stageRoot/resources/imperaos-runtime" -Recurse -Force
 
       - name: Write internal unsigned evidence

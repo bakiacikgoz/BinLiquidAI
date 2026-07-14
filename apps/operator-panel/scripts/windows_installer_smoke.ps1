@@ -2,7 +2,7 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$InstallerPath,
   [string]$ExpectedInstallerSha256 = "",
-  [string]$ExpectedProductName = "AegisOS Operator Panel",
+  [string]$ExpectedProductName = "ImperaOS Operator Panel",
   [string]$OutputDir = "artifacts/windows-installer-smoke",
   [switch]$AllowUnsignedSmoke,
   [switch]$RunInstall,
