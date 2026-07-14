@@ -7,6 +7,42 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GIT = shutil.which("git")
 
+CANONICAL_SURFACES = {
+    "imperaos/core/orchestrator.py": (
+        "You are ImperaOS assistant in product mode.",
+        "You are ImperaOS response synthesizer.",
+    ),
+    "imperaos/computer_use/adapters/browser_adapter.py": (
+        '"User-Agent": "ImperaOS/real-acceptance"',
+    ),
+    "imperaos/computer_use/runtime.py": (
+        "Run ImperaOS computer-use on a macOS pilot machine.",
+    ),
+    "imperaos/computer_use/vision_runtime/qualification.py": (
+        "I understand ImperaOS will control my macOS desktop",
+        "<title>ImperaOS Local Fixture</title>",
+    ),
+    "apps/operator-panel/src/routeCapabilityMatrix.ts": (
+        "imperaos control-plane agent register",
+        "imperaos operator snapshot",
+    ),
+    "apps/operator-panel/src/components/control-plane/AgentRegistryView.tsx": (
+        "imperaos control-plane agent register",
+    ),
+    "contracts/control_plane/fixtures/pilot_ops_drill_pass.json": (
+        "imperaos config resolve --profile enterprise",
+    ),
+    "contracts/operator_panel/fixtures/operator_panel_preview.json": (
+        "./support/imperaos-support.zip",
+    ),
+    "tests/test_enterprise_workspace_remote_pr_ci_gate.py": (
+        "https://github.com/bakiacikgoz/ImperaOS/pull/42",
+    ),
+    "tests/test_windows_release_gate.py": (
+        "imperaos-0.4.1-py3-none-any.whl",
+    ),
+}
+
 
 def _former(*parts: str) -> str:
     return "".join(parts)
@@ -43,6 +79,18 @@ def test_tracked_text_and_paths_do_not_publish_former_product_families() -> None
                 findings.append(f"content:{relative}:{token}")
 
     assert findings == []
+
+
+def test_canonical_runtime_fixture_command_url_and_archive_surfaces() -> None:
+    missing: list[str] = []
+
+    for relative, expected_fragments in CANONICAL_SURFACES.items():
+        source = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        for fragment in expected_fragments:
+            if fragment not in source:
+                missing.append(f"{relative}: {fragment}")
+
+    assert missing == []
 
 
 def test_canonical_state_directory_is_the_only_product_state_ignore() -> None:
