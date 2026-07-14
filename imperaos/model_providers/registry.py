@@ -56,7 +56,13 @@ def resolve_model_provider_registry(
         except ValidationError as exc:
             raise InvalidProviderConfig(str(exc)) from exc
         providers = [item for item in providers if item.provider_id != record.provider_id]
-        providers.append(_apply_env_activation(record, remote_enabled=remote_enabled, env=env or os.environ))
+        providers.append(
+            _apply_env_activation(
+                record,
+                remote_enabled=remote_enabled,
+                env=env or os.environ,
+            )
+        )
 
     raw_policies = payload.get("provider_policies", {})
     if raw_policies and not isinstance(raw_policies, Mapping):

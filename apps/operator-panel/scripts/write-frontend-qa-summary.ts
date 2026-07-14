@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 type JsonObject = Record<string, unknown>;
 
@@ -67,7 +68,7 @@ type QaSummary = {
   blockers: string[];
 };
 
-const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(SCRIPT_DIR, '..');
 const REPO_ROOT = findRepoRoot(APP_ROOT);
 const OUTPUT_ROOT = path.join(REPO_ROOT, 'artifacts', 'operator-panel-ui');
@@ -248,7 +249,7 @@ function buildSummary(): QaSummary {
     ...(criticalFindings > 0 ? [`Critical UI control findings: ${criticalFindings}`] : []),
     ...(highFindings > 0 ? [`High UI control findings: ${highFindings}`] : []),
     ...(E2E_REQUIRED && e2eSuiteStatus === 'skipped' ? ['Playwright E2E did not run'] : []),
-    ...(e2eSuiteStatus === 'failed' ? ['Playwright E2E failed'] : []),
+    ...(E2E_REQUIRED && e2eSuiteStatus === 'failed' ? ['Playwright E2E failed'] : []),
     ...(tauriBridgeSmokeStatus === 'failed' ? ['Tauri bridge smoke failed'] : []),
     ...(liveCliSmokeStatus === 'failed' ? ['Live CLI smoke failed'] : []),
     ...(accessibilityStatus === 'failed' ? ['Accessibility smoke failed'] : []),

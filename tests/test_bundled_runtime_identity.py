@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 RESOURCE_ROOT = ROOT / "apps/operator-panel/src-tauri/resources"
 FORMER_RUNTIME = "bin" + "liquid-runtime"
@@ -42,8 +41,12 @@ def test_active_consumers_use_only_canonical_runtime_identity() -> None:
 
 
 def test_runtime_build_identity_is_exact() -> None:
-    windows = (ROOT / "apps/operator-panel/scripts/build_bundled_runtime_windows.ps1").read_text(encoding="utf-8")
-    macos = (ROOT / "apps/operator-panel/scripts/build_bundled_runtime_macos.sh").read_text(encoding="utf-8")
+    windows = (
+        ROOT / "apps/operator-panel/scripts/build_bundled_runtime_windows.ps1"
+    ).read_text(encoding="utf-8")
+    macos = (ROOT / "apps/operator-panel/scripts/build_bundled_runtime_macos.sh").read_text(
+        encoding="utf-8"
+    )
     for source in (windows, macos):
         assert "imperaos-*.whl" in source
         assert "-m imperaos" in source
@@ -52,13 +55,17 @@ def test_runtime_build_identity_is_exact() -> None:
 
 
 def test_windows_runtime_manifest_is_written_as_utf8_without_bom() -> None:
-    source = (ROOT / "apps/operator-panel/scripts/build_bundled_runtime_windows.ps1").read_text(encoding="utf-8")
+    source = (
+        ROOT / "apps/operator-panel/scripts/build_bundled_runtime_windows.ps1"
+    ).read_text(encoding="utf-8")
     assert "New-Object System.Text.UTF8Encoding($false)" in source
     assert "[System.IO.File]::WriteAllLines" in source
 
 
 def test_tauri_smoke_bootstrap_is_windows_and_unicode_safe() -> None:
-    source = (ROOT / "apps/operator-panel/scripts/tauri-launched-smoke.ts").read_text(encoding="utf-8")
+    source = (ROOT / "apps/operator-panel/scripts/tauri-launched-smoke.ts").read_text(
+        encoding="utf-8"
+    )
     assert "import { fileURLToPath } from 'node:url';" in source
     assert "path.dirname(fileURLToPath(import.meta.url))" in source
     assert "new URL(import.meta.url).pathname" not in source

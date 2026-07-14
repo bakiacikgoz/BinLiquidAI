@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 type UiControlKind =
@@ -75,7 +76,7 @@ type UiControlFinding = {
   message: string;
 };
 
-const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(SCRIPT_DIR, '..');
 const REPO_ROOT = findRepoRoot(APP_ROOT);
 const SRC_ROOT = path.join(APP_ROOT, 'src');
@@ -630,7 +631,8 @@ function testFiles(root: string): string[] {
 function readTestIndex(): Map<string, string> {
   const index = new Map<string, string>();
   for (const filePath of [...testFiles(SRC_ROOT), ...testFiles(E2E_ROOT)]) {
-    index.set(path.relative(APP_ROOT, filePath), fs.readFileSync(filePath, 'utf8'));
+    const relativeTestPath = path.relative(APP_ROOT, filePath).split(path.sep).join('/');
+    index.set(relativeTestPath, fs.readFileSync(filePath, 'utf8'));
   }
   return index;
 }
@@ -701,7 +703,7 @@ function auditFile(
   const localFunctionBodies = collectLocalFunctionBodies(source);
   const appPageRanges = buildAppPageRanges(source);
   const controls: UiControlInventoryItem[] = [];
-  const relativeFile = path.relative(REPO_ROOT, filePath);
+  const relativeFile = path.relative(REPO_ROOT, filePath).split(path.sep).join('/');
 
   function visit(node: ts.Node, component: string): void {
     let nextComponent = component;

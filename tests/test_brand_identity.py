@@ -83,7 +83,8 @@ def test_typescript_identity_is_a_typed_frozen_view_of_canonical_json() -> None:
     source = TYPESCRIPT_PATH.read_text(encoding="utf-8")
 
     import_match = re.fullmatch(
-        r'import canonicalProductIdentity from "(?P<path>[^"\r\n]+)";\n\n'
+        r'import canonicalProductIdentity from "(?P<path>[^"\r\n]+)" '
+        r'with \{ type: "json" \};\n\n'
         r"export type ProductIdentity = Readonly<\{\n"
         r"(?P<fields>(?:  [A-Za-z][A-Za-z0-9]*: string;\n)+)"
         r"\}>;\n\n"
