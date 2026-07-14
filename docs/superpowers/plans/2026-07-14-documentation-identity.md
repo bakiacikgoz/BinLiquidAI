@@ -53,7 +53,7 @@ family_two = "ae" + "gis"
 3. Casefold every tracked document path and UTF-8-decoded content, collecting any match for either family.
 4. Assert the violation list is empty with relative paths in the failure message.
 5. Require the two canonical `docs/IMPERAOS_...` paths.
-6. Require README to contain canonical `uv run imperaos`, `.imperaos`, `IMPERAOS_`, and `github.com/bakiacikgoz/ImperaOS` examples.
+6. Require README to contain canonical `uv run imperaos`, `.imperaos`, and `IMPERAOS_` examples. Do not add a repository URL that is absent from the base README; existing URLs elsewhere remain covered by the generic scan.
 
 Use `utf-8-sig` for the scan so a BOM does not affect text matching. Do not write any document in the test.
 

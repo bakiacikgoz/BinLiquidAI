@@ -74,7 +74,7 @@ Follow RED-GREEN-REFACTOR:
 2. Use `git ls-files -- '*.md' '*.txt'` to define the authoritative tracked-document set.
 3. Construct both former families from smaller fragments and reject them case-insensitively in every tracked document's content and relative path.
 4. Require both canonical renamed documents and reject their former path identities without embedding a forbidden token.
-5. Require canonical README examples for CLI, state root, environment prefix, and repository URL.
+5. Require canonical README examples for CLI, state root, and environment prefix; repository URLs are validated wherever they already exist in tracked documentation.
 6. Observe RED on the current 138 content-bearing documents and two paths.
 7. Apply the byte-preserving migration and the two verified file moves.
 8. Run the new contract plus documentation-consuming regression suites and Ruff.
