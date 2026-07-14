@@ -91,7 +91,7 @@ def test_brand_gate_is_early_and_fail_closed() -> None:
     gate_step = steps[gate]
     assert isinstance(gate_step, dict)
     assert gate_step.get("run") == "make brand-consistency-gate"
-    assert gate_step.get("continue-on-error") is not True
+    assert gate_step.get("continue-on-error", False) is False
     assert "if" not in gate_step
 
     makefile = _read(ROOT / "Makefile")
