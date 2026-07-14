@@ -10,8 +10,10 @@ No push, workflow dispatch, secret mutation, signing, notarization, or release p
 
 - Base commit: `341c4166e20069ed4994b0cd97c9fb570795d1d1`
 - Original implementation commit: `40422de2f3e6b38b9acf9e4d7c5059a03a419457` (`ci: move build and release workflows to ImperaOS`)
-- Original verification-report commit: `b297ca8` (`docs: record task 6.2 verification`), superseded by this post-review report update
-- Review-hardening commit: `ddff3e7ce19f83b36cda75afa204419c02063866` (`test: harden CI release identity regression`)
+- Original verification-report commit: `b297ca8` (`docs: record task 6.2 verification`)
+- First review-hardening commit: `ddff3e7ce19f83b36cda75afa204419c02063866` (`test: harden CI release identity regression`)
+- First post-review report commit: `ba2279420d6c12203c840b59820c8066d3329ddc` (`docs: update task 6.2 verification`), superseded by this final report update
+- Second review-hardening commit: `cf09e0deb1927e8c332c0094e0442699f65b8873` (`test: require CI brand gate failures to block`)
 
 The exact implementation diff is five files, 74 insertions, and 6 deletions:
 
@@ -70,7 +72,7 @@ The constructed-token scan of all active workflows plus `apps/operator-panel/scr
 
 ## Early Blocking Brand Gate
 
-The early CI gate remains fail-closed: the parsed `jobs.test.steps` sequence contains exactly one Sync dependencies step, one ImperaOS brand consistency gate step, and one Lint step in that order. The gate step's command is exactly `make brand-consistency-gate`; `continue-on-error: true` and an `if` condition are forbidden. The Makefile target still runs the gate in `--mode enforce`.
+The early CI gate remains fail-closed: the parsed `jobs.test.steps` sequence contains exactly one Sync dependencies step, one ImperaOS brand consistency gate step, and one Lint step in that order. The gate step's command is exactly `make brand-consistency-gate`; `continue-on-error` must be absent or the literal boolean `false`, so boolean `true` and expression strings are forbidden; an `if` condition is also forbidden. The Makefile target still runs the gate in `--mode enforce`.
 
 ## Post-review Hardening
 
@@ -89,7 +91,13 @@ Post-review covering gates:
 - Ruff on `tests/test_ci_release_identity.py`: `All checks passed!`.
 - PyYAML parsing of all active workflows: `workflow-yaml-ok:11`.
 
-The hardening is committed separately as `ddff3e7ce19f83b36cda75afa204419c02063866`; it changes only the regression test.
+The first hardening is committed separately as `ddff3e7ce19f83b36cda75afa204419c02063866`; it changes only the regression test.
+
+### Second re-review hardening
+
+Second re-review identified that `gate_step.get("continue-on-error") is not True` still accepted the exact GitHub Actions expression `continue-on-error: ${{ true }}` because safe YAML parsing preserves the expression as a string. Mutation evidence confirmed the gap: the first hardened test incorrectly passed 1/1 with that expression. Changing only the assertion to `gate_step.get("continue-on-error", False) is False` produced the expected RED (`assert '${{ true }}' is False`). After restoring the workflow exactly, the covering suite passed 7/7, Ruff passed, and all 11 workflows parsed.
+
+The second hardening is committed separately as `cf09e0deb1927e8c332c0094e0442699f65b8873`; it is a one-line test-only change. No production workflow diff was committed in either review cycle.
 
 ## Brand Inventory
 
@@ -97,7 +105,7 @@ The exact committed-`HEAD` inventory command completed successfully and wrote ig
 
 | Field | Actual value |
 | --- | ---: |
-| `gitCommit` | `ddff3e7ce19f83b36cda75afa204419c02063866` |
+| `gitCommit` | `cf09e0deb1927e8c332c0094e0442699f65b8873` |
 | `status` | `fail` |
 | `scannedFileCount` | 1,544 |
 | `legacyContentMatchCount` | 907 |
@@ -106,7 +114,7 @@ The exact committed-`HEAD` inventory command completed successfully and wrote ig
 | `builtArtifactMatchCount` | 0 |
 | Total findings | 928 |
 
-The category sum is 928 and exactly matches the JSON `findings` array length. The findings comprise 909 blocking findings and 19 manual-review findings. The inventory was generated after the test-only hardening commit, and `gitCommit` exactly matched committed `HEAD` at generation time. The repository-wide inventory correctly remains `fail` because later phases own the remaining findings; this does not contradict the clean Task 6.2 active workflow/script scope. Inventory JSON/Markdown artifacts remain ignored and are not part of either commit.
+The category sum is 928 and exactly matches the JSON `findings` array length. The findings comprise 909 blocking findings and 19 manual-review findings. The inventory was regenerated after the second test-only hardening commit, and `gitCommit` exactly matched committed `HEAD` at generation time. The repository-wide inventory correctly remains `fail` because later phases own the remaining findings; this does not contradict the clean Task 6.2 active workflow/script scope. Inventory JSON/Markdown artifacts remain ignored and are not part of the commits.
 
 ## Remote CI Deferral
 
@@ -118,4 +126,4 @@ Qualification soak, temp-path, service-label, and observability identity work re
 
 ## Final Status
 
-`DONE_WITH_CONCERNS` — Task 6.2 satisfies its minimal four-consumer identity contract, hardened regression, syntax, canonical-build, active-scope scan, fail-closed gate, inventory, and no-side-effect requirements across the original implementation and separate review-hardening commits. The review findings are closed. The remaining concerns are external to this implementation: one pre-existing TypeScript identity test failure remains, and a longer Windows temp root creates 18 path-sensitive failures that disappear without code changes. Full remote-CI green remains intentionally deferred to Phase 10.
+`DONE_WITH_CONCERNS` — Task 6.2 satisfies its minimal four-consumer identity contract, twice-hardened regression, syntax, canonical-build, active-scope scan, fail-closed gate, inventory, and no-side-effect requirements across the original implementation and separate review-hardening commits. Both review rounds are closed. The remaining concerns are external to this implementation: one pre-existing TypeScript identity test failure remains, and a longer Windows temp root creates 18 path-sensitive failures that disappear without code changes. Full remote-CI green remains intentionally deferred to Phase 10.
