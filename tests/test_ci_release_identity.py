@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_ROOT = ROOT / ".github/workflows"
 INTERNAL_UNSIGNED = WORKFLOW_ROOT / "operator-panel-internal-unsigned-build.yml"
@@ -14,6 +16,14 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _read_workflow(path: Path) -> dict[object, object]:
+    workflow = yaml.safe_load(_read(path))
+    assert isinstance(workflow, dict)
+    if True in workflow and "on" not in workflow:
+        workflow["on"] = workflow.pop(True)
+    return workflow
+
+
 def test_active_workflows_use_no_former_product_identity() -> None:
     violations: list[str] = []
     for path in sorted(WORKFLOW_ROOT.glob("*.y*ml")):
@@ -25,11 +35,19 @@ def test_active_workflows_use_no_former_product_identity() -> None:
 
 def test_internal_unsigned_stages_the_canonical_binary_on_both_platforms() -> None:
     workflow = _read(INTERNAL_UNSIGNED)
-    assert workflow.count("imperaos_operator_panel") == 4
-    assert "target/debug/imperaos_operator_panel" in workflow
-    assert "target/debug/imperaos_operator_panel.exe" in workflow
-    assert '"${STAGE_ROOT}/imperaos_operator_panel"' in workflow
-    assert '"$stageRoot/imperaos_operator_panel.exe"' in workflow
+    macos_source = (
+        "            apps/operator-panel/src-tauri/target/debug/"
+        "imperaos_operator_panel \\\n"
+    )
+    macos_destination = '"${STAGE_ROOT}/imperaos_operator_panel"'
+    windows_source = (
+        '"apps/operator-panel/src-tauri/target/debug/imperaos_operator_panel.exe"'
+    )
+    windows_destination = '"$stageRoot/imperaos_operator_panel.exe"'
+    assert workflow.count(macos_source) == 1
+    assert workflow.count(macos_destination) == 1
+    assert workflow.count(windows_source) == 1
+    assert workflow.count(windows_destination) == 1
 
 
 def test_installer_smoke_uses_the_canonical_product_everywhere() -> None:
@@ -53,12 +71,28 @@ def test_direct_release_scripts_use_no_former_product_identity() -> None:
 
 
 def test_brand_gate_is_early_and_fail_closed() -> None:
-    workflow = _read(WORKFLOW_ROOT / "ci.yml")
-    sync = workflow.index("Sync dependencies")
-    gate = workflow.index("ImperaOS brand consistency gate")
-    lint = workflow.index("Lint")
+    workflow = _read_workflow(WORKFLOW_ROOT / "ci.yml")
+    jobs = workflow.get("jobs")
+    assert isinstance(jobs, dict)
+    test_job = jobs.get("test")
+    assert isinstance(test_job, dict)
+    steps = test_job.get("steps")
+    assert isinstance(steps, list)
+
+    names = [step.get("name") for step in steps if isinstance(step, dict)]
+    assert names.count("Sync dependencies") == 1
+    assert names.count("ImperaOS brand consistency gate") == 1
+    assert names.count("Lint") == 1
+    sync = names.index("Sync dependencies")
+    gate = names.index("ImperaOS brand consistency gate")
+    lint = names.index("Lint")
     assert sync < gate < lint
-    assert "run: make brand-consistency-gate" in workflow
+
+    gate_step = steps[gate]
+    assert isinstance(gate_step, dict)
+    assert gate_step.get("run") == "make brand-consistency-gate"
+    assert gate_step.get("continue-on-error") is not True
+    assert "if" not in gate_step
 
     makefile = _read(ROOT / "Makefile")
     target = makefile.split("brand-consistency-gate:", maxsplit=1)[1].split(
