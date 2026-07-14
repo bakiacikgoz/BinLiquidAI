@@ -1,4 +1,4 @@
-# BinLiquid AI v0.2.x Kapsamlı Teknik Durum Raporu
+# ImperaOS AI v0.2.x Kapsamlı Teknik Durum Raporu
 
 **Tarih:** 1 Mart 2026  
 **Kapsam:** v0.2 çekirdeği + v0.2.x odaklı tuning güncellemeleri  
@@ -8,7 +8,7 @@
 
 ## 1) Yönetici Özeti
 
-BinLiquid AI, yerel çalışan (offline-first) hibrit bir asistan olarak, `LLM + orchestrator + router + expert + memory + telemetry + benchmark + research` bileşenlerini CLI merkezli üretim hattında birleştiriyor.
+ImperaOS AI, yerel çalışan (offline-first) hibrit bir asistan olarak, `LLM + orchestrator + router + expert + memory + telemetry + benchmark + research` bileşenlerini CLI merkezli üretim hattında birleştiriyor.
 
 Bu rapor tarihindeki güncel durumda:
 
@@ -30,8 +30,8 @@ Bu rapor tarihindeki güncel durumda:
 - Son commitler:
   - `7d00cd1` — `feat(v0.2.x): tune planner, code verification, sltc calibration, and memory salience`
   - `ead8b28` — `feat: implement v0.2 cli-first reliability beta`
-  - `81a3349` — `feat: complete binliquid product+research runtime, fast chat, benchmarks and docs`
-  - `5a7d2ce` — `feat: bootstrap binliquid v2 product+research foundations`
+  - `81a3349` — `feat: complete imperaos product+research runtime, fast chat, benchmarks and docs`
+  - `5a7d2ce` — `feat: bootstrap imperaos v2 product+research foundations`
 
 ### 2.2 Kod Tabanı Boyutu (anlık envanter)
 
@@ -45,10 +45,10 @@ Bu rapor tarihindeki güncel durumda:
 
 | Dosya | Satır |
 |---|---:|
-| `binliquid/core/orchestrator.py` | 900 |
-| `binliquid/cli.py` | 626 |
-| `binliquid/runtime/config.py` | 442 |
-| `binliquid/core/planner.py` | 417 |
+| `imperaos/core/orchestrator.py` | 900 |
+| `imperaos/cli.py` | 626 |
+| `imperaos/runtime/config.py` | 442 |
+| `imperaos/core/planner.py` | 417 |
 | `benchmarks/run_smoke.py` | 414 |
 | `research/sltc_experiments/train_router.py` | 387 |
 
@@ -56,7 +56,7 @@ Bu rapor tarihindeki güncel durumda:
 
 ## 3) Ürün Tanıtımı ve Konumlandırma
 
-BinLiquid AI, küçük bir LLM çekirdeğini (varsayılan `lfm2.5-thinking:1.2b`) aşağıdaki üretim-first yaklaşımıyla kullanır:
+ImperaOS AI, küçük bir LLM çekirdeğini (varsayılan `lfm2.5-thinking:1.2b`) aşağıdaki üretim-first yaklaşımıyla kullanır:
 
 1. **LLM text-native üretim hattı**: giriş/çıktı doğal dil üzerinden, strict yapılandırılmış karar şemalarıyla.
 2. **Router + expert mimarisi**: görev bazlı uzmanlaşma ile kalite/süre/maliyet dengesi.
@@ -95,14 +95,14 @@ Bu yaklaşım, “tek bir modelle her şeyi çözme” yerine “karar katmanı 
 
 | Katman | Ana Dizin | Rol |
 |---|---|---|
-| Uygulama girişi | `binliquid/cli.py` | Komutlar, profile resolve, orchestrator inşa, output modları |
-| Çekirdek kontrol | `binliquid/core/*` | Planner, orchestrator, provider client zinciri |
-| Router | `binliquid/router/*` | Rule router, sLTC router, research interface köprüsü |
-| Expert | `binliquid/experts/*` | Code, research, memory-plan uzmanları |
-| Araçlar | `binliquid/tools/*` | Code verify, retrieval, local search, sandbox run |
-| Bellek | `binliquid/memory/*` | Salience gate, SQLite store, ranker, session memory |
-| Şemalar | `binliquid/schemas/*` | Task/router/expert payload contract modelleri |
-| Telemetry | `binliquid/telemetry/*` | Trace event, artifact envelope yazımı |
+| Uygulama girişi | `imperaos/cli.py` | Komutlar, profile resolve, orchestrator inşa, output modları |
+| Çekirdek kontrol | `imperaos/core/*` | Planner, orchestrator, provider client zinciri |
+| Router | `imperaos/router/*` | Rule router, sLTC router, research interface köprüsü |
+| Expert | `imperaos/experts/*` | Code, research, memory-plan uzmanları |
+| Araçlar | `imperaos/tools/*` | Code verify, retrieval, local search, sandbox run |
+| Bellek | `imperaos/memory/*` | Salience gate, SQLite store, ranker, session memory |
+| Şemalar | `imperaos/schemas/*` | Task/router/expert payload contract modelleri |
+| Telemetry | `imperaos/telemetry/*` | Trace event, artifact envelope yazımı |
 | Benchmark | `benchmarks/*` | Smoke/ablation/energy koşucular ve raporlama |
 | Research | `research/sltc_experiments/*` | Router train/eval/calibration pipeline |
 | Dokümantasyon | `docs/*` | Mimari, güvenlik, benchmark protokol, release gate |
@@ -586,7 +586,7 @@ Kapsanan başlıklar:
 
 - `uv run ruff check .` -> geçti
 - `uv run pytest -q` -> geçti
-- `uv run binliquid doctor --profile balanced` -> geçti
+- `uv run imperaos doctor --profile balanced` -> geçti
 
 ---
 
@@ -662,14 +662,14 @@ Bu raporun kapsadığı odak paket, şu 4 kalemin kod seviyesinde uygulanmasıd�
 ```bash
 uv run ruff check .
 uv run pytest -q
-uv run binliquid doctor --profile balanced
-uv run binliquid config resolve --profile balanced --json
-uv run binliquid benchmark smoke --mode all --profile balanced
-uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
-uv run binliquid benchmark energy --profile balanced --energy-mode measured
-uv run binliquid research train-router --dataset .binliquid/research/router_dataset.jsonl --output-dir research/sltc_experiments/artifacts --seed 42
-uv run binliquid research eval-router --dataset .binliquid/research/router_dataset.jsonl --model research/sltc_experiments/artifacts/router_model.json --output-dir research/sltc_experiments/artifacts
-uv run binliquid research calibrate-router --dataset .binliquid/research/router_dataset.jsonl --output-dir research/sltc_experiments/artifacts --seed 42
+uv run imperaos doctor --profile balanced
+uv run imperaos config resolve --profile balanced --json
+uv run imperaos benchmark smoke --mode all --profile balanced
+uv run imperaos benchmark ablation --mode all --profile balanced --suite quality
+uv run imperaos benchmark energy --profile balanced --energy-mode measured
+uv run imperaos research train-router --dataset .imperaos/research/router_dataset.jsonl --output-dir research/sltc_experiments/artifacts --seed 42
+uv run imperaos research eval-router --dataset .imperaos/research/router_dataset.jsonl --model research/sltc_experiments/artifacts/router_model.json --output-dir research/sltc_experiments/artifacts
+uv run imperaos research calibrate-router --dataset .imperaos/research/router_dataset.jsonl --output-dir research/sltc_experiments/artifacts --seed 42
 ```
 
 ---
@@ -686,7 +686,7 @@ Bu rapor dosyası eklendikten sonra yeni commit ve push bu turda ayrıca işlene
 
 ## 26) Sonuç
 
-BinLiquid AI, bu an itibarıyla:
+ImperaOS AI, bu an itibarıyla:
 
 1. Çalışan bir v0.2 CLI-first reliability çekirdeğine sahip.
 2. v0.2.x tuning paketindeki dört odak işini kod seviyesinde entegre etmiş durumda.

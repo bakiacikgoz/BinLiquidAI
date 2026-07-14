@@ -45,11 +45,11 @@ Only the identities change: external fallback becomes `imperaos`, while Python-b
 
 ## Bundled Runtime Ownership Boundary
 
-The main plan mentions the runtime resource path in both Task 5.3 and Task 6.1. To avoid an intermediate package configuration that points to a directory the build scripts do not yet create, Task 5.3 does not rename `resources/binliquid-runtime`, change the Tauri resource entry, or change the Rust bundled-runtime relative path.
+The main plan mentions the runtime resource path in both Task 5.3 and Task 6.1. To avoid an intermediate package configuration that points to a directory the build scripts do not yet create, Task 5.3 does not rename `resources/imperaos-runtime`, change the Tauri resource entry, or change the Rust bundled-runtime relative path.
 
 Task 6.1 owns these changes atomically:
 
-- physical `binliquid-runtime` to `imperaos-runtime` directory rename;
+- physical `imperaos-runtime` to `imperaos-runtime` directory rename;
 - Tauri resource configuration;
 - Rust resource resolver and tests;
 - wheel glob, module verification, manifest, README, and build/verify scripts.

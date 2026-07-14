@@ -1,6 +1,6 @@
-# AegisOS Operator Panel (v0.5.0-beta)
+# ImperaOS Operator Panel (v0.5.0-beta)
 
-Tauri 2 + React control plane for BinLiquid core.
+Tauri 2 + React control plane for ImperaOS core.
 
 ## Dev Mode (External CLI)
 
@@ -12,7 +12,7 @@ pnpm tauri:dev
 Settings defaults:
 - `mode=auto`
 - profile `balanced`
-- root dir `.binliquid/team/jobs`
+- root dir `.imperaos/team/jobs`
 
 ## Frontend QA Gate
 
@@ -38,7 +38,7 @@ or local server is intentionally unavailable.
 In `auto` mode, bridge resolution order is:
 1. configured `cliPath`
 2. bundled runtime python
-3. `binliquid` on PATH
+3. `imperaos` on PATH
 
 ## Release Mode (Bundled Runtime)
 

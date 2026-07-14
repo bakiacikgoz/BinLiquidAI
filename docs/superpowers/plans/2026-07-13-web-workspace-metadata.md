@@ -155,7 +155,7 @@ Expected: scenario passes. If the already identified Chromium binary is still ab
 - [ ] **Step 8: Audit boundaries and former metadata**
 
 ```powershell
-rg -n 'binliquid-workspace|"name"\s*:\s*"operator-panel"|<title>operator-panel</title>' package.json apps/operator-panel/package.json apps/operator-panel/index.html apps/operator-panel/e2e
+rg -n 'imperaos-workspace|"name"\s*:\s*"operator-panel"|<title>operator-panel</title>' package.json apps/operator-panel/package.json apps/operator-panel/index.html apps/operator-panel/e2e
 git diff --name-only 2b0e5bf
 git diff --check
 ```

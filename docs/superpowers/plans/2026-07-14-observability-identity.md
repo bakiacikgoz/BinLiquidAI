@@ -86,23 +86,23 @@ Expected: the Prometheus snapshot and active operational identity checks fail be
 
 - [ ] **Step 3: Rename metric series without changing values**
 
-In `write_prometheus_textfile()`, replace only the eight `binliquid_` prefixes with `imperaos_`. Preserve ordering, keys, whitespace, newline termination, directory creation, and return value.
+In `write_prometheus_textfile()`, replace only the eight `imperaos_` prefixes with `imperaos_`. Preserve ordering, keys, whitespace, newline termination, directory creation, and return value.
 
 - [ ] **Step 4: Rename all coupled active operational identities**
 
 Apply these exact mappings:
 
 ```text
-/private/tmp/binliquid_soak_ -> /private/tmp/imperaos_soak_
-binliquid_soak_* -> imperaos_soak_*
-com.binliquid.qualification-soak. -> com.imperaos.qualification-soak.
-BinLiquid Qualification Soak Monitor -> ImperaOS Qualification Soak Monitor
-copy_item "binliquid" -> copy_item "imperaos"
-/tmp/binliquid-ollama.log -> /tmp/imperaos-ollama.log
-/tmp/binliquid_v03_demo.json -> /tmp/imperaos_v03_demo.json
-binliquid_gate_ -> imperaos_gate_
-binliquid-gate-ascii -> imperaos-gate-ascii
-BinLiquid Gate Space -> ImperaOS Gate Space
+/private/tmp/imperaos_soak_ -> /private/tmp/imperaos_soak_
+imperaos_soak_* -> imperaos_soak_*
+com.imperaos.qualification-soak. -> com.imperaos.qualification-soak.
+ImperaOS Qualification Soak Monitor -> ImperaOS Qualification Soak Monitor
+copy_item "imperaos" -> copy_item "imperaos"
+/tmp/imperaos-ollama.log -> /tmp/imperaos-ollama.log
+/tmp/imperaos_v03_demo.json -> /tmp/imperaos_v03_demo.json
+imperaos_gate_ -> imperaos_gate_
+imperaos-gate-ascii -> imperaos-gate-ascii
+ImperaOS Gate Space -> ImperaOS Gate Space
 ```
 
 Update the matching active runbook soak example. Do not change control flow or evidence contents.

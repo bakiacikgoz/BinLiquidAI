@@ -13,7 +13,7 @@ Move every active Operator Panel product-identity surface from the former brand 
 - Use the existing canonical `PRODUCT_IDENTITY` module where a UI surface needs the product display name or operator product name.
 - Keep domain-specific fixture identifiers explicit when they are serialized or operational values, such as `imperaos-computer-use` and the ImperaOS preview hostname.
 - Read and write only `imperaos.operator.settings.v1` in final application code.
-- Do not read, migrate, copy, or delete `aegisos.operator.settings.v1`. Existing settings under the former key are intentionally ignored and defaults are loaded.
+- Do not read, migrate, copy, or delete `imperaos.operator.settings.v1`. Existing settings under the former key are intentionally ignored and defaults are loaded.
 - Do not add a React brand context or another identity registry.
 - Do not retain compatibility aliases or former-brand constants in active Operator Panel code.
 

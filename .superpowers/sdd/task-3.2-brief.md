@@ -2,8 +2,8 @@
 
 ## Goal
 
-Move every active, project-owned environment variable from `BINLIQUID_` or
-`AEGISOS_` to the canonical `IMPERAOS_` prefix. This is a strict rename: the
+Move every active, project-owned environment variable from `IMPERAOS_` or
+`IMPERAOS_` to the canonical `IMPERAOS_` prefix. This is a strict rename: the
 old prefixes must not be read, forwarded, documented as active, or retained as
 compatibility aliases.
 
@@ -16,7 +16,7 @@ compatibility aliases.
 - Keep provider-standard variables such as `OPENAI_API_KEY`,
   `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, and `COMPANY_LLM_API_KEY` unchanged.
 - The Tauri environment allow-list accepts `IMPERAOS_` and rejects
-  `BINLIQUID_`/`AEGISOS_`.
+  `IMPERAOS_`/`IMPERAOS_`.
 - A legacy-only environment must not affect resolved configuration.
 - Secret values must remain redacted from resolved configuration output and
   must never be asserted or printed in test output.
@@ -31,7 +31,7 @@ compatibility aliases.
   `apps/operator-panel/src-tauri/src/bridge.rs`.
 - Active workflows, scripts, configuration profiles, examples, operator
   guides, runbooks, and tests.
-- Rename local build-script variables such as `BINLIQUID_VERSION` where they
+- Rename local build-script variables such as `IMPERAOS_VERSION` where they
   are active implementation details, without changing deferred manifest/schema
   field names owned by later phases.
 
@@ -39,7 +39,7 @@ compatibility aliases.
 
 - Do not change state roots, package/distribution/CLI names, dependencies, or
   lock-file dependency graphs.
-- Do not change runtime kinds/enums (`BINLIQUID_CORE`, `BINLIQUID_TEAM`) or their
+- Do not change runtime kinds/enums (`IMPERAOS_CORE`, `IMPERAOS_TEAM`) or their
   serialized values; Task 4 owns those domain contracts.
 - Do not change generated schemas, metrics, event names, team identifiers, or
   bundled-runtime manifest field names that are assigned to later phases.
@@ -52,7 +52,7 @@ compatibility aliases.
 Write failing tests first for at least:
 
 1. `IMPERAOS_` values override profile/default configuration.
-2. `BINLIQUID_` and `AEGISOS_` values are ignored in strict mode.
+2. `IMPERAOS_` and `IMPERAOS_` values are ignored in strict mode.
 3. `IMPERAOS_CONFIG_ROOT` is honored and the old config-root variable is not.
 4. The Rust bridge allow-list accepts canonical project variables and rejects
    both legacy prefixes while retaining approved provider-standard keys.
@@ -66,7 +66,7 @@ Write failing tests first for at least:
 - Operator Panel Vitest suite and Rust bridge tests.
 - Full Python test suite with the known Windows short `--basetemp` workaround.
 - Static scan of active source/config/workflow/script/test paths for project
-  legacy environment prefixes. Any remaining `BINLIQUID_` match must be a
+  legacy environment prefixes. Any remaining `IMPERAOS_` match must be a
   Task-4 enum/domain identifier or classified immutable historical evidence.
 - Run the repository brand inventory and report the before/after counts.
 

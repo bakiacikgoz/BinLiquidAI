@@ -22,7 +22,7 @@ Do not invent a new generation command or hand-edit generated JSON. Run memory o
    - add or run a focused control-plane parity check showing tracked runtime-kind/attestation schemas are stale relative to current models.
 3. Run all three required generators.
 4. Inspect the diff. It must contain only expected generated-schema changes:
-   - `binliquid_core` / `binliquid_team` to `imperaos_core` / `imperaos_team` in current control-plane runtime schemas;
+   - `imperaos_core` / `imperaos_team` to `imperaos_core` / `imperaos_team` in current control-plane runtime schemas;
    - old operator-attestation identity to its ImperaOS `/v2` identity;
    - Operator Panel contract schema values from `2.0` to `3.0`;
    - model-provider output may legitimately have no diff.

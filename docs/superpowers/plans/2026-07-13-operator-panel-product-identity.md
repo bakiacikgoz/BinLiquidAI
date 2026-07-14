@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Final application code reads and writes only `imperaos.operator.settings.v1`.
-- Data stored only under `aegisos.operator.settings.v1` is ignored; do not migrate, copy, or delete it.
+- Data stored only under `imperaos.operator.settings.v1` is ignored; do not migrate, copy, or delete it.
 - English and Turkish UI must both render ImperaOS product and assistant titles.
 - Do not add a React context, identity registry, compatibility alias, dependency, or lockfile change.
 - Do not modify package, HTML, Tauri, Cargo, bundled-runtime, installer, CI, historical, signed, or immutable surfaces in this task.
@@ -107,7 +107,7 @@ describe('Operator Panel product identity surfaces', () => {
         readOnlyByDefault="Read-only by default"
       />,
     );
-    const formerDisplayName = ['Aegis', 'OS'].join('');
+    const formerDisplayName = ['ImperaOS', 'OS'].join('');
 
     expect(PRODUCT_IDENTITY.displayName).toBe('ImperaOS');
     expect(sidebar).toContain('<h1>ImperaOS</h1>');
@@ -197,7 +197,7 @@ In `apps/operator-panel/src/settings.test.ts`, import `saveSettings` and add:
 
 ```typescript
 it('uses only the canonical ImperaOS browser settings namespace', () => {
-  const formerKey = ['aegis', 'os.operator.settings.v1'].join('');
+  const formerKey = ['imperaos', 'os.operator.settings.v1'].join('');
   localStorage.setItem(formerKey, JSON.stringify({ ...DEFAULT_SETTINGS, profile: 'strict' }));
 
   expect(SETTINGS_KEY).toBe('imperaos.operator.settings.v1');
@@ -251,8 +251,8 @@ it('uses ImperaOS preview hosts, windows, and team identifiers', () => {
     previewRunDetail(settings),
     previewTailEvents(),
   ]);
-  const formerHost = ['preview.', 'aegis', '.local'].join('');
-  const formerWindowTitle = ['Aegis', ' Preview Form'].join('');
+  const formerHost = ['preview.', 'imperaos', '.local'].join('');
+  const formerWindowTitle = ['ImperaOS', ' Preview Form'].join('');
 
   expect(serialized).toContain('imperaos-computer-use');
   expect(serialized).toContain('https://preview.imperaos.local/form');
@@ -275,10 +275,10 @@ Expected: FAIL because active preview URL and window identities still contain th
 In `apps/operator-panel/src/previewFixtures.ts`, change every active preview occurrence as follows:
 
 ```text
-https://preview.aegis.local/form -> https://preview.imperaos.local/form
-safari:Aegis Preview Form -> safari:ImperaOS Preview Form
-Aegis Preview Form -> ImperaOS Preview Form
-aegis-computer-use -> imperaos-computer-use
+https://preview.imperaos.local/form -> https://preview.imperaos.local/form
+safari:ImperaOS Preview Form -> safari:ImperaOS Preview Form
+ImperaOS Preview Form -> ImperaOS Preview Form
+imperaos-computer-use -> imperaos-computer-use
 ```
 
 Apply the same preview title replacement in `apps/operator-panel/src/assistant/assistantFixtures.ts`. Update matching expected values in `apps/operator-panel/src/bridge.test.ts` and `apps/operator-panel/src/workspace.test.ts`. In `apps/operator-panel/e2e/assistant.spec.ts`, use:
@@ -321,7 +321,7 @@ Expected: assistant Playwright scenario PASS. If the environment lacks the requi
 Run:
 
 ```powershell
-rg -n "AegisOS|aegisos\.operator\.settings|aegis-computer-use|preview\.aegis|Aegis Preview" apps/operator-panel/src apps/operator-panel/e2e
+rg -n "ImperaOS|imperaos\.operator\.settings|imperaos-computer-use|preview\.imperaos|ImperaOS Preview" apps/operator-panel/src apps/operator-panel/e2e
 git diff --name-only 7acc7f6
 git diff --check
 ```

@@ -10,13 +10,13 @@ Publish active operational metrics, qualification-soak paths, temporary-file nam
 
 ## Current State
 
-Runtime configuration already points Prometheus textfile output at `.imperaos/metrics/imperaos.prom`, but `write_prometheus_textfile()` still emits eight `binliquid_` metric names. Active macOS and qualification scripts also retain former-brand temp roots, a launchd label, a log file, a demo payload, a computer-use integration-gate temp prefix, and a monitor title. The active operations runbook still shows the former soak root.
+Runtime configuration already points Prometheus textfile output at `.imperaos/metrics/imperaos.prom`, but `write_prometheus_textfile()` still emits eight `imperaos_` metric names. Active macOS and qualification scripts also retain former-brand temp roots, a launchd label, a log file, a demo payload, a computer-use integration-gate temp prefix, and a monitor title. The active operations runbook still shows the former soak root.
 
 ## Chosen Approach
 
 Treat metrics and their directly operated runtime surfaces as one atomic identity boundary:
 
-- rename the eight emitted metric names from `binliquid_` to `imperaos_`;
+- rename the eight emitted metric names from `imperaos_` to `imperaos_`;
 - rename active qualification-soak workspace discovery, examples, and launchd labels;
 - rename the active macOS Ollama log, governance-demo payload, and computer-use gate temp paths;
 - repair the resilient-soak copy list to copy the renamed `imperaos` package;

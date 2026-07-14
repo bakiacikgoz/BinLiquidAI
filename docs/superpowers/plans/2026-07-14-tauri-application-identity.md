@@ -18,7 +18,7 @@
 - External CLI fallback and Python module fallback: `imperaos`.
 - Only `IMPERAOS_*` plus the existing explicit provider-secret allowlist may be forwarded.
 - Former desktop app-data paths are ignored; do not migrate, copy, delete, or fall back to them.
-- Keep `resources/binliquid-runtime/`, the Tauri resource entry, Rust bundled-runtime relative path, and their tests unchanged until Task 6.1.
+- Keep `resources/imperaos-runtime/`, the Tauri resource entry, Rust bundled-runtime relative path, and their tests unchanged until Task 6.1.
 - Cargo lock may change only the root package name.
 - Do not change dependencies, versions, frontend package metadata, build/verify scripts, installer, CI, history, signed, or immutable files.
 - Implementation commit subject: `refactor: move desktop application identity to ImperaOS`.
@@ -242,7 +242,7 @@ Run from the repository root:
 git diff -- apps/operator-panel/src-tauri/Cargo.lock
 ```
 
-Expected: the only `Cargo.lock` content change is root package name `aegisos_operator_panel` to `imperaos_operator_panel`; dependency versions/checksums are identical.
+Expected: the only `Cargo.lock` content change is root package name `imperaos_operator_panel` to `imperaos_operator_panel`; dependency versions/checksums are identical.
 
 - [ ] **Step 7: Run focused GREEN tests**
 
@@ -290,8 +290,8 @@ Expected: the Tauri dev process launches and stays alive for the probe window. T
 Run targeted scans over the five active Task 5.3 files and new test:
 
 ```powershell
-rg -n -i 'AegisOS|com\.aegisos|aegisos_operator_panel|\boperator_panel_lib\b|program: "binliquid"|"-m".*"binliquid"|join\("aegisos-operator-panel"\)|join\("AegisOS Operator Panel"\)' apps/operator-panel/src-tauri/tauri.conf.json apps/operator-panel/src-tauri/Cargo.toml apps/operator-panel/src-tauri/Cargo.lock apps/operator-panel/src-tauri/src/main.rs apps/operator-panel/src-tauri/src/bridge.rs apps/operator-panel/src-tauri/tests/desktop_identity.rs
-rg -n 'resources/binliquid-runtime|binliquid-runtime/python' apps/operator-panel/src-tauri/tauri.conf.json apps/operator-panel/src-tauri/src/bridge.rs
+rg -n -i 'ImperaOS|com\.imperaos|imperaos_operator_panel|\boperator_panel_lib\b|program: "imperaos"|"-m".*"imperaos"|join\("imperaos-operator-panel"\)|join\("ImperaOS Operator Panel"\)' apps/operator-panel/src-tauri/tauri.conf.json apps/operator-panel/src-tauri/Cargo.toml apps/operator-panel/src-tauri/Cargo.lock apps/operator-panel/src-tauri/src/main.rs apps/operator-panel/src-tauri/src/bridge.rs apps/operator-panel/src-tauri/tests/desktop_identity.rs
+rg -n 'resources/imperaos-runtime|imperaos-runtime/python' apps/operator-panel/src-tauri/tauri.conf.json apps/operator-panel/src-tauri/src/bridge.rs
 git diff --check
 ```
 

@@ -1,6 +1,6 @@
-# BinLiquid / AegisOS
+# ImperaOS / ImperaOS
 
-**BinLiquid / AegisOS** is a self-hosted Agent Control Plane for governed AI
+**ImperaOS / ImperaOS** is a self-hosted Agent Control Plane for governed AI
 agent production readiness. It helps operators register agents, simulate policy
 decisions, enforce approval lifecycle, bind runs to verified identity, preserve
 audit/replay artifacts, export signed evidence packs, and block unsupported
@@ -9,7 +9,7 @@ release claims before agents are trusted in production-like workflows.
 Product boundary: [Agent Control Plane Product Boundary](docs/AGENT_CONTROL_PLANE_PRODUCT_BOUNDARY.md).
 Governed Memory v1 is documented in [Governed Memory Layer](docs/GOVERNED_MEMORY_LAYER.md).
 
-BinLiquid currently provides four control-plane surfaces:
+ImperaOS currently provides four control-plane surfaces:
 
 1. **Control Plane Core** — agent registry, run coordination, policy simulation, evidence pack export/verify, readiness checks and claim guard.
 2. **Governed Runtime** — existing core and team runtime execution backends with planning, routing, scoped memory, policy decisions, approvals, checkpointing and replayable audit traces.
@@ -44,9 +44,9 @@ BinLiquid currently provides four control-plane surfaces:
 | Live Windows computer-use | Not qualified | Disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`. |
 | Live Linux computer-use | Not qualified | Disabled with `LINUX_COMPUTER_USE_NOT_QUALIFIED`; Wayland/X11/session qualification is required. |
 
-### What BinLiquid is not yet
+### What ImperaOS is not yet
 
-BinLiquid should **not** currently be marketed as:
+ImperaOS should **not** currently be marketed as:
 
 - an unrestricted enterprise-wide multi-agent orchestration system,
 - a universally production-ready high-concurrency agent platform,
@@ -127,9 +127,9 @@ Core Runtime
 Computer-use operator control surfaces:
 
 ```bash
-uv run python -m binliquid computer-use doctor --platform all --json
-uv run python -m binliquid computer-use summary --root-dir .binliquid/team/jobs --limit 20 --json
-uv run python -m binliquid operator capabilities --json
+uv run python -m imperaos computer-use doctor --platform all --json
+uv run python -m imperaos computer-use summary --root-dir .imperaos/team/jobs --limit 20 --json
+uv run python -m imperaos operator capabilities --json
 ```
 
 Operator capabilities advertise `computerUseSummaryJson=true` when the summary
@@ -140,19 +140,19 @@ until the vision runtime reports a fail-closed qualified capability.
 Control Plane quick commands:
 
 ```bash
-uv run binliquid control-plane doctor --profile enterprise --json
-uv run binliquid control-plane agent register --spec examples/control_plane/agent_governed_ops.yaml --profile enterprise --json
-uv run binliquid control-plane policy simulate --agent-id governed-ops --profile enterprise --json
-uv run binliquid control-plane run submit --agent-id governed-ops --once "Inspect queue and draft remediation" --profile enterprise --json
-uv run binliquid control-plane claims verify --profile enterprise --json
-uv run binliquid provider invoke --provider openai_responses --profile enterprise --mode dry-run --once "Inspect service alerts and draft read-only triage summary" --json
+uv run imperaos control-plane doctor --profile enterprise --json
+uv run imperaos control-plane agent register --spec examples/control_plane/agent_governed_ops.yaml --profile enterprise --json
+uv run imperaos control-plane policy simulate --agent-id governed-ops --profile enterprise --json
+uv run imperaos control-plane run submit --agent-id governed-ops --once "Inspect queue and draft remediation" --profile enterprise --json
+uv run imperaos control-plane claims verify --profile enterprise --json
+uv run imperaos provider invoke --provider openai_responses --profile enterprise --mode dry-run --once "Inspect service alerts and draft read-only triage summary" --json
 ```
 
 Provider governance quick commands:
 
 ```bash
-uv run python -m binliquid provider registry list --profile enterprise --json
-uv run python -m binliquid provider policy simulate --profile enterprise --provider-id openai-public --data-class confidential --json
+uv run python -m imperaos provider registry list --profile enterprise --json
+uv run python -m imperaos provider policy simulate --profile enterprise --provider-id openai-public --data-class confidential --json
 uv run python scripts/run_provider_governance_gate.py --profile enterprise --json
 ```
 
@@ -178,13 +178,13 @@ make bootstrap
 make install
 uv run ruff check .
 uv run pytest -q
-uv run binliquid doctor --profile balanced
+uv run imperaos doctor --profile balanced
 ```
 
 Product-complete local closure:
 
 ```bash
-uv run binliquid setup first-run --profile enterprise --mode local-enterprise --json
+uv run imperaos setup first-run --profile enterprise --mode local-enterprise --json
 uv run python scripts/run_product_complete_closure_gate.py --profile enterprise --json
 ```
 
@@ -197,9 +197,9 @@ See [Product-Complete Closure](docs/PRODUCT_COMPLETE_CLOSURE.md),
 ```powershell
 winget install --id=astral-sh.uv -e
 uv sync --python 3.11 --extra dev
-uv run python -m binliquid --version
-uv run python -m binliquid doctor --profile balanced --json
-uv run python -m binliquid operator capabilities --json
+uv run python -m imperaos --version
+uv run python -m imperaos doctor --profile balanced --json
+uv run python -m imperaos operator capabilities --json
 ```
 
 Optional Windows bootstrap:
@@ -231,9 +231,9 @@ defaults < profile < environment variables < CLI flags
 Resolve effective config:
 
 ```bash
-uv run binliquid config resolve --profile balanced --json
-uv run binliquid config resolve --profile balanced --provider ollama --fallback-provider transformers
-uv run binliquid config resolve --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
+uv run imperaos config resolve --profile balanced --json
+uv run imperaos config resolve --profile balanced --provider ollama --fallback-provider transformers
+uv run imperaos config resolve --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
 ```
 
 ---
@@ -243,17 +243,17 @@ uv run binliquid config resolve --profile balanced --provider auto --model qwen3
 ### Chat
 
 ```bash
-uv run binliquid chat --profile balanced --once "selam" --stream --fast-path
-uv run binliquid chat --profile balanced --once "kodu düzelt" --no-fast-path
-uv run binliquid chat --profile balanced --once "plan çıkar" --model qwen3.5:4b
+uv run imperaos chat --profile balanced --once "selam" --stream --fast-path
+uv run imperaos chat --profile balanced --once "kodu düzelt" --no-fast-path
+uv run imperaos chat --profile balanced --once "plan çıkar" --model qwen3.5:4b
 ```
 
 Structured output for UI/thin-shell integrations:
 
 ```bash
-uv run binliquid chat --profile balanced --once "selam" --json
-uv run binliquid chat --profile balanced --once "selam" --json-stream --stream
-uv run binliquid chat --profile balanced --once "selam" --stdio-json --stream
+uv run imperaos chat --profile balanced --once "selam" --json
+uv run imperaos chat --profile balanced --once "selam" --json-stream --stream
+uv run imperaos chat --profile balanced --once "selam" --stdio-json --stream
 ```
 
 ### Provider recipes
@@ -261,29 +261,29 @@ uv run binliquid chat --profile balanced --once "selam" --stdio-json --stream
 Default profile:
 
 ```bash
-uv run binliquid chat --profile balanced --once "selam"
+uv run imperaos chat --profile balanced --once "selam"
 ```
 
 Ollama model:
 
 ```bash
 ollama pull qwen3.5:4b
-uv run binliquid doctor --profile balanced --provider ollama --model qwen3.5:4b
-uv run binliquid chat --profile balanced --provider ollama --model qwen3.5:4b --once "uzun plan çıkar"
+uv run imperaos doctor --profile balanced --provider ollama --model qwen3.5:4b
+uv run imperaos chat --profile balanced --provider ollama --model qwen3.5:4b --once "uzun plan çıkar"
 ```
 
 Transformers custom model:
 
 ```bash
-uv run binliquid doctor --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct
-uv run binliquid chat --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "özetle"
+uv run imperaos doctor --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct
+uv run imperaos chat --profile balanced --provider transformers --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "özetle"
 ```
 
 Auto provider chain:
 
 ```bash
-uv run binliquid doctor --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
-uv run binliquid chat --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "adım adım anlat"
+uv run imperaos doctor --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
+uv run imperaos chat --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct --once "adım adım anlat"
 ```
 
 ### Native provider previews
@@ -295,20 +295,20 @@ cloud routing by default.
 
 ```bash
 uv run python scripts/run_provider_native_adapter_gate.py --profile enterprise --json
-uv run python -m binliquid provider native conformance run --profile enterprise --provider-kind all --offline --json
+uv run python -m imperaos provider native conformance run --profile enterprise --provider-kind all --offline --json
 ```
 
 Show model override source:
 
 ```bash
-IMPERAOS_MODEL_NAME=qwen3.5:4b uv run binliquid config resolve --profile balanced --json
+IMPERAOS_MODEL_NAME=qwen3.5:4b uv run imperaos config resolve --profile balanced --json
 ```
 
 ---
 
 ## Governance and Approvals
 
-BinLiquid treats mutating or risky execution as a governed operation. Approval-gated flows must pass through the lifecycle:
+ImperaOS treats mutating or risky execution as a governed operation. Approval-gated flows must pass through the lifecycle:
 
 ```text
 pending -> approved -> executed -> consumed
@@ -317,11 +317,11 @@ pending -> approved -> executed -> consumed
 Common commands:
 
 ```bash
-uv run binliquid approval pending --json
-uv run binliquid approval show --id <approval_id> --json
-uv run binliquid approval decide --id <approval_id> --approve --actor ops-user
-uv run binliquid approval execute --id <approval_id> --actor ops-user
-uv run binliquid operator capabilities --json
+uv run imperaos approval pending --json
+uv run imperaos approval show --id <approval_id> --json
+uv run imperaos approval decide --id <approval_id> --approve --actor ops-user
+uv run imperaos approval execute --id <approval_id> --actor ops-user
+uv run imperaos operator capabilities --json
 ```
 
 Important invariants:
@@ -338,23 +338,23 @@ Important invariants:
 Team Runtime adds governed multi-agent execution with DAG-style scheduling, handoff, scoped memory, checkpointing, and audit/replay support.
 
 ```bash
-uv run binliquid team init --output team.yaml
-uv run binliquid team init --output team-regulated.yaml --template regulated
-uv run binliquid team validate --spec team.yaml --json
-uv run binliquid team run --spec team.yaml --once "Build a compliance-aware rollout plan" --json
-uv run binliquid team resume --spec team.yaml --job-id <blocked_job_id> --root-dir .binliquid/team/jobs --json
-uv run binliquid team status --job-id <id> --root-dir .binliquid/team/jobs --json
-uv run binliquid team list --root-dir .binliquid/team/jobs --json
-uv run binliquid team logs --job-id <id> --root-dir .binliquid/team/jobs --json-stream
-uv run binliquid team replay --job-id <id> --root-dir .binliquid/team/jobs --verify --json
-uv run binliquid team artifacts --job-id <id> --root-dir .binliquid/team/jobs --export ./team-artifacts
+uv run imperaos team init --output team.yaml
+uv run imperaos team init --output team-regulated.yaml --template regulated
+uv run imperaos team validate --spec team.yaml --json
+uv run imperaos team run --spec team.yaml --once "Build a compliance-aware rollout plan" --json
+uv run imperaos team resume --spec team.yaml --job-id <blocked_job_id> --root-dir .imperaos/team/jobs --json
+uv run imperaos team status --job-id <id> --root-dir .imperaos/team/jobs --json
+uv run imperaos team list --root-dir .imperaos/team/jobs --json
+uv run imperaos team logs --job-id <id> --root-dir .imperaos/team/jobs --json-stream
+uv run imperaos team replay --job-id <id> --root-dir .imperaos/team/jobs --verify --json
+uv run imperaos team artifacts --job-id <id> --root-dir .imperaos/team/jobs --export ./team-artifacts
 ```
 
 Restricted pilot gates:
 
 ```bash
-uv run binliquid team pilot-check --spec examples/team/restricted_pilot.yaml --profile restricted --mode deterministic --report artifacts/team_pilot_report.json --json
-uv run binliquid team pilot-check --spec examples/team/restricted_pilot_live.yaml --profile restricted --mode live-provider --provider auto --report artifacts/team_pilot_live_report.json --json
+uv run imperaos team pilot-check --spec examples/team/restricted_pilot.yaml --profile restricted --mode deterministic --report artifacts/team_pilot_report.json --json
+uv run imperaos team pilot-check --spec examples/team/restricted_pilot_live.yaml --profile restricted --mode live-provider --provider auto --report artifacts/team_pilot_live_report.json --json
 ```
 
 Team Runtime is currently best described as:
@@ -369,7 +369,7 @@ It should not yet be described as unrestricted enterprise-wide orchestration.
 
 ## Vision-First Computer Use
 
-BinLiquid includes a vision-first computer-use foundation for desktop/web/file workflows. The design goal is a universal runtime that can observe the active screen, interpret UI state, decide the next safe action, execute controlled input, verify progress, and record replayable audit evidence.
+ImperaOS includes a vision-first computer-use foundation for desktop/web/file workflows. The design goal is a universal runtime that can observe the active screen, interpret UI state, decide the next safe action, execute controlled input, verify progress, and record replayable audit evidence.
 
 Current runtime loop:
 
@@ -404,14 +404,14 @@ linux_live_enabled = false
 Doctor:
 
 ```bash
-uv run binliquid computer-use doctor --json
-uv run python -m binliquid computer-use doctor --json
+uv run imperaos computer-use doctor --json
+uv run python -m imperaos computer-use doctor --json
 ```
 
 Qualification fixture/schema verification:
 
 ```bash
-uv run python -m binliquid computer-use qualification verify \
+uv run python -m imperaos computer-use qualification verify \
   --schema contracts/computer_use/platform_qualification.schema.json \
   --input contracts/computer_use/fixtures/windows_platform_qualification_pass_fixture.json \
   --json
@@ -502,29 +502,29 @@ apps/operator-panel/scripts/
 Smoke, team, ablation, and energy benchmarks:
 
 ```bash
-uv run binliquid benchmark smoke --mode all --profile balanced
-uv run binliquid benchmark team --profile balanced --suite smoke --spec team.yaml
-uv run binliquid benchmark team --profile restricted --suite smoke --spec team.yaml --deterministic-mock
-uv run binliquid benchmark ablation --mode all --profile balanced --suite smoke
-uv run binliquid benchmark ablation --mode all --profile balanced --suite quality
-uv run binliquid benchmark energy --profile balanced --energy-mode measured
+uv run imperaos benchmark smoke --mode all --profile balanced
+uv run imperaos benchmark team --profile balanced --suite smoke --spec team.yaml
+uv run imperaos benchmark team --profile restricted --suite smoke --spec team.yaml --deterministic-mock
+uv run imperaos benchmark ablation --mode all --profile balanced --suite smoke
+uv run imperaos benchmark ablation --mode all --profile balanced --suite quality
+uv run imperaos benchmark energy --profile balanced --energy-mode measured
 ```
 
 Router research workflows:
 
 ```bash
-uv run binliquid research train-router \
-  --dataset .binliquid/research/router_dataset.jsonl \
+uv run imperaos research train-router \
+  --dataset .imperaos/research/router_dataset.jsonl \
   --output-dir research/sltc_experiments/artifacts \
   --seed 42
 
-uv run binliquid research eval-router \
-  --dataset .binliquid/research/router_dataset.jsonl \
+uv run imperaos research eval-router \
+  --dataset .imperaos/research/router_dataset.jsonl \
   --model research/sltc_experiments/artifacts/router_model.json \
   --output-dir research/sltc_experiments/artifacts
 
-uv run binliquid research calibrate-router \
-  --dataset .binliquid/research/router_dataset.jsonl \
+uv run imperaos research calibrate-router \
+  --dataset .imperaos/research/router_dataset.jsonl \
   --output-dir research/sltc_experiments/artifacts \
   --seed 42
 ```
@@ -562,12 +562,12 @@ uv run python scripts/prepare_enterprise_fixture.py --root .
 Validation commands:
 
 ```bash
-uv run binliquid auth whoami --profile enterprise --json
-uv run binliquid auth check --profile enterprise --permission runtime.run --json
-uv run binliquid security baseline --profile enterprise --json
-uv run binliquid metrics snapshot --profile enterprise --json
-uv run binliquid qualification run --profile enterprise --mode mixed --soak-hours 6 --output-root artifacts/qualification --json
-uv run binliquid ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
+uv run imperaos auth whoami --profile enterprise --json
+uv run imperaos auth check --profile enterprise --permission runtime.run --json
+uv run imperaos security baseline --profile enterprise --json
+uv run imperaos metrics snapshot --profile enterprise --json
+uv run imperaos qualification run --profile enterprise --mode mixed --soak-hours 6 --output-root artifacts/qualification --json
+uv run imperaos ga readiness --profile enterprise --report artifacts/ga_readiness_report.json --json
 ```
 
 `ga readiness` evaluates signed qualification evidence from `artifacts/qualification_report.json`. Without the required workload set and soak threshold, the result should remain conditional.
@@ -626,7 +626,7 @@ Recommended local validation before PR/merge:
 ```bash
 uv run ruff check .
 uv run python -m pytest -q
-uv run python -m compileall binliquid
+uv run python -m compileall imperaos
 uv run python scripts/generate_operator_contract_schemas.py
 corepack pnpm --dir apps/operator-panel test
 corepack pnpm --dir apps/operator-panel lint
@@ -639,8 +639,8 @@ git diff --check
 Computer-use-specific validation:
 
 ```bash
-uv run python -m binliquid computer-use doctor --json
-uv run python -m binliquid operator capabilities --json
+uv run python -m imperaos computer-use doctor --json
+uv run python -m imperaos operator capabilities --json
 uv run python scripts/evaluate_computer_use_platform_matrix.py \
   --profile balanced \
   --output artifacts/computer_use_platform_matrix.json \
@@ -682,13 +682,13 @@ Computer-use live automation remains blocked per platform until platform qualifi
 
 ## Computer-Use Vision Pilot
 
-BinLiquid includes a supervised macOS vision-first computer-use pilot behind fail-closed flags. It supports deterministic mock qualification, redacted replay/audit artifacts, strict local vision-provider parsing, and approval-gated risky actions. Raw screenshots are not persisted by default.
+ImperaOS includes a supervised macOS vision-first computer-use pilot behind fail-closed flags. It supports deterministic mock qualification, redacted replay/audit artifacts, strict local vision-provider parsing, and approval-gated risky actions. Raw screenshots are not persisted by default.
 
 Windows live computer-use is not qualified and remains disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.
 
 ```bash
-uv run binliquid computer-use qualify --runtime vision-first --suite smoke --mode deterministic --json
-uv run binliquid computer-use vision doctor --profile balanced --json
+uv run imperaos computer-use qualify --runtime vision-first --suite smoke --mode deterministic --json
+uv run imperaos computer-use vision doctor --profile balanced --json
 ```
 
 ## Documentation Index
@@ -745,4 +745,4 @@ SUPPORT_BUNDLE.md
 
 ## Suggested Project Description
 
-> BinLiquid is a private, local-first, security-governed agentic runtime for enterprise-controlled environments. It combines a production-grade core assistant runtime, pilot-hardened multi-agent Team Runtime, beta operator panel, and qualification-gated vision-first computer-use foundation with strict approval, replay, audit, and fail-closed safety controls.
+> ImperaOS is a private, local-first, security-governed agentic runtime for enterprise-controlled environments. It combines a production-grade core assistant runtime, pilot-hardened multi-agent Team Runtime, beta operator panel, and qualification-gated vision-first computer-use foundation with strict approval, replay, audit, and fail-closed safety controls.

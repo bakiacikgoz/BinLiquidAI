@@ -1,6 +1,6 @@
 # macOS M4 Local Trial Runbook
 
-This runbook prepares BinLiquid / AegisOS for a personal Apple Silicon M4 local trial from source. It is not a public desktop release, signing, notarization, production deployment, or unrestricted live computer-use procedure.
+This runbook prepares ImperaOS / ImperaOS for a personal Apple Silicon M4 local trial from source. It is not a public desktop release, signing, notarization, production deployment, or unrestricted live computer-use procedure.
 
 ## Boundaries
 
@@ -43,9 +43,9 @@ corepack pnpm --dir apps/operator-panel install --frozen-lockfile
 ## First Diagnostics
 
 ```bash
-uv run binliquid setup first-run --profile enterprise --mode local-enterprise --json
-uv run binliquid assistant doctor --profile enterprise --json
-uv run binliquid assistant models --profile enterprise --json
+uv run imperaos setup first-run --profile enterprise --mode local-enterprise --json
+uv run imperaos assistant doctor --profile enterprise --json
+uv run imperaos assistant models --profile enterprise --json
 uv run python scripts/run_macos_local_trial_gate.py --profile enterprise --json
 ```
 
@@ -90,8 +90,8 @@ This is optional and is not required for the base local trial gate.
 ```bash
 ollama serve
 ollama list
-uv run binliquid assistant doctor --profile enterprise --json
-uv run binliquid assistant models --profile enterprise --json
+uv run imperaos assistant doctor --profile enterprise --json
+uv run imperaos assistant models --profile enterprise --json
 ```
 
 If no model/provider is ready, the correct local-trial result is `conditional` or `setup_required`. Product mode must not silently fall back to preview fixture answers.

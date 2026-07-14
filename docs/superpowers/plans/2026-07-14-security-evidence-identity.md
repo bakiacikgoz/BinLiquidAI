@@ -71,12 +71,12 @@ Expected: the generic scans and canonical/behavior assertions fail on all six cu
 Make only these replacements:
 
 ```text
-binliquid-dev-secret -> imperaos-dev-secret
-binliquid-enterprise-fixture: -> imperaos-enterprise-fixture:
-binliquid-managed-kms- -> imperaos-managed-kms-
-owner="binliquid" -> owner="imperaos"
-https://github.com/bakiacikgoz/BinLiquidAI -> https://github.com/bakiacikgoz/ImperaOS
-Product-complete closure gate for BinLiquid / AegisOS. -> Product-complete closure gate for ImperaOS.
+imperaos-dev-secret -> imperaos-dev-secret
+imperaos-enterprise-fixture: -> imperaos-enterprise-fixture:
+imperaos-managed-kms- -> imperaos-managed-kms-
+owner="imperaos" -> owner="imperaos"
+https://github.com/bakiacikgoz/ImperaOS -> https://github.com/bakiacikgoz/ImperaOS
+Product-complete closure gate for ImperaOS / ImperaOS. -> Product-complete closure gate for ImperaOS.
 ```
 
 Do not rename environment variables, schemas, purpose identifiers, JSON fields, evidence files, commands, or control flow.

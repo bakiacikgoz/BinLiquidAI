@@ -42,7 +42,7 @@
 
 **Files:**
 - Create: `tests/test_bundled_runtime_identity.py`
-- Delete: `apps/operator-panel/src-tauri/resources/binliquid-runtime/README.txt`
+- Delete: `apps/operator-panel/src-tauri/resources/imperaos-runtime/README.txt`
 - Create: `apps/operator-panel/src-tauri/resources/imperaos-runtime/README.txt`
 - Modify: `.gitignore`
 - Modify: `apps/operator-panel/src-tauri/tauri.conf.json`
@@ -155,7 +155,7 @@ Expected: pytest fails because `imperaos-runtime` is absent and active consumers
 
 - [ ] **Step 4: Create the canonical tracked resource and remove the former tracked placeholder**
 
-Delete `apps/operator-panel/src-tauri/resources/binliquid-runtime/README.txt` and create `apps/operator-panel/src-tauri/resources/imperaos-runtime/README.txt` with exactly:
+Delete `apps/operator-panel/src-tauri/resources/imperaos-runtime/README.txt` and create `apps/operator-panel/src-tauri/resources/imperaos-runtime/README.txt` with exactly:
 
 ```text
 Generated runtime bundle location for ImperaOS Operator Panel.
@@ -174,25 +174,25 @@ Apply these exact identity replacements, without adding fallback branches:
 
 ```text
 apps/operator-panel/src-tauri/tauri.conf.json
-  resources/binliquid-runtime/ -> resources/imperaos-runtime/
+  resources/imperaos-runtime/ -> resources/imperaos-runtime/
 
 apps/operator-panel/src-tauri/src/bridge.rs
-  binliquid-runtime/python/Scripts/python.exe -> imperaos-runtime/python/Scripts/python.exe
-  binliquid-runtime/python/bin/python -> imperaos-runtime/python/bin/python
+  imperaos-runtime/python/Scripts/python.exe -> imperaos-runtime/python/Scripts/python.exe
+  imperaos-runtime/python/bin/python -> imperaos-runtime/python/bin/python
 
 apps/operator-panel/scripts/build_bundled_runtime_windows.ps1
-  src-tauri\resources\binliquid-runtime -> src-tauri\resources\imperaos-runtime
-  Generated Windows runtime bundle for AegisOS Operator Panel. -> Generated Windows runtime bundle for ImperaOS Operator Panel.
+  src-tauri\resources\imperaos-runtime -> src-tauri\resources\imperaos-runtime
+  Generated Windows runtime bundle for ImperaOS Operator Panel. -> Generated Windows runtime bundle for ImperaOS Operator Panel.
 
 apps/operator-panel/scripts/build_bundled_runtime_macos.sh
-  src-tauri/resources/binliquid-runtime -> src-tauri/resources/imperaos-runtime
-  Generated runtime bundle location for AegisOS Operator Panel. -> Generated runtime bundle location for ImperaOS Operator Panel.
+  src-tauri/resources/imperaos-runtime -> src-tauri/resources/imperaos-runtime
+  Generated runtime bundle location for ImperaOS Operator Panel. -> Generated runtime bundle location for ImperaOS Operator Panel.
 
 apps/operator-panel/scripts/verify_bundled_runtime_macos.sh
-  src-tauri/resources/binliquid-runtime -> src-tauri/resources/imperaos-runtime
+  src-tauri/resources/imperaos-runtime -> src-tauri/resources/imperaos-runtime
 
 apps/operator-panel/scripts/windows_installer_smoke.ps1
-  resources\binliquid-runtime -> resources\imperaos-runtime
+  resources\imperaos-runtime -> resources\imperaos-runtime
 ```
 
 Keep the existing safety boundary in the Windows builder: resolve `src-tauri/resources`, require the target to remain below that parent, and remove only the canonical runtime directory.
@@ -215,20 +215,20 @@ Replace every runtime path segment in the listed files while preserving the surr
 
 ```text
 .gitignore
-  resources/binliquid-runtime/ -> resources/imperaos-runtime/
+  resources/imperaos-runtime/ -> resources/imperaos-runtime/
 
 .github/workflows/windows-ci.yml
 .github/workflows/operator-panel-runtime-matrix.yml
 .github/workflows/operator-panel-release-windows.yml
 .github/workflows/operator-panel-release-macos.yml
 .github/workflows/operator-panel-internal-unsigned-build.yml
-  binliquid-runtime -> imperaos-runtime (path segments only)
+  imperaos-runtime -> imperaos-runtime (path segments only)
 
 apps/operator-panel/README.md
 docs/MACOS_M4_LOCAL_TRIAL_RUNBOOK.md
 docs/RELEASE_CHECKLIST.md
-  binliquid-runtime -> imperaos-runtime
-  -m binliquid -> -m imperaos
+  imperaos-runtime -> imperaos-runtime
+  -m imperaos -> -m imperaos
 ```
 
 Do not change workflow artifact labels, product/binary expectations, environment names, secret names, cache keys, or unrelated release prose; those remain Task 6.2.

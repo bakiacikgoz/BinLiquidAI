@@ -62,7 +62,7 @@ CLEAN_SMOKE = WORKFLOW_ROOT / "operator-panel-windows-clean-smoke.yml"
 WINDOWS_SMOKE = ROOT / "apps/operator-panel/scripts/windows_installer_smoke.ps1"
 MACOS_CODESIGN = ROOT / "apps/operator-panel/scripts/codesign_notarize_macos.sh"
 
-FORMER_BRANDS = (("aegis" + "os").casefold(), ("bin" + "liquid").casefold())
+FORMER_BRANDS = (("imperaos" + "os").casefold(), ("bin" + "liquid").casefold())
 
 
 def _read(path: Path) -> str:
@@ -139,19 +139,19 @@ Make only these replacements:
 
 ```text
 .github/workflows/operator-panel-internal-unsigned-build.yml
-  target/debug/aegisos_operator_panel -> target/debug/imperaos_operator_panel
-  ${STAGE_ROOT}/aegisos_operator_panel -> ${STAGE_ROOT}/imperaos_operator_panel
-  target/debug/aegisos_operator_panel.exe -> target/debug/imperaos_operator_panel.exe
-  $stageRoot/aegisos_operator_panel.exe -> $stageRoot/imperaos_operator_panel.exe
+  target/debug/imperaos_operator_panel -> target/debug/imperaos_operator_panel
+  ${STAGE_ROOT}/imperaos_operator_panel -> ${STAGE_ROOT}/imperaos_operator_panel
+  target/debug/imperaos_operator_panel.exe -> target/debug/imperaos_operator_panel.exe
+  $stageRoot/imperaos_operator_panel.exe -> $stageRoot/imperaos_operator_panel.exe
 
 .github/workflows/operator-panel-windows-clean-smoke.yml
-  -ExpectedProductName "AegisOS Operator Panel" -> -ExpectedProductName "ImperaOS Operator Panel"
+  -ExpectedProductName "ImperaOS Operator Panel" -> -ExpectedProductName "ImperaOS Operator Panel"
 
 apps/operator-panel/scripts/windows_installer_smoke.ps1
-  [string]$ExpectedProductName = "AegisOS Operator Panel" -> [string]$ExpectedProductName = "ImperaOS Operator Panel"
+  [string]$ExpectedProductName = "ImperaOS Operator Panel" -> [string]$ExpectedProductName = "ImperaOS Operator Panel"
 
 apps/operator-panel/scripts/codesign_notarize_macos.sh
-  QUARANTINE_TAG="0081;$(date +%s);AegisOS;" -> QUARANTINE_TAG="0081;$(date +%s);ImperaOS;"
+  QUARANTINE_TAG="0081;$(date +%s);ImperaOS;" -> QUARANTINE_TAG="0081;$(date +%s);ImperaOS;"
 ```
 
 Do not change runtime paths, artifact roots, workflow triggers, signing variables, cache keys, or release eligibility metadata.
@@ -230,7 +230,7 @@ Expected: the full Python suite passes with only the repository's documented ski
 Construct former tokens in PowerShell and scan only active Task 6.2 surfaces:
 
 ```powershell
-$formerProduct = 'Aegis' + 'OS'
+$formerProduct = 'ImperaOS' + 'OS'
 $formerDistribution = 'Bin' + 'Liquid'
 $active = @('.github/workflows', 'apps/operator-panel/scripts/windows_installer_smoke.ps1', 'apps/operator-panel/scripts/codesign_notarize_macos.sh')
 rg -n -i "$formerProduct|$formerDistribution" -- $active

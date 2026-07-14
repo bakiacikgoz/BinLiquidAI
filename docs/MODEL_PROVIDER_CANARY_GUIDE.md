@@ -4,7 +4,7 @@ Model provider canaries are controlled readiness checks for configured providers
 fail-closed by default and do not make live network calls unless both controls are present:
 
 ```bash
-IMPERAOS_PROVIDER_LIVE_CANARY=1 uv run python -m binliquid provider canary run \
+IMPERAOS_PROVIDER_LIVE_CANARY=1 uv run python -m imperaos provider canary run \
   --provider-id openai-public \
   --profile balanced \
   --data-class public \
@@ -29,7 +29,7 @@ authorization headers, PII, or confidential fixture content.
 Verify evidence with:
 
 ```bash
-uv run python -m binliquid provider canary verify \
+uv run python -m imperaos provider canary verify \
   --evidence-root artifacts/model-provider-governance/canary \
   --json
 ```

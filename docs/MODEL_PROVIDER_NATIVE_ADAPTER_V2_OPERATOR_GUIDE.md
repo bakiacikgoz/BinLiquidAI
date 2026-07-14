@@ -55,7 +55,7 @@ Operators should treat any missing native metadata as not approved for native ro
 Run the offline native conformance matrix:
 
 ```bash
-uv run python -m binliquid provider native conformance run \
+uv run python -m imperaos provider native conformance run \
   --profile enterprise \
   --provider-kind all \
   --offline \
@@ -65,7 +65,7 @@ uv run python -m binliquid provider native conformance run \
 Verify the saved native evidence:
 
 ```bash
-uv run python -m binliquid provider native conformance verify \
+uv run python -m imperaos provider native conformance verify \
   --input artifacts/model-provider-governance/native-v2/anthropic_messages_native_adapter_report.json \
   --json
 ```

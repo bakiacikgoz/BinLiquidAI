@@ -5,7 +5,7 @@ Provider runtime invocation starts with dry-run evidence, not live API calls.
 Run a dry-run invocation:
 
 ```bash
-uv run binliquid provider invoke \
+uv run imperaos provider invoke \
   --provider openai_responses \
   --model gpt-placeholder \
   --profile enterprise \

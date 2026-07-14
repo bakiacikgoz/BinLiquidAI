@@ -1,8 +1,8 @@
-# AegisOS Enterprise Theme System v1
+# ImperaOS Enterprise Theme System v1
 
 ## Amaç
 
-Bu doküman, BinLiquid / AegisOS arayüz brief'ini üretime uygun bir tema sistemine çevirir. Hedef dil:
+Bu doküman, ImperaOS / ImperaOS arayüz brief'ini üretime uygun bir tema sistemine çevirir. Hedef dil:
 
 - macOS esintili ama birebir kopya olmayan
 - premium enterprise control surface hissi veren
@@ -287,7 +287,7 @@ Hedef his: "onay yüzeyi", "işlem terminali" değil
 
 ## 9. Uygulama Sonucu
 
-Bu sistem, AegisOS'u tipik bir SaaS dashboard görünümünden uzaklaştırıp:
+Bu sistem, ImperaOS'u tipik bir SaaS dashboard görünümünden uzaklaştırıp:
 
 - kurumsal sistem yazılımı
 - güvenlik odaklı kontrol paneli

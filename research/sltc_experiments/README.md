@@ -10,7 +10,7 @@ This folder contains reproducible offline experiments for router calibration.
 ## Train
 
 ```bash
-uv run binliquid research train-router \
+uv run imperaos research train-router \
   --dataset .imperaos/research/router_dataset.jsonl \
   --output-dir research/sltc_experiments/artifacts \
   --seed 42
@@ -19,7 +19,7 @@ uv run binliquid research train-router \
 ## Eval
 
 ```bash
-uv run binliquid research eval-router \
+uv run imperaos research eval-router \
   --dataset .imperaos/research/router_dataset.jsonl \
   --model research/sltc_experiments/artifacts/router_model.json \
   --output-dir research/sltc_experiments/artifacts

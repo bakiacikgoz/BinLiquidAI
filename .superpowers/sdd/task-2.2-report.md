@@ -83,7 +83,7 @@ and inspection cover the standard build.
   frontend/Tauri build output.
 
 `uv lock` resolved 75 packages. The lock diff only removes the editable root package
-record `binliquid==0.4.1` and adds the equivalent `imperaos==0.4.1` record. Dependency
+record `imperaos==0.4.1` and adds the equivalent `imperaos==0.4.1` record. Dependency
 constraints, resolved dependency versions, extras, and hashes are unchanged.
 
 ## Wheel inspection
@@ -96,7 +96,7 @@ Bare `uv build` completed successfully and produced:
 Archive inspection confirmed:
 
 - `imperaos/` package present;
-- no `binliquid/` package;
+- no `imperaos/` package;
 - `imperaos/identity.json` present and byte-identical to
   `branding/identity.json`;
 - the sole console entrypoint is `imperaos = imperaos.cli:app`;
@@ -115,8 +115,8 @@ environment. All probes ran from `C:\tmp\i22run`, with `PYTHONPATH` cleared:
 | `imperaos --version` | `0.4.1`, exit 0 |
 | identity slug probe | `imperaos`, exit 0 |
 | import origin | `C:\tmp\i22venv\Lib\site-packages\imperaos\__init__.py` |
-| `binliquid.exe` present | false |
-| `aegis.exe` present | false |
+| `imperaos.exe` present | false |
+| `imperaos.exe` present | false |
 
 ## Verification
 
@@ -152,9 +152,9 @@ own the deferred contracts and surfaces.
 
 ## Deliberately deferred legacy tokens
 
-The task intentionally preserves all deferred contracts, including `.binliquid`
-state roots, `BINLIQUID_*` environment lookups, `binliquid_` metric names,
-`binliquid_core`/`binliquid_team` runtime kinds, `aegis-*` team identifiers,
+The task intentionally preserves all deferred contracts, including `.imperaos`
+state roots, `IMPERAOS_*` environment lookups, `imperaos_` metric names,
+`imperaos_core`/`imperaos_team` runtime kinds, `imperaos-*` team identifiers,
 legacy schema/manifest values, provider metadata keys, and signed or historical
 evidence. Frontend/Tauri packages and resource directories, docs, and other
 later-task surfaces were not rebranded here; active workflow automation is covered
@@ -173,8 +173,8 @@ with subject `fix: update automation for ImperaOS CLI`.
 The correction updates 76 active references across `Makefile` and eight workflow
 files, covering direct `uv run` console calls, `python -m` calls, bundled-runtime
 module probes, the compile target, and Python package-directory filters/arguments.
-It deliberately leaves `.binliquid` state paths, `BINLIQUID_*` environment keys,
-and `binliquid-runtime` Tauri resource directories unchanged.
+It deliberately leaves `.imperaos` state paths, `IMPERAOS_*` environment keys,
+and `imperaos-runtime` Tauri resource directories unchanged.
 
 ### Review-fix TDD and verification
 
@@ -229,8 +229,8 @@ validate the bundled runtime with `-m imperaos`. The macOS and Windows verificat
 scripts use the same module probe. Their generated release-gate hints also show the
 working ImperaOS module command.
 
-The correction deliberately preserves the resource directory `binliquid-runtime`,
-the manifest field `binliquid_version`, and the `BINLIQUID_*` environment-variable
+The correction deliberately preserves the resource directory `imperaos-runtime`,
+the manifest field `imperaos_version`, and the `IMPERAOS_*` environment-variable
 contract, along with every other identifier deferred to later rebrand tasks.
 
 ### Second-review TDD and verification
@@ -281,7 +281,7 @@ with subject `fix: update installer smoke for ImperaOS runtime`.
 
 `windows_installer_smoke.ps1` now executes all version, capability, and doctor probes
 with `-m imperaos` and writes `imperaos-version.txt`. The bundled resource lookup at
-`resources\binliquid-runtime` remains unchanged as required.
+`resources\imperaos-runtime` remains unchanged as required.
 
 ### Final correction TDD and verification
 
@@ -305,8 +305,8 @@ returned one passing guard test.
 
 A comprehensive guard enumerated 138 tracked files under `Makefile`, `.github/**`,
 `apps/operator-panel/scripts/**`, and `scripts/**`. It found zero occurrences of the
-four removed active forms: `-m binliquid`, `uv run binliquid`, `binliquid-*.whl`, or
-`compileall binliquid`. Generated `dist/` artifacts were removed afterward.
+four removed active forms: `-m imperaos`, `uv run imperaos`, `imperaos-*.whl`, or
+`compileall imperaos`. Generated `dist/` artifacts were removed afterward.
 
 ### Final tracked-state inventory
 

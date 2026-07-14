@@ -12,8 +12,8 @@ Resolved runtime config uses this strict order:
 Command:
 
 ```bash
-uv run binliquid config resolve --profile balanced --json
-uv run binliquid config resolve --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
+uv run imperaos config resolve --profile balanced --json
+uv run imperaos config resolve --profile balanced --provider auto --model qwen3.5:4b --hf-model-id Qwen/Qwen3.5-4B-Instruct
 ```
 
 ## Important Fields

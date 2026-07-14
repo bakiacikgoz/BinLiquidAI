@@ -72,7 +72,7 @@ For design-partner field evidence closure, the attestation is bound to a
 specific target-environment session and evidence bundle:
 
 ```bash
-uv run binliquid pilot field attest-verify \
+uv run imperaos pilot field attest-verify \
   --session artifacts/design-partner-field-evidence/session.json \
   --bundle artifacts/design-partner-field-evidence/target_evidence_bundle.json \
   --operator-attestation artifacts/design-partner-field-evidence/operator_attestation.json \

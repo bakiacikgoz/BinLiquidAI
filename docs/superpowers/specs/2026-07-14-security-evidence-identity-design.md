@@ -25,7 +25,7 @@ The environment variable and managed-KMS schema version are already canonical. T
 
 Apply an atomic six-consumer identity migration:
 
-- `binliquid-dev-secret` becomes `imperaos-dev-secret` only as the no-environment development fallback;
+- `imperaos-dev-secret` becomes `imperaos-dev-secret` only as the no-environment development fallback;
 - the fixture seed domain becomes `imperaos-enterprise-fixture`;
 - the KMS temp prefix becomes `imperaos-managed-kms-`;
 - the organization owner becomes `imperaos`;

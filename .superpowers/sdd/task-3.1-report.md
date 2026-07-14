@@ -64,7 +64,7 @@ focused rerun passed 63 tests without changing expectations or production behavi
 
 ## Deferred-token preservation
 
-The staged zero-context diff guard proved these explicit identifiers unchanged: `BINLIQUID_*`, `AEGISOS_*`, `env_prefix`, `binliquid-runtime`, `binliquid_version`, schema IDs, runtime kinds, team IDs, provider metadata keys, metric names/prefixes, frontend storage keys, bundle IDs, and the preserved qualification service label.
+The staged zero-context diff guard proved these explicit identifiers unchanged: `IMPERAOS_*`, `IMPERAOS_*`, `env_prefix`, `imperaos-runtime`, `imperaos_version`, schema IDs, runtime kinds, team IDs, provider metadata keys, metric names/prefixes, frontend storage keys, bundle IDs, and the preserved qualification service label.
 
 No signed or historical evidence files changed. The negative config regression constructs
 the legacy state spelling at runtime so active test fixtures contain no legacy path literal.

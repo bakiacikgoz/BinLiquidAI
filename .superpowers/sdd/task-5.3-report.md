@@ -27,7 +27,7 @@ Tests were changed or added before production/configuration edits.
    failed on the current Cargo package identity:
    `assertion failed: cargo.contains("name = \"imperaos_operator_panel\"")`.
 2. `cargo test ... resolve_cli_command_external_fallback_uses_imperaos -- --nocapture`
-   failed with `left: "binliquid"`, `right: "imperaos"`.
+   failed with `left: "imperaos"`, `right: "imperaos"`.
 3. `cargo test ... desktop_runtime_workdirs_use_only_imperaos_identity -- --nocapture`
    failed to compile with `E0425` for the absent
    `macos_runtime_workdir`, `windows_runtime_workdir`, and
@@ -138,7 +138,7 @@ app-data identity matches.
 
 The deliberate Task 6.1 scan still found exactly five references:
 
-- one Tauri resource entry for `resources/binliquid-runtime/`;
+- one Tauri resource entry for `resources/imperaos-runtime/`;
 - two platform branches of the Rust bundled Python relative path;
 - two matching existing Rust test expectations.
 
