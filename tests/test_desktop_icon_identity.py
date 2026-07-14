@@ -29,12 +29,46 @@ OBSOLETE_SCREENSHOTS = (
     "ChatGPT Image 17 May 2026 18_43_42 (3).png",
 )
 
+ICNS_CHUNK_TYPES = {
+    b"ic07",
+    b"ic08",
+    b"ic09",
+    b"ic10",
+    b"ic11",
+    b"ic12",
+    b"ic13",
+    b"ic14",
+    b"il32",
+    b"is32",
+    b"l8mk",
+    b"s8mk",
+}
+
 
 def _png_dimensions(path: Path) -> tuple[int, int]:
     data = path.read_bytes()
     assert data.startswith(b"\x89PNG\r\n\x1a\n")
     assert data[12:16] == b"IHDR"
     return struct.unpack(">II", data[16:24])
+
+
+def _icns_chunk_types(path: Path) -> set[bytes]:
+    data = path.read_bytes()
+    assert data.startswith(b"icns")
+    assert struct.unpack(">I", data[4:8])[0] == len(data)
+
+    offset = 8
+    chunk_types: set[bytes] = set()
+    while offset < len(data):
+        chunk_type = data[offset : offset + 4]
+        chunk_size = struct.unpack(">I", data[offset + 4 : offset + 8])[0]
+        assert chunk_size >= 8
+        assert offset + chunk_size <= len(data)
+        chunk_types.add(chunk_type)
+        offset += chunk_size
+
+    assert offset == len(data)
+    return chunk_types
 
 
 def test_code_native_imperaos_icon_source_is_tracked_with_established_geometry() -> None:
@@ -50,7 +84,7 @@ def test_generated_tauri_icon_set_has_expected_formats_and_dimensions() -> None:
         assert _png_dimensions(ICON_ROOT / name) == expected
 
     assert (ICON_ROOT / "icon.ico").read_bytes().startswith(b"\x00\x00\x01\x00")
-    assert (ICON_ROOT / "icon.icns").read_bytes().startswith(b"icns")
+    assert _icns_chunk_types(ICON_ROOT / "icon.icns") == ICNS_CHUNK_TYPES
 
 
 def test_unreferenced_former_identity_screenshots_are_removed() -> None:
