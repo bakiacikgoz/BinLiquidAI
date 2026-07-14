@@ -6,11 +6,12 @@ Task 6.2 changed only the CI and direct release-script identity boundary. It add
 
 No push, workflow dispatch, secret mutation, signing, notarization, or release publication occurred.
 
-## Implementation Commit
+## Commit History
 
 - Base commit: `341c4166e20069ed4994b0cd97c9fb570795d1d1`
-- Implementation commit: `40422de2f3e6b38b9acf9e4d7c5059a03a419457`
-- Subject: `ci: move build and release workflows to ImperaOS`
+- Original implementation commit: `40422de2f3e6b38b9acf9e4d7c5059a03a419457` (`ci: move build and release workflows to ImperaOS`)
+- Original verification-report commit: `b297ca8` (`docs: record task 6.2 verification`), superseded by this post-review report update
+- Review-hardening commit: `ddff3e7ce19f83b36cda75afa204419c02063866` (`test: harden CI release identity regression`)
 
 The exact implementation diff is five files, 74 insertions, and 6 deletions:
 
@@ -22,7 +23,7 @@ The exact implementation diff is five files, 74 insertions, and 6 deletions:
 | `apps/operator-panel/scripts/windows_installer_smoke.ps1` | modified | 1 | 1 |
 | `tests/test_ci_release_identity.py` | added | 68 | 0 |
 
-The consumer edits set the unsigned staged binaries to `imperaos_operator_panel` and `imperaos_operator_panel.exe`, the workflow and script product name to `ImperaOS Operator Panel`, and the quarantine metadata producer brand to `ImperaOS`. The implementation commit passed independent specification and code-quality review with no findings.
+The consumer edits set the unsigned staged binaries to `imperaos_operator_panel` and `imperaos_operator_panel.exe`, the workflow and script product name to `ImperaOS Operator Panel`, and the quarantine metadata producer brand to `ImperaOS`. Post-review findings concerned only the strength of the regression contract and were fixed in the separate test-only hardening commit; no production workflow or release-script change was required.
 
 ## RED Evidence
 
@@ -69,7 +70,26 @@ The constructed-token scan of all active workflows plus `apps/operator-panel/scr
 
 ## Early Blocking Brand Gate
 
-The early CI gate remains fail-closed: workflows still invoke `make brand-consistency-gate`, and the Makefile target still runs the gate in `--mode enforce`. The regression contract for this behavior passed before and after the consumer edits. The gate was neither weakened nor moved out of the early blocking position.
+The early CI gate remains fail-closed: the parsed `jobs.test.steps` sequence contains exactly one Sync dependencies step, one ImperaOS brand consistency gate step, and one Lint step in that order. The gate step's command is exactly `make brand-consistency-gate`; `continue-on-error: true` and an `if` condition are forbidden. The Makefile target still runs the gate in `--mode enforce`.
+
+## Post-review Hardening
+
+Review identified two contract-strength issues in `tests/test_ci_release_identity.py`:
+
+1. The original early-gate test used global text positions and a substring command check, so it could accept a fail-open command or step controls.
+2. The original canonical-binary test used a global occurrence count plus partial substrings rather than four independent complete source/destination assertions.
+
+Mutation evidence confirmed the first issue. With an uncommitted `run: make brand-consistency-gate || true` mutation, the original test passed 1/1. After strengthening the test while the mutation remained, the test failed on the exact command comparison. The workflow was then restored exactly; no workflow diff was committed.
+
+The hardened test uses `yaml.safe_load` with normalization for GitHub Actions' YAML 1.1 `on` key, selects only the `test` job, enforces unique step names and exact ordering, requires the exact gate command, and rejects fail-open step controls. The binary assertions now require each complete macOS/Windows source and destination exactly once.
+
+Post-review covering gates:
+
+- `tests/test_ci_release_identity.py` plus `tests/test_automation_distribution_identity.py`: 7 passed.
+- Ruff on `tests/test_ci_release_identity.py`: `All checks passed!`.
+- PyYAML parsing of all active workflows: `workflow-yaml-ok:11`.
+
+The hardening is committed separately as `ddff3e7ce19f83b36cda75afa204419c02063866`; it changes only the regression test.
 
 ## Brand Inventory
 
@@ -77,16 +97,16 @@ The exact committed-`HEAD` inventory command completed successfully and wrote ig
 
 | Field | Actual value |
 | --- | ---: |
-| `gitCommit` | `40422de2f3e6b38b9acf9e4d7c5059a03a419457` |
+| `gitCommit` | `ddff3e7ce19f83b36cda75afa204419c02063866` |
 | `status` | `fail` |
-| `scannedFileCount` | 1,543 |
+| `scannedFileCount` | 1,544 |
 | `legacyContentMatchCount` | 907 |
 | `legacyPathMatchCount` | 2 |
 | `binaryMetadataMatchCount` | 19 |
 | `builtArtifactMatchCount` | 0 |
 | Total findings | 928 |
 
-The category sum is 928 and exactly matches the JSON `findings` array length. The findings comprise 909 blocking findings and 19 manual-review findings. The `gitCommit` exactly matched committed `HEAD`. The repository-wide inventory correctly remains `fail` because later phases own the remaining findings; this does not contradict the clean Task 6.2 active workflow/script scope.
+The category sum is 928 and exactly matches the JSON `findings` array length. The findings comprise 909 blocking findings and 19 manual-review findings. The inventory was generated after the test-only hardening commit, and `gitCommit` exactly matched committed `HEAD` at generation time. The repository-wide inventory correctly remains `fail` because later phases own the remaining findings; this does not contradict the clean Task 6.2 active workflow/script scope. Inventory JSON/Markdown artifacts remain ignored and are not part of either commit.
 
 ## Remote CI Deferral
 
@@ -98,4 +118,4 @@ Qualification soak, temp-path, service-label, and observability identity work re
 
 ## Final Status
 
-`DONE_WITH_CONCERNS` — Task 6.2 satisfies its minimal four-consumer identity contract, regression, syntax, canonical-build, active-scope scan, fail-closed gate, inventory, and no-side-effect requirements. Independent specification and code-quality review reported no findings. The only concerns are external to this implementation: one pre-existing TypeScript identity test failure remains, and a longer Windows temp root creates 18 path-sensitive failures that disappear without code changes. Full remote-CI green remains intentionally deferred to Phase 10.
+`DONE_WITH_CONCERNS` — Task 6.2 satisfies its minimal four-consumer identity contract, hardened regression, syntax, canonical-build, active-scope scan, fail-closed gate, inventory, and no-side-effect requirements across the original implementation and separate review-hardening commits. The review findings are closed. The remaining concerns are external to this implementation: one pre-existing TypeScript identity test failure remains, and a longer Windows temp root creates 18 path-sensitive failures that disappear without code changes. Full remote-CI green remains intentionally deferred to Phase 10.
