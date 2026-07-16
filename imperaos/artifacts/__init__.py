@@ -7,6 +7,7 @@ from imperaos.artifacts.content import (
     validate_artifact_content,
 )
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
+from imperaos.artifacts.filesystem import GuardedArtifactFilesystem, StoredArtifactFile
 from imperaos.artifacts.models import (
     ARTIFACT_CONTENT_LIMITS_BYTES,
     ArtifactDataClass,
@@ -31,9 +32,11 @@ __all__ = [
     "ArtifactKind",
     "ArtifactRevisionDescriptor",
     "ArtifactStatus",
+    "GuardedArtifactFilesystem",
     "OperationContext",
     "PrincipalType",
     "SafeJsonPatch",
+    "StoredArtifactFile",
     "can_transition_data_class",
     "canonical_json",
     "validate_artifact_content",
