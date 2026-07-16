@@ -67,6 +67,7 @@ from imperaos.artifacts.rpc_protocol import (
     encode_frame,
     parse_request_payload,
 )
+from imperaos.artifacts.rpc_server import ArtifactRpcServer
 from imperaos.artifacts.service import ArtifactService
 from imperaos.artifacts.store import (
     ArtifactStore,
@@ -90,6 +91,7 @@ __all__ = [
     "ArtifactOperationResult",
     "ArtifactReadResult",
     "ArtifactRpcMethod",
+    "ArtifactRpcServer",
     "ArtifactService",
     "ArtifactContent",
     "ArtifactAssetDescriptor",
