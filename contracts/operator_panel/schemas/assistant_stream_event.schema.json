@@ -15,15 +15,42 @@
       "title": "Data",
       "type": "object"
     },
+    "dataClass": {
+      "anyOf": [
+        {
+          "enum": [
+            "public",
+            "internal",
+            "confidential",
+            "regulated"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dataclass"
+    },
     "event": {
       "enum": [
         "status",
         "token",
+        "delta",
+        "text_delta",
         "router_decision",
         "policy_decision",
         "approval_pending",
         "expert_start",
         "expert_end",
+        "artifact_proposed",
+        "artifact_committed",
+        "artifact_patch_proposed",
+        "artifact_patch_applied",
+        "form_requested",
+        "form_submitted",
+        "tool_result",
         "audit_artifact",
         "final",
         "warning",
@@ -33,7 +60,22 @@
       "title": "Event",
       "type": "string"
     },
+    "eventId": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Eventid"
+    },
     "sequence": {
+      "minimum": 1,
       "title": "Sequence",
       "type": "integer"
     },
@@ -44,6 +86,19 @@
     "timestampUtc": {
       "title": "Timestamputc",
       "type": "string"
+    },
+    "traceId": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Traceid"
     }
   },
   "required": [

@@ -10,11 +10,20 @@ export type AssistantTurnStatus =
 export type AssistantStreamEventType =
   | 'status'
   | 'token'
+  | 'delta'
+  | 'text_delta'
   | 'router_decision'
   | 'policy_decision'
   | 'approval_pending'
   | 'expert_start'
   | 'expert_end'
+  | 'artifact_proposed'
+  | 'artifact_committed'
+  | 'artifact_patch_proposed'
+  | 'artifact_patch_applied'
+  | 'form_requested'
+  | 'form_submitted'
+  | 'tool_result'
   | 'audit_artifact'
   | 'final'
   | 'warning'
@@ -73,11 +82,14 @@ export interface AssistantCancelTurnResponse {
 
 export interface AssistantStreamEvent {
   contractVersion: string;
+  eventId?: string;
   assistantTurnId: string;
   sessionId: string;
   event: AssistantStreamEventType;
   sequence: number;
   timestampUtc: string;
+  traceId?: string;
+  dataClass?: 'public' | 'internal' | 'confidential' | 'regulated';
   data: unknown;
 }
 
@@ -117,6 +129,9 @@ export interface AssistantRunRef {
 
 export interface AssistantArtifactRef {
   name: string;
+  artifactId?: string;
+  revisionId?: string;
+  kind?: string;
   path?: string;
   summary?: string;
 }

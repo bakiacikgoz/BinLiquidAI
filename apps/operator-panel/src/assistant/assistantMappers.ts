@@ -135,11 +135,20 @@ function normalizeEventName(value: unknown): AssistantStreamEventType {
   const allowed: AssistantStreamEventType[] = [
     'status',
     'token',
+    'delta',
+    'text_delta',
     'router_decision',
     'policy_decision',
     'approval_pending',
     'expert_start',
     'expert_end',
+    'artifact_proposed',
+    'artifact_committed',
+    'artifact_patch_proposed',
+    'artifact_patch_applied',
+    'form_requested',
+    'form_submitted',
+    'tool_result',
     'audit_artifact',
     'final',
     'warning',
@@ -157,11 +166,20 @@ export function normalizeAssistantStreamEvent(value: unknown): AssistantStreamEv
   }
   return {
     contractVersion,
+    eventId: readString(record, 'eventId') || undefined,
     assistantTurnId: readString(record, 'assistantTurnId'),
     sessionId: readString(record, 'sessionId'),
     event: normalizeEventName(record.event),
     sequence: typeof record.sequence === 'number' ? record.sequence : 0,
     timestampUtc: readString(record, 'timestampUtc', nowUtc()),
+    traceId: readString(record, 'traceId') || undefined,
+    dataClass:
+      record.dataClass === 'public' ||
+      record.dataClass === 'internal' ||
+      record.dataClass === 'confidential' ||
+      record.dataClass === 'regulated'
+        ? record.dataClass
+        : undefined,
     data: record.data ?? {},
   };
 }
@@ -220,7 +238,9 @@ export function mapCliAssistantEvent(
       });
       return { ...previous, turns, status: 'streaming', error: null };
     }
-    case 'token': {
+    case 'token':
+    case 'delta':
+    case 'text_delta': {
       const token = readString(data, 'text') || readString(data, 'token') || readString(data, 'delta');
       turn.status = 'streaming';
       turn.assistantMessage.text += token;
@@ -293,6 +313,68 @@ export function mapCliAssistantEvent(
         referencedArtifacts: [...previous.referencedArtifacts, artifact],
         error: null,
       };
+    }
+    case 'artifact_proposed':
+    case 'artifact_committed':
+    case 'artifact_patch_proposed':
+    case 'artifact_patch_applied': {
+      const artifactId = readString(data, 'artifactId') || readString(data, 'artifact_id');
+      const revisionId = readString(data, 'revisionId') || readString(data, 'revision_id');
+      const kind = readString(data, 'kind');
+      const artifact = {
+        name: readString(data, 'title', artifactId || kind || 'artifact'),
+        artifactId: artifactId || undefined,
+        revisionId: revisionId || undefined,
+        kind: kind || undefined,
+        summary: readString(data, 'summary', event.event.replaceAll('_', ' ')),
+      };
+      turn.assistantMessage.referencedArtifacts.push(artifact);
+      appendTimeline(turn, event, {
+        tone: event.event.endsWith('committed') || event.event.endsWith('applied') ? 'success' : 'info',
+        title: event.event.replaceAll('_', ' '),
+        subtitle: artifactId || artifact.name,
+        timestampUtc: event.timestampUtc,
+      });
+      return {
+        ...previous,
+        turns,
+        referencedArtifacts: [...previous.referencedArtifacts, artifact],
+        error: null,
+      };
+    }
+    case 'form_requested':
+    case 'form_submitted': {
+      const artifactId = readString(data, 'artifactId') || readString(data, 'artifact_id');
+      const revisionId = readString(data, 'revisionId') || readString(data, 'revision_id');
+      const artifact = {
+        name: readString(data, 'title', artifactId || 'form'),
+        artifactId: artifactId || undefined,
+        revisionId: revisionId || undefined,
+        kind: 'form',
+        summary: event.event.replaceAll('_', ' '),
+      };
+      turn.assistantMessage.referencedArtifacts.push(artifact);
+      appendTimeline(turn, event, {
+        tone: event.event === 'form_submitted' ? 'success' : 'info',
+        title: event.event.replaceAll('_', ' '),
+        subtitle: artifactId || 'form',
+        timestampUtc: event.timestampUtc,
+      });
+      return {
+        ...previous,
+        turns,
+        referencedArtifacts: [...previous.referencedArtifacts, artifact],
+        error: null,
+      };
+    }
+    case 'tool_result': {
+      appendTimeline(turn, event, {
+        tone: readString(data, 'status') === 'failed' ? 'error' : 'info',
+        title: readString(data, 'toolName', 'tool result'),
+        subtitle: readString(data, 'status', 'completed'),
+        timestampUtc: event.timestampUtc,
+      });
+      return { ...previous, turns, status: 'streaming', error: null };
     }
     case 'final': {
       const finalText = readString(data, 'final_text') || readString(data, 'text') || readString(data, 'content');

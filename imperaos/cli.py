@@ -1229,21 +1229,50 @@ def _assistant_event_payload(
     data: dict[str, object],
 ) -> dict[str, object]:
     normalized = {
-        "token": "delta",
-        "status": "delta",
-        "approval_pending": "approval_required",
-        "approval_required": "approval_required",
+        "token": "text_delta",
+        "delta": "text_delta",
+        "status": "status",
+        "approval_pending": "approval_pending",
+        "approval_required": "approval_pending",
         "final": "final",
         "error": "error",
-        "tool_proposal": "tool_proposal",
-    }.get(event, "delta")
+        "tool_proposal": "status",
+    }.get(event, event)
+    supported = {
+        "status",
+        "text_delta",
+        "router_decision",
+        "policy_decision",
+        "approval_pending",
+        "expert_start",
+        "expert_end",
+        "artifact_proposed",
+        "artifact_committed",
+        "artifact_patch_proposed",
+        "artifact_patch_applied",
+        "form_requested",
+        "form_submitted",
+        "tool_result",
+        "audit_artifact",
+        "warning",
+        "error",
+        "final",
+        "cancelled",
+    }
+    if normalized not in supported:
+        normalized = "status"
+    trace_id = data.get("traceId") or data.get("trace_id") or f"trace-{turn_id}"
+    data_class = data.get("dataClass") or data.get("data_class") or "internal"
     return {
         "contractVersion": OPERATOR_PANEL_CONTRACT_VERSION,
+        "eventId": f"{turn_id}-{sequence}",
         "assistantTurnId": turn_id,
         "sessionId": session_id,
         "event": normalized,
         "sequence": sequence,
         "timestampUtc": _assistant_utc_now(),
+        "traceId": trace_id,
+        "dataClass": data_class,
         "data": data,
     }
 

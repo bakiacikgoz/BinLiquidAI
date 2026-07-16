@@ -85,6 +85,60 @@ describe('assistant mappers', () => {
     expect(duplicate.turns[0].assistantMessage.text).toBe('Hello');
   });
 
+  it('maps v3 text, artifact, and form events while preserving v2 token support', () => {
+    const withText = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0',
+        eventId: 'event-1',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'text_delta',
+        sequence: 1,
+        timestampUtc: '2026-07-16T08:00:00Z',
+        traceId: 'trace-1',
+        dataClass: 'internal',
+        data: { text: 'Draft' },
+      },
+      started(),
+    );
+    const withArtifact = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0',
+        eventId: 'event-2',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'artifact_committed',
+        sequence: 2,
+        timestampUtc: '2026-07-16T08:00:01Z',
+        traceId: 'trace-1',
+        dataClass: 'internal',
+        data: { artifactId: 'artifact-1', revisionId: 'revision-1', kind: 'document' },
+      },
+      withText,
+    );
+    const withForm = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0',
+        eventId: 'event-3',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'form_requested',
+        sequence: 3,
+        timestampUtc: '2026-07-16T08:00:02Z',
+        traceId: 'trace-1',
+        dataClass: 'confidential',
+        data: { artifactId: 'form-1', revisionId: 'revision-form-1', schema: { type: 'object' } },
+      },
+      withArtifact,
+    );
+
+    expect(withForm.turns[0].assistantMessage.text).toBe('Draft');
+    expect(withForm.referencedArtifacts).toEqual([
+      expect.objectContaining({ artifactId: 'artifact-1', revisionId: 'revision-1', kind: 'document' }),
+      expect.objectContaining({ artifactId: 'form-1', revisionId: 'revision-form-1', kind: 'form' }),
+    ]);
+  });
+
   it('marks final events as completed with metrics', () => {
     const completed = mapCliAssistantEvent(
       {

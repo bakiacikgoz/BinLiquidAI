@@ -224,6 +224,66 @@ def test_assistant_stream_contract_accepts_cancelled_terminal_event() -> None:
     assert event.event == "cancelled"
 
 
+def test_assistant_stream_v3_validates_artifact_and_form_events() -> None:
+    artifact = AssistantStreamEventPayloadContract.model_validate(
+        {
+            "contractVersion": "3.0",
+            "eventId": "event-artifact-1",
+            "assistantTurnId": "turn-artifact",
+            "sessionId": "session-artifact",
+            "event": "artifact_committed",
+            "sequence": 3,
+            "timestampUtc": "2026-07-16T08:00:00Z",
+            "traceId": "trace-artifact",
+            "dataClass": "internal",
+            "data": {
+                "artifactId": "artifact-1",
+                "revisionId": "revision-1",
+                "kind": "document",
+            },
+        }
+    )
+    form = AssistantStreamEventPayloadContract.model_validate(
+        {
+            "contractVersion": "3.0",
+            "eventId": "event-form-1",
+            "assistantTurnId": "turn-form",
+            "sessionId": "session-form",
+            "event": "form_requested",
+            "sequence": 4,
+            "timestampUtc": "2026-07-16T08:00:01Z",
+            "traceId": "trace-form",
+            "dataClass": "confidential",
+            "data": {
+                "artifactId": "form-1",
+                "revisionId": "revision-form-1",
+                "schema": {"type": "object", "properties": {}},
+            },
+        }
+    )
+
+    assert artifact.event_id == "event-artifact-1"
+    assert form.data_class == "confidential"
+
+
+def test_assistant_stream_v3_rejects_missing_identity_and_invalid_sequence() -> None:
+    payload = {
+        "contractVersion": "3.0",
+        "eventId": "event-invalid",
+        "assistantTurnId": "turn-invalid",
+        "sessionId": "session-invalid",
+        "event": "artifact_committed",
+        "sequence": 0,
+        "timestampUtc": "2026-07-16T08:00:00Z",
+        "traceId": "trace-invalid",
+        "dataClass": "internal",
+        "data": {"kind": "document"},
+    }
+
+    with pytest.raises(ValueError):
+        AssistantStreamEventPayloadContract.model_validate(payload)
+
+
 def test_assistant_runtime_v3_golden_covers_required_parity_scenarios() -> None:
     fixture_path = (
         Path(__file__).resolve().parents[1]

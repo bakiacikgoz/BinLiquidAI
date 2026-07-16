@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from imperaos.control_plane.models import (
     ClaimMatrix,
@@ -271,27 +271,109 @@ class AssistantStartTurnPayloadContract(ContractModel):
     status: Literal["started"]
 
 
+class AssistantArtifactEventDataContract(ContractModel):
+    artifact_id: str = Field(alias="artifactId", min_length=1, max_length=128)
+    revision_id: str | None = Field(default=None, alias="revisionId", max_length=128)
+    proposal_id: str | None = Field(default=None, alias="proposalId", max_length=128)
+    kind: (
+        Literal["document", "form", "code", "flow", "spreadsheet", "canvas", "slides"]
+        | None
+    ) = None
+    title: str | None = Field(default=None, max_length=200)
+    base_revision_number: int | None = Field(default=None, alias="baseRevisionNumber", ge=1)
+    summary: str | None = Field(default=None, max_length=500)
+    status: str | None = Field(default=None, max_length=64)
+
+
+class AssistantFormRequestedDataContract(ContractModel):
+    artifact_id: str = Field(alias="artifactId", min_length=1, max_length=128)
+    revision_id: str = Field(alias="revisionId", min_length=1, max_length=128)
+    schema_: dict[str, Any] = Field(alias="schema")
+    ui_schema: dict[str, Any] = Field(default_factory=dict, alias="uiSchema")
+    title: str | None = Field(default=None, max_length=200)
+
+
+class AssistantFormSubmittedDataContract(ContractModel):
+    artifact_id: str = Field(alias="artifactId", min_length=1, max_length=128)
+    revision_id: str = Field(alias="revisionId", min_length=1, max_length=128)
+    submission_id: str = Field(alias="submissionId", min_length=1, max_length=128)
+    status: Literal["accepted", "rejected", "pending_continuation"]
+
+
+class AssistantToolResultDataContract(ContractModel):
+    tool_call_id: str = Field(alias="toolCallId", min_length=1, max_length=128)
+    tool_name: str = Field(alias="toolName", min_length=1, max_length=128)
+    status: Literal["succeeded", "failed", "denied"]
+    result: dict[str, Any] = Field(default_factory=dict)
+
+
 class AssistantStreamEventPayloadContract(ContractModel):
     contract_version: Literal["3.0"] = Field(alias="contractVersion")
+    event_id: str | None = Field(default=None, alias="eventId", min_length=1, max_length=128)
     assistant_turn_id: str = Field(alias="assistantTurnId")
     session_id: str = Field(alias="sessionId")
     event: Literal[
         "status",
         "token",
+        "delta",
+        "text_delta",
         "router_decision",
         "policy_decision",
         "approval_pending",
         "expert_start",
         "expert_end",
+        "artifact_proposed",
+        "artifact_committed",
+        "artifact_patch_proposed",
+        "artifact_patch_applied",
+        "form_requested",
+        "form_submitted",
+        "tool_result",
         "audit_artifact",
         "final",
         "warning",
         "error",
         "cancelled",
     ]
-    sequence: int
+    sequence: int = Field(ge=1)
     timestamp_utc: str = Field(alias="timestampUtc")
+    trace_id: str | None = Field(default=None, alias="traceId", max_length=128)
+    data_class: Literal["public", "internal", "confidential", "regulated"] | None = Field(
+        default=None, alias="dataClass"
+    )
     data: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_typed_event_data(self) -> AssistantStreamEventPayloadContract:
+        v3_events = {
+            "artifact_proposed",
+            "artifact_committed",
+            "artifact_patch_proposed",
+            "artifact_patch_applied",
+            "form_requested",
+            "form_submitted",
+            "tool_result",
+        }
+        if self.event not in v3_events:
+            return self
+        if self.event_id is None or self.trace_id is None or self.data_class is None:
+            raise ValueError("v3 typed events require eventId, traceId, and dataClass")
+        if self.event.startswith("artifact_"):
+            parsed = AssistantArtifactEventDataContract.model_validate(self.data)
+            if (
+                self.event in {"artifact_committed", "artifact_patch_applied"}
+                and parsed.revision_id is None
+            ):
+                raise ValueError("committed artifact events require revisionId")
+            if self.event.startswith("artifact_patch_") and parsed.proposal_id is None:
+                raise ValueError("artifact patch events require proposalId")
+        elif self.event == "form_requested":
+            AssistantFormRequestedDataContract.model_validate(self.data)
+        elif self.event == "form_submitted":
+            AssistantFormSubmittedDataContract.model_validate(self.data)
+        else:
+            AssistantToolResultDataContract.model_validate(self.data)
+        return self
 
 
 class ApprovalPendingPayloadContract(ContractModel):
