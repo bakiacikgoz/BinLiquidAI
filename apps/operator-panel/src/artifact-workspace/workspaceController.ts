@@ -45,6 +45,7 @@ export type ArtifactWorkspaceAction =
       content: ArtifactContent;
     }
   | { type: 'saveFailed'; artifactId: string; message: string }
+  | { type: 'saveNoop'; artifactId: string }
   | { type: 'saveConflicted'; artifactId: string; remote: ArtifactReadResult }
   | { type: 'metadataUpdated'; operation: ArtifactOperationResult }
   | { type: 'closeRequested'; artifactId: string }
@@ -133,23 +134,39 @@ export function artifactWorkspaceReducer(
         saveError: null,
       }));
     case 'saveSucceeded':
-      return replaceTab(state, action.artifactId, (tab) => ({
-        ...tab,
-        artifact: action.operation.artifact,
-        revision: action.operation.revision,
-        persistedContent: action.content,
-        draftContent: action.content,
-        dirty: false,
-        saveState: action.operation.disposition === 'no_op' ? 'idle' : 'saved',
-        saveError: null,
-        conflict: null,
-      }));
+      return replaceTab(state, action.artifactId, (tab) => {
+        const hasNewerDraft = tab.draftContent !== action.content;
+        return {
+          ...tab,
+          artifact: action.operation.artifact,
+          revision: action.operation.revision,
+          persistedContent: action.content,
+          draftContent: hasNewerDraft ? tab.draftContent : action.content,
+          dirty: hasNewerDraft,
+          saveState: hasNewerDraft
+            ? 'dirty'
+            : action.operation.disposition === 'no_op'
+              ? 'idle'
+              : 'saved',
+          saveError: null,
+          conflict: null,
+        };
+      });
     case 'saveFailed':
       return replaceTab(state, action.artifactId, (tab) => ({
         ...tab,
         dirty: true,
         saveState: 'error',
         saveError: action.message,
+      }));
+    case 'saveNoop':
+      return replaceTab(state, action.artifactId, (tab) => ({
+        ...tab,
+        persistedContent: tab.draftContent,
+        dirty: false,
+        saveState: 'idle',
+        saveError: null,
+        conflict: null,
       }));
     case 'saveConflicted':
       return replaceTab(state, action.artifactId, (tab) => ({
