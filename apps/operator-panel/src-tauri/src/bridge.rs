@@ -1,3 +1,7 @@
+use crate::artifact_rpc::{
+    build_trusted_request, SupervisorError, TrustedArtifactIdentity, WorkspaceRpcLaunch,
+    WorkspaceRpcRegistry,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -123,6 +127,207 @@ impl BridgeConfig {
             .unwrap_or(".imperaos/team/jobs")
             .to_string()
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArtifactBridgePayload {
+    params: Value,
+    idempotency_key: Option<String>,
+    timeout_ms: Option<u64>,
+}
+
+macro_rules! artifact_bridge_command {
+    ($name:ident, $method:literal) => {
+        #[tauri::command]
+        pub async fn $name(
+            app: tauri::AppHandle,
+            payload: ArtifactBridgePayload,
+        ) -> BridgeResult<Value> {
+            bridge_artifact_rpc_call(app, $method.to_string(), payload).await
+        }
+    };
+}
+
+artifact_bridge_command!(bridge_artifact_list, "artifact.list");
+artifact_bridge_command!(bridge_artifact_get, "artifact.get");
+artifact_bridge_command!(bridge_artifact_create, "artifact.create");
+artifact_bridge_command!(bridge_artifact_mutate, "artifact.mutate");
+artifact_bridge_command!(
+    bridge_artifact_propose_mutation,
+    "artifact.propose_mutation"
+);
+artifact_bridge_command!(bridge_artifact_apply_proposal, "artifact.apply_proposal");
+artifact_bridge_command!(bridge_artifact_history, "artifact.history");
+artifact_bridge_command!(bridge_artifact_restore, "artifact.restore");
+artifact_bridge_command!(bridge_artifact_archive, "artifact.archive");
+artifact_bridge_command!(bridge_artifact_duplicate, "artifact.duplicate");
+artifact_bridge_command!(bridge_artifact_asset_import, "artifact.asset.import");
+artifact_bridge_command!(bridge_artifact_form_submit, "artifact.form.submit");
+artifact_bridge_command!(bridge_artifact_export_begin, "artifact.export.begin");
+artifact_bridge_command!(bridge_artifact_export_commit, "artifact.export.commit");
+artifact_bridge_command!(bridge_artifact_export_cancel, "artifact.export.cancel");
+artifact_bridge_command!(bridge_artifact_import_evidence, "artifact.import_evidence");
+
+async fn bridge_artifact_rpc_call(
+    app: tauri::AppHandle,
+    method: String,
+    payload: ArtifactBridgePayload,
+) -> BridgeResult<Value> {
+    let registry = app.state::<WorkspaceRpcRegistry>();
+    let config = trusted_artifact_bridge_config();
+    let identity = match resolve_trusted_artifact_identity(&config, &app).await {
+        Ok(identity) => identity,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let resolved = match resolve_cli_command(&config, app_resource_dir(&app).as_deref()) {
+        Ok(resolved) => resolved,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let artifact_root = default_cli_workdir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".imperaos")
+        .join("artifacts");
+    let launch =
+        match WorkspaceRpcLaunch::new(resolved.program, resolved.prefix_args, artifact_root) {
+            Ok(launch) => launch,
+            Err(error) => return BridgeResult::err(supervisor_bridge_error(&method, error)),
+        };
+    let timeout_ms = payload
+        .timeout_ms
+        .unwrap_or(DEFAULT_TIMEOUT_MS)
+        .clamp(1, 120_000);
+    let request = match build_trusted_request(
+        &method,
+        payload.params,
+        &identity,
+        payload.idempotency_key,
+        timeout_ms,
+    ) {
+        Ok(request) => request,
+        Err(error) => return BridgeResult::err(supervisor_bridge_error(&method, error)),
+    };
+    let supervisor = match registry.get_or_start(launch).await {
+        Ok(supervisor) => supervisor,
+        Err(error) => return BridgeResult::err(supervisor_bridge_error(&method, error)),
+    };
+    match supervisor
+        .call(request, Duration::from_millis(timeout_ms))
+        .await
+    {
+        Ok(value) => BridgeResult::ok(value),
+        Err(error) => BridgeResult::err(supervisor_bridge_error(&method, error)),
+    }
+}
+
+fn trusted_artifact_bridge_config() -> BridgeConfig {
+    BridgeConfig {
+        mode: Some("auto".to_string()),
+        cli_path: None,
+        bundled_python_path: None,
+        profile: Some(
+            std::env::var("IMPERAOS_PROFILE").unwrap_or_else(|_| "enterprise".to_string()),
+        ),
+        root_dir: None,
+        env: HashMap::new(),
+        timeout_ms: Some(DEFAULT_TIMEOUT_MS),
+    }
+}
+
+async fn resolve_trusted_artifact_identity(
+    config: &BridgeConfig,
+    app: &tauri::AppHandle,
+) -> Result<TrustedArtifactIdentity, BridgeError> {
+    let profile = config.profile();
+    let workspace_id = match std::env::var("IMPERAOS_WORKSPACE_ID") {
+        Ok(value) if !value.trim().is_empty() => value.trim().to_string(),
+        _ if profile != "enterprise" => "local".to_string(),
+        _ => {
+            return Err(BridgeError::new(
+                "ARTIFACT_PERMISSION_DENIED",
+                "Trusted artifact workspace identity is unavailable.",
+                "",
+                "artifact identity",
+                false,
+            ))
+        }
+    };
+
+    if profile == "enterprise" {
+        let whoami = run_cli_json_owned_with_resource_dir(
+            config,
+            vec![
+                "auth".to_string(),
+                "whoami".to_string(),
+                "--profile".to_string(),
+                profile,
+                "--json".to_string(),
+            ],
+            app_resource_dir(app).as_deref(),
+        )
+        .await?;
+        if whoami.get("verified").and_then(Value::as_bool) != Some(true) {
+            return Err(BridgeError::new(
+                "ARTIFACT_PERMISSION_DENIED",
+                "Trusted artifact principal could not be verified.",
+                "",
+                "artifact identity",
+                false,
+            ));
+        }
+        let actor = whoami
+            .get("actor")
+            .and_then(Value::as_object)
+            .ok_or_else(|| {
+                BridgeError::new(
+                    "ARTIFACT_PERMISSION_DENIED",
+                    "Trusted artifact principal is missing.",
+                    "",
+                    "artifact identity",
+                    false,
+                )
+            })?;
+        let principal_id = actor
+            .get("actor_id")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let roles = actor
+            .get("roles")
+            .and_then(Value::as_array)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        return TrustedArtifactIdentity::new(workspace_id, principal_id, "user", roles)
+            .map_err(|error| supervisor_bridge_error("artifact identity", error));
+    }
+
+    let principal_id = std::env::var("IMPERAOS_ACTOR_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "local-user".to_string());
+    let roles = std::env::var("IMPERAOS_ARTIFACT_ROLES")
+        .ok()
+        .map(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .filter(|role| !role.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .filter(|roles| !roles.is_empty())
+        .unwrap_or_else(|| vec!["artifact_admin".to_string()]);
+    TrustedArtifactIdentity::new(workspace_id, principal_id, "user", roles)
+        .map_err(|error| supervisor_bridge_error("artifact identity", error))
+}
+
+fn supervisor_bridge_error(command: &str, error: SupervisorError) -> BridgeError {
+    BridgeError::new(&error.code, error.message, "", command, error.retryable)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2496,6 +2701,18 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
     };
 
     for key in env_keys {
+        if let Ok(value) = std::env::var(key) {
+            command.env(key, value);
+        }
+    }
+    for key in [
+        "IMPERAOS_PROFILE",
+        "IMPERAOS_WORKSPACE_ID",
+        "IMPERAOS_IDENTITY_ASSERTION_PATH",
+        "IMPERAOS_BREAK_GLASS_ASSERTION_PATH",
+        "IMPERAOS_ACTOR_ID",
+        "IMPERAOS_ARTIFACT_ROLES",
+    ] {
         if let Ok(value) = std::env::var(key) {
             command.env(key, value);
         }

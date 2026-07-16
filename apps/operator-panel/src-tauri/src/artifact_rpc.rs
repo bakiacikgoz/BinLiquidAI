@@ -3,7 +3,10 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::Mutex;
@@ -13,6 +16,32 @@ const RPC_MAX_FRAME_BYTES: usize = 32 * 1024 * 1024;
 const RPC_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 const RPC_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_RESTART_ATTEMPTS: u8 = 3;
+const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
+    "artifact.list",
+    "artifact.get",
+    "artifact.create",
+    "artifact.mutate",
+    "artifact.propose_mutation",
+    "artifact.apply_proposal",
+    "artifact.history",
+    "artifact.restore",
+    "artifact.archive",
+    "artifact.duplicate",
+    "artifact.asset.import",
+    "artifact.form.submit",
+    "artifact.export.begin",
+    "artifact.export.commit",
+    "artifact.export.cancel",
+    "artifact.import_evidence",
+];
+const MUTATION_METHODS_WITH_KEYS: &[&str] = &[
+    "artifact.create",
+    "artifact.mutate",
+    "artifact.propose_mutation",
+    "artifact.restore",
+    "artifact.duplicate",
+];
+static REQUEST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone)]
 pub struct WorkspaceRpcLaunch {
@@ -64,6 +93,134 @@ impl WorkspaceRpcLaunch {
         }
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TrustedArtifactIdentity {
+    workspace_id: String,
+    principal_id: String,
+    principal_type: String,
+    roles: Vec<String>,
+}
+
+impl TrustedArtifactIdentity {
+    pub fn new(
+        workspace_id: impl Into<String>,
+        principal_id: impl Into<String>,
+        principal_type: impl Into<String>,
+        roles: Vec<String>,
+    ) -> Result<Self, SupervisorError> {
+        let identity = Self {
+            workspace_id: workspace_id.into(),
+            principal_id: principal_id.into(),
+            principal_type: principal_type.into(),
+            roles,
+        };
+        if !is_bounded_id(&identity.workspace_id)
+            || !is_bounded_id(&identity.principal_id)
+            || !matches!(
+                identity.principal_type.as_str(),
+                "user" | "assistant" | "system" | "import"
+            )
+            || identity.roles.len() > 64
+            || identity.roles.iter().any(|role| !is_bounded_id(role))
+        {
+            return Err(SupervisorError::new(
+                "ARTIFACT_PERMISSION_DENIED",
+                "trusted artifact identity is invalid",
+                false,
+            ));
+        }
+        Ok(identity)
+    }
+}
+
+pub fn build_trusted_request(
+    method: &str,
+    params: Value,
+    identity: &TrustedArtifactIdentity,
+    idempotency_key: Option<String>,
+    deadline_ms: u64,
+) -> Result<Value, SupervisorError> {
+    if !ALLOWED_ARTIFACT_METHODS.contains(&method) {
+        return Err(SupervisorError::protocol(
+            "artifact RPC method is not allowlisted",
+        ));
+    }
+    if !(1..=120_000).contains(&deadline_ms) {
+        return Err(SupervisorError::protocol(
+            "artifact RPC deadline is outside its boundary",
+        ));
+    }
+    let params_object = params
+        .as_object()
+        .ok_or_else(|| SupervisorError::protocol("artifact RPC params must be an object"))?;
+    if [
+        "principal",
+        "principalId",
+        "principalType",
+        "roles",
+        "workspaceId",
+    ]
+    .iter()
+    .any(|key| params_object.contains_key(*key))
+    {
+        return Err(SupervisorError::new(
+            "ARTIFACT_PERMISSION_DENIED",
+            "renderer params cannot override trusted artifact identity",
+            false,
+        ));
+    }
+    if let Some(key) = idempotency_key.as_ref() {
+        if !is_bounded_id(key) {
+            return Err(SupervisorError::protocol(
+                "artifact RPC idempotency key is invalid",
+            ));
+        }
+    }
+    if MUTATION_METHODS_WITH_KEYS.contains(&method)
+        && (idempotency_key.is_none()
+            || params_object.get("idempotencyKey").and_then(Value::as_str)
+                != idempotency_key.as_deref())
+    {
+        return Err(SupervisorError::protocol(
+            "artifact RPC mutation idempotency key is not envelope-bound",
+        ));
+    }
+    let sequence = REQUEST_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    Ok(json!({
+        "contractVersion": RPC_CONTRACT_VERSION,
+        "requestId": format!("tauri-{timestamp}-{sequence}"),
+        "method": method,
+        "workspaceId": identity.workspace_id,
+        "principal": {
+            "principalId": identity.principal_id,
+            "principalType": identity.principal_type,
+            "roles": identity.roles,
+        },
+        "idempotencyKey": idempotency_key,
+        "deadlineMs": deadline_ms,
+        "params": params,
+    }))
+}
+
+fn is_bounded_id(value: &str) -> bool {
+    if value.is_empty() || value.len() > 128 {
+        return false;
+    }
+    let mut characters = value.chars();
+    let Some(first) = characters.next() else {
+        return false;
+    };
+    first.is_ascii_alphanumeric()
+        && characters.all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+        })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -153,6 +310,35 @@ struct SupervisorState {
 pub struct WorkspaceRpcSupervisor {
     launch: WorkspaceRpcLaunch,
     state: Mutex<SupervisorState>,
+}
+
+#[derive(Default)]
+pub struct WorkspaceRpcRegistry {
+    supervisor: Mutex<Option<Arc<WorkspaceRpcSupervisor>>>,
+}
+
+impl WorkspaceRpcRegistry {
+    pub async fn get_or_start(
+        &self,
+        launch: WorkspaceRpcLaunch,
+    ) -> Result<Arc<WorkspaceRpcSupervisor>, SupervisorError> {
+        let supervisor = {
+            let mut guard = self.supervisor.lock().await;
+            guard
+                .get_or_insert_with(|| Arc::new(WorkspaceRpcSupervisor::new(launch)))
+                .clone()
+        };
+        supervisor.start().await?;
+        Ok(supervisor)
+    }
+
+    pub async fn shutdown(&self) -> Result<(), SupervisorError> {
+        let supervisor = self.supervisor.lock().await.take();
+        if let Some(supervisor) = supervisor {
+            supervisor.shutdown().await?;
+        }
+        Ok(())
+    }
 }
 
 impl WorkspaceRpcSupervisor {
@@ -592,5 +778,38 @@ mod tests {
         assert_eq!(&framed[..4], &(payload.len() as u32).to_be_bytes());
         assert_eq!(&framed[4..], payload);
         assert!(encode_frame(&vec![0; 1025], 1024).is_err());
+    }
+
+    #[test]
+    fn trusted_request_builder_enforces_route_and_identity_boundaries() {
+        let identity = TrustedArtifactIdentity::new(
+            "workspace-1",
+            "user-1",
+            "user",
+            vec!["artifact_editor".to_string()],
+        )
+        .expect("identity should validate");
+        let request = build_trusted_request(
+            "artifact.get",
+            json!({"artifactId": "artifact-1"}),
+            &identity,
+            None,
+            5000,
+        )
+        .expect("request should build");
+
+        assert_eq!(request["workspaceId"], "workspace-1");
+        assert_eq!(request["principal"]["principalId"], "user-1");
+        assert!(
+            build_trusted_request("artifact.unknown", json!({}), &identity, None, 5000,).is_err()
+        );
+        assert!(build_trusted_request(
+            "artifact.get",
+            json!({"artifactId": "artifact-1", "workspaceId": "other"}),
+            &identity,
+            None,
+            5000,
+        )
+        .is_err());
     }
 }
