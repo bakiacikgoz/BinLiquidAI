@@ -56,7 +56,9 @@ export type AssistantSessionActions = {
 export function useAssistantSession(
   settings: PanelSettings,
   getContext: () => AssistantContextSnapshot,
+  options: { enabled?: boolean } = {},
 ): { state: AssistantSessionState; actions: AssistantSessionActions } {
+  const enabled = options.enabled ?? true;
   const [state, setState] = useState<AssistantSessionState>(() => createAssistantSession());
   const stateRef = useRef(state);
   const eventQueueRef = useRef<AssistantStreamEvent[]>([]);
@@ -124,6 +126,9 @@ export function useAssistantSession(
   );
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     let cancelled = false;
     let cleanup: (() => void) | undefined;
     void listenAssistantEvents((event) => {
@@ -142,7 +147,7 @@ export function useAssistantSession(
       timeoutTimersRef.current.clear();
       cleanup?.();
     };
-  }, [applyEvent]);
+  }, [applyEvent, enabled]);
 
   useEffect(() => {
     state.turns.forEach((turn) => {
@@ -159,7 +164,7 @@ export function useAssistantSession(
       controls?: AssistantComposerControls,
     ) => {
       const userMessage = message.trim();
-      if (!userMessage || ['starting', 'streaming'].includes(stateRef.current.status)) {
+      if (!enabled || !userMessage || ['starting', 'streaming'].includes(stateRef.current.status)) {
         return;
       }
 
@@ -225,7 +230,7 @@ export function useAssistantSession(
         );
       }
     },
-    [applyEvent, armTurnTimeout, clearTurnTimeout, getContext, settings],
+    [applyEvent, armTurnTimeout, clearTurnTimeout, enabled, getContext, settings],
   );
 
   const newChat = useCallback(() => {

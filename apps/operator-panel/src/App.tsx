@@ -84,7 +84,7 @@ import {
   buildSystemHealthSummary,
   mapWorkspaceStageToMissionStage,
 } from './missionMappers';
-import { useAssistantSession } from './assistant/useAssistantSession';
+import { useAssistantRuntimeSession } from './assistant/useAssistantRuntimeSession';
 import { useAssistantModels } from './assistant/useAssistantModels';
 import type { AssistantProviderKind } from './assistant/modelDiscovery';
 import { MissionControlView } from './components/mission/MissionControlView';
@@ -1544,7 +1544,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     setActiveView('runs');
     setRunTab('stream');
   }
-  const assistantSession = useAssistantSession(settings, () => ({
+  const assistantSession = useAssistantRuntimeSession(settings, () => ({
     selectedRunId,
     selectedRunStatus: runStatus,
     selectedRunEvents: events,

@@ -1,7 +1,7 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai';
 
 import { normalizeAssistantStreamEvent } from './assistantMappers';
-import type { AssistantStreamEvent } from './assistantTypes';
+import type { AssistantComposerControls, AssistantStreamEvent } from './assistantTypes';
 
 
 export type ImperaUIDataParts = {
@@ -12,7 +12,14 @@ export type ImperaUIDataParts = {
 };
 
 export type ImperaUIMessage = UIMessage<
-  { traceId?: string; dataClass?: string },
+  {
+    traceId?: string;
+    dataClass?: string;
+    turnId?: string;
+    createdAtUtc?: string;
+    selectedRunId?: string;
+    controls?: AssistantComposerControls;
+  },
   ImperaUIDataParts
 >;
 
