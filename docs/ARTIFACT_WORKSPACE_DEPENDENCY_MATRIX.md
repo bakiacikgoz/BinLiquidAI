@@ -4,7 +4,7 @@
 - Owner: MAIN / Artifact Workspace
 - Authoritative sources: approved artifact workspace plan Task 1.1; `contracts/artifact_workspace/dependency_matrix.json`; official package documentation linked below
 - Last verified: 2026-07-16 at Git commit `d79f5e4c40573ccd99dfd07eca4ca54c1b1f545c`
-- Open decisions: commercial Handsontable and tldraw entitlements; dynamic RJSF validator implementation; secondary lockfile removal
+- Open decisions: commercial Handsontable and tldraw entitlements; dynamic RJSF validator implementation
 
 ## Decision
 
@@ -30,13 +30,12 @@ The machine-readable source is `contracts/artifact_workspace/dependency_matrix.j
 
 ## Compatibility result
 
-Current decision probe result is valid but release readiness is false because:
+The Phase 2 dependency/CSP probe is valid but release readiness remains false because:
 
-- Tauri CSP is `null`.
-- Required Phase 2 packages are not installed yet.
-- A second app-local lockfile exists.
 - Commercial editor entitlements are not recorded.
 - RJSF runtime-dynamic validation has no proven no-eval renderer implementation.
+
+All required Phase 2 packages are exact-pinned in the root workspace lockfile. The redundant app-local lockfile was removed. Tauri CSP is non-null, local-only, and contains no `unsafe-eval`; editor-specific production probes remain required before their feature flags can open.
 
 Run:
 

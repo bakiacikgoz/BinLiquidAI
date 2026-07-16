@@ -27,13 +27,16 @@ def test_artifact_dependency_matrix_uses_exact_unique_versions() -> None:
     }
 
 
-def test_artifact_compatibility_probe_fails_closed_on_current_release_blockers() -> None:
+def test_artifact_compatibility_probe_accepts_phase2_but_keeps_license_gates_closed() -> None:
     report = evaluate_dependency_matrix(REPO_ROOT)
     reason_codes = {blocker["code"] for blocker in report["blockers"]}
 
     assert report["matrixValid"] is True
     assert report["releaseReady"] is False
-    assert "CSP_DISABLED" in reason_codes
-    assert "MISSING_REQUIRED_DEPENDENCY" in reason_codes
     assert "LICENSE_GATE_BLOCKED" in reason_codes
+    assert "CSP_DISABLED" not in reason_codes
+    assert "CSP_UNSAFE_EVAL_FORBIDDEN" not in reason_codes
+    assert "MISSING_REQUIRED_DEPENDENCY" not in reason_codes
+    assert "DEPENDENCY_VERSION_MISMATCH" not in reason_codes
+    assert "SECONDARY_LOCKFILE_PRESENT" not in reason_codes
     assert report["canonicalLockfile"] == "pnpm-lock.yaml"
