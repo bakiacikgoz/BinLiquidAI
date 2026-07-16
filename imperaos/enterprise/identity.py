@@ -11,6 +11,20 @@ from pydantic import BaseModel, ConfigDict, Field
 from imperaos.enterprise.signing import TrustedKey, canonical_payload_hash
 from imperaos.runtime.config import RuntimeConfig
 
+_ARTIFACT_ALL_PERMISSIONS = {
+    "artifact.read",
+    "artifact.create",
+    "artifact.update",
+    "artifact.restore",
+    "artifact.archive",
+    "artifact.duplicate",
+    "artifact.export",
+    "artifact.asset.import",
+    "artifact.form.submit",
+    "artifact.ai.propose",
+    "artifact.ai.apply",
+}
+
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "platform_admin": {
         "runtime.run",
@@ -22,6 +36,17 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "backup.create",
         "restore.verify",
         "support.export",
+        "artifact.read",
+        "artifact.create",
+        "artifact.update",
+        "artifact.restore",
+        "artifact.archive",
+        "artifact.duplicate",
+        "artifact.export",
+        "artifact.asset.import",
+        "artifact.form.submit",
+        "artifact.ai.propose",
+        "artifact.ai.apply",
     },
     "security_admin": {
         "approval.decide",
@@ -46,14 +71,38 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "audit.read",
         "replay.verify",
         "config.read",
+        "artifact.read",
+        "artifact.create",
+        "artifact.update",
+        "artifact.restore",
+        "artifact.archive",
+        "artifact.duplicate",
+        "artifact.export",
+        "artifact.asset.import",
+        "artifact.form.submit",
+        "artifact.ai.propose",
     },
     "auditor": {
         "audit.read",
         "audit.export",
         "replay.verify",
         "config.read",
+        "artifact.read",
     },
-    "observer": {"config.read", "audit.read"},
+    "observer": {"config.read", "audit.read", "artifact.read"},
+    "artifact_admin": set(_ARTIFACT_ALL_PERMISSIONS),
+    "artifact_editor": {
+        "artifact.read",
+        "artifact.create",
+        "artifact.update",
+        "artifact.restore",
+        "artifact.duplicate",
+        "artifact.export",
+        "artifact.asset.import",
+        "artifact.form.submit",
+        "artifact.ai.propose",
+    },
+    "artifact_viewer": {"artifact.read"},
 }
 
 

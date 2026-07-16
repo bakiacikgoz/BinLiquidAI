@@ -28,6 +28,12 @@ from imperaos.artifacts.models import (
     can_transition_data_class,
     canonical_json,
 )
+from imperaos.artifacts.policy import (
+    ArtifactPermission,
+    ArtifactPolicyAction,
+    ArtifactPolicyDecision,
+    ArtifactPolicyGateway,
+)
 from imperaos.artifacts.store import (
     ArtifactStore,
     RevisionWriteResult,
@@ -49,6 +55,10 @@ __all__ = [
     "ArtifactKind",
     "ArtifactMigration",
     "ArtifactMigrationReport",
+    "ArtifactPermission",
+    "ArtifactPolicyAction",
+    "ArtifactPolicyDecision",
+    "ArtifactPolicyGateway",
     "ArtifactRevisionDescriptor",
     "ArtifactStatus",
     "ArtifactStore",
