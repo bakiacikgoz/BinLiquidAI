@@ -1,0 +1,72 @@
+{
+  "generatedFrom": "imperaos.artifacts",
+  "schemaVersion": "artifact-workspace.contract-manifest/v1",
+  "schemas": [
+    {
+      "category": "content",
+      "file": "document.v1.schema.json",
+      "name": "document.v1",
+      "sha256": "7f6b89650c775ade47e4bf19cffe8b7811c0595c60d313f6b429b93b866efab9"
+    },
+    {
+      "category": "content",
+      "file": "form.v1.schema.json",
+      "name": "form.v1",
+      "sha256": "8fc121b102c9c1cd360bc894146bc98963d3d5e0a5747a3f1234af722058e9c9"
+    },
+    {
+      "category": "content",
+      "file": "code.v1.schema.json",
+      "name": "code.v1",
+      "sha256": "5e1ae05ab3a74efc48f608265a28c64ea180aac1f2df89ee9cdce326c35cdbe3"
+    },
+    {
+      "category": "content",
+      "file": "flow.v1.schema.json",
+      "name": "flow.v1",
+      "sha256": "afeb88068aef06cd4f3d87c8c8583e4e88c68e8d975afa551f7a09373216c67f"
+    },
+    {
+      "category": "content",
+      "file": "spreadsheet.v1.schema.json",
+      "name": "spreadsheet.v1",
+      "sha256": "8c906188e7ac749817455c9288fbb22788830bad540a784f4f77642fed2af365"
+    },
+    {
+      "category": "content",
+      "file": "canvas.v1.schema.json",
+      "name": "canvas.v1",
+      "sha256": "034f15b6c634a86cfb4c7fecaee1badf63bb8215f6d043719adf1a4511d3fe3e"
+    },
+    {
+      "category": "content",
+      "file": "slides.v1.schema.json",
+      "name": "slides.v1",
+      "sha256": "cf116b803dd4cc937b90664b2cb8b92a249e003931276832326861d71aaa2fc8"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-descriptor.v1.schema.json",
+      "name": "artifact-descriptor.v1",
+      "sha256": "ae18cb3c644cb5e119d4b95ae440ca1ce10bb10769de83ebf47ffc1cb2821af5"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-revision.v1.schema.json",
+      "name": "artifact-revision.v1",
+      "sha256": "d814b4665f75dbc302cf955a42a29430eba3f99b98883d353dfe9ef67020a427"
+    },
+    {
+      "category": "contract",
+      "file": "operation-context.v1.schema.json",
+      "name": "operation-context.v1",
+      "sha256": "bf9cebdd4fe5a74c685497f20f83726fb1af442214167a59251d135c63e1ea7f"
+    },
+    {
+      "category": "contract",
+      "file": "safe-json-patch.v1.schema.json",
+      "name": "safe-json-patch.v1",
+      "sha256": "5b43640479a73e7005f2e5b4e33542c0e2738803167265849c3d8d4916252c5a"
+    }
+  ]
+}
