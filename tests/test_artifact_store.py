@@ -72,7 +72,7 @@ def test_store_suppresses_noop_and_restores_as_a_new_revision(tmp_path: Path) ->
     assert restored.created is True
     assert store.get_revision("workspace-1", "artifact-1", "revision-3").content == b'{"version":1}'
     assert [item.revision_number for item in store.list_revisions("workspace-1", "artifact-1")] == [
-        1,
-        2,
         3,
+        2,
+        1,
     ]

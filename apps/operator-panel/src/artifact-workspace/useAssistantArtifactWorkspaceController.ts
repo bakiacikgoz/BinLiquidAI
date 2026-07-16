@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import type { AssistantSessionState } from '../assistant/assistantTypes';
 import { ArtifactAutosaveQueue } from './artifactAutosave';
 import { ArtifactBridgeError, artifactBridge as defaultBridge, type ArtifactBridge } from './artifactBridge';
+import { compareArtifactContent, type ArtifactDiffResult } from './artifactDiff';
 import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './artifactContracts';
 import { exportDocumentArtifact, type DocumentArtifactExportFormat } from './artifactDocumentExport';
 import { ArtifactWorkspaceController } from './workspaceController';
@@ -17,6 +18,18 @@ export type ArtifactWorkspaceUiError = {
   code: string;
   message: string;
   retryable: boolean;
+};
+
+export type ArtifactRevisionComparison = {
+  artifactId: string;
+  selectedRevisionId: string;
+  afterRevisionId: string;
+  status: 'loading' | 'ready' | 'error';
+  beforeRevisionNumber: number | null;
+  afterRevisionNumber: number;
+  dirtyDraftExcluded: boolean;
+  result: ArtifactDiffResult | null;
+  error: ArtifactWorkspaceUiError | null;
 };
 
 export interface AssistantArtifactWorkspaceControllerOptions {
@@ -64,13 +77,26 @@ export function useAssistantArtifactWorkspaceController({
   const [historyByArtifact, setHistoryByArtifact] = useState<Record<string, ArtifactRevision[]>>({});
   const [historyNextCursor, setHistoryNextCursor] = useState<Record<string, string | null>>({});
   const [historyLoadingArtifactId, setHistoryLoadingArtifactId] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<ArtifactRevisionComparison | null>(null);
+  const comparisonRequestSequence = useRef(0);
   const state = useSyncExternalStore(
     useCallback((listener) => controller.subscribe(listener), [controller]),
     useCallback(() => controller.getState(), [controller]),
     useCallback(() => controller.getState(), [controller]),
   );
 
+  const invalidateComparison = useCallback(() => {
+    comparisonRequestSequence.current += 1;
+    setComparison(null);
+  }, []);
+
   useEffect(() => () => autosave.dispose(), [autosave]);
+
+  useEffect(() => {
+    if (!comparison) return;
+    const tab = state.tabs.find((candidate) => candidate.artifact.artifactId === comparison.artifactId);
+    if (!tab || tab.revision.revisionId !== comparison.afterRevisionId) invalidateComparison();
+  }, [comparison, invalidateComparison, state.tabs]);
 
   const loadCatalog = useCallback(
     async (append = false) => {
@@ -128,6 +154,7 @@ export function useAssistantArtifactWorkspaceController({
 
   const openArtifact = useCallback(
     async (artifactId: string) => {
+      invalidateComparison();
       setOpen(true);
       if (controller.getState().tabs.some((tab) => tab.artifact.artifactId === artifactId)) {
         controller.activate(artifactId);
@@ -146,7 +173,7 @@ export function useAssistantArtifactWorkspaceController({
         setLoadingArtifactId(null);
       }
     },
-    [controller, loadHistory],
+    [controller, invalidateComparison, loadHistory],
   );
 
   const edit = useCallback(
@@ -154,8 +181,79 @@ export function useAssistantArtifactWorkspaceController({
     [autosave],
   );
 
+  const compareRevision = useCallback(
+    async (artifactId: string, revisionId: string) => {
+      const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+      if (!tab) return;
+      const requestSequence = ++comparisonRequestSequence.current;
+      setComparison({
+        artifactId,
+        selectedRevisionId: revisionId,
+        afterRevisionId: tab.revision.revisionId,
+        status: 'loading',
+        beforeRevisionNumber: null,
+        afterRevisionNumber: tab.revision.revisionNumber,
+        dirtyDraftExcluded: tab.dirty,
+        result: null,
+        error: null,
+      });
+      try {
+        const historical = await bridge.get({ artifactId, revisionId });
+        if (requestSequence !== comparisonRequestSequence.current) return;
+        if (
+          historical.artifact.artifactId !== artifactId ||
+          historical.revision.artifactId !== artifactId ||
+          historical.revision.revisionId !== revisionId
+        ) {
+          throw new Error('Historical revision identity mismatch.');
+        }
+        const current = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+        if (!current || current.artifact.kind !== historical.artifact.kind) {
+          throw new Error('Artifact comparison context changed.');
+        }
+        if (current.revision.revisionId !== tab.revision.revisionId) {
+          throw new Error('Artifact comparison context changed.');
+        }
+        setComparison({
+          artifactId,
+          selectedRevisionId: revisionId,
+          afterRevisionId: current.revision.revisionId,
+          status: 'ready',
+          beforeRevisionNumber: historical.revision.revisionNumber,
+          afterRevisionNumber: current.revision.revisionNumber,
+          dirtyDraftExcluded: current.dirty,
+          result: compareArtifactContent(historical.content, current.persistedContent),
+          error: null,
+        });
+      } catch (caught) {
+        if (requestSequence !== comparisonRequestSequence.current) return;
+        setComparison({
+          artifactId,
+          selectedRevisionId: revisionId,
+          afterRevisionId: tab.revision.revisionId,
+          status: 'error',
+          beforeRevisionNumber: null,
+          afterRevisionNumber: tab.revision.revisionNumber,
+          dirtyDraftExcluded: tab.dirty,
+          result: null,
+          error: normalizeWorkspaceError(caught, {
+            code: 'ARTIFACT_COMPARISON_FAILED',
+            message: 'The selected revisions could not be compared.',
+            retryable: true,
+          }),
+        });
+      }
+    },
+    [bridge, controller],
+  );
+
+  const closeComparison = useCallback(() => {
+    invalidateComparison();
+  }, [invalidateComparison]);
+
   const restoreArtifact = useCallback(
     async (artifactId: string, revisionId: string) => {
+      invalidateComparison();
       setError(null);
       setOperationNotice(null);
       try {
@@ -177,7 +275,7 @@ export function useAssistantArtifactWorkspaceController({
         }));
       }
     },
-    [autosave, controller, loadHistory],
+    [autosave, controller, invalidateComparison, loadHistory],
   );
 
   const exportDocument = useCallback(
@@ -223,7 +321,8 @@ export function useAssistantArtifactWorkspaceController({
     setCatalogNextCursor(null);
     setHistoryByArtifact({});
     setHistoryNextCursor({});
-  }, [autosave, controller]);
+    invalidateComparison();
+  }, [autosave, controller, invalidateComparison]);
 
   const toggle = useCallback(() => {
     if (!open && catalog.length === 0 && !catalogLoading) void loadCatalog(false);
@@ -236,8 +335,13 @@ export function useAssistantArtifactWorkspaceController({
       reset,
       selectLegacyArtifact: onSelectLegacyArtifact,
       openArtifact,
-      activate: (artifactId: string) => controller.activate(artifactId),
+      activate: (artifactId: string) => {
+        invalidateComparison();
+        controller.activate(artifactId);
+      },
       edit,
+      compareRevision,
+      closeComparison,
       flush: (artifactId?: string) => autosave.flush(artifactId),
       retrySave: (artifactId: string) => autosave.retry(artifactId),
       requestClose: (artifactId: string) => controller.requestClose(artifactId),
@@ -253,7 +357,7 @@ export function useAssistantArtifactWorkspaceController({
       loadHistory: (artifactId: string) => loadHistory(artifactId, false),
       loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [autosave, controller, edit, exportDocument, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, reset, restoreArtifact, toggle],
+    [autosave, closeComparison, compareRevision, controller, edit, exportDocument, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, reset, restoreArtifact, toggle],
   );
 
   const activeTab =
@@ -263,6 +367,11 @@ export function useAssistantArtifactWorkspaceController({
     assistantState.referencedArtifacts.length > 0 ||
     legacyArtifacts.length > 0 ||
     state.tabs.length > 0;
+  const visibleComparison = comparison
+    && activeTab?.artifact.artifactId === comparison.artifactId
+    && activeTab.revision.revisionId === comparison.afterRevisionId
+    ? comparison
+    : null;
 
   return {
     open,
@@ -280,6 +389,7 @@ export function useAssistantArtifactWorkspaceController({
     history: activeTab ? historyByArtifact[activeTab.artifact.artifactId] ?? [] : [],
     historyNextCursor: activeTab ? historyNextCursor[activeTab.artifact.artifactId] ?? null : null,
     historyLoadingArtifactId,
+    comparison: visibleComparison,
     actions,
   };
 }

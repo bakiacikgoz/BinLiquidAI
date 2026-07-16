@@ -61,6 +61,8 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
     contents.set(revision.revisionId, content);
     const exportRequests: Array<{ command: string; request: Record<string, unknown> }> = [];
     let pendingExportFormat = 'markdown';
+    let mutationGate: Promise<void> | null = null;
+    let releaseMutationGate: (() => void) | null = null;
 
     const ok = (data: unknown) => ({ ok: true, data, error: null });
     const operation = () => ({ artifact: descriptor, revision, created: false, disposition: 'updated' });
@@ -93,14 +95,46 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
     (window as unknown as { __artifactE2eState: unknown }).__artifactE2eState = {
       exportRequests,
       snapshot: () => ({ descriptor, revision, content, history: [...history] }),
+      holdMutations: () => {
+        if (mutationGate) return;
+        mutationGate = new Promise<void>((resolve) => { releaseMutationGate = resolve; });
+      },
+      releaseMutations: () => {
+        releaseMutationGate?.();
+        releaseMutationGate = null;
+        mutationGate = null;
+      },
+      seedBulkRevision: (addedBlocks: number) => {
+        nextRevision({
+          ...content,
+          blocks: [
+            ...content.blocks,
+            ...Array.from({ length: addedBlocks }, (_, index) => ({
+              id: `bulk-${String(index).padStart(4, '0')}`,
+              type: 'paragraph',
+              props: {},
+              content: [{ type: 'text', text: `Bulk block ${index}`, styles: {} }],
+              children: [],
+            })),
+          ],
+        }, 'replace_content', 'Seed bounded diff fixture');
+      },
     };
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: Record<string, unknown>) => {
         if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
-        if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
+        if (command === 'bridge_artifact_get') {
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          const requestedRevisionId = typeof params.revisionId === 'string' ? params.revisionId : revision.revisionId;
+          const requestedRevision = history.find((item) => item.revisionId === requestedRevisionId);
+          const requestedContent = contents.get(requestedRevisionId);
+          if (!requestedRevision || !requestedContent) throw new Error('Unknown artifact revision');
+          return ok({ artifact: descriptor, revision: requestedRevision, content: requestedContent });
+        }
         if (command === 'bridge_artifact_history') return ok({ items: history, next_cursor: null });
         if (command === 'bridge_artifact_mutate') {
           const params = (args.payload as { params: Record<string, unknown> }).params;
+          if (mutationGate) await mutationGate;
           nextRevision(params.content as typeof content, 'replace_content', String(params.changeSummary ?? 'Autosave'));
           return ok(operation());
         }

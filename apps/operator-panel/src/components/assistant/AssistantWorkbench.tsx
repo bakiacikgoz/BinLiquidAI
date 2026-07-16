@@ -3,8 +3,12 @@ import { useMemo, useState } from 'react';
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import type { ArtifactDescriptor, ArtifactRevision } from '../../artifact-workspace/artifactContracts';
 import type { ArtifactWorkspaceState } from '../../artifact-workspace/workspaceController';
-import type { ArtifactWorkspaceUiError } from '../../artifact-workspace/useAssistantArtifactWorkspaceController';
+import type {
+  ArtifactRevisionComparison,
+  ArtifactWorkspaceUiError,
+} from '../../artifact-workspace/useAssistantArtifactWorkspaceController';
 import { ArtifactEditorHost } from '../../artifact-workspace/editors/ArtifactEditorHost';
+import { ArtifactDiffView } from '../../artifact-workspace/ui/ArtifactDiffView';
 import { translateAssistantText, type UiLocale } from '../../i18n';
 import { Badge } from '../primitives/Badge';
 import { Button } from '../primitives/Button';
@@ -24,6 +28,7 @@ type WorkspaceProps = {
   history?: ArtifactRevision[];
   historyNextCursor?: string | null;
   historyLoading?: boolean;
+  comparison?: ArtifactRevisionComparison | null;
   onOpenArtifact?: (artifactId: string) => void;
   onActivateArtifact?: (artifactId: string) => void;
   onRequestClose?: (artifactId: string) => void;
@@ -31,6 +36,8 @@ type WorkspaceProps = {
   onLoadMoreCatalog?: () => void;
   onLoadHistory?: (artifactId: string) => void;
   onLoadMoreHistory?: (artifactId: string) => void;
+  onCompareRevision?: (artifactId: string, revisionId: string) => void;
+  onCloseComparison?: () => void;
   onEditArtifact?: (artifactId: string, content: ArtifactWorkspaceState['tabs'][number]['draftContent']) => void;
   onRestoreArtifact?: (artifactId: string, revisionId: string) => void;
   onExportArtifact?: (artifactId: string, format: 'markdown' | 'html') => void;
@@ -79,6 +86,7 @@ export function AssistantWorkbench({
   history = [],
   historyNextCursor = null,
   historyLoading = false,
+  comparison = null,
   onOpenArtifact,
   onActivateArtifact,
   onRequestClose,
@@ -86,6 +94,8 @@ export function AssistantWorkbench({
   onLoadMoreCatalog,
   onLoadHistory,
   onLoadMoreHistory,
+  onCompareRevision,
+  onCloseComparison,
   onEditArtifact,
   onRestoreArtifact,
   onExportArtifact,
@@ -127,6 +137,9 @@ export function AssistantWorkbench({
       );
     });
   }, [catalog, kindFilter, locale, search, statusFilter]);
+  const activeComparison = activeTab && comparison?.artifactId === activeTab.artifact.artifactId
+    ? comparison
+    : null;
 
   return (
     <aside className="assistant-workbench" aria-label={title}>
@@ -230,21 +243,38 @@ export function AssistantWorkbench({
               {activeTab.artifact.status === 'archived' ? (
                 <p className="artifact-workspace-banner">Archived artifacts are read-only.</p>
               ) : null}
-              <ArtifactEditorHost
-                artifact={activeTab.artifact}
-                revision={activeTab.revision}
-                content={activeTab.draftContent}
-                mode={activeTab.artifact.status === 'archived' ? 'view' : 'edit'}
-                saveState={activeTab.saveState}
-                onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
-                onSelectionChange={() => undefined}
-                onRequestExport={(format) => {
-                  if (format === 'markdown' || format === 'html') {
-                    onExportArtifact?.(activeTab.artifact.artifactId, format);
-                  }
-                }}
-              />
-              {activeTab.artifact.kind === 'document' ? (
+              {activeComparison?.status === 'loading' ? (
+                <p className="artifact-workspace-banner" role="status">Loading revision comparison…</p>
+              ) : null}
+              {activeComparison?.status === 'error' && activeComparison.error ? (
+                <p className="artifact-workspace-banner" role="alert">{activeComparison.error.message}</p>
+              ) : null}
+              {activeComparison?.status === 'ready' && activeComparison.result && activeComparison.beforeRevisionNumber !== null ? (
+                <ArtifactDiffView
+                  beforeRevisionNumber={activeComparison.beforeRevisionNumber}
+                  afterRevisionNumber={activeComparison.afterRevisionNumber}
+                  dirtyDraftExcluded={activeComparison.dirtyDraftExcluded}
+                  result={activeComparison.result}
+                  onClose={() => onCloseComparison?.()}
+                />
+              ) : null}
+              <div hidden={activeComparison?.status === 'ready'} aria-hidden={activeComparison?.status === 'ready' || undefined}>
+                <ArtifactEditorHost
+                  artifact={activeTab.artifact}
+                  revision={activeTab.revision}
+                  content={activeTab.draftContent}
+                  mode={activeTab.artifact.status === 'archived' ? 'view' : 'edit'}
+                  saveState={activeTab.saveState}
+                  onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
+                  onSelectionChange={() => undefined}
+                  onRequestExport={(format) => {
+                    if (format === 'markdown' || format === 'html') {
+                      onExportArtifact?.(activeTab.artifact.artifactId, format);
+                    }
+                  }}
+                />
+              </div>
+              {activeTab.artifact.kind === 'document' && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Document export">
                   <Button
                     variant="ghost"
@@ -276,14 +306,24 @@ export function AssistantWorkbench({
                     <span>{item.changeSummary || item.mutationType}</span>
                     <time dateTime={item.createdAtUtc}>{new Date(item.createdAtUtc).toLocaleString()}</time>
                     {item.revisionId !== activeTab.revision.revisionId ? (
-                      <Button
-                        variant="ghost"
-                        aria-label={`Restore revision ${item.revisionNumber}`}
-                        disabled={activeTab.artifact.status === 'archived' || activeTab.dirty || activeTab.saveState === 'saving'}
-                        onClick={() => onRestoreArtifact?.(activeTab.artifact.artifactId, item.revisionId)}
-                      >
-                        Restore
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          aria-label={`Compare revision ${item.revisionNumber}`}
+                          disabled={historyLoading}
+                          onClick={() => onCompareRevision?.(activeTab.artifact.artifactId, item.revisionId)}
+                        >
+                          Compare
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          aria-label={`Restore revision ${item.revisionNumber}`}
+                          disabled={activeTab.artifact.status === 'archived' || activeTab.dirty || activeTab.saveState === 'saving'}
+                          onClick={() => onRestoreArtifact?.(activeTab.artifact.artifactId, item.revisionId)}
+                        >
+                          Restore
+                        </Button>
+                      </>
                     ) : null}
                   </article>
                 )) : <p className="assistant-empty-state">No revision history loaded.</p>}

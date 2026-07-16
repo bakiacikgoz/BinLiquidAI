@@ -1696,6 +1696,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         history={assistantArtifactWorkspace.history}
         historyNextCursor={assistantArtifactWorkspace.historyNextCursor}
         historyLoading={Boolean(assistantArtifactWorkspace.historyLoadingArtifactId)}
+        comparison={assistantArtifactWorkspace.comparison}
         workspaceError={assistantArtifactWorkspace.error}
         operationNotice={assistantArtifactWorkspace.operationNotice}
         onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
@@ -1705,6 +1706,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         onLoadMoreCatalog={() => void assistantArtifactWorkspace.actions.loadMoreCatalog()}
         onLoadHistory={(artifactId) => void assistantArtifactWorkspace.actions.loadHistory(artifactId)}
         onLoadMoreHistory={(artifactId) => void assistantArtifactWorkspace.actions.loadMoreHistory(artifactId)}
+        onCompareRevision={(artifactId, revisionId) =>
+          void assistantArtifactWorkspace.actions.compareRevision(artifactId, revisionId)
+        }
+        onCloseComparison={assistantArtifactWorkspace.actions.closeComparison}
         onEditArtifact={assistantArtifactWorkspace.actions.edit}
         onRestoreArtifact={(artifactId, revisionId) =>
           void assistantArtifactWorkspace.actions.restore(artifactId, revisionId)

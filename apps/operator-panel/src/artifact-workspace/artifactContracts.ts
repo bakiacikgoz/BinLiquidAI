@@ -93,7 +93,18 @@ export const ArtifactReadResultSchema = z
     revision: ArtifactRevisionSchema,
     content: ArtifactContentSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.revision.artifactId !== value.artifact.artifactId) {
+      context.addIssue({ code: 'custom', path: ['revision', 'artifactId'], message: 'Revision artifact identity mismatch.' });
+    }
+    if (value.content.kind !== value.artifact.kind) {
+      context.addIssue({ code: 'custom', path: ['content', 'kind'], message: 'Artifact content kind mismatch.' });
+    }
+    if (value.content.schemaVersion !== value.artifact.schemaVersion) {
+      context.addIssue({ code: 'custom', path: ['content', 'schemaVersion'], message: 'Artifact content schema mismatch.' });
+    }
+  });
 
 export const ArtifactOperationResultSchema = z
   .object({

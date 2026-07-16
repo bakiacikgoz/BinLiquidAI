@@ -129,12 +129,19 @@ def test_document_service_mutate_history_conflict_and_restore(tmp_path: Path) ->
         context,
     )
     history = service.history(ArtifactHistoryQuery(artifact_id="artifact-1"), context)
+    first_page = service.history(ArtifactHistoryQuery(artifact_id="artifact-1", limit=2), context)
+    second_page = service.history(
+        ArtifactHistoryQuery(artifact_id="artifact-1", cursor=first_page.next_cursor, limit=2),
+        context,
+    )
 
     assert mutated.artifact.current_revision_number == 2
     assert stale.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
     assert "stale-secret-marker" not in str(stale.value)
     assert restored.artifact.current_revision_number == 3
-    assert [item.revision_number for item in history.items] == [1, 2, 3]
+    assert [item.revision_number for item in history.items] == [3, 2, 1]
+    assert [item.revision_number for item in first_page.items] == [3, 2]
+    assert [item.revision_number for item in second_page.items] == [1]
 
 
 def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision(

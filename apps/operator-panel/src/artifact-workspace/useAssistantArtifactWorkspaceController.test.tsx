@@ -73,6 +73,53 @@ describe('assistant artifact workspace controller hook', () => {
     expect(result.current.history.map((revision) => revision.revisionId)).toEqual(['revision-1', 'revision-0']);
   });
 
+  it('compares an immutable historical revision without replacing the dirty draft', async () => {
+    const current = documentResult();
+    current.revision = { ...current.revision, revisionId: 'revision-2', revisionNumber: 2 };
+    current.artifact = { ...current.artifact, currentRevisionId: 'revision-2', currentRevisionNumber: 2 };
+    const historical = documentResult();
+    historical.content = {
+      kind: 'document', schemaVersion: 1, language: 'en', pageMode: 'document',
+      blocks: [{ id: 'historical-block', type: 'paragraph', props: {}, content: [], children: [] }],
+    };
+    const get = vi.fn()
+      .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(historical);
+    const bridge = {
+      get,
+      history: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+    } as unknown as ArtifactBridge;
+    const { result } = renderHook(() => useAssistantArtifactWorkspaceController({
+      assistantState: createAssistantSession('session-1'),
+      legacyArtifacts: [],
+      selectedLegacyArtifactName: '',
+      onSelectLegacyArtifact: vi.fn(),
+      bridge,
+    }));
+    const dirtyDraft = {
+      kind: 'document' as const, schemaVersion: 1 as const, language: 'en', pageMode: 'document' as const,
+      blocks: [{ id: 'local-block', type: 'paragraph', props: {}, content: [], children: [] }],
+    };
+
+    await act(async () => result.current.actions.openArtifact('artifact-1'));
+    act(() => result.current.actions.edit('artifact-1', dirtyDraft));
+    await act(async () => result.current.actions.compareRevision('artifact-1', 'revision-1'));
+
+    expect(get).toHaveBeenNthCalledWith(2, { artifactId: 'artifact-1', revisionId: 'revision-1' });
+    expect(result.current.activeTab).toMatchObject({ dirty: true, draftContent: dirtyDraft });
+    expect(result.current.comparison).toMatchObject({
+      status: 'ready', artifactId: 'artifact-1', selectedRevisionId: 'revision-1',
+      beforeRevisionNumber: 1, afterRevisionNumber: 2, dirtyDraftExcluded: true,
+    });
+    expect(result.current.comparison?.result?.entries).toEqual([
+      expect.objectContaining({ scope: 'block', key: 'historical-block', change: 'removed' }),
+    ]);
+
+    await act(async () => result.current.actions.openArtifact('artifact-1'));
+    expect(result.current.comparison).toBeNull();
+    expect(result.current.activeTab).toMatchObject({ dirty: true, draftContent: dirtyDraft });
+  });
+
   it('owns shell state and opens a typed artifact tab outside App.tsx', async () => {
     const bridge = {
       get: vi.fn().mockResolvedValue(documentResult()),

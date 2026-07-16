@@ -228,7 +228,7 @@ class ArtifactStore:
             rows = connection.execute(
                 """
                 SELECT * FROM artifact_revisions
-                WHERE artifact_id = ? ORDER BY revision_number
+                WHERE artifact_id = ? ORDER BY revision_number DESC
                 """,
                 (artifact_id,),
             ).fetchall()

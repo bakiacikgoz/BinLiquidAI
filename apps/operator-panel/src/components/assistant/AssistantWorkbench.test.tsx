@@ -113,6 +113,7 @@ describe('AssistantWorkbench', () => {
     const onLoadMore = vi.fn();
     const onLoadMoreHistory = vi.fn();
     const onRestoreArtifact = vi.fn();
+    const onCompareRevision = vi.fn();
     const onExportArtifact = vi.fn();
     const previousRevision: ArtifactRevision = {
       ...revision,
@@ -143,6 +144,7 @@ describe('AssistantWorkbench', () => {
         onLoadHistory={vi.fn()}
         onLoadMoreHistory={onLoadMoreHistory}
         onRestoreArtifact={onRestoreArtifact}
+        onCompareRevision={onCompareRevision}
         onExportArtifact={onExportArtifact}
       />,
     );
@@ -166,6 +168,8 @@ describe('AssistantWorkbench', () => {
 
     await user.click(screen.getByRole('button', { name: 'Restore revision 1' }));
     expect(onRestoreArtifact).toHaveBeenCalledWith('artifact-document', 'revision-1');
+    await user.click(screen.getByRole('button', { name: 'Compare revision 1' }));
+    expect(onCompareRevision).toHaveBeenCalledWith('artifact-document', 'revision-1');
     await user.click(screen.getByRole('button', { name: 'Load more history' }));
     expect(onLoadMoreHistory).toHaveBeenCalledWith('artifact-document');
 
