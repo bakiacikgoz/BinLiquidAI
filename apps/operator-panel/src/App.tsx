@@ -1588,6 +1588,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     try {
       await decideApproval(settings, approvalId, approve, settings.operatorId, 'assistant approval action');
       pushToast('ok', `${label} OK`);
+      assistantSession.actions.updateApprovalStatus(approvalId, approve ? 'approved' : 'rejected');
       assistantSession.actions.appendSystemMessage(
         approve
           ? locale === 'tr'
@@ -1624,6 +1625,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     try {
       await executeApproval(settings, approvalId, settings.operatorId);
       pushToast('ok', `${t.execute} OK`);
+      assistantSession.actions.updateApprovalStatus(approvalId, 'executed');
       assistantSession.actions.appendSystemMessage(
         locale === 'tr'
           ? 'Onaylı aksiyon yönetişim yaşam döngüsü üzerinden yürütüldü'

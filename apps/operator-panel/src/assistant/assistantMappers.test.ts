@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import assistantRuntimeGolden from '../../../../contracts/operator_panel/fixtures/assistant_runtime_v3_golden.json';
+
 import {
   createAssistantSession,
   createAssistantTurn,
@@ -16,6 +18,17 @@ function started() {
     sessionId: session.sessionId,
     userMessage: 'inspect failed run',
     createdAtUtc: '2026-03-08T09:00:00Z',
+  });
+  return startAssistantTurnLocally(session, turn);
+}
+
+function startedFor(sessionId: string, turnId: string) {
+  const session = createAssistantSession(sessionId);
+  const turn = createAssistantTurn({
+    id: turnId,
+    sessionId,
+    userMessage: 'golden parity scenario',
+    createdAtUtc: '2026-07-16T07:00:00Z',
   });
   return startAssistantTurnLocally(session, turn);
 }
@@ -110,6 +123,47 @@ describe('assistant mappers', () => {
     expect(awaitingApproval.turns[0].assistantMessage.approval?.detailLoaded).toBe(false);
   });
 
+  it('unwraps legacy nested trace data for approvals and audit artifacts', () => {
+    const awaitingApproval = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'approval_pending',
+        sequence: 1,
+        timestampUtc: '2026-03-08T09:00:03Z',
+        data: {
+          stage: 'approval_pending',
+          request_id: 'request-1',
+          data: { approval_id: 'apr_nested', title: 'Nested approval', risk: 'high' },
+        },
+      },
+      started(),
+    );
+    const withArtifact = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'audit_artifact',
+        sequence: 2,
+        timestampUtc: '2026-03-08T09:00:04Z',
+        data: {
+          stage: 'audit_artifact',
+          request_id: 'request-1',
+          data: { path: 'artifacts/job-1/audit.json', summary: 'Nested evidence' },
+        },
+      },
+      awaitingApproval,
+    );
+
+    expect(awaitingApproval.pendingApprovalId).toBe('apr_nested');
+    expect(awaitingApproval.turns[0].assistantMessage.approval?.title).toBe('Nested approval');
+    expect(withArtifact.referencedArtifacts).toEqual([
+      { name: 'artifact', path: 'artifacts/job-1/audit.json', summary: 'Nested evidence' },
+    ]);
+  });
+
   it('keeps warning events non-blocking', () => {
     const warned = mapCliAssistantEvent(
       {
@@ -146,5 +200,33 @@ describe('assistant mappers', () => {
     expect(cancelled.activeTurnId).toBeNull();
     expect(cancelled.error).toBeNull();
     expect(cancelled.turns[0].status).toBe('cancelled');
+  });
+
+  it('projects every assistant runtime golden scenario into the expected session state', () => {
+    for (const scenario of assistantRuntimeGolden.scenarios) {
+      const firstEvent = scenario.events[0];
+      const projected = scenario.events.reduce(
+        (state, event) => mapCliAssistantEvent(event, state),
+        startedFor(firstEvent.sessionId, firstEvent.assistantTurnId),
+      );
+      const expected = scenario.expectedSession as unknown as Record<string, string | number | null>;
+      const turn = projected.turns[0];
+
+      expect(projected.status, scenario.id).toBe(expected.status);
+      expect(turn.assistantMessage.text, scenario.id).toBe(expected.text);
+      expect(projected.pendingApprovalId, scenario.id).toBe(expected.pendingApprovalId);
+      if (typeof expected.timelineCount === 'number') {
+        expect(turn.assistantMessage.timeline.length - 1, scenario.id).toBe(expected.timelineCount);
+      }
+      if (typeof expected.referencedArtifactCount === 'number') {
+        expect(projected.referencedArtifacts, scenario.id).toHaveLength(expected.referencedArtifactCount);
+      }
+      if (typeof expected.errorCode === 'string') {
+        expect(projected.error?.code, scenario.id).toBe(expected.errorCode);
+      }
+      if (typeof expected.approvalStatus === 'string') {
+        expect(turn.assistantMessage.approval?.status, scenario.id).toBe(expected.approvalStatus);
+      }
+    }
   });
 });

@@ -1246,6 +1246,31 @@ def _assistant_event_payload(
     }
 
 
+def _assistant_trace_stream_event(
+    trace_event: dict[str, object],
+) -> tuple[str, dict[str, object]] | None:
+    stage = str(trace_event.get("stage", "status"))
+    if stage == "final_response":
+        return None
+    stage_to_event = {
+        "request_received": "status",
+        "planner_output": "status",
+        "router_decision": "router_decision",
+        "router_shadow_decision": "router_decision",
+        "policy_decision": "policy_decision",
+        "approval_pending": "approval_pending",
+        "expert_start": "expert_start",
+        "expert_call": "expert_end",
+        "memory_write_decision": "status",
+        "audit_artifact": "audit_artifact",
+    }
+    raw_data = trace_event.get("data")
+    data = dict(raw_data) if isinstance(raw_data, dict) else {}
+    data.setdefault("stage", stage)
+    data.setdefault("request_id", trace_event.get("request_id"))
+    return stage_to_event.get(stage, "status"), data
+
+
 def _assistant_turn_events(
     *,
     profile: str,
@@ -4845,29 +4870,10 @@ def chat(
         typer.echo(json.dumps({"event": event, "data": data}, ensure_ascii=False))
 
     def _emit_trace_events(result_trace_id: str) -> None:
-        stage_to_event = {
-            "request_received": "status",
-            "planner_output": "status",
-            "router_decision": "router_decision",
-            "router_shadow_decision": "router_decision",
-            "policy_decision": "policy_decision",
-            "approval_pending": "approval_pending",
-            "expert_start": "expert_start",
-            "expert_call": "expert_end",
-            "memory_write_decision": "status",
-            "audit_artifact": "audit_artifact",
-            "final_response": "final",
-        }
-        for event in orchestrator.trace_events(result_trace_id):
-            stage = str(event.get("stage", "status"))
-            _emit_json_event(
-                stage_to_event.get(stage, "status"),
-                {
-                    "stage": stage,
-                    "request_id": event.get("request_id"),
-                    "data": event.get("data", {}),
-                },
-            )
+        for trace_event in orchestrator.trace_events(result_trace_id):
+            mapped = _assistant_trace_stream_event(trace_event)
+            if mapped is not None:
+                _emit_json_event(*mapped)
 
     def _run_once(user_text: str) -> None:
         sid = session_id or "session-default"

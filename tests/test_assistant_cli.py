@@ -5,9 +5,44 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from imperaos.cli import app
+from imperaos.cli import _assistant_trace_stream_event, app
 
 runner = CliRunner()
+
+
+def test_assistant_trace_stream_event_flattens_data_and_skips_terminal_trace() -> None:
+    approval = _assistant_trace_stream_event(
+        {
+            "stage": "approval_pending",
+            "request_id": "request-1",
+            "data": {
+                "approval_id": "approval-1",
+                "title": "Approval required",
+                "risk": "medium",
+            },
+        }
+    )
+
+    assert approval == (
+        "approval_pending",
+        {
+            "approval_id": "approval-1",
+            "title": "Approval required",
+            "risk": "medium",
+            "stage": "approval_pending",
+            "request_id": "request-1",
+        },
+    )
+    assert (
+        _assistant_trace_stream_event(
+            {
+                "stage": "final_response",
+                "request_id": "request-1",
+                "data": {"final_text": "duplicate"},
+            }
+        )
+        is None
+    )
 
 
 def test_assistant_models_exposes_product_contract(monkeypatch) -> None:

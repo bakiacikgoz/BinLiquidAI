@@ -16,6 +16,14 @@ function asRecord(value: unknown): RecordValue {
   return typeof value === 'object' && value !== null ? (value as RecordValue) : {};
 }
 
+function unwrapTraceData(value: unknown): RecordValue {
+  const outer = asRecord(value);
+  if (typeof outer.stage !== 'string' || typeof outer.data !== 'object' || outer.data === null) {
+    return outer;
+  }
+  return { ...outer, ...asRecord(outer.data) };
+}
+
 function readString(source: RecordValue, key: string, fallback = ''): string {
   const value = source[key];
   return typeof value === 'string' ? value : fallback;
@@ -159,7 +167,7 @@ export function normalizeAssistantStreamEvent(value: unknown): AssistantStreamEv
 }
 
 export function extractApprovalIdFromEvent(event: AssistantStreamEvent): string | null {
-  const data = asRecord(event.data);
+  const data = unwrapTraceData(event.data);
   const approvalId =
     readString(data, 'approval_id') ||
     readString(data, 'approvalId') ||
@@ -198,7 +206,7 @@ export function mapCliAssistantEvent(
     return previous;
   }
 
-  const data = asRecord(event.data);
+  const data = unwrapTraceData(event.data);
   turn.eventSequence = event.sequence;
 
   switch (event.event) {

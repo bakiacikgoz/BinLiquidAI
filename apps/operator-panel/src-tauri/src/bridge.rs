@@ -3411,6 +3411,36 @@ mod tests {
     }
 
     #[test]
+    fn assistant_runtime_v3_golden_events_parse_through_the_tauri_bridge() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../contracts/operator_panel/fixtures/assistant_runtime_v3_golden.json"
+        ))
+        .expect("assistant runtime golden fixture");
+        let scenarios = fixture["scenarios"].as_array().expect("scenarios");
+
+        for scenario in scenarios {
+            let events = scenario["events"].as_array().expect("events");
+            for (index, event) in events.iter().enumerate() {
+                let line = serde_json::to_string(&json!({
+                    "event": event["event"],
+                    "data": event["data"],
+                }))
+                .expect("json line");
+                let parsed = parse_assistant_json_line(
+                    &line,
+                    event["assistantTurnId"].as_str().expect("turn id"),
+                    event["sessionId"].as_str().expect("session id"),
+                    (index + 1) as u64,
+                )
+                .expect("parse golden event");
+
+                assert_eq!(parsed.event, event["event"].as_str().expect("event name"));
+                assert_eq!(parsed.data, event["data"]);
+            }
+        }
+    }
+
+    #[test]
     fn assistant_stderr_preview_is_sanitized() {
         let preview = sanitize_preview("failed sk-abc123456789 ghp_abcdefghijklmnop");
 

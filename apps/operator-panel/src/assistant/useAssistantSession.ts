@@ -49,6 +49,7 @@ export type AssistantSessionActions = {
   cancel: () => Promise<void>;
   applyEvent: (event: AssistantStreamEvent) => void;
   markApprovalDetailLoaded: (approvalId: string, detail: unknown) => void;
+  updateApprovalStatus: (approvalId: string, status: string) => void;
   appendSystemMessage: (message: string) => void;
 };
 
@@ -284,6 +285,41 @@ export function useAssistantSession(
     }));
   }, []);
 
+  const updateApprovalStatus = useCallback((approvalId: string, status: string) => {
+    const completedAtUtc = new Date().toISOString();
+    setState((previous) => {
+      let matched = false;
+      const turns = previous.turns.map((turn) => {
+        if (turn.assistantMessage.approval?.approvalId !== approvalId) {
+          return turn;
+        }
+        matched = true;
+        return {
+          ...turn,
+          status: 'completed' as const,
+          completedAtUtc: turn.completedAtUtc ?? completedAtUtc,
+          assistantMessage: {
+            ...turn.assistantMessage,
+            approval: {
+              ...turn.assistantMessage.approval,
+              status,
+            },
+          },
+        };
+      });
+      if (!matched) {
+        return previous;
+      }
+      return {
+        ...previous,
+        turns,
+        activeTurnId: previous.pendingApprovalId === approvalId ? null : previous.activeTurnId,
+        status: previous.pendingApprovalId === approvalId ? ('completed' as const) : previous.status,
+        pendingApprovalId: previous.pendingApprovalId === approvalId ? null : previous.pendingApprovalId,
+      };
+    });
+  }, []);
+
   const appendSystemMessage = useCallback((message: string) => {
     setState((previous) => {
       const active = previous.turns.at(-1);
@@ -325,6 +361,7 @@ export function useAssistantSession(
       cancel,
       applyEvent,
       markApprovalDetailLoaded,
+      updateApprovalStatus,
       appendSystemMessage,
     },
   };

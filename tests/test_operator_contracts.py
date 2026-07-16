@@ -208,6 +208,50 @@ def test_assistant_bridge_payload_contracts_match_schema() -> None:
     assert event.event == "token"
 
 
+def test_assistant_stream_contract_accepts_cancelled_terminal_event() -> None:
+    event = AssistantStreamEventPayloadContract.model_validate(
+        {
+            "contractVersion": "3.0",
+            "assistantTurnId": "turn-cancelled",
+            "sessionId": "session-cancelled",
+            "event": "cancelled",
+            "sequence": 9_000_000_000,
+            "timestampUtc": "2026-07-16T07:00:00Z",
+            "data": {"message": "Assistant turn cancelled by operator."},
+        }
+    )
+
+    assert event.event == "cancelled"
+
+
+def test_assistant_runtime_v3_golden_covers_required_parity_scenarios() -> None:
+    fixture_path = (
+        Path(__file__).resolve().parents[1]
+        / "contracts"
+        / "operator_panel"
+        / "fixtures"
+        / "assistant_runtime_v3_golden.json"
+    )
+    payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+    assert payload["version"] == "1"
+    assert payload["contractVersion"] == "3.0"
+    assert {scenario["id"] for scenario in payload["scenarios"]} == {
+        "text_stream_final",
+        "router_policy_timeline",
+        "approval_pending",
+        "audit_artifact_reference",
+        "cancelled_deduplicated",
+        "error_and_missing_final",
+        "preview_projection",
+    }
+    for scenario in payload["scenarios"]:
+        assert scenario["events"]
+        assert scenario["expectedSession"]["status"]
+        for event in scenario["events"]:
+            AssistantStreamEventPayloadContract.model_validate(event)
+
+
 def test_operator_capabilities_payload_matches_contract() -> None:
     result = runner.invoke(app, ["operator", "capabilities", "--json"])
     assert result.exit_code == 0

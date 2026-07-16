@@ -125,4 +125,32 @@ describe('useAssistantSession runtime metadata', () => {
     expect(bridgeMocks.cancelAssistantTurn).toHaveBeenCalledWith(expect.any(Object), expect.stringMatching(/^assistant-turn-/));
     expect(result.current.state.error).toBeNull();
   });
+
+  it('synchronizes a decided approval into the canonical assistant session', async () => {
+    const { result } = renderHook(() => useAssistantSession({ ...DEFAULT_SETTINGS }, () => emptyContext));
+
+    await act(async () => {
+      await result.current.actions.send('Propose a governed action.');
+    });
+    const turn = result.current.state.turns[0];
+    act(() => {
+      result.current.actions.applyEvent({
+        contractVersion: '3.0',
+        assistantTurnId: turn.id,
+        sessionId: result.current.state.sessionId,
+        event: 'approval_pending',
+        sequence: 1,
+        timestampUtc: '2026-07-16T07:00:00Z',
+        data: { approval_id: 'approval-sync', title: 'Approval required' },
+      });
+    });
+    await waitFor(() => expect(result.current.state.pendingApprovalId).toBe('approval-sync'));
+
+    act(() => result.current.actions.updateApprovalStatus('approval-sync', 'approved'));
+
+    expect(result.current.state.pendingApprovalId).toBeNull();
+    expect(result.current.state.status).toBe('completed');
+    expect(result.current.state.turns[0].status).toBe('completed');
+    expect(result.current.state.turns[0].assistantMessage.approval?.status).toBe('approved');
+  });
 });

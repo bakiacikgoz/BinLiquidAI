@@ -27,7 +27,8 @@
         "audit_artifact",
         "final",
         "warning",
-        "error"
+        "error",
+        "cancelled"
       ],
       "title": "Event",
       "type": "string"

@@ -287,6 +287,7 @@ class AssistantStreamEventPayloadContract(ContractModel):
         "final",
         "warning",
         "error",
+        "cancelled",
     ]
     sequence: int
     timestamp_utc: str = Field(alias="timestampUtc")
