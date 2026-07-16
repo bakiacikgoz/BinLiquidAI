@@ -1,10 +1,61 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { ThreadPrimitive, useAuiState } from '@assistant-ui/react';
 
 import type { AssistantTurn } from '../../assistant/assistantTypes';
 import type { UiLocale } from '../../i18n';
 import { AssistantMessage } from './AssistantMessage';
 
 const LATEST_THRESHOLD_PX = 96;
+
+interface RuntimeTranscriptContextValue {
+  turns: AssistantTurn[];
+  approvalDisabled: boolean;
+  approvalDisabledReason: string;
+  emptyRunLabel: string;
+  debugRawEnabled: boolean;
+  locale: UiLocale;
+  onReviewApproval: (approvalId: string) => void;
+  onApprove: (approvalId: string) => void;
+  onReject: (approvalId: string) => void;
+  onExecute: (approvalId: string) => void;
+  onRegenerate: (turnId: string) => void;
+}
+
+const RuntimeTranscriptContext = createContext<RuntimeTranscriptContextValue | null>(null);
+
+function RuntimeTurnMessage() {
+  const context = useContext(RuntimeTranscriptContext);
+  const messageId = useAuiState((state) => state.message.id);
+  if (!context || !messageId.endsWith('-assistant')) return null;
+  const turn = context.turns.find((candidate) => candidate.assistantMessage.id === messageId);
+  if (!turn) return null;
+  return (
+    <div data-assistant-turn="true">
+      <AssistantMessage
+        turn={turn}
+        approvalDisabled={context.approvalDisabled}
+        approvalDisabledReason={context.approvalDisabledReason}
+        emptyRunLabel={context.emptyRunLabel}
+        debugRawEnabled={context.debugRawEnabled}
+        locale={context.locale}
+        onReviewApproval={context.onReviewApproval}
+        onApprove={context.onApprove}
+        onReject={context.onReject}
+        onExecute={context.onExecute}
+        onRegenerate={context.onRegenerate}
+      />
+    </div>
+  );
+}
 
 function bottomGap(element: HTMLElement): number {
   return element.scrollHeight - element.clientHeight - element.scrollTop;
@@ -40,6 +91,19 @@ export function AssistantTranscript({
   const previousLastTurnIdRef = useRef('');
   const userNavigatedTranscriptRef = useRef(false);
   const [isAtLatest, setIsAtLatest] = useState(true);
+  const runtimeContext: RuntimeTranscriptContextValue = {
+    turns,
+    approvalDisabled,
+    approvalDisabledReason,
+    emptyRunLabel,
+    debugRawEnabled,
+    locale,
+    onReviewApproval,
+    onApprove,
+    onReject,
+    onExecute,
+    onRegenerate,
+  };
   const lastTurnId = turns.at(-1)?.id ?? '';
   const transcriptContentKey = useMemo(
     () =>
@@ -158,23 +222,9 @@ export function AssistantTranscript({
   return (
     <div className="assistant-transcript-shell">
       <div className="assistant-transcript" role="log" aria-live="polite" ref={transcriptRef}>
-        {turns.map((turn) => (
-          <div key={turn.id} data-assistant-turn="true">
-            <AssistantMessage
-              turn={turn}
-              approvalDisabled={approvalDisabled}
-              approvalDisabledReason={approvalDisabledReason}
-              emptyRunLabel={emptyRunLabel}
-              debugRawEnabled={debugRawEnabled}
-              locale={locale}
-              onReviewApproval={onReviewApproval}
-              onApprove={onApprove}
-              onReject={onReject}
-              onExecute={onExecute}
-              onRegenerate={onRegenerate}
-            />
-          </div>
-        ))}
+        <RuntimeTranscriptContext.Provider value={runtimeContext}>
+          <ThreadPrimitive.Messages components={{ Message: RuntimeTurnMessage }} />
+        </RuntimeTranscriptContext.Provider>
       </div>
       {!isAtLatest ? (
         <button type="button" className="assistant-jump-latest" onClick={() => scrollToLatest()}>

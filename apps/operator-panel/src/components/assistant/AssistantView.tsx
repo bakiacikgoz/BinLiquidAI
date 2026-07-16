@@ -1,7 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { AssistantRuntimeProvider } from '@assistant-ui/react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import type { AssistantComposerControls } from '../../assistant/assistantTypes';
+import { useImperaAssistantUiRuntime } from '../../assistant/assistantUiRuntime';
 import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
 import type { AssistantRuntimeSettings } from '../../settings';
 import { assistantUiText, type UiLocale } from '../../i18n';
@@ -148,13 +150,21 @@ export function AssistantView({
         : null,
     ].filter((item): item is { id: string; title: string; body: string } => Boolean(item));
   }, [locale, state.pendingApprovalId, state.selectedRunIds, state.status, state.turns]);
+  const assistantRuntime = useImperaAssistantUiRuntime({
+    state,
+    onNew: (message) =>
+      onSend(message, runtimeSettings, { contextAttachmentKinds: [], toolIntents: [] }),
+    onCancel,
+    onRegenerate,
+  });
 
   return (
-    <section
-      className={`assistant-surface assistant-surface-${surfaceState}`}
-      aria-labelledby="assistant-title"
-      data-testid="page-primary-region"
-    >
+    <AssistantRuntimeProvider runtime={assistantRuntime}>
+      <section
+        className={`assistant-surface assistant-surface-${surfaceState}`}
+        aria-labelledby="assistant-title"
+        data-testid="page-primary-region"
+      >
       <header className="assistant-top-chrome">
         <div className="assistant-context-switcher" aria-label="Assistant workspace context">
           <div className="assistant-top-select assistant-top-select-wide">
@@ -377,6 +387,7 @@ export function AssistantView({
           </>
         ) : null}
       </div>
-    </section>
+      </section>
+    </AssistantRuntimeProvider>
   );
 }

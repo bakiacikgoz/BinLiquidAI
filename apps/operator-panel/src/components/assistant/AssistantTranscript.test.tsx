@@ -1,7 +1,9 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AssistantRuntimeProvider } from '@assistant-ui/react';
 
-import type { AssistantTurn } from '../../assistant/assistantTypes';
+import { useImperaAssistantUiRuntime } from '../../assistant/assistantUiRuntime';
+import type { AssistantSessionState, AssistantTurn } from '../../assistant/assistantTypes';
 import { renderOperatorPanel } from '../../test/render';
 import { AssistantTranscript } from './AssistantTranscript';
 
@@ -34,21 +36,43 @@ const baseTurn: AssistantTurn = {
 
 const noop = () => undefined;
 
-function renderTranscript(turns: AssistantTurn[]) {
-  return renderOperatorPanel(
-    <AssistantTranscript
-      turns={turns}
-      approvalDisabled={false}
-      approvalDisabledReason=""
-      emptyRunLabel="No run"
-      debugRawEnabled={false}
-      onReviewApproval={noop}
-      onApprove={noop}
-      onReject={noop}
-      onExecute={noop}
-      onRegenerate={noop}
-    />,
+function RuntimeTranscript({ turns }: { turns: AssistantTurn[] }) {
+  const state: AssistantSessionState = {
+    sessionId: 'session-1',
+    turns,
+    activeTurnId: turns.at(-1)?.id ?? null,
+    status: turns.at(-1)?.status ?? 'idle',
+    selectedRunIds: [],
+    referencedArtifacts: [],
+    pendingApprovalId: null,
+    error: null,
+  };
+  const runtime = useImperaAssistantUiRuntime({
+    state,
+    onNew: noop,
+    onCancel: noop,
+    onRegenerate: noop,
+  });
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      <AssistantTranscript
+        turns={turns}
+        approvalDisabled={false}
+        approvalDisabledReason=""
+        emptyRunLabel="No run"
+        debugRawEnabled={false}
+        onReviewApproval={noop}
+        onApprove={noop}
+        onReject={noop}
+        onExecute={noop}
+        onRegenerate={noop}
+      />
+    </AssistantRuntimeProvider>
   );
+}
+
+function renderTranscript(turns: AssistantTurn[]) {
+  return renderOperatorPanel(<RuntimeTranscript turns={turns} />);
 }
 
 describe('AssistantTranscript sticky scrolling', () => {
@@ -128,7 +152,7 @@ describe('AssistantTranscript sticky scrolling', () => {
     scrollHeightValue = 1500;
 
     rerender(
-      <AssistantTranscript
+      <RuntimeTranscript
         turns={[
           {
             ...baseTurn,
@@ -138,15 +162,6 @@ describe('AssistantTranscript sticky scrolling', () => {
             },
           },
         ]}
-        approvalDisabled={false}
-        approvalDisabledReason=""
-        emptyRunLabel="No run"
-        debugRawEnabled={false}
-        onReviewApproval={noop}
-        onApprove={noop}
-        onReject={noop}
-        onExecute={noop}
-        onRegenerate={noop}
       />,
     );
 
