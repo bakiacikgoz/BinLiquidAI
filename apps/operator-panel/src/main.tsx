@@ -11,6 +11,7 @@ import './styles/premium-components.css'
 import './styles/premium-shell.css'
 import './styles/premium-mission.css'
 import './styles/premium-assistant.css'
+import './artifact-workspace/artifact-workspace.css'
 
 import App from './App.tsx'
 
