@@ -10,6 +10,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from imperaos.artifacts.commands import (  # noqa: E402
+    ApplyArtifactProposalCommand,
+    ArchiveArtifactCommand,
+    ArtifactHistoryQuery,
+    CreateArtifactCommand,
+    DuplicateArtifactCommand,
+    GetArtifactQuery,
+    ListArtifactsQuery,
+    MutateArtifactCommand,
+    ProposeArtifactMutationCommand,
+    RestoreArtifactCommand,
+)
 from imperaos.artifacts.content import (  # noqa: E402
     CanvasContentV1,
     CodeContentV1,
@@ -40,6 +52,16 @@ SCHEMAS = {
     "artifact-revision.v1": ArtifactRevisionDescriptor,
     "operation-context.v1": OperationContext,
     "safe-json-patch.v1": SafeJsonPatch,
+    "artifact-create-command.v1": CreateArtifactCommand,
+    "artifact-get-query.v1": GetArtifactQuery,
+    "artifact-list-query.v1": ListArtifactsQuery,
+    "artifact-mutation-command.v1": MutateArtifactCommand,
+    "artifact-mutation-proposal-command.v1": ProposeArtifactMutationCommand,
+    "artifact-apply-proposal-command.v1": ApplyArtifactProposalCommand,
+    "artifact-history-query.v1": ArtifactHistoryQuery,
+    "artifact-restore-command.v1": RestoreArtifactCommand,
+    "artifact-archive-command.v1": ArchiveArtifactCommand,
+    "artifact-duplicate-command.v1": DuplicateArtifactCommand,
 }
 CONTENT_SCHEMA_NAMES = {
     "document.v1",

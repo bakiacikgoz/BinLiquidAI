@@ -244,6 +244,28 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
                 UNIQUE (artifact_id, idempotency_key)
             ) STRICT
             """,
+            """
+            CREATE TABLE artifact_mutation_proposals (
+                proposal_id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                artifact_id TEXT NOT NULL,
+                base_revision_number INTEGER NOT NULL CHECK (base_revision_number >= 1),
+                mutation_type TEXT NOT NULL,
+                content_json TEXT NOT NULL,
+                content_sha256 TEXT NOT NULL CHECK (length(content_sha256) = 64),
+                idempotency_key TEXT NOT NULL,
+                summary TEXT NOT NULL DEFAULT '',
+                proposed_by_id TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('pending', 'applied', 'rejected', 'stale')),
+                created_at_utc TEXT NOT NULL,
+                applied_revision_id TEXT,
+                completed_at_utc TEXT,
+                FOREIGN KEY (artifact_id) REFERENCES artifacts(artifact_id) ON DELETE RESTRICT,
+                FOREIGN KEY (applied_revision_id)
+                    REFERENCES artifact_revisions(revision_id) ON DELETE RESTRICT,
+                UNIQUE (artifact_id, idempotency_key)
+            ) STRICT
+            """,
         ),
     ),
 )
@@ -257,6 +279,7 @@ _ROW_COUNT_TABLES = (
     "artifact_operation_dedup",
     "artifact_exports",
     "form_submissions",
+    "artifact_mutation_proposals",
 )
 
 

@@ -53,9 +53,22 @@ def test_artifact_contract_manifest_covers_seven_content_kinds_and_hashes() -> N
         "canvas.v1",
         "slides.v1",
     }
+    command_names = {
+        "artifact-create-command.v1",
+        "artifact-get-query.v1",
+        "artifact-list-query.v1",
+        "artifact-mutation-command.v1",
+        "artifact-mutation-proposal-command.v1",
+        "artifact-apply-proposal-command.v1",
+        "artifact-history-query.v1",
+        "artifact-restore-command.v1",
+        "artifact-archive-command.v1",
+        "artifact-duplicate-command.v1",
+    }
 
     assert manifest["schemaVersion"] == "artifact-workspace.contract-manifest/v1"
     assert content_names <= set(entries)
+    assert command_names <= set(entries)
     for name, entry in entries.items():
         payload = (SCHEMA_ROOT / entry["file"]).read_bytes()
         assert hashlib.sha256(payload).hexdigest() == entry["sha256"], name

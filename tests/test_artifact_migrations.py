@@ -66,6 +66,7 @@ def test_migrations_apply_forward_only_schema_and_runtime_pragmas(tmp_path: Path
         "artifact_write_journal",
         "artifact_exports",
         "form_submissions",
+        "artifact_mutation_proposals",
     } <= tables
     assert {
         "idx_artifacts_workspace_updated",

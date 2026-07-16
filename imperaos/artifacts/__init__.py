@@ -1,6 +1,18 @@
 """Governed artifact workspace domain."""
 
 from imperaos.artifacts.assets import ArtifactAssetStore, AssetImportResult
+from imperaos.artifacts.commands import (
+    ApplyArtifactProposalCommand,
+    ArchiveArtifactCommand,
+    ArtifactHistoryQuery,
+    CreateArtifactCommand,
+    DuplicateArtifactCommand,
+    GetArtifactQuery,
+    ListArtifactsQuery,
+    MutateArtifactCommand,
+    ProposeArtifactMutationCommand,
+    RestoreArtifactCommand,
+)
 from imperaos.artifacts.content import (
     ARTIFACT_CONTENT_MODEL_BY_KIND,
     ArtifactContent,
@@ -34,6 +46,14 @@ from imperaos.artifacts.policy import (
     ArtifactPolicyDecision,
     ArtifactPolicyGateway,
 )
+from imperaos.artifacts.results import (
+    ArtifactHistoryResult,
+    ArtifactListResult,
+    ArtifactMutationProposalResult,
+    ArtifactOperationResult,
+    ArtifactReadResult,
+)
+from imperaos.artifacts.service import ArtifactService
 from imperaos.artifacts.store import (
     ArtifactStore,
     RevisionWriteResult,
@@ -45,6 +65,15 @@ from imperaos.artifacts.store import (
 __all__ = [
     "ARTIFACT_CONTENT_LIMITS_BYTES",
     "ARTIFACT_CONTENT_MODEL_BY_KIND",
+    "ApplyArtifactProposalCommand",
+    "ArchiveArtifactCommand",
+    "ArtifactHistoryQuery",
+    "ArtifactHistoryResult",
+    "ArtifactListResult",
+    "ArtifactMutationProposalResult",
+    "ArtifactOperationResult",
+    "ArtifactReadResult",
+    "ArtifactService",
     "ArtifactContent",
     "ArtifactAssetDescriptor",
     "ArtifactAssetStore",
@@ -62,9 +91,16 @@ __all__ = [
     "ArtifactRevisionDescriptor",
     "ArtifactStatus",
     "ArtifactStore",
+    "CreateArtifactCommand",
+    "DuplicateArtifactCommand",
+    "GetArtifactQuery",
     "GuardedArtifactFilesystem",
+    "ListArtifactsQuery",
+    "MutateArtifactCommand",
     "OperationContext",
     "PrincipalType",
+    "ProposeArtifactMutationCommand",
+    "RestoreArtifactCommand",
     "SafeJsonPatch",
     "AssetImportResult",
     "StorageReconciliationReport",

@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "ArtifactMutationType": {
+      "enum": [
+        "create",
+        "replace_content",
+        "json_patch",
+        "text_edit",
+        "cell_patch",
+        "slide_patch",
+        "restore",
+        "duplicate",
+        "import_evidence"
+      ],
+      "title": "ArtifactMutationType",
+      "type": "string"
+    },
+    "JsonValue": {}
+  },
+  "$id": "https://schemas.imperaos.local/artifacts/artifact-mutation-command.v1.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "approvalGranted": {
+      "default": false,
+      "title": "Approvalgranted",
+      "type": "boolean"
+    },
+    "artifactId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "title": "Artifactid",
+      "type": "string"
+    },
+    "changeSummary": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Changesummary",
+      "type": "string"
+    },
+    "content": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Content",
+      "type": "object"
+    },
+    "expectedRevisionNumber": {
+      "minimum": 1,
+      "title": "Expectedrevisionnumber",
+      "type": "integer"
+    },
+    "idempotencyKey": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "title": "Idempotencykey",
+      "type": "string"
+    },
+    "mutationType": {
+      "$ref": "#/$defs/ArtifactMutationType"
+    },
+    "proposalId": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposalid"
+    }
+  },
+  "required": [
+    "artifactId",
+    "expectedRevisionNumber",
+    "mutationType",
+    "content",
+    "idempotencyKey"
+  ],
+  "title": "MutateArtifactCommand",
+  "type": "object",
+  "x-imperaos-contract": "artifact-mutation-command.v1"
+}

@@ -234,6 +234,67 @@ class ArtifactStore:
             ).fetchall()
         return tuple(_revision_from_row(row) for row in rows)
 
+    def list_artifacts(
+        self,
+        workspace_id: str,
+        *,
+        kind: str | None = None,
+        status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[ArtifactDescriptor, ...]:
+        clauses = ["workspace_id = ?"]
+        parameters: list[object] = [workspace_id]
+        if kind is not None:
+            clauses.append("kind = ?")
+            parameters.append(kind)
+        if status is not None:
+            clauses.append("status = ?")
+            parameters.append(status)
+        parameters.extend((limit, offset))
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT * FROM artifacts WHERE {' AND '.join(clauses)}
+                ORDER BY updated_at_utc DESC, artifact_id
+                LIMIT ? OFFSET ?
+                """,
+                parameters,
+            ).fetchall()
+        return tuple(_artifact_from_row(row) for row in rows)
+
+    def update_artifact_metadata(
+        self,
+        artifact: ArtifactDescriptor,
+        *,
+        expected_revision_number: int,
+    ) -> ArtifactDescriptor:
+        if artifact.current_revision_number != expected_revision_number:
+            self._raise_conflict(
+                "metadata update revision is inconsistent",
+                actual_revision=artifact.current_revision_number,
+                expected_revision=expected_revision_number,
+            )
+        with self._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                record = _artifact_record(artifact)
+                record["expected_revision_number"] = expected_revision_number
+                cursor = connection.execute(_ARTIFACT_UPDATE_SQL, record)
+                if cursor.rowcount != 1:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT,
+                        "artifact revision changed during metadata update",
+                    )
+                connection.commit()
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
+            except sqlite3.Error as exc:
+                connection.rollback()
+                self._raise_storage_failure(exc, "metadata_update_failed")
+        return artifact
+
     def reconcile_storage(self) -> StorageReconciliationReport:
         with self._connect() as connection:
             pending = connection.execute(

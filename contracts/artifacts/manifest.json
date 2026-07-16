@@ -73,6 +73,66 @@
       "file": "safe-json-patch.v1.schema.json",
       "name": "safe-json-patch.v1",
       "sha256": "5b43640479a73e7005f2e5b4e33542c0e2738803167265849c3d8d4916252c5a"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-create-command.v1.schema.json",
+      "name": "artifact-create-command.v1",
+      "sha256": "6fa6fe11d7d4bd2869c4868a16c6c232b086cd63649164be9221f6339d35f8df"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-get-query.v1.schema.json",
+      "name": "artifact-get-query.v1",
+      "sha256": "d42c64bd6619e1d1590685e252ade4db0ae8fa78b764e894c6e92e738ce014bd"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-list-query.v1.schema.json",
+      "name": "artifact-list-query.v1",
+      "sha256": "151bbff313e302b5043255f49e739b6a0db923f8a8f966c89c8798ddd15c3222"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-mutation-command.v1.schema.json",
+      "name": "artifact-mutation-command.v1",
+      "sha256": "37e5fdc6f47ce49a25d113d347a7fac3a3154c278f411925b7099d397b64df9e"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-mutation-proposal-command.v1.schema.json",
+      "name": "artifact-mutation-proposal-command.v1",
+      "sha256": "58fe98d54e3f1792ada75c76ade9d90e101c6603c49b3e512a3c065c5deb440c"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-apply-proposal-command.v1.schema.json",
+      "name": "artifact-apply-proposal-command.v1",
+      "sha256": "1b474c8e1f5ca4405a5acaa5ee5c8f1c1cb309ab8d4065b789aff4f5680d6eed"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-history-query.v1.schema.json",
+      "name": "artifact-history-query.v1",
+      "sha256": "ca3234d3161e8bf449e18d0c72f2b77fba2d439d52a3d47877a3acb0af601427"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-restore-command.v1.schema.json",
+      "name": "artifact-restore-command.v1",
+      "sha256": "60346d6623be97a5c49528cda3b1d3bd0a9c4a4420c0dcc3750a57f4835ef95c"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-archive-command.v1.schema.json",
+      "name": "artifact-archive-command.v1",
+      "sha256": "223b24b35617d9c159e1d985fddfdb20df0068b04d42eabb7c4af86ee4914e54"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-duplicate-command.v1.schema.json",
+      "name": "artifact-duplicate-command.v1",
+      "sha256": "799d6cc66e696a512ab322f36ea2f03c2a96c5d79624723d9127cbcface30f44"
     }
   ]
 }
