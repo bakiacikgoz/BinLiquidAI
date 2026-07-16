@@ -121,3 +121,81 @@
     transition: none;
   }
 }
+
+.document-artifact-editor {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-md);
+  overflow: hidden;
+  background: var(--aw-background);
+}
+
+.document-artifact-toolbar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--aw-border);
+  background: var(--aw-muted);
+}
+
+.document-artifact-toolbar button {
+  min-height: 1.9rem;
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-sm);
+  padding: 0.25rem 0.55rem;
+  background: var(--aw-background);
+  color: var(--aw-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.document-artifact-toolbar button:focus-visible {
+  outline: 2px solid var(--aw-ring);
+  outline-offset: 1px;
+}
+
+.document-artifact-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.document-artifact-toolbar [role="status"] {
+  margin-left: auto;
+  color: var(--aw-foreground-muted);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.document-artifact-blocknote {
+  min-height: 280px;
+  max-height: min(58vh, 760px);
+  overflow: auto;
+  background: var(--aw-background);
+  color: var(--aw-foreground);
+}
+
+.document-artifact-blocknote .bn-editor {
+  min-height: 260px;
+  padding: 1.25rem clamp(1rem, 4vw, 3rem);
+  background: transparent;
+  color: inherit;
+}
+
+.artifact-editor-loading,
+.artifact-editor-placeholder {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--aw-border);
+  border-radius: var(--aw-radius-md);
+  padding: var(--space-4);
+  color: var(--aw-foreground-muted);
+  text-align: center;
+}

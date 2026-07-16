@@ -1701,6 +1701,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         onLoadCatalog={() => void assistantArtifactWorkspace.actions.loadCatalog()}
         onLoadMoreCatalog={() => void assistantArtifactWorkspace.actions.loadMoreCatalog()}
         onLoadHistory={(artifactId) => void assistantArtifactWorkspace.actions.loadHistory(artifactId)}
+        onEditArtifact={assistantArtifactWorkspace.actions.edit}
         onViewRuns={() => {
           setRunTab('artifacts');
           setActiveView('runs');

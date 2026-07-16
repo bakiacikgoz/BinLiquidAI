@@ -79,8 +79,28 @@ describe('AssistantWorkbench', () => {
         {
           artifact: descriptor,
           revision,
-          persistedContent: { kind: 'document', schemaVersion: 1, blocks: [] },
-          draftContent: { kind: 'document', schemaVersion: 1, blocks: [{ id: 'block-1' }] },
+          persistedContent: {
+            kind: 'document',
+            schemaVersion: 1,
+            language: 'en',
+            pageMode: 'document',
+            blocks: [],
+          },
+          draftContent: {
+            kind: 'document',
+            schemaVersion: 1,
+            language: 'en',
+            pageMode: 'document',
+            blocks: [
+              {
+                id: 'block-1',
+                type: 'paragraph',
+                props: {},
+                content: [{ type: 'text', text: 'Launch', styles: {} }],
+                children: [],
+              },
+            ],
+          },
           dirty: true,
           saveState: 'dirty',
           saveError: null,

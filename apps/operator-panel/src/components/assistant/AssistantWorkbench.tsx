@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import type { ArtifactDescriptor, ArtifactRevision } from '../../artifact-workspace/artifactContracts';
 import type { ArtifactWorkspaceState } from '../../artifact-workspace/workspaceController';
+import { ArtifactEditorHost } from '../../artifact-workspace/editors/ArtifactEditorHost';
 import { translateAssistantText, type UiLocale } from '../../i18n';
 import { Badge } from '../primitives/Badge';
 import { Button } from '../primitives/Button';
@@ -27,6 +28,7 @@ type WorkspaceProps = {
   onLoadCatalog?: () => void;
   onLoadMoreCatalog?: () => void;
   onLoadHistory?: (artifactId: string) => void;
+  onEditArtifact?: (artifactId: string, content: ArtifactWorkspaceState['tabs'][number]['draftContent']) => void;
 };
 
 function stringifyPreview(value: unknown): string {
@@ -75,6 +77,7 @@ export function AssistantWorkbench({
   onLoadCatalog,
   onLoadMoreCatalog,
   onLoadHistory,
+  onEditArtifact,
 }: {
   state: AssistantSessionState;
   artifacts: AssistantWorkbenchArtifact[];
@@ -205,7 +208,16 @@ export function AssistantWorkbench({
               {activeTab.artifact.status === 'archived' ? (
                 <p className="artifact-workspace-banner">Archived artifacts are read-only.</p>
               ) : null}
-              <pre className="assistant-workbench-preview"><code>{stringifyPreview(activeTab.draftContent)}</code></pre>
+              <ArtifactEditorHost
+                artifact={activeTab.artifact}
+                revision={activeTab.revision}
+                content={activeTab.draftContent}
+                mode={activeTab.artifact.status === 'archived' ? 'view' : 'edit'}
+                saveState={activeTab.saveState}
+                onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
+                onSelectionChange={() => undefined}
+                onRequestExport={() => undefined}
+              />
               <div className="artifact-workspace-history" aria-label="Revision history">
                 <div className="assistant-workbench-panel-head">
                   <span>Revision history</span>
