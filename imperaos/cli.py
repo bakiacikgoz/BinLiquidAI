@@ -16,6 +16,7 @@ from benchmarks.run_ablation import run_ablation_benchmark, run_energy_benchmark
 from benchmarks.run_smoke import run_smoke_benchmark
 from benchmarks.run_team import run_team_benchmark
 from imperaos import __version__
+from imperaos.artifacts.cli import register_artifact_cli
 from imperaos.computer_use import ComputerUseMode
 from imperaos.computer_use.runtime import ComputerUseRunner, SessionCommand
 from imperaos.computer_use.vision_runtime.capability_resolver import (
@@ -292,6 +293,7 @@ from research.sltc_experiments.eval_router import evaluate_router_model
 from research.sltc_experiments.train_router import calibrate_router_params, train_router_model
 
 app = typer.Typer(help="ImperaOS CLI")
+register_artifact_cli(app)
 benchmark_app = typer.Typer(help="Benchmark commands")
 memory_app = typer.Typer(help="Memory commands")
 memory_index_app = typer.Typer(help="Memory index commands")
