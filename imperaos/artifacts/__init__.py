@@ -1,5 +1,6 @@
 """Governed artifact workspace domain."""
 
+from imperaos.artifacts.assets import ArtifactAssetStore, AssetImportResult
 from imperaos.artifacts.content import (
     ARTIFACT_CONTENT_MODEL_BY_KIND,
     ArtifactContent,
@@ -16,6 +17,7 @@ from imperaos.artifacts.migrations import (
 )
 from imperaos.artifacts.models import (
     ARTIFACT_CONTENT_LIMITS_BYTES,
+    ArtifactAssetDescriptor,
     ArtifactDataClass,
     ArtifactDescriptor,
     ArtifactKind,
@@ -38,6 +40,8 @@ __all__ = [
     "ARTIFACT_CONTENT_LIMITS_BYTES",
     "ARTIFACT_CONTENT_MODEL_BY_KIND",
     "ArtifactContent",
+    "ArtifactAssetDescriptor",
+    "ArtifactAssetStore",
     "ArtifactDataClass",
     "ArtifactDescriptor",
     "ArtifactDomainError",
@@ -52,6 +56,7 @@ __all__ = [
     "OperationContext",
     "PrincipalType",
     "SafeJsonPatch",
+    "AssetImportResult",
     "StorageReconciliationReport",
     "StoredArtifactFile",
     "StoredRevision",

@@ -52,6 +52,12 @@
     },
     {
       "category": "contract",
+      "file": "artifact-asset.v1.schema.json",
+      "name": "artifact-asset.v1",
+      "sha256": "edce2572e506f98aa2d7db52dddfa24d81f14a4340fa6196476af4372c307703"
+    },
+    {
+      "category": "contract",
       "file": "artifact-revision.v1.schema.json",
       "name": "artifact-revision.v1",
       "sha256": "d814b4665f75dbc302cf955a42a29430eba3f99b98883d353dfe9ef67020a427"

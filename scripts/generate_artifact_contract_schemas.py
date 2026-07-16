@@ -21,6 +21,7 @@ from imperaos.artifacts.content import (  # noqa: E402
     SpreadsheetContentV1,
 )
 from imperaos.artifacts.models import (  # noqa: E402
+    ArtifactAssetDescriptor,
     ArtifactDescriptor,
     ArtifactRevisionDescriptor,
     OperationContext,
@@ -35,6 +36,7 @@ SCHEMAS = {
     "canvas.v1": CanvasContentV1,
     "slides.v1": SlidesContentV1,
     "artifact-descriptor.v1": ArtifactDescriptor,
+    "artifact-asset.v1": ArtifactAssetDescriptor,
     "artifact-revision.v1": ArtifactRevisionDescriptor,
     "operation-context.v1": OperationContext,
     "safe-json-patch.v1": SafeJsonPatch,

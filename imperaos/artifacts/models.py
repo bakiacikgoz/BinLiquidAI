@@ -228,3 +228,43 @@ class ArtifactRevisionDescriptor(ArtifactModel):
         if any(part in {"", ".", ".."} for part in normalized.split("/")):
             raise ValueError("contentRelpath contains an unsafe segment")
         return normalized
+
+
+class ArtifactAssetDescriptor(ArtifactModel):
+    asset_id: BoundedId
+    workspace_id: BoundedId
+    sha256: Sha256
+    media_type: Literal["image/png", "image/jpeg", "image/gif", "image/webp"]
+    size_bytes: int = Field(ge=1, le=20 * 1024 * 1024)
+    relative_path: Annotated[str, StringConstraints(min_length=1, max_length=512, strict=True)]
+    width: int | None = Field(default=None, ge=1, le=100_000)
+    height: int | None = Field(default=None, ge=1, le=100_000)
+    original_name: Annotated[
+        str | None,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=255, strict=True),
+    ] = None
+    data_class: ArtifactDataClass = Field(strict=False)
+    created_by_id: BoundedId
+    created_at_utc: datetime
+
+    @field_validator("created_at_utc")
+    @classmethod
+    def validate_asset_created_at(cls, value: datetime) -> datetime:
+        return _normalize_utc(value)
+
+    @field_validator("relative_path")
+    @classmethod
+    def validate_asset_relative_path(cls, value: str) -> str:
+        normalized = value.replace("\\", "/")
+        if normalized.startswith(("/", "~")) or ":" in normalized:
+            raise ValueError("relativePath must be relative")
+        if any(part in {"", ".", ".."} for part in normalized.split("/")):
+            raise ValueError("relativePath contains an unsafe segment")
+        return normalized
+
+    @field_validator("original_name")
+    @classmethod
+    def validate_original_name(cls, value: str | None) -> str | None:
+        if value is not None and any(character in value for character in ("/", "\\", "\x00")):
+            raise ValueError("originalName must be a basename")
+        return value
