@@ -9,7 +9,7 @@ build/
 .imperaos/
 .worktrees/
 benchmarks/results/
-artifacts/
+/artifacts/
 test-results/
 .DS_Store
 node_modules/
