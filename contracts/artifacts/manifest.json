@@ -139,6 +139,36 @@
       "file": "artifact-evidence-event.v1.schema.json",
       "name": "artifact-evidence-event.v1",
       "sha256": "4d670ea8309794310549e934b044d694724ad219ffedc9ef6731ca1ba941640c"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-rpc-principal.v1.schema.json",
+      "name": "artifact-rpc-principal.v1",
+      "sha256": "bda3e2894da38d37ba508f86c633f90b9d4e732457699344a7968356a6e29cd0"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-rpc-request.v1.schema.json",
+      "name": "artifact-rpc-request.v1",
+      "sha256": "3be130c17998ed128a1975ff16ff0f1be68215c3f0e19dc9b12eb0fb241d5b74"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-rpc-response.v1.schema.json",
+      "name": "artifact-rpc-response.v1",
+      "sha256": "bc402837c94344bf340facd0c84649172b74e9f275fab9aa16a890fac127aadc"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-rpc-error.v1.schema.json",
+      "name": "artifact-rpc-error.v1",
+      "sha256": "153f52f44c193313cba75c7b31716b6d2cf090f9b0f274c4389a78e025e4e03b"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-rpc-handshake.v1.schema.json",
+      "name": "artifact-rpc-handshake.v1",
+      "sha256": "1bcd26f1a77eeec9eaee0c4ce4a4a8da4ba731226fc5d8677ed285ed678c6f7b"
     }
   ]
 }

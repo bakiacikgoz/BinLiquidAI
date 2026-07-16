@@ -65,6 +65,11 @@ def test_artifact_contract_manifest_covers_seven_content_kinds_and_hashes() -> N
         "artifact-archive-command.v1",
         "artifact-duplicate-command.v1",
         "artifact-evidence-event.v1",
+        "artifact-rpc-principal.v1",
+        "artifact-rpc-request.v1",
+        "artifact-rpc-response.v1",
+        "artifact-rpc-error.v1",
+        "artifact-rpc-handshake.v1",
     }
 
     assert manifest["schemaVersion"] == "artifact-workspace.contract-manifest/v1"

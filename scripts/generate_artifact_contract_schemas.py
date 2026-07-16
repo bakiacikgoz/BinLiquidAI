@@ -39,6 +39,13 @@ from imperaos.artifacts.models import (  # noqa: E402
     ArtifactRevisionDescriptor,
     OperationContext,
 )
+from imperaos.artifacts.rpc_protocol import (  # noqa: E402
+    RpcError,
+    RpcHandshake,
+    RpcPrincipal,
+    RpcRequest,
+    RpcResponse,
+)
 
 SCHEMAS = {
     "document.v1": DocumentContentV1,
@@ -64,6 +71,11 @@ SCHEMAS = {
     "artifact-archive-command.v1": ArchiveArtifactCommand,
     "artifact-duplicate-command.v1": DuplicateArtifactCommand,
     "artifact-evidence-event.v1": ArtifactEvidenceEvent,
+    "artifact-rpc-principal.v1": RpcPrincipal,
+    "artifact-rpc-request.v1": RpcRequest,
+    "artifact-rpc-response.v1": RpcResponse,
+    "artifact-rpc-error.v1": RpcError,
+    "artifact-rpc-handshake.v1": RpcHandshake,
 }
 CONTENT_SCHEMA_NAMES = {
     "document.v1",

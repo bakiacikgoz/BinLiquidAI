@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "ArtifactRpcMethod": {
+      "enum": [
+        "rpc.handshake",
+        "rpc.health",
+        "rpc.shutdown",
+        "artifact.list",
+        "artifact.get",
+        "artifact.create",
+        "artifact.mutate",
+        "artifact.propose_mutation",
+        "artifact.apply_proposal",
+        "artifact.history",
+        "artifact.restore",
+        "artifact.archive",
+        "artifact.duplicate",
+        "artifact.asset.import",
+        "artifact.form.submit",
+        "artifact.export.begin",
+        "artifact.export.commit",
+        "artifact.export.cancel",
+        "artifact.import_evidence"
+      ],
+      "title": "ArtifactRpcMethod",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.imperaos.local/artifacts/artifact-rpc-handshake.v1.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "contractVersion": {
+      "const": "1.0",
+      "title": "Contractversion",
+      "type": "string"
+    },
+    "gracefulShutdown": {
+      "const": true,
+      "title": "Gracefulshutdown",
+      "type": "boolean"
+    },
+    "maxFrameBytes": {
+      "maximum": 33554432,
+      "minimum": 1024,
+      "title": "Maxframebytes",
+      "type": "integer"
+    },
+    "methods": {
+      "items": {
+        "$ref": "#/$defs/ArtifactRpcMethod"
+      },
+      "title": "Methods",
+      "type": "array"
+    },
+    "networkListener": {
+      "const": false,
+      "title": "Networklistener",
+      "type": "boolean"
+    },
+    "stdoutProtocolOnly": {
+      "const": true,
+      "title": "Stdoutprotocolonly",
+      "type": "boolean"
+    },
+    "transport": {
+      "const": "stdio-length-prefixed-json",
+      "title": "Transport",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contractVersion",
+    "transport",
+    "maxFrameBytes",
+    "methods",
+    "networkListener",
+    "stdoutProtocolOnly",
+    "gracefulShutdown"
+  ],
+  "title": "RpcHandshake",
+  "type": "object",
+  "x-imperaos-contract": "artifact-rpc-handshake.v1"
+}
