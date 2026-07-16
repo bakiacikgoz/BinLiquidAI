@@ -8,6 +8,12 @@ from imperaos.artifacts.content import (
 )
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.filesystem import GuardedArtifactFilesystem, StoredArtifactFile
+from imperaos.artifacts.migrations import (
+    ArtifactMigration,
+    ArtifactMigrationReport,
+    connect_artifact_metadata,
+    migrate_artifact_metadata,
+)
 from imperaos.artifacts.models import (
     ARTIFACT_CONTENT_LIMITS_BYTES,
     ArtifactDataClass,
@@ -30,6 +36,8 @@ __all__ = [
     "ArtifactDomainError",
     "ArtifactErrorCode",
     "ArtifactKind",
+    "ArtifactMigration",
+    "ArtifactMigrationReport",
     "ArtifactRevisionDescriptor",
     "ArtifactStatus",
     "GuardedArtifactFilesystem",
@@ -39,5 +47,7 @@ __all__ = [
     "StoredArtifactFile",
     "can_transition_data_class",
     "canonical_json",
+    "connect_artifact_metadata",
+    "migrate_artifact_metadata",
     "validate_artifact_content",
 ]
