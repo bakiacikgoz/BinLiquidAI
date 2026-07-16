@@ -16,6 +16,17 @@ export const ArtifactKindSchema = z.enum([
   'canvas',
   'slides',
 ]);
+
+export const ArtifactLicenseCapabilitySchema = z.object({
+  contractVersion: z.literal('artifact-license-capability/v1'),
+  kind: z.enum(['spreadsheet', 'canvas']),
+  enabled: z.boolean(),
+  reasonCode: z.string().min(1).max(128).regex(/^ARTIFACT_LICENSE_[A-Z_]+$/),
+}).strict().superRefine((capability, context) => {
+  if (capability.enabled !== (capability.reasonCode === 'ARTIFACT_LICENSE_ENABLED')) {
+    context.addIssue({ code: 'custom', path: ['reasonCode'], message: 'License capability reason does not match enabled state.' });
+  }
+});
 export const ArtifactStatusSchema = z.enum(['draft', 'active', 'archived', 'blocked', 'corrupt']);
 export const ArtifactDataClassSchema = z.enum([
   'public',
@@ -124,6 +135,8 @@ export const CodeArtifactContentSchema = z
 export const LegacyCodeArtifactContentSchema = z.object({
   kind: z.literal('code'),
   schemaVersion: z.literal(1),
+  // Legacy v1 intentionally rejects NUL explicitly; strict v2 has the complete filename policy.
+  // eslint-disable-next-line no-control-regex
   filename: z.string().min(1).max(255).regex(/^[^/\\:\u0000]+$/),
   language: z.string().min(1).max(64).regex(/^[a-z0-9_+-]+$/),
   text: z.string().max(5 * 1024 * 1024),
@@ -212,9 +225,130 @@ const LegacyFlowArtifactContentSchema = z.object({
   schemaVersion: z.literal(1),
 }).passthrough();
 
+function validXlsxAddress(address: string): boolean {
+  const match = /^([A-Z]{1,3})([1-9][0-9]{0,6})$/.exec(address);
+  if (!match) return false;
+  const column = [...match[1]].reduce(
+    (value, character) => value * 26 + character.charCodeAt(0) - 64,
+    0,
+  );
+  return column <= 16_384 && Number(match[2]) <= 1_048_576;
+}
+
+const SpreadsheetScalarSchema = z.union([
+  z.string().max(32_767),
+  z.number().finite().min(-1e15).max(1e15),
+  z.boolean(),
+  z.null(),
+]);
+
+const SpreadsheetCellSchema = z.object({ value: SpreadsheetScalarSchema }).strict();
+const SpreadsheetColumnSchema = z.object({
+  index: z.number().int().min(1).max(16_384),
+  width: z.number().finite().min(20).max(1_000).default(120),
+  hidden: z.boolean().default(false),
+}).strict();
+const SpreadsheetSheetSchema = z.object({
+  id: boundedId,
+  name: z.string().trim().min(1).max(100).refine((value) => !CONTROL_OR_FORMAT_CHARACTER.test(value)),
+  cells: z.record(z.string(), SpreadsheetCellSchema).default({}),
+  columns: z.array(SpreadsheetColumnSchema).max(16_384).default([]),
+}).strict().superRefine((sheet, context) => {
+  Object.keys(sheet.cells).forEach((address) => {
+    if (!validXlsxAddress(address)) {
+      context.addIssue({ code: 'custom', path: ['cells', address], message: 'Cell address is outside XFD1048576.' });
+    }
+  });
+  const indexes = sheet.columns.map((column) => column.index);
+  if (new Set(indexes).size !== indexes.length) {
+    context.addIssue({ code: 'custom', path: ['columns'], message: 'Column indexes must be unique.' });
+  }
+});
+
+export const SpreadsheetArtifactContentSchema = z.object({
+  kind: z.literal('spreadsheet'),
+  schemaVersion: z.literal(2),
+  calculationMode: z.literal('disabled'),
+  sheets: z.array(SpreadsheetSheetSchema).min(1).max(1_024),
+}).strict().superRefine((workbook, context) => {
+  const ids = workbook.sheets.map((sheet) => sheet.id);
+  if (new Set(ids).size !== ids.length) {
+    context.addIssue({ code: 'custom', path: ['sheets'], message: 'Sheet IDs must be unique.' });
+  }
+  const cellCount = workbook.sheets.reduce((count, sheet) => count + Object.keys(sheet.cells).length, 0);
+  if (cellCount > 100_000) {
+    context.addIssue({ code: 'custom', path: ['sheets'], message: 'Workbook exceeds 100000 cells.' });
+  }
+});
+
+const LegacySpreadsheetArtifactContentSchema = z.object({
+  kind: z.literal('spreadsheet'),
+  schemaVersion: z.literal(1),
+}).passthrough();
+
+const CanvasObjectSchema = z.object({
+  id: boundedId,
+  type: z.enum(['rectangle', 'ellipse', 'text', 'line', 'arrow', 'note', 'image']),
+  x: z.number().finite().min(-1_000_000).max(1_000_000),
+  y: z.number().finite().min(-1_000_000).max(1_000_000),
+  width: z.number().finite().positive().max(1_000_000),
+  height: z.number().finite().positive().max(1_000_000),
+  text: z.string().max(10_000).nullable().optional(),
+  assetId: boundedId.nullable().optional(),
+}).strict().superRefine((item, context) => {
+  if (item.type === 'image' && !item.assetId) {
+    context.addIssue({ code: 'custom', path: ['assetId'], message: 'Canvas image requires an asset ID.' });
+  }
+  if (item.type !== 'image' && item.assetId) {
+    context.addIssue({ code: 'custom', path: ['assetId'], message: 'Only images may reference assets.' });
+  }
+});
+
+export const CanvasArtifactContentSchema = z.object({
+  kind: z.literal('canvas'),
+  schemaVersion: z.literal(2),
+  snapshot: z.object({ objects: z.array(CanvasObjectSchema).max(10_000).default([]) }).strict(),
+  assetIds: z.array(boundedId).max(10_000).default([]),
+  embeds: z.literal('deny'),
+  remoteAssets: z.literal('deny'),
+}).strict().superRefine((canvas, context) => {
+  const objectIds = canvas.snapshot.objects.map((item) => item.id);
+  if (new Set(objectIds).size !== objectIds.length) {
+    context.addIssue({ code: 'custom', path: ['snapshot', 'objects'], message: 'Canvas object IDs must be unique.' });
+  }
+  const assets = new Set(canvas.assetIds);
+  if (assets.size !== canvas.assetIds.length) {
+    context.addIssue({ code: 'custom', path: ['assetIds'], message: 'Canvas asset IDs must be unique.' });
+  }
+  canvas.snapshot.objects.forEach((item, index) => {
+    if (item.assetId && !assets.has(item.assetId)) {
+      context.addIssue({ code: 'custom', path: ['snapshot', 'objects', index, 'assetId'], message: 'Unknown canvas asset ID.' });
+    }
+  });
+});
+
+const LegacyCanvasArtifactContentSchema = z.object({
+  kind: z.literal('canvas'),
+  schemaVersion: z.literal(1),
+}).passthrough();
+
+const LegacyCanvasArtifactExportContentSchema = z.object({
+  kind: z.literal('canvas'),
+  schemaVersion: z.literal(1),
+  snapshot: z.record(z.string(), z.json()),
+  assetIds: z.array(boundedId).max(10_000).default([]),
+  embeds: z.literal('deny').default('deny'),
+  remoteAssets: z.literal('deny').default('deny'),
+}).strict();
+
+export const CanvasArtifactExportContentSchema = z.union([
+  CanvasArtifactContentSchema,
+  LegacyCanvasArtifactExportContentSchema,
+]);
+
 const NonCodeArtifactContentSchema = z
   .object({
-    kind: z.enum(['document', 'form', 'spreadsheet', 'canvas', 'slides']),
+    kind: z.enum(['document', 'form', 'slides']),
     schemaVersion: z.number().int().min(1).max(1000),
   })
   .passthrough();
@@ -224,6 +358,10 @@ export const ArtifactContentSchema = z.union([
   LegacyCodeArtifactContentSchema,
   FlowArtifactContentSchema,
   LegacyFlowArtifactContentSchema,
+  SpreadsheetArtifactContentSchema,
+  LegacySpreadsheetArtifactContentSchema,
+  CanvasArtifactContentSchema,
+  LegacyCanvasArtifactContentSchema,
   NonCodeArtifactContentSchema,
 ]);
 
@@ -349,7 +487,10 @@ export type ArtifactRevision = z.infer<typeof ArtifactRevisionSchema>;
 export type ArtifactContent = z.infer<typeof ArtifactContentSchema>;
 export type CodeArtifactLanguage = z.infer<typeof CodeArtifactLanguageSchema>;
 export type CodeArtifactContent = z.output<typeof CodeArtifactContentSchema>;
+export type ArtifactLicenseCapability = z.output<typeof ArtifactLicenseCapabilitySchema>;
 export type FlowArtifactContent = z.output<typeof FlowArtifactContentSchema>;
+export type SpreadsheetArtifactContent = z.output<typeof SpreadsheetArtifactContentSchema>;
+export type CanvasArtifactContent = z.output<typeof CanvasArtifactContentSchema>;
 export type ArtifactReadResult = z.infer<typeof ArtifactReadResultSchema>;
 export type ArtifactOperationResult = z.infer<typeof ArtifactOperationResultSchema>;
 export type ArtifactMutationProposalResult = z.output<typeof ArtifactMutationProposalResultSchema>;
@@ -392,6 +533,19 @@ export interface ArtifactMutationRequest {
   changeSummary?: string;
   approvalGranted?: boolean;
   proposalId?: string;
+}
+
+export type SpreadsheetCellOperation =
+  | { op: 'set'; address: string; value: string | number | boolean | null }
+  | { op: 'clear'; address: string };
+
+export interface SpreadsheetCellPatchRequest {
+  artifactId: string;
+  expectedRevisionNumber: number;
+  sheetId: string;
+  operations: SpreadsheetCellOperation[];
+  idempotencyKey: string;
+  changeSummary?: string;
 }
 
 export interface ArtifactMutationProposalRequest {

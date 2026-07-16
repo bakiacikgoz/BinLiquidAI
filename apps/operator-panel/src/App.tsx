@@ -1723,10 +1723,17 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         onRestoreArtifact={(artifactId, revisionId) =>
           void assistantArtifactWorkspace.actions.restore(artifactId, revisionId)
         }
-        onExportArtifact={(artifactId, format) => {
+        onExportArtifact={(artifactId, format, sheetId) => {
+          const artifactKind = assistantArtifactWorkspace.state.tabs.find(
+            (tab) => tab.artifact.artifactId === artifactId,
+          )?.artifact.kind;
           if (format === 'source') void assistantArtifactWorkspace.actions.exportCode(artifactId);
-          else if (format === 'json' || format === 'svg' || format === 'png') {
+          else if (format === 'json' && artifactKind === 'canvas') {
+            void assistantArtifactWorkspace.actions.exportCanvas(artifactId);
+          } else if (format === 'json' || format === 'svg' || format === 'png') {
             void assistantArtifactWorkspace.actions.exportFlow(artifactId, format);
+          } else if (format === 'csv' || format === 'xlsx') {
+            void assistantArtifactWorkspace.actions.exportSpreadsheet(artifactId, format, sheetId);
           } else void assistantArtifactWorkspace.actions.exportDocument(artifactId, format);
         }}
         onViewRuns={() => {

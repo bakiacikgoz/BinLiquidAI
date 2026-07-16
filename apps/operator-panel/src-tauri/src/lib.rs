@@ -62,6 +62,7 @@ pub fn run() {
             bridge::bridge_artifact_get,
             bridge::bridge_artifact_create,
             bridge::bridge_artifact_mutate,
+            bridge::bridge_artifact_spreadsheet_patch,
             bridge::bridge_artifact_propose_mutation,
             bridge::bridge_artifact_apply_proposal,
             bridge::bridge_artifact_history,

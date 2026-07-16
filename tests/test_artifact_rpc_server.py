@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from io import BytesIO
 from pathlib import Path
 
@@ -60,6 +61,26 @@ def _request(
 def _decode_responses(payload: bytes) -> list[RpcResponse]:
     decoder = RpcFrameDecoder()
     return [RpcResponse.model_validate_json(frame) for frame in decoder.feed(payload)]
+
+
+def test_handshake_exposes_only_redacted_backend_license_capabilities(tmp_path: Path) -> None:
+    response = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts")).handle_request(
+        _request("license-handshake", ArtifactRpcMethod.RPC_HANDSHAKE)
+    )
+    assert response.ok and response.result is not None
+    assert response.result["licenseCapabilities"] == [
+        {
+            "contractVersion": "artifact-license-capability/v1", "kind": "spreadsheet",
+            "enabled": False, "reasonCode": "ARTIFACT_LICENSE_EVIDENCE_MISSING",
+        },
+        {
+            "contractVersion": "artifact-license-capability/v1", "kind": "canvas",
+            "enabled": False, "reasonCode": "ARTIFACT_LICENSE_EVIDENCE_MISSING",
+        },
+    ]
+    serialized = json.dumps(response.result)
+    assert "secret" not in serialized.lower()
+    assert "signature" not in serialized.lower()
 
 
 def test_server_dispatches_service_calls_and_deduplicates_request_ids(tmp_path: Path) -> None:

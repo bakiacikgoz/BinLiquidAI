@@ -667,6 +667,16 @@ struct RpcHandshakeResult {
     network_listener: bool,
     stdout_protocol_only: bool,
     graceful_shutdown: bool,
+    license_capabilities: Vec<RpcLicenseCapability>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RpcLicenseCapability {
+    contract_version: String,
+    kind: String,
+    enabled: bool,
+    reason_code: String,
 }
 
 fn validate_handshake(
@@ -678,6 +688,16 @@ fn validate_handshake(
         .ok_or_else(|| SupervisorError::protocol("artifact RPC handshake result is missing"))?;
     let handshake: RpcHandshakeResult = serde_json::from_value(result.clone())
         .map_err(|_| SupervisorError::protocol("artifact RPC handshake shape is invalid"))?;
+    let safe_license_capabilities = handshake.license_capabilities.len() == 2
+        && handshake.license_capabilities.iter().any(|item| item.kind == "spreadsheet")
+        && handshake.license_capabilities.iter().any(|item| item.kind == "canvas")
+        && handshake.license_capabilities.iter().all(|capability| {
+            capability.contract_version == "artifact-license-capability/v1"
+                && matches!(capability.kind.as_str(), "spreadsheet" | "canvas")
+                && capability.reason_code.starts_with("ARTIFACT_LICENSE_")
+                && (capability.enabled
+                    == (capability.reason_code == "ARTIFACT_LICENSE_ENABLED"))
+        });
     if handshake.contract_version != RPC_CONTRACT_VERSION
         || handshake.transport != "stdio-length-prefixed-json"
         || handshake.max_frame_bytes == 0
@@ -685,6 +705,7 @@ fn validate_handshake(
         || handshake.network_listener
         || !handshake.stdout_protocol_only
         || !handshake.graceful_shutdown
+        || !safe_license_capabilities
     {
         return Err(SupervisorError::protocol(
             "artifact RPC handshake capabilities are unsafe or incompatible",

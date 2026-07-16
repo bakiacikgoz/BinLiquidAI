@@ -8,8 +8,10 @@ import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './ar
 import type { ArtifactFormSubmissionRequest } from './artifactContracts';
 import { FormSessionRuntime } from './editors/form/formSessionRuntime';
 import { exportCodeArtifact } from './artifactCodeExport';
+import { exportCanvasArtifact } from './artifactCanvasExport';
 import { exportDocumentArtifact, type DocumentArtifactExportFormat } from './artifactDocumentExport';
 import { exportFlowArtifact, type FlowArtifactExportFormat } from './artifactFlowExport';
+import { exportSpreadsheetArtifact, type SpreadsheetExportFormat } from './artifactSpreadsheetExport';
 import { ArtifactWorkspaceController } from './workspaceController';
 
 export type LegacyWorkbenchArtifact = {
@@ -489,6 +491,68 @@ export function useAssistantArtifactWorkspaceController({
     }
   }, [autosave, bridge, controller]);
 
+  const exportSpreadsheet = useCallback(async (
+    artifactId: string,
+    format: SpreadsheetExportFormat,
+    sheetId?: string,
+  ) => {
+    setError(null);
+    setOperationNotice(null);
+    try {
+      await autosave.flush(artifactId);
+      const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+      if (!tab) throw new Error('Artifact tab is not open.');
+      if (tab.dirty || tab.saveState === 'error' || tab.saveState === 'conflict') {
+        throw new Error('Artifact must be saved before export.');
+      }
+      const outcome = await exportSpreadsheetArtifact({
+        artifact: tab.artifact,
+        revision: tab.revision,
+        content: tab.draftContent,
+        format,
+        sheetId,
+        bridge,
+      });
+      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      return outcome;
+    } catch (caught) {
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_EXPORT_FAILED',
+        message: 'The spreadsheet could not be exported.',
+        retryable: true,
+      }));
+      return null;
+    }
+  }, [autosave, bridge, controller]);
+
+  const exportCanvas = useCallback(async (artifactId: string) => {
+    setError(null);
+    setOperationNotice(null);
+    try {
+      await autosave.flush(artifactId);
+      const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+      if (!tab) throw new Error('Artifact tab is not open.');
+      if (tab.dirty || tab.saveState === 'error' || tab.saveState === 'conflict') {
+        throw new Error('Artifact must be saved before export.');
+      }
+      const outcome = await exportCanvasArtifact({
+        artifact: tab.artifact,
+        revision: tab.revision,
+        content: tab.draftContent,
+        bridge,
+      });
+      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      return outcome;
+    } catch (caught) {
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_EXPORT_FAILED',
+        message: 'The canvas JSON could not be exported.',
+        retryable: true,
+      }));
+      return null;
+    }
+  }, [autosave, bridge, controller]);
+
   const submitForm = useCallback(async (request: ArtifactFormSubmissionRequest) => {
     setError(null);
     setOperationNotice(null);
@@ -570,6 +634,8 @@ export function useAssistantArtifactWorkspaceController({
         exportDocument,
         exportCode,
         exportFlow,
+        exportSpreadsheet,
+        exportCanvas,
       submitForm,
       archive: (artifactId: string) => controller.archive(artifactId),
       clearError: () => setError(null),
@@ -579,7 +645,7 @@ export function useAssistantArtifactWorkspaceController({
       loadHistory: (artifactId: string) => loadHistory(artifactId, false),
       loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCode, exportDocument, exportFlow, formRuntime, forkConflict, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, restoreArtifact, submitForm, toggle],
+    [autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSpreadsheet, formRuntime, forkConflict, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, restoreArtifact, submitForm, toggle],
   );
 
   const activeTab =

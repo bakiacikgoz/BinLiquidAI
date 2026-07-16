@@ -20,8 +20,7 @@ vi.mock('@monaco-editor/react', async () => {
       onDidBlurEditorText(listener: () => void): { dispose(): void };
     }): void;
   };
-  return {
-    default: (props: MockEditorProps) => {
+  function MockMonacoEditor(props: MockEditorProps) {
       const selectionListener = React.useRef<((event: { selection: Record<string, number> }) => void) | null>(null);
       React.useEffect(() => {
         props.onMount?.({
@@ -52,7 +51,9 @@ vi.mock('@monaco-editor/react', async () => {
           }),
         }, 'Emit selection'),
       );
-    },
+  }
+  return {
+    default: MockMonacoEditor,
   };
 });
 

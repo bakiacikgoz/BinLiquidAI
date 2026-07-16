@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 import typer
@@ -11,8 +13,9 @@ from imperaos.artifacts.commands import (
     GetArtifactQuery,
     ListArtifactsQuery,
 )
+from imperaos.artifacts.licenses import ArtifactLicenseCapability, evaluate_artifact_license
 from imperaos.artifacts.migrations import ArtifactMigrationReport, migrate_artifact_metadata
-from imperaos.artifacts.models import OperationContext, PrincipalType
+from imperaos.artifacts.models import ArtifactKind, OperationContext, PrincipalType
 from imperaos.artifacts.rpc_protocol import (
     ARTIFACT_RPC_CONTRACT_VERSION,
     ARTIFACT_RPC_MAX_FRAME_BYTES,
@@ -27,12 +30,45 @@ ARTIFACT_ROOT_OPTION = typer.Option(
     "--root",
     help="Artifact data root",
 )
+REPO_ROOT_OPTION = typer.Option(Path.cwd(), "--repo-root")
+LICENSE_EVIDENCE_OPTION = typer.Option(None, "--evidence")
+SPREADSHEET_LICENSE_EVIDENCE_OPTION = typer.Option(
+    None, "--spreadsheet-license-evidence"
+)
+CANVAS_LICENSE_EVIDENCE_OPTION = typer.Option(None, "--canvas-license-evidence")
 
 artifact_app = typer.Typer(help="Artifact workspace diagnostics")
 artifact_integrity_app = typer.Typer(help="Artifact integrity diagnostics")
 artifact_migration_app = typer.Typer(help="Artifact metadata migration commands")
+artifact_license_app = typer.Typer(help="Licensed artifact editor diagnostics")
 artifact_app.add_typer(artifact_integrity_app, name="integrity")
 artifact_app.add_typer(artifact_migration_app, name="migration")
+artifact_app.add_typer(artifact_license_app, name="license")
+
+
+@artifact_license_app.command("doctor")
+def artifact_license_doctor(
+    kind: str = typer.Option(..., "--kind", help="spreadsheet or canvas"),
+    profile: str = typer.Option("production", "--profile"),
+    build_target: str = typer.Option("windows-x86_64", "--build-target"),
+    evidence: Path | None = LICENSE_EVIDENCE_OPTION,
+    repo_root: Path = REPO_ROOT_OPTION,
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    del json_output
+    if kind not in {"spreadsheet", "canvas"}:
+        raise typer.BadParameter("--kind must be spreadsheet or canvas")
+    if profile != "production":
+        raise typer.BadParameter("only the production profile is supported")
+    report = evaluate_artifact_license(
+        kind,  # type: ignore[arg-type]
+        repo_root=repo_root.resolve(),
+        evidence_path=evidence.resolve() if evidence is not None else None,
+        build_target=build_target,
+    )
+    _emit(report.model_dump(mode="json", by_alias=True))
+    if not report.capability.enabled:
+        raise typer.Exit(3)
 
 
 def register_artifact_cli(root_app: typer.Typer) -> None:
@@ -176,12 +212,49 @@ def workspace_rpc(
         help="Serve length-prefixed JSON frames over stdin/stdout",
     ),
     root: Path = ARTIFACT_ROOT_OPTION,
+    repo_root: Path = REPO_ROOT_OPTION,
+    build_target: str = typer.Option("windows-x86_64", "--build-target"),
+    spreadsheet_license_evidence: Path | None = SPREADSHEET_LICENSE_EVIDENCE_OPTION,
+    canvas_license_evidence: Path | None = CANVAS_LICENSE_EVIDENCE_OPTION,
 ) -> None:
     if not stdio_json:
         raise typer.BadParameter("--stdio-json is required")
-    server = ArtifactRpcServer(ArtifactService(root))
+    capabilities = _resolve_license_capabilities(
+        repo_root=repo_root.resolve(),
+        build_target=build_target,
+        spreadsheet_evidence=spreadsheet_license_evidence,
+        canvas_evidence=canvas_license_evidence,
+    )
+    server = ArtifactRpcServer(
+        ArtifactService(root, license_capabilities=capabilities)
+    )
     exit_code = server.serve(sys.stdin.buffer, sys.stdout.buffer, sys.stderr.buffer)
     raise typer.Exit(exit_code)
+
+
+def _resolve_license_capabilities(
+    *,
+    repo_root: Path,
+    build_target: str,
+    spreadsheet_evidence: Path | None,
+    canvas_evidence: Path | None,
+    environment: Mapping[str, str] | None = None,
+) -> dict[ArtifactKind, ArtifactLicenseCapability]:
+    resolved_environment = os.environ if environment is None else environment
+    evidence_by_kind = {
+        ArtifactKind.SPREADSHEET: spreadsheet_evidence,
+        ArtifactKind.CANVAS: canvas_evidence,
+    }
+    return {
+        kind: evaluate_artifact_license(
+            kind.value,  # type: ignore[arg-type]
+            repo_root=repo_root,
+            evidence_path=evidence.resolve() if evidence is not None else None,
+            build_target=build_target,
+            environment=resolved_environment,
+        ).capability
+        for kind, evidence in evidence_by_kind.items()
+    }
 
 
 def _diagnostic_context(workspace: str, request_id: str) -> OperationContext:

@@ -46,9 +46,21 @@
     },
     {
       "category": "content",
+      "file": "spreadsheet.v2.schema.json",
+      "name": "spreadsheet.v2",
+      "sha256": "f4720427f863ef09968924c1a7e42f0ce5873eef52b6619ed02e221dae493f52"
+    },
+    {
+      "category": "content",
       "file": "canvas.v1.schema.json",
       "name": "canvas.v1",
       "sha256": "034f15b6c634a86cfb4c7fecaee1badf63bb8215f6d043719adf1a4511d3fe3e"
+    },
+    {
+      "category": "content",
+      "file": "canvas.v2.schema.json",
+      "name": "canvas.v2",
+      "sha256": "0f6b2343df8b672bcf0489fa104647e5b1cfefeb7a7bf8fdb14d60f539908f23"
     },
     {
       "category": "content",
@@ -109,6 +121,12 @@
       "file": "artifact-mutation-command.v1.schema.json",
       "name": "artifact-mutation-command.v1",
       "sha256": "37e5fdc6f47ce49a25d113d347a7fac3a3154c278f411925b7099d397b64df9e"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-spreadsheet-cell-patch-command.v1.schema.json",
+      "name": "artifact-spreadsheet-cell-patch-command.v1",
+      "sha256": "b0efedd551fe1ea9ca6f311c381a29684674d7621703d9e29a0cbd057d03e131"
     },
     {
       "category": "contract",
@@ -190,6 +208,18 @@
     },
     {
       "category": "contract",
+      "file": "artifact-license-capability.v1.schema.json",
+      "name": "artifact-license-capability.v1",
+      "sha256": "06fc6c29327355b7495e758190400d4d2114ea3f5ac313689919721c70e3ce81"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-license-doctor-result.v1.schema.json",
+      "name": "artifact-license-doctor-result.v1",
+      "sha256": "e4d56a9d5e0d600b39d8e2e6bb6c3efc32d1efc4592a5091a8f00ecf8da3d445"
+    },
+    {
+      "category": "contract",
       "file": "artifact-evidence-event.v1.schema.json",
       "name": "artifact-evidence-event.v1",
       "sha256": "4d670ea8309794310549e934b044d694724ad219ffedc9ef6731ca1ba941640c"
@@ -204,7 +234,7 @@
       "category": "contract",
       "file": "artifact-rpc-request.v1.schema.json",
       "name": "artifact-rpc-request.v1",
-      "sha256": "3be130c17998ed128a1975ff16ff0f1be68215c3f0e19dc9b12eb0fb241d5b74"
+      "sha256": "d5a1c2fcad36fa53552de828da4bcd6b009bbde77fe22200798c22af058b3e14"
     },
     {
       "category": "contract",
@@ -222,7 +252,7 @@
       "category": "contract",
       "file": "artifact-rpc-handshake.v1.schema.json",
       "name": "artifact-rpc-handshake.v1",
-      "sha256": "1bcd26f1a77eeec9eaee0c4ce4a4a8da4ba731226fc5d8677ed285ed678c6f7b"
+      "sha256": "de0f7647d336227aeec0d8416b0501ace15fe4039419e6395e374abeac720240"
     }
   ]
 }

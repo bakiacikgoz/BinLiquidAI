@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Literal
 
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
-from imperaos.artifacts.filesystem import GuardedArtifactFilesystem
 from imperaos.artifacts.exports import ArtifactExportRecord, ArtifactExportStatus
+from imperaos.artifacts.filesystem import GuardedArtifactFilesystem
 from imperaos.artifacts.migrations import (
     DEFAULT_BUSY_TIMEOUT_MS,
     connect_artifact_metadata,
@@ -218,7 +218,8 @@ class ArtifactStore:
                     """
                     UPDATE artifact_exports
                     SET status = ?, basename = ?, sha256 = ?, size_bytes = ?, reason_code = ?,
-                        terminal_idempotency_key = ?, terminal_request_sha256 = ?, completed_at_utc = ?
+                        terminal_idempotency_key = ?, terminal_request_sha256 = ?,
+                        completed_at_utc = ?
                     WHERE export_id = ? AND workspace_id = ? AND status = 'pending'
                     """,
                     (
@@ -497,7 +498,7 @@ class ArtifactStore:
         )
         if operation is not None or request_hash is not None:
             if (
-                operation not in {"mutate", "restore"}
+                operation not in {"mutate", "restore", "spreadsheet_cell_patch"}
                 or request_hash is None
                 or len(request_hash) != 64
             ):
@@ -1597,11 +1598,13 @@ WHERE artifact_id = :artifact_id
 _REVISION_INSERT_SQL = """
 INSERT INTO artifact_revisions (
     revision_id, artifact_id, parent_revision_id, base_revision_id, revision_number,
-    schema_version, mutation_type, content_relpath, content_sha256, content_size_bytes, content_encoding,
+    schema_version, mutation_type, content_relpath, content_sha256,
+    content_size_bytes, content_encoding,
     change_summary, author_type, author_id, idempotency_key, created_at_utc
 ) VALUES (
     :revision_id, :artifact_id, :parent_revision_id, :base_revision_id, :revision_number,
-    :schema_version, :mutation_type, :content_relpath, :content_sha256, :content_size_bytes, :content_encoding,
+    :schema_version, :mutation_type, :content_relpath, :content_sha256,
+    :content_size_bytes, :content_encoding,
     :change_summary, :author_type, :author_id, :idempotency_key, :created_at_utc
 )
 """

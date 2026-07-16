@@ -158,6 +158,7 @@ artifact_bridge_command!(bridge_artifact_list, "artifact.list");
 artifact_bridge_command!(bridge_artifact_get, "artifact.get");
 artifact_bridge_command!(bridge_artifact_create, "artifact.create");
 artifact_bridge_command!(bridge_artifact_mutate, "artifact.mutate");
+artifact_bridge_command!(bridge_artifact_spreadsheet_patch, "artifact.spreadsheet.patch");
 artifact_bridge_command!(
     bridge_artifact_propose_mutation,
     "artifact.propose_mutation"

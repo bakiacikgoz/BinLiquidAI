@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,23 +21,30 @@ from imperaos.artifacts.commands import (
     GetArtifactQuery,
     ListArtifactsQuery,
     MutateArtifactCommand,
+    PatchSpreadsheetCellsCommand,
     ProposeArtifactMutationCommand,
     RestoreArtifactCommand,
     SubmitArtifactFormCommand,
 )
-from imperaos.artifacts.content import ArtifactContent, FormContentV1, validate_artifact_content
+from imperaos.artifacts.content import (
+    ArtifactContent,
+    FormContentV1,
+    SpreadsheetContentV2,
+    validate_artifact_content,
+)
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
+from imperaos.artifacts.evidence import (
+    ArtifactEvidenceRecorder,
+    record_artifact_evidence,
+)
 from imperaos.artifacts.exports import (
     DEFAULT_ARTIFACT_EXPORT_MAX_BYTES,
     canonical_export_basename,
     require_export_format,
 )
-from imperaos.artifacts.evidence import (
-    ArtifactEvidenceRecorder,
-    record_artifact_evidence,
-)
 from imperaos.artifacts.form_continuation import ArtifactFormContinuationGateway
 from imperaos.artifacts.forms import validate_form_response
+from imperaos.artifacts.licenses import ArtifactLicenseCapability
 from imperaos.artifacts.models import (
     ArtifactDescriptor,
     ArtifactKind,
@@ -77,11 +85,40 @@ class ArtifactService:
         continuation_gateway: ArtifactFormContinuationGateway | None | object = (
             _DEFAULT_CONTINUATION_GATEWAY
         ),
+        license_capabilities: Mapping[ArtifactKind, ArtifactLicenseCapability] | None = None,
     ) -> None:
         self.store = ArtifactStore(root)
         self.policy = policy or ArtifactPolicyGateway()
         self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
         self._continuation_gateway = continuation_gateway
+        supplied = dict(license_capabilities or {})
+        self._license_capabilities = {
+            kind: supplied.get(kind) or ArtifactLicenseCapability(
+                kind=kind.value,  # type: ignore[arg-type]
+                enabled=False,
+                reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
+            )
+            for kind in (ArtifactKind.SPREADSHEET, ArtifactKind.CANVAS)
+        }
+        if any(
+            capability.kind != kind.value
+            for kind, capability in self._license_capabilities.items()
+        ):
+            raise ValueError("artifact license capability kind mismatch")
+
+    def license_capabilities(self) -> tuple[ArtifactLicenseCapability, ...]:
+        return tuple(self._license_capabilities.values())
+
+    def _require_licensed_editor(self, kind: ArtifactKind) -> None:
+        if kind in self._license_capabilities and not self._license_capabilities[kind].enabled:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_LICENSE_UNAVAILABLE,
+                "licensed artifact editing is unavailable",
+                details={
+                    "kind": kind.value,
+                    "reasonCode": self._license_capabilities[kind].reason_code,
+                },
+            )
 
     @record_artifact_evidence("artifact.create")
     def create(
@@ -161,6 +198,72 @@ class ArtifactService:
         )
         return operation
 
+    @record_artifact_evidence("artifact.spreadsheet.cell_patch")
+    def patch_spreadsheet_cells(
+        self,
+        command: PatchSpreadsheetCellsCommand,
+        context: OperationContext,
+    ) -> ArtifactOperationResult:
+        artifact = self.store.get_artifact(context.workspace_id, command.artifact_id)
+        if artifact.kind is not ArtifactKind.SPREADSHEET or artifact.schema_version != 2:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_SCHEMA_VERSION_UNSUPPORTED,
+                "cell patches require a spreadsheet.v2 artifact",
+            )
+        self._require_licensed_editor(ArtifactKind.SPREADSHEET)
+        request_hash = self._request_hash(command)
+        replay = self._load_operation_replay(
+            context.workspace_id,
+            command.idempotency_key,
+            "spreadsheet_cell_patch",
+            request_hash,
+        )
+        if replay is not None:
+            return replay
+        stored = self.store.get_revision(
+            context.workspace_id, artifact.artifact_id, artifact.current_revision_id
+        )
+        content = self._decode_content(
+            artifact.kind, stored.content, schema_version=stored.descriptor.schema_version
+        )
+        if not isinstance(content, SpreadsheetContentV2):
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                "stored spreadsheet content has an invalid type",
+            )
+        payload = content.model_dump(mode="json", by_alias=True)
+        target = next(
+            (sheet for sheet in payload["sheets"] if sheet["id"] == command.sheet_id),
+            None,
+        )
+        if target is None:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID,
+                "spreadsheet patch sheet does not exist",
+            )
+        cells = target["cells"]
+        for operation in command.operations:
+            if operation.op == "set":
+                cells[operation.address] = {"value": operation.value}
+            else:
+                cells.pop(operation.address, None)
+        validated = self._validate_content(
+            ArtifactKind.SPREADSHEET, payload, schema_version=2
+        )
+        return self.mutate(
+            MutateArtifactCommand(
+                artifact_id=artifact.artifact_id,
+                expected_revision_number=command.expected_revision_number,
+                mutation_type=ArtifactMutationType.CELL_PATCH,
+                content=validated.model_dump(mode="json", by_alias=True),
+                idempotency_key=command.idempotency_key,
+                change_summary=command.change_summary,
+            ),
+            context,
+            _operation="spreadsheet_cell_patch",
+            _request_hash=request_hash,
+        )
+
     @record_artifact_evidence("artifact.get")
     def get(
         self,
@@ -209,6 +312,9 @@ class ArtifactService:
         self,
         command: MutateArtifactCommand,
         context: OperationContext,
+        *,
+        _operation: str = "mutate",
+        _request_hash: str | None = None,
     ) -> ArtifactOperationResult:
         current = self.store.get_artifact(context.workspace_id, command.artifact_id)
         permission = (
@@ -224,11 +330,12 @@ class ArtifactService:
             target_data_class=current.data_class,
             approval_granted=command.approval_granted,
         )
-        request_hash = self._request_hash(command)
+        self._require_licensed_editor(current.kind)
+        request_hash = _request_hash or self._request_hash(command)
         replay = self._load_operation_replay(
             context.workspace_id,
             command.idempotency_key,
-            "mutate",
+            _operation,
             request_hash,
         )
         if replay is not None:
@@ -292,7 +399,7 @@ class ArtifactService:
             revision,
             payload,
             expected_revision_number=command.expected_revision_number,
-            operation="mutate",
+            operation=_operation,
             request_hash=request_hash,
         )
         operation = ArtifactOperationResult(
@@ -476,6 +583,7 @@ class ArtifactService:
             context,
             artifact_workspace_id=current.workspace_id,
         )
+        self._require_licensed_editor(current.kind)
         request_hash = self._request_hash(command)
         replay = self._load_operation_replay(
             context.workspace_id,
@@ -599,6 +707,7 @@ class ArtifactService:
             context,
             artifact_workspace_id=source.workspace_id,
         )
+        self._require_licensed_editor(source.kind)
         request_hash = self._request_hash(command)
         replay = self._load_operation_replay(
             context.workspace_id,

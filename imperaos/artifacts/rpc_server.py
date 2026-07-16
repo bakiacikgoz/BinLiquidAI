@@ -21,6 +21,7 @@ from imperaos.artifacts.commands import (
     GetArtifactQuery,
     ListArtifactsQuery,
     MutateArtifactCommand,
+    PatchSpreadsheetCellsCommand,
     ProposeArtifactMutationCommand,
     RestoreArtifactCommand,
     SubmitArtifactFormCommand,
@@ -46,6 +47,7 @@ _MAX_DEDUP_RESPONSES = 1024
 _MUTATION_METHODS_WITH_KEYS = {
     ArtifactRpcMethod.ARTIFACT_CREATE,
     ArtifactRpcMethod.ARTIFACT_MUTATE,
+    ArtifactRpcMethod.ARTIFACT_SPREADSHEET_PATCH,
     ArtifactRpcMethod.ARTIFACT_PROPOSE_MUTATION,
     ArtifactRpcMethod.ARTIFACT_RESTORE,
     ArtifactRpcMethod.ARTIFACT_DUPLICATE,
@@ -172,7 +174,9 @@ class ArtifactRpcServer:
 
     def _dispatch(self, request: RpcRequest) -> dict[str, Any]:
         if request.method is ArtifactRpcMethod.RPC_HANDSHAKE:
-            return RpcHandshake.default().model_dump(mode="json", by_alias=True)
+            return RpcHandshake.default(
+                self.service.license_capabilities()
+            ).model_dump(mode="json", by_alias=True)
         if request.method is ArtifactRpcMethod.RPC_HEALTH:
             return {
                 "status": "ready",
@@ -196,6 +200,10 @@ class ArtifactRpcServer:
             ArtifactRpcMethod.ARTIFACT_GET: (GetArtifactQuery, self.service.get),
             ArtifactRpcMethod.ARTIFACT_CREATE: (CreateArtifactCommand, self.service.create),
             ArtifactRpcMethod.ARTIFACT_MUTATE: (MutateArtifactCommand, self.service.mutate),
+            ArtifactRpcMethod.ARTIFACT_SPREADSHEET_PATCH: (
+                PatchSpreadsheetCellsCommand,
+                self.service.patch_spreadsheet_cells,
+            ),
             ArtifactRpcMethod.ARTIFACT_PROPOSE_MUTATION: (
                 ProposeArtifactMutationCommand,
                 self.service.propose_mutation,

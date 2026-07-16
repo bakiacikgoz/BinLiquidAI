@@ -255,3 +255,73 @@ def test_flow_v2_is_strict_bounded_and_acyclic() -> None:
 
     assert (ArtifactKind.FLOW, 1) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
     assert (ArtifactKind.FLOW, 2) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
+
+
+def test_canvas_v2_is_strict_bounded_and_asset_referential() -> None:
+    content = {
+        "kind": "canvas",
+        "schemaVersion": 2,
+        "snapshot": {
+            "objects": [
+                {
+                    "id": "shape-1", "type": "rectangle", "x": 10, "y": 20,
+                    "width": 200, "height": 100, "text": "Local note",
+                },
+                {
+                    "id": "image-1", "type": "image", "x": 0, "y": 0,
+                    "width": 80, "height": 80, "assetId": "asset-1",
+                },
+            ]
+        },
+        "assetIds": ["asset-1"],
+        "embeds": "deny",
+        "remoteAssets": "deny",
+    }
+    assert validate_artifact_content(ArtifactKind.CANVAS, content).schema_version == 2
+    assert (ArtifactKind.CANVAS, 2) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
+
+    shape = content["snapshot"]["objects"][0]
+    image = content["snapshot"]["objects"][1]
+    cases = [
+        {**content, "snapshot": {"objects": [shape, shape]}},
+        {**content, "snapshot": {"objects": [{**image, "assetId": "missing"}]}},
+        {**content, "snapshot": {"objects": [{**shape, "src": "https://example.com/x"}]}},
+        {**content, "snapshot": {"objects": [{**shape, "x": float("nan")}]}},
+        {**content, "snapshot": {"objects": [{**shape, "type": "embed"}]}},
+    ]
+    for invalid in cases:
+        with pytest.raises(ValidationError):
+            validate_artifact_content(ArtifactKind.CANVAS, invalid)
+
+def test_spreadsheet_v2_is_strict_scalar_and_xlsx_bounded() -> None:
+    strict = {
+        "kind": "spreadsheet", "schemaVersion": 2, "calculationMode": "disabled",
+        "sheets": [{
+            "id": "sheet-1", "name": "Sheet 1",
+            "cells": {"XFD1048576": {"value": "last"}, "A1": {"value": 1.5}},
+            "columns": [{"index": 1, "width": 120, "hidden": False}],
+        }],
+    }
+    assert validate_artifact_content(ArtifactKind.SPREADSHEET, strict).schema_version == 2
+
+    for address in ("XFE1", "A1048577", "A0"):
+        invalid = {**strict, "sheets": [{**strict["sheets"][0], "cells": {address: {"value": 1}}}]}
+        with pytest.raises(ValidationError, match="XFD1048576"):
+            validate_artifact_content(ArtifactKind.SPREADSHEET, invalid)
+
+    invalid_value = {
+        **strict,
+        "sheets": [{**strict["sheets"][0], "cells": {"A1": {"value": {"formula": "=1+1"}}}}],
+    }
+    with pytest.raises(ValidationError):
+        validate_artifact_content(ArtifactKind.SPREADSHEET, invalid_value)
+
+    unknown_cell_field = {
+        **strict,
+        "sheets": [{**strict["sheets"][0], "cells": {"A1": {"value": 1, "formula": "=1+1"}}}],
+    }
+    with pytest.raises(ValidationError):
+        validate_artifact_content(ArtifactKind.SPREADSHEET, unknown_cell_field)
+
+    assert (ArtifactKind.SPREADSHEET, 1) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
+    assert (ArtifactKind.SPREADSHEET, 2) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION

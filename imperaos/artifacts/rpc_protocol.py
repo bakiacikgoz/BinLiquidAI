@@ -13,6 +13,7 @@ from imperaos.artifacts.models import (
     PrincipalType,
     canonical_json,
 )
+from imperaos.artifacts.licenses import ArtifactLicenseCapability
 
 ARTIFACT_RPC_CONTRACT_VERSION = "1.0"
 ARTIFACT_RPC_MAX_FRAME_BYTES = 32 * 1024 * 1024
@@ -27,6 +28,7 @@ class ArtifactRpcMethod(StrEnum):
     ARTIFACT_GET = "artifact.get"
     ARTIFACT_CREATE = "artifact.create"
     ARTIFACT_MUTATE = "artifact.mutate"
+    ARTIFACT_SPREADSHEET_PATCH = "artifact.spreadsheet.patch"
     ARTIFACT_PROPOSE_MUTATION = "artifact.propose_mutation"
     ARTIFACT_APPLY_PROPOSAL = "artifact.apply_proposal"
     ARTIFACT_HISTORY = "artifact.history"
@@ -90,9 +92,13 @@ class RpcHandshake(ArtifactModel):
     network_listener: Literal[False]
     stdout_protocol_only: Literal[True]
     graceful_shutdown: Literal[True]
+    license_capabilities: tuple[ArtifactLicenseCapability, ...]
 
     @classmethod
-    def default(cls) -> RpcHandshake:
+    def default(
+        cls,
+        license_capabilities: tuple[ArtifactLicenseCapability, ...] | None = None,
+    ) -> RpcHandshake:
         return cls(
             contract_version=ARTIFACT_RPC_CONTRACT_VERSION,
             transport="stdio-length-prefixed-json",
@@ -101,6 +107,16 @@ class RpcHandshake(ArtifactModel):
             network_listener=False,
             stdout_protocol_only=True,
             graceful_shutdown=True,
+            license_capabilities=license_capabilities or (
+                ArtifactLicenseCapability(
+                    kind="spreadsheet", enabled=False,
+                    reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
+                ),
+                ArtifactLicenseCapability(
+                    kind="canvas", enabled=False,
+                    reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
+                ),
+            ),
         )
 
 

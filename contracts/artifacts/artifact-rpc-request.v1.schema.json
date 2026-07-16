@@ -9,6 +9,7 @@
         "artifact.get",
         "artifact.create",
         "artifact.mutate",
+        "artifact.spreadsheet.patch",
         "artifact.propose_mutation",
         "artifact.apply_proposal",
         "artifact.history",

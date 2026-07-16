@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
-import type { ArtifactDescriptor, ArtifactRevision } from '../../artifact-workspace/artifactContracts';
+import { SpreadsheetArtifactContentSchema, type ArtifactDescriptor, type ArtifactRevision } from '../../artifact-workspace/artifactContracts';
 import type { ArtifactFormSubmissionRequest, ArtifactFormSubmissionResult } from '../../artifact-workspace/artifactContracts';
 import type { FormSessionRuntime } from '../../artifact-workspace/editors/form/formSessionRuntime';
 import type { ArtifactWorkspaceState } from '../../artifact-workspace/workspaceController';
@@ -49,7 +49,7 @@ type WorkspaceProps = {
   onEditArtifact?: (artifactId: string, content: ArtifactWorkspaceState['tabs'][number]['draftContent']) => void;
   onRetrySave?: (artifactId: string) => void;
   onRestoreArtifact?: (artifactId: string, revisionId: string) => void;
-  onExportArtifact?: (artifactId: string, format: 'markdown' | 'html' | 'source' | 'json' | 'svg' | 'png') => void;
+  onExportArtifact?: (artifactId: string, format: 'markdown' | 'html' | 'source' | 'json' | 'svg' | 'png' | 'csv' | 'xlsx', sheetId?: string) => void;
   formRuntime?: FormSessionRuntime;
   onSubmitForm?: (request: ArtifactFormSubmissionRequest) => Promise<ArtifactFormSubmissionResult>;
   workspaceError?: ArtifactWorkspaceUiError | null;
@@ -177,6 +177,9 @@ export function AssistantWorkbench({
   }, [catalog, kindFilter, locale, search, statusFilter]);
   const activeComparison = activeTab && comparison?.artifactId === activeTab.artifact.artifactId
     ? comparison
+    : null;
+  const activeSpreadsheet = activeTab?.artifact.kind === 'spreadsheet'
+    ? SpreadsheetArtifactContentSchema.safeParse(activeTab.draftContent)
     : null;
 
   useEffect(() => {
@@ -410,6 +413,27 @@ export function AssistantWorkbench({
                       Export {format.toUpperCase()}
                     </Button>
                   ))}
+                </div>
+              ) : null}
+              {activeTab.artifact.kind === 'spreadsheet' && activeSpreadsheet?.success && activeComparison?.status !== 'ready' ? (
+                <div className="artifact-workspace-export-actions" aria-label="Spreadsheet export">
+                  {activeSpreadsheet.data.sheets.map((sheet) => (
+                    <Button
+                      key={sheet.id}
+                      variant="ghost"
+                      disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
+                      onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'csv', sheet.id)}
+                    >
+                      Export {sheet.name} CSV
+                    </Button>
+                  ))}
+                  <Button
+                    variant="ghost"
+                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
+                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'xlsx')}
+                  >
+                    Export XLSX
+                  </Button>
                 </div>
               ) : null}
               <div className="artifact-workspace-history" aria-label="Revision history">

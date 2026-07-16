@@ -1,0 +1,56 @@
+import { artifactBridge as defaultBridge, type ArtifactBridge } from './artifactBridge';
+import {
+  CanvasArtifactExportContentSchema,
+  type ArtifactContent,
+  type ArtifactDescriptor,
+  type ArtifactRevision,
+} from './artifactContracts';
+
+export type CanvasExportOutcome =
+  | { status: 'cancelled' }
+  | { status: 'exported'; basename: string; sha256: string; sizeBytes: number };
+
+export function serializeCanvasJson(content: unknown): Uint8Array {
+  const parsed = CanvasArtifactExportContentSchema.parse(content);
+  return new TextEncoder().encode(`${JSON.stringify(parsed, null, 2)}\n`);
+}
+
+export async function exportCanvasArtifact({
+  artifact,
+  revision,
+  content,
+  bridge = defaultBridge,
+}: {
+  artifact: ArtifactDescriptor;
+  revision: ArtifactRevision;
+  content: ArtifactContent;
+  bridge?: ArtifactBridge;
+}): Promise<CanvasExportOutcome> {
+  if (
+    artifact.kind !== 'canvas'
+    || artifact.schemaVersion !== revision.schemaVersion
+    || ![1, 2].includes(revision.schemaVersion)
+  ) {
+    throw new Error('Canvas JSON export requires an exact supported canvas revision.');
+  }
+  const bytes = serializeCanvasJson(content);
+  const begin = await bridge.beginExport({
+    artifactId: artifact.artifactId,
+    revisionId: revision.revisionId,
+    format: 'json',
+    idempotencyKey: `export-${artifact.artifactId.slice(0, 48)}-${revision.revisionId.slice(0, 48)}-${globalThis.crypto.randomUUID()}`,
+  });
+  if (begin.cancelled) return { status: 'cancelled' };
+  if (!begin.ticket) throw new Error('Native export did not return a ticket.');
+  if (bytes.byteLength > begin.maxBytes) {
+    await bridge.cancelExport(begin.ticket).catch(() => undefined);
+    throw new Error('Canvas JSON export exceeds the native size limit.');
+  }
+  try {
+    const result = await bridge.commitExport(begin.ticket, bytes);
+    return { status: 'exported', ...result };
+  } catch (error) {
+    await bridge.cancelExport(begin.ticket).catch(() => undefined);
+    throw error;
+  }
+}

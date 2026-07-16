@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import unicodedata
 from typing import Annotated, ClassVar, Literal
@@ -433,7 +434,9 @@ class FlowNodeDataV2(ArtifactModel):
     @field_validator("label", "description")
     @classmethod
     def reject_control_text(cls, value: str | None) -> str | None:
-        if value is not None and any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+        if value is not None and any(
+            unicodedata.category(character) in {"Cc", "Cf"} for character in value
+        ):
             raise ValueError("flow text contains a control character")
         return value
 
@@ -462,7 +465,9 @@ class FlowEdgeV2(ArtifactModel):
     @field_validator("label")
     @classmethod
     def reject_control_label(cls, value: str | None) -> str | None:
-        if value is not None and any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+        if value is not None and any(
+            unicodedata.category(character) in {"Cc", "Cf"} for character in value
+        ):
             raise ValueError("flow edge label contains a control character")
         return value
 
@@ -552,6 +557,86 @@ class SpreadsheetContentV1(ArtifactContentModel):
         return self
 
 
+def _valid_xlsx_address(address: str) -> bool:
+    match = re.fullmatch(r"([A-Z]{1,3})([1-9][0-9]{0,6})", address)
+    if match is None:
+        return False
+    column = 0
+    for character in match.group(1):
+        column = column * 26 + ord(character) - ord("A") + 1
+    return column <= 16_384 and int(match.group(2)) <= 1_048_576
+
+
+class SpreadsheetCellV2(ArtifactModel):
+    value: str | int | float | bool | None
+
+    @field_validator("value")
+    @classmethod
+    def validate_scalar(cls, value: str | int | float | bool | None):
+        if isinstance(value, str) and len(value) > 32_767:
+            raise ValueError("spreadsheet string cell exceeds 32767 characters")
+        if (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and (not math.isfinite(value) or abs(value) > 1e15)
+        ):
+            raise ValueError("spreadsheet numeric cell is outside the deterministic range")
+        return value
+
+
+class SpreadsheetColumnV2(ArtifactModel):
+    index: int = Field(ge=1, le=16_384)
+    width: float = Field(default=120, ge=20, le=1_000, allow_inf_nan=False)
+    hidden: bool = False
+
+
+class SpreadsheetSheetV2(ArtifactModel):
+    id: BoundedId
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    cells: dict[str, SpreadsheetCellV2] = Field(default_factory=dict)
+    columns: list[SpreadsheetColumnV2] = Field(default_factory=list, max_length=16_384)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        if any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+            raise ValueError("spreadsheet sheet name contains a control character")
+        return value
+
+    @field_validator("cells")
+    @classmethod
+    def validate_addresses(
+        cls, value: dict[str, SpreadsheetCellV2]
+    ) -> dict[str, SpreadsheetCellV2]:
+        if any(not _valid_xlsx_address(address) for address in value):
+            raise ValueError("spreadsheet cell address is outside XFD1048576")
+        return value
+
+    @field_validator("columns")
+    @classmethod
+    def validate_columns(cls, value: list[SpreadsheetColumnV2]) -> list[SpreadsheetColumnV2]:
+        indexes = [column.index for column in value]
+        if len(indexes) != len(set(indexes)):
+            raise ValueError("spreadsheet contains duplicate column indexes")
+        return value
+
+
+class SpreadsheetContentV2(ArtifactModel):
+    kind: Literal["spreadsheet"] = "spreadsheet"
+    schema_version: Literal[2] = 2
+    calculation_mode: Literal["disabled"] = "disabled"
+    sheets: list[SpreadsheetSheetV2] = Field(min_length=1, max_length=1_024)
+
+    @model_validator(mode="after")
+    def validate_workbook(self) -> SpreadsheetContentV2:
+        sheet_ids = [sheet.id for sheet in self.sheets]
+        if len(sheet_ids) != len(set(sheet_ids)):
+            raise ValueError("spreadsheet contains duplicate sheet ids")
+        if sum(len(sheet.cells) for sheet in self.sheets) > 100_000:
+            raise ValueError("spreadsheet exceeds 100000 non-empty cells")
+        return self
+
+
 class CanvasContentV1(ArtifactContentModel):
     kind: Literal["canvas"] = "canvas"
     snapshot: dict[str, JsonValue]
@@ -565,6 +650,55 @@ class CanvasContentV1(ArtifactContentModel):
         if _contains_remote_url(value):
             raise ValueError("canvas snapshot contains a remote URL")
         return value
+
+
+class CanvasObjectV2(ArtifactModel):
+    id: BoundedId
+    type: Literal["rectangle", "ellipse", "text", "line", "arrow", "note", "image"]
+    x: float = Field(ge=-1_000_000, le=1_000_000)
+    y: float = Field(ge=-1_000_000, le=1_000_000)
+    width: float = Field(gt=0, le=1_000_000)
+    height: float = Field(gt=0, le=1_000_000)
+    text: str | None = Field(default=None, max_length=10_000)
+    asset_id: BoundedId | None = None
+
+    @model_validator(mode="after")
+    def validate_asset_usage(self) -> CanvasObjectV2:
+        if self.type == "image" and self.asset_id is None:
+            raise ValueError("canvas image requires an asset id")
+        if self.type != "image" and self.asset_id is not None:
+            raise ValueError("only canvas images may reference assets")
+        return self
+
+
+class CanvasSnapshotV2(ArtifactModel):
+    objects: list[CanvasObjectV2] = Field(default_factory=list, max_length=10_000)
+
+    @field_validator("objects")
+    @classmethod
+    def validate_unique_ids(cls, value: list[CanvasObjectV2]) -> list[CanvasObjectV2]:
+        ids = [item.id for item in value]
+        if len(ids) != len(set(ids)):
+            raise ValueError("canvas object ids must be unique")
+        return value
+
+
+class CanvasContentV2(ArtifactModel):
+    kind: Literal["canvas"] = "canvas"
+    schema_version: Literal[2] = 2
+    snapshot: CanvasSnapshotV2
+    asset_ids: list[BoundedId] = Field(default_factory=list, max_length=10_000)
+    embeds: Literal["deny"] = "deny"
+    remote_assets: Literal["deny"] = "deny"
+
+    @model_validator(mode="after")
+    def validate_assets(self) -> CanvasContentV2:
+        if len(self.asset_ids) != len(set(self.asset_ids)):
+            raise ValueError("canvas asset ids must be unique")
+        allowed = set(self.asset_ids)
+        if any(item.asset_id not in allowed for item in self.snapshot.objects if item.asset_id):
+            raise ValueError("canvas object references an unknown asset")
+        return self
 
 
 class SlidesContentV1(ArtifactContentModel):
@@ -608,7 +742,9 @@ ArtifactContent = (
     | FlowContentV1
     | FlowContentV2
     | SpreadsheetContentV1
+    | SpreadsheetContentV2
     | CanvasContentV1
+    | CanvasContentV2
     | SlidesContentV1
 )
 
@@ -628,6 +764,8 @@ ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION: dict[
     **{(kind, 1): model for kind, model in ARTIFACT_CONTENT_MODEL_BY_KIND.items()},
     (ArtifactKind.CODE, 2): CodeContentV2,
     (ArtifactKind.FLOW, 2): FlowContentV2,
+    (ArtifactKind.SPREADSHEET, 2): SpreadsheetContentV2,
+    (ArtifactKind.CANVAS, 2): CanvasContentV2,
 }
 
 

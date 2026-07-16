@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field, JsonValue, StringConstraints
+from pydantic import Field, JsonValue, StringConstraints, model_validator
 
 from imperaos.artifacts.models import (
     ArtifactDataClass,
@@ -48,6 +48,39 @@ class MutateArtifactCommand(ArtifactModel):
     change_summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""
     approval_granted: bool = False
     proposal_id: BoundedId | None = None
+
+
+class SpreadsheetSetCellOperation(ArtifactModel):
+    op: Literal["set"]
+    address: Annotated[str, StringConstraints(min_length=2, max_length=10, strict=True)]
+    value: JsonValue
+
+
+class SpreadsheetClearCellOperation(ArtifactModel):
+    op: Literal["clear"]
+    address: Annotated[str, StringConstraints(min_length=2, max_length=10, strict=True)]
+
+
+SpreadsheetCellOperation = Annotated[
+    SpreadsheetSetCellOperation | SpreadsheetClearCellOperation,
+    Field(discriminator="op"),
+]
+
+
+class PatchSpreadsheetCellsCommand(ArtifactModel):
+    artifact_id: BoundedId
+    expected_revision_number: int = Field(ge=1)
+    sheet_id: BoundedId
+    operations: list[SpreadsheetCellOperation] = Field(min_length=1, max_length=10_000)
+    idempotency_key: BoundedId
+    change_summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""
+
+    @model_validator(mode="after")
+    def reject_duplicate_addresses(self) -> PatchSpreadsheetCellsCommand:
+        addresses = [operation.address for operation in self.operations]
+        if len(addresses) != len(set(addresses)):
+            raise ValueError("spreadsheet patch contains duplicate addresses")
+        return self
 
 
 class ProposeArtifactMutationCommand(ArtifactModel):

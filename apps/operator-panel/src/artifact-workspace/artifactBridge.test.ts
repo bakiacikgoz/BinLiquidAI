@@ -93,6 +93,29 @@ describe('artifact bridge', () => {
     });
   });
 
+  it('sends bounded spreadsheet cell patches through the dedicated RPC method', async () => {
+    const invoke = mockInvoke({
+      artifact: { ...descriptor, kind: 'spreadsheet', schemaVersion: 2 },
+      revision: {
+        revisionId: 'revision-2', artifactId: 'artifact-1', parentRevisionId: 'revision-1',
+        baseRevisionId: null, revisionNumber: 2, schemaVersion: 2, mutationType: 'cell_patch',
+        contentRelpath: 'content/sheet.json', contentSha256: 'a'.repeat(64), contentSizeBytes: 10,
+        contentEncoding: 'json', changeSummary: 'Patch', authorType: 'user', authorId: 'user-1',
+        idempotencyKey: 'patch-1', createdAtUtc: '2026-07-16T08:01:00Z',
+      },
+      created: false,
+      disposition: 'updated',
+    });
+    const { artifactBridge } = await import('./artifactBridge');
+    await artifactBridge.patchSpreadsheetCells({
+      artifactId: 'artifact-1', expectedRevisionNumber: 1, sheetId: 'sheet-1',
+      operations: [{ op: 'set', address: 'A1', value: 42 }], idempotencyKey: 'patch-1',
+    });
+    expect(invoke).toHaveBeenCalledWith('bridge_artifact_spreadsheet_patch', {
+      payload: expect.objectContaining({ idempotencyKey: 'patch-1' }),
+    });
+  });
+
   it('fails closed when a successful native response violates the runtime contract', async () => {
     mockInvoke({ items: [{ ...descriptor, kind: 'unknown' }], next_cursor: null });
     const { ArtifactContractError, artifactBridge } = await import('./artifactBridge');

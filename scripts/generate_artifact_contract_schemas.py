@@ -22,12 +22,14 @@ from imperaos.artifacts.commands import (  # noqa: E402
     GetArtifactQuery,
     ListArtifactsQuery,
     MutateArtifactCommand,
+    PatchSpreadsheetCellsCommand,
     ProposeArtifactMutationCommand,
     RestoreArtifactCommand,
     SubmitArtifactFormCommand,
 )
 from imperaos.artifacts.content import (  # noqa: E402
     CanvasContentV1,
+    CanvasContentV2,
     CodeContentV1,
     CodeContentV2,
     DocumentContentV1,
@@ -37,8 +39,13 @@ from imperaos.artifacts.content import (  # noqa: E402
     SafeJsonPatch,
     SlidesContentV1,
     SpreadsheetContentV1,
+    SpreadsheetContentV2,
 )
 from imperaos.artifacts.evidence import ArtifactEvidenceEvent  # noqa: E402
+from imperaos.artifacts.licenses import (  # noqa: E402
+    ArtifactLicenseCapability,
+    ArtifactLicenseDoctorResult,
+)
 from imperaos.artifacts.models import (  # noqa: E402
     ArtifactAssetDescriptor,
     ArtifactDescriptor,
@@ -66,7 +73,9 @@ SCHEMAS = {
     "flow.v1": FlowContentV1,
     "flow.v2": FlowContentV2,
     "spreadsheet.v1": SpreadsheetContentV1,
+    "spreadsheet.v2": SpreadsheetContentV2,
     "canvas.v1": CanvasContentV1,
+    "canvas.v2": CanvasContentV2,
     "slides.v1": SlidesContentV1,
     "artifact-descriptor.v1": ArtifactDescriptor,
     "artifact-asset.v1": ArtifactAssetDescriptor,
@@ -77,6 +86,7 @@ SCHEMAS = {
     "artifact-get-query.v1": GetArtifactQuery,
     "artifact-list-query.v1": ListArtifactsQuery,
     "artifact-mutation-command.v1": MutateArtifactCommand,
+    "artifact-spreadsheet-cell-patch-command.v1": PatchSpreadsheetCellsCommand,
     "artifact-mutation-proposal-command.v1": ProposeArtifactMutationCommand,
     "artifact-apply-proposal-command.v1": ApplyArtifactProposalCommand,
     "artifact-history-query.v1": ArtifactHistoryQuery,
@@ -90,6 +100,8 @@ SCHEMAS = {
     "artifact-export-cancel-command.v1": CancelArtifactExportCommand,
     "artifact-export-begin-result.v1": ArtifactExportBeginResult,
     "artifact-export-result.v1": ArtifactExportResult,
+    "artifact-license-capability.v1": ArtifactLicenseCapability,
+    "artifact-license-doctor-result.v1": ArtifactLicenseDoctorResult,
     "artifact-evidence-event.v1": ArtifactEvidenceEvent,
     "artifact-rpc-principal.v1": RpcPrincipal,
     "artifact-rpc-request.v1": RpcRequest,
@@ -105,7 +117,9 @@ CONTENT_SCHEMA_NAMES = {
     "flow.v1",
     "flow.v2",
     "spreadsheet.v1",
+    "spreadsheet.v2",
     "canvas.v1",
+    "canvas.v2",
     "slides.v1",
 }
 

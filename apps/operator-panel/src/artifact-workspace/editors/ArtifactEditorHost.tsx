@@ -5,6 +5,7 @@ import type {
   ArtifactDescriptor,
   ArtifactFormSubmissionRequest,
   ArtifactFormSubmissionResult,
+  ArtifactLicenseCapability,
   ArtifactRevision,
 } from '../artifactContracts';
 import type { ArtifactSaveState } from '../workspaceController';
@@ -13,9 +14,10 @@ import type { CodeArtifactSelection } from './code/codeAdapter';
 import type { DocumentArtifactSelection } from './document/documentAdapter';
 import type { FlowArtifactSelection } from './flow/flowAdapter';
 import { FormSessionRuntime } from './form/formSessionRuntime';
+import { ArtifactLicenseBlocked } from '../ui/ArtifactLicenseBlocked';
 
 export type ArtifactSelection = DocumentArtifactSelection | CodeArtifactSelection | FlowArtifactSelection;
-export type ArtifactExportFormat = 'json' | 'markdown' | 'html' | 'txt' | 'source' | 'svg' | 'png';
+export type ArtifactExportFormat = 'json' | 'markdown' | 'html' | 'txt' | 'source' | 'svg' | 'png' | 'csv' | 'xlsx';
 
 export interface ArtifactEditorProps {
   artifact: ArtifactDescriptor;
@@ -34,6 +36,7 @@ export interface ArtifactEditorHostProps extends ArtifactEditorProps {
   formEnabled?: boolean;
   codeEnabled?: boolean;
   flowEnabled?: boolean;
+  licenseCapability?: ArtifactLicenseCapability;
   locale?: 'en' | 'tr';
 }
 
@@ -112,6 +115,20 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
         <FlowArtifactEditor {...props} />
       </Suspense>
     );
+  }
+  if (props.artifact.kind === 'spreadsheet' || props.artifact.kind === 'canvas') {
+    const capability = props.licenseCapability ?? {
+      contractVersion: 'artifact-license-capability/v1' as const,
+      kind: props.artifact.kind,
+      enabled: false,
+      reasonCode: 'ARTIFACT_LICENSE_EVIDENCE_MISSING',
+    };
+    return <ArtifactLicenseBlocked
+      artifact={props.artifact}
+      content={props.content}
+      capability={capability}
+      onExportJson={props.artifact.kind === 'canvas' ? () => props.onRequestExport('json') : undefined}
+    />;
   }
   if (props.artifact.kind !== 'document') {
     return (
