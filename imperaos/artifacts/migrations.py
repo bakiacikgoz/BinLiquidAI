@@ -66,7 +66,7 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
                 ),
                 title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 200),
                 status TEXT NOT NULL DEFAULT 'draft' CHECK (
-                    status IN ('draft', 'published', 'archived')
+                    status IN ('draft', 'active', 'archived', 'blocked', 'corrupt')
                 ),
                 schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version >= 1),
                 data_class TEXT NOT NULL CHECK (
@@ -186,6 +186,19 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
                 PRIMARY KEY (workspace_id, idempotency_key)
             ) STRICT
             """,
+            """
+            CREATE TABLE artifact_write_journal (
+                journal_id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                artifact_id TEXT NOT NULL,
+                revision_id TEXT NOT NULL UNIQUE,
+                content_relpath TEXT NOT NULL,
+                content_sha256 TEXT NOT NULL CHECK (length(content_sha256) = 64),
+                state TEXT NOT NULL CHECK (state IN ('pending', 'committed', 'quarantined')),
+                created_at_utc TEXT NOT NULL,
+                completed_at_utc TEXT
+            ) STRICT
+            """,
         ),
     ),
     ArtifactMigration(
@@ -264,6 +277,7 @@ def connect_artifact_metadata(
     connection.execute("PRAGMA synchronous=FULL")
     connection.execute("PRAGMA foreign_keys=ON")
     connection.execute(f"PRAGMA busy_timeout={busy_timeout_ms}")
+    connection.row_factory = sqlite3.Row
     return connection
 
 

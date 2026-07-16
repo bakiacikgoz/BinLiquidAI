@@ -63,6 +63,7 @@ def test_migrations_apply_forward_only_schema_and_runtime_pragmas(tmp_path: Path
         "artifact_assets",
         "artifact_links",
         "artifact_operation_dedup",
+        "artifact_write_journal",
         "artifact_exports",
         "form_submissions",
     } <= tables

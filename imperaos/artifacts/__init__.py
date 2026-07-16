@@ -26,6 +26,13 @@ from imperaos.artifacts.models import (
     can_transition_data_class,
     canonical_json,
 )
+from imperaos.artifacts.store import (
+    ArtifactStore,
+    RevisionWriteResult,
+    StorageReconciliationReport,
+    StoredRevision,
+    revision_content_relpath,
+)
 
 __all__ = [
     "ARTIFACT_CONTENT_LIMITS_BYTES",
@@ -40,14 +47,19 @@ __all__ = [
     "ArtifactMigrationReport",
     "ArtifactRevisionDescriptor",
     "ArtifactStatus",
+    "ArtifactStore",
     "GuardedArtifactFilesystem",
     "OperationContext",
     "PrincipalType",
     "SafeJsonPatch",
+    "StorageReconciliationReport",
     "StoredArtifactFile",
+    "StoredRevision",
     "can_transition_data_class",
     "canonical_json",
     "connect_artifact_metadata",
     "migrate_artifact_metadata",
+    "revision_content_relpath",
+    "RevisionWriteResult",
     "validate_artifact_content",
 ]
