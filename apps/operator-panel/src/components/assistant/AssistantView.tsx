@@ -7,6 +7,7 @@ import { useImperaAssistantUiRuntime } from '../../assistant/assistantUiRuntime'
 import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
 import type { AssistantRuntimeSettings } from '../../settings';
 import { assistantUiText, type UiLocale } from '../../i18n';
+import { ArtifactWorkbenchShell } from '../../artifact-workspace/ui/ArtifactWorkbenchShell';
 import { Card } from '../primitives/Card';
 import { Icon } from '../primitives/Icon';
 import { AssistantComposer } from './AssistantComposer';
@@ -274,7 +275,8 @@ export function AssistantView({
         </div>
       </header>
 
-      <div className={workbench ? 'assistant-surface-grid assistant-surface-grid-workbench' : 'assistant-surface-grid'}>
+      <div className="assistant-surface-grid">
+        <ArtifactWorkbenchShell workbench={workbench} onCloseWorkbench={() => onToggleWorkbench?.()}>
         <div className="assistant-main-stage">
           {state.turns.length > 0 ? (
             <header className="assistant-session-header">
@@ -358,8 +360,7 @@ export function AssistantView({
             onCancel={currentTurnRunning ? onCancel : undefined}
           />
         </div>
-
-        {workbench ? <div className="assistant-workbench-slot">{workbench}</div> : null}
+        </ArtifactWorkbenchShell>
 
         {rightRail ? (
           <>

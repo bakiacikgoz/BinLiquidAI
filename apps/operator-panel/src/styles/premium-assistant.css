@@ -313,8 +313,89 @@
   min-height: 0;
 }
 
-.assistant-surface-grid-workbench {
-  grid-template-columns: minmax(460px, 1fr) minmax(300px, 380px) 330px;
+.artifact-workbench-shell {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.artifact-workbench-shell [data-panel] {
+  min-width: 0;
+  min-height: 0;
+}
+
+.artifact-workbench-resize-handle {
+  position: relative;
+  width: 8px;
+  background: var(--assistant-line);
+  transition: background 120ms ease;
+}
+
+.artifact-workbench-resize-handle:hover,
+.artifact-workbench-resize-handle:focus-visible {
+  outline: 0;
+  background: var(--assistant-blue);
+}
+
+.artifact-workbench-drawer {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 92vw);
+}
+
+.artifact-workbench-drawer-backdrop {
+  border: 0;
+  background: rgba(5, 12, 24, 0.58);
+}
+
+.artifact-workbench-drawer-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-left: 1px solid var(--assistant-line);
+  background: var(--assistant-bg);
+  box-shadow: -20px 0 54px rgba(0, 0, 0, 0.24);
+}
+
+.artifact-workbench-drawer-panel > header {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--assistant-line);
+}
+
+.artifact-workbench-drawer-panel > header button,
+.artifact-workbench-error button {
+  min-height: 36px;
+  border: 1px solid var(--assistant-line-strong);
+  border-radius: 7px;
+  padding: 0 12px;
+  background: var(--assistant-panel-soft);
+  color: var(--assistant-text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+}
+
+.artifact-workbench-error {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--assistant-error) 42%, var(--assistant-line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--assistant-error) 7%, var(--assistant-panel));
+  color: var(--assistant-text);
+}
+
+.artifact-workbench-error p {
+  margin: 0;
+  color: var(--assistant-muted);
 }
 
 .assistant-main-stage {
