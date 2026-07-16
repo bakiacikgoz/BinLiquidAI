@@ -1,3 +1,7 @@
+use crate::artifact_export::{
+    ArtifactExportCancelResult, ArtifactExportResult, ArtifactExportState, ExportBinding,
+    ExportBoundaryError, DEFAULT_MAX_EXPORT_BYTES, DEFAULT_TICKET_TTL,
+};
 use crate::artifact_rpc::{
     build_trusted_request, SupervisorError, TrustedArtifactIdentity, WorkspaceRpcLaunch,
     WorkspaceRpcRegistry,
@@ -11,6 +15,7 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
+use tauri_plugin_dialog::DialogExt;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader as TokioBufReader};
 use tokio::process::Command;
 use tokio::process::{ChildStderr, ChildStdout};
@@ -164,10 +169,247 @@ artifact_bridge_command!(bridge_artifact_archive, "artifact.archive");
 artifact_bridge_command!(bridge_artifact_duplicate, "artifact.duplicate");
 artifact_bridge_command!(bridge_artifact_asset_import, "artifact.asset.import");
 artifact_bridge_command!(bridge_artifact_form_submit, "artifact.form.submit");
-artifact_bridge_command!(bridge_artifact_export_begin, "artifact.export.begin");
-artifact_bridge_command!(bridge_artifact_export_commit, "artifact.export.commit");
-artifact_bridge_command!(bridge_artifact_export_cancel, "artifact.export.cancel");
 artifact_bridge_command!(bridge_artifact_import_evidence, "artifact.import_evidence");
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArtifactExportBeginRequest {
+    artifact_id: String,
+    revision_id: String,
+    format: String,
+    suggested_name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactExportBeginResult {
+    cancelled: bool,
+    ticket: Option<String>,
+    expires_in_ms: Option<u64>,
+    max_bytes: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArtifactExportCommitRequest {
+    ticket: String,
+    bytes: Vec<u8>,
+    sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArtifactExportCancelRequest {
+    ticket: String,
+}
+
+#[tauri::command]
+pub async fn bridge_artifact_export_begin(
+    app: tauri::AppHandle,
+    request: ArtifactExportBeginRequest,
+) -> BridgeResult<ArtifactExportBeginResult> {
+    if normalize_required_text(&request.artifact_id, "artifact_id", "artifact export begin")
+        .is_err()
+        || normalize_required_text(&request.revision_id, "revision_id", "artifact export begin")
+            .is_err()
+    {
+        return BridgeResult::err(BridgeError::new(
+            "INVALID_INPUT",
+            "artifact_id and revision_id are required",
+            "",
+            "artifact export begin",
+            false,
+        ));
+    }
+    let (filter_name, extensions) = match export_format(&request.format) {
+        Ok(format) => format,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let suggested_name = sanitize_export_filename(&request.suggested_name, extensions[0]);
+    let identity =
+        match resolve_trusted_artifact_identity(&trusted_artifact_bridge_config(), &app).await {
+            Ok(identity) => identity,
+            Err(error) => return BridgeResult::err(error),
+        };
+    let binding = match ExportBinding::new(identity.workspace_id(), identity.principal_id()) {
+        Ok(binding) => binding,
+        Err(error) => {
+            return BridgeResult::err(export_bridge_error("artifact export begin", error))
+        }
+    };
+    let dialog_app = app.clone();
+    let selection = match tokio::task::spawn_blocking(move || {
+        dialog_app
+            .dialog()
+            .file()
+            .set_file_name(suggested_name)
+            .add_filter(filter_name, &extensions)
+            .blocking_save_file()
+    })
+    .await
+    {
+        Ok(selection) => selection,
+        Err(_) => {
+            return BridgeResult::err(BridgeError::new(
+                "ARTIFACT_EXPORT_FAILED",
+                "Native export dialog failed.",
+                "",
+                "artifact export begin",
+                true,
+            ))
+        }
+    };
+    let Some(selection) = selection else {
+        return BridgeResult::ok(ArtifactExportBeginResult {
+            cancelled: true,
+            ticket: None,
+            expires_in_ms: None,
+            max_bytes: configured_max_export_bytes(),
+        });
+    };
+    let target = match selection.into_path() {
+        Ok(path) => path,
+        Err(_) => {
+            return BridgeResult::err(BridgeError::new(
+                "ARTIFACT_EXPORT_FAILED",
+                "Native export target is not a local filesystem path.",
+                "",
+                "artifact export begin",
+                false,
+            ))
+        }
+    };
+    let state = app.state::<ArtifactExportState>();
+    match state
+        .issue_ticket(
+            target,
+            binding,
+            configured_max_export_bytes(),
+            DEFAULT_TICKET_TTL,
+        )
+        .await
+    {
+        Ok(issued) => BridgeResult::ok(ArtifactExportBeginResult {
+            cancelled: false,
+            ticket: Some(issued.ticket),
+            expires_in_ms: Some(issued.expires_in_ms),
+            max_bytes: issued.max_bytes,
+        }),
+        Err(error) => BridgeResult::err(export_bridge_error("artifact export begin", error)),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_artifact_export_commit(
+    app: tauri::AppHandle,
+    request: ArtifactExportCommitRequest,
+) -> BridgeResult<ArtifactExportResult> {
+    let identity =
+        match resolve_trusted_artifact_identity(&trusted_artifact_bridge_config(), &app).await {
+            Ok(identity) => identity,
+            Err(error) => return BridgeResult::err(error),
+        };
+    let binding = match ExportBinding::new(identity.workspace_id(), identity.principal_id()) {
+        Ok(binding) => binding,
+        Err(error) => {
+            return BridgeResult::err(export_bridge_error("artifact export commit", error))
+        }
+    };
+    match app
+        .state::<ArtifactExportState>()
+        .commit(&request.ticket, &binding, request.bytes, &request.sha256)
+        .await
+    {
+        Ok(result) => BridgeResult::ok(result),
+        Err(error) => BridgeResult::err(export_bridge_error("artifact export commit", error)),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_artifact_export_cancel(
+    app: tauri::AppHandle,
+    request: ArtifactExportCancelRequest,
+) -> BridgeResult<ArtifactExportCancelResult> {
+    let identity =
+        match resolve_trusted_artifact_identity(&trusted_artifact_bridge_config(), &app).await {
+            Ok(identity) => identity,
+            Err(error) => return BridgeResult::err(error),
+        };
+    let binding = match ExportBinding::new(identity.workspace_id(), identity.principal_id()) {
+        Ok(binding) => binding,
+        Err(error) => {
+            return BridgeResult::err(export_bridge_error("artifact export cancel", error))
+        }
+    };
+    match app
+        .state::<ArtifactExportState>()
+        .cancel(&request.ticket, &binding)
+        .await
+    {
+        Ok(result) => BridgeResult::ok(result),
+        Err(error) => BridgeResult::err(export_bridge_error("artifact export cancel", error)),
+    }
+}
+
+fn export_format(format: &str) -> Result<(&'static str, Vec<&'static str>), BridgeError> {
+    match format.trim().to_ascii_lowercase().as_str() {
+        "json" => Ok(("JSON", vec!["json"])),
+        "markdown" | "md" => Ok(("Markdown", vec!["md"])),
+        "html" => Ok(("HTML", vec!["html"])),
+        "csv" => Ok(("CSV", vec!["csv"])),
+        "xlsx" => Ok(("Excel", vec!["xlsx"])),
+        "png" => Ok(("PNG", vec!["png"])),
+        "svg" => Ok(("SVG", vec!["svg"])),
+        "pptx" => Ok(("PowerPoint", vec!["pptx"])),
+        "zip" => Ok(("ZIP", vec!["zip"])),
+        _ => Err(BridgeError::new(
+            "ARTIFACT_EXPORT_FAILED",
+            "Artifact export format is unsupported.",
+            "",
+            "artifact export begin",
+            false,
+        )),
+    }
+}
+
+fn sanitize_export_filename(value: &str, extension: &str) -> String {
+    let basename = Path::new(value)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("artifact");
+    let mut sanitized = basename
+        .chars()
+        .map(|character| {
+            if character.is_alphanumeric() || matches!(character, ' ' | '-' | '_' | '.') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .take(120)
+        .collect::<String>();
+    sanitized = sanitized.trim_matches([' ', '.']).to_string();
+    if sanitized.is_empty() {
+        sanitized = "artifact".to_string();
+    }
+    let suffix = format!(".{extension}");
+    if !sanitized.to_ascii_lowercase().ends_with(&suffix) {
+        sanitized.push_str(&suffix);
+    }
+    sanitized
+}
+
+fn configured_max_export_bytes() -> usize {
+    std::env::var("IMPERAOS_ARTIFACT_MAX_EXPORT_BYTES")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0 && *value <= DEFAULT_MAX_EXPORT_BYTES)
+        .unwrap_or(DEFAULT_MAX_EXPORT_BYTES)
+}
+
+fn export_bridge_error(command: &str, error: ExportBoundaryError) -> BridgeError {
+    BridgeError::new(&error.code, error.message, "", command, error.retryable)
+}
 
 async fn bridge_artifact_rpc_call(
     app: tauri::AppHandle,

@@ -134,6 +134,14 @@ impl TrustedArtifactIdentity {
         }
         Ok(identity)
     }
+
+    pub fn workspace_id(&self) -> &str {
+        &self.workspace_id
+    }
+
+    pub fn principal_id(&self) -> &str {
+        &self.principal_id
+    }
 }
 
 pub fn build_trusted_request(
