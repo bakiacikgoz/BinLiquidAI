@@ -85,6 +85,7 @@ import {
   mapWorkspaceStageToMissionStage,
 } from './missionMappers';
 import { useAssistantRuntimeSession } from './assistant/useAssistantRuntimeSession';
+import { useAssistantArtifactWorkspaceController } from './artifact-workspace/useAssistantArtifactWorkspaceController';
 import { useAssistantModels } from './assistant/useAssistantModels';
 import type { AssistantProviderKind } from './assistant/modelDiscovery';
 import { MissionControlView } from './components/mission/MissionControlView';
@@ -401,7 +402,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportPath, setExportPath] = useState('');
   const [exportSubmitting, setExportSubmitting] = useState(false);
-  const [assistantWorkbenchOpen, setAssistantWorkbenchOpen] = useState(false);
 
   const [events, setEvents] = useState<unknown[]>([]);
   const [eventsCursor, setEventsCursor] = useState(0);
@@ -1552,6 +1552,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     pendingApproval: approvalDetail || activeApproval,
     systemHealth,
   }));
+  const assistantArtifactWorkspace = useAssistantArtifactWorkspaceController({
+    assistantState: assistantSession.state,
+    legacyArtifacts: assistantWorkbenchArtifacts,
+    selectedLegacyArtifactName: selectedArtifactName,
+    onSelectLegacyArtifact: setSelectedArtifactName,
+  });
 
   useEffect(() => {
     const approvalId = assistantSession.state.pendingApprovalId;
@@ -1674,15 +1680,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       onViewRuns={() => setActiveView('runs')}
     />
   );
-  const assistantWorkbenchAvailable = assistantSession.state.turns.length > 0;
+  const assistantWorkbenchAvailable = assistantArtifactWorkspace.available;
   const assistantWorkbench =
-    assistantWorkbenchAvailable && assistantWorkbenchOpen ? (
+    assistantWorkbenchAvailable && assistantArtifactWorkspace.open ? (
       <AssistantWorkbench
         state={assistantSession.state}
-        artifacts={assistantWorkbenchArtifacts}
-        selectedArtifactName={selectedArtifactName}
+        artifacts={assistantArtifactWorkspace.legacyArtifacts}
+        selectedArtifactName={assistantArtifactWorkspace.selectedLegacyArtifactName}
         locale={locale}
-        onSelectArtifact={setSelectedArtifactName}
+        onSelectArtifact={assistantArtifactWorkspace.actions.selectLegacyArtifact}
         onViewRuns={() => {
           setRunTab('artifacts');
           setActiveView('runs');
@@ -1944,7 +1950,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             rightRail={assistantRightRail}
             workbench={assistantWorkbench}
             workbenchAvailable={assistantWorkbenchAvailable}
-            workbenchOpen={assistantWorkbenchOpen}
+            workbenchOpen={assistantArtifactWorkspace.open}
             runtimeSettings={assistantRuntimeSettings}
             modelDiscovery={assistantModels}
             locale={locale}
@@ -1953,10 +1959,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               void assistantSession.actions.send(message, runtimeSettings, controls)
             }
             onNewChat={() => {
-              setAssistantWorkbenchOpen(false);
+              assistantArtifactWorkspace.actions.reset();
               assistantSession.actions.newChat();
             }}
-            onToggleWorkbench={() => setAssistantWorkbenchOpen((value) => !value)}
+            onToggleWorkbench={assistantArtifactWorkspace.actions.toggle}
             onReviewApproval={onReviewAssistantApproval}
             onApprove={(approvalId) => void onDecideAssistantApproval(approvalId, true)}
             onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}
