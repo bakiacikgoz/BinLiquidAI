@@ -1,3 +1,4 @@
+pub mod artifact_rpc;
 mod bridge;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
