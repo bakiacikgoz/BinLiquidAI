@@ -3,6 +3,9 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
+import pytest
+from artifact_store_support import make_artifact_pair
+
 from imperaos.artifacts.models import PrincipalType
 from imperaos.artifacts.rpc_protocol import (
     ArtifactRpcMethod,
@@ -88,6 +91,30 @@ def test_server_dispatches_service_calls_and_deduplicates_request_ids(tmp_path: 
             {"artifactId": "artifact-1"},
         )
     )
+    assert first.result is not None
+    source_revision_id = first.result["revision"]["revisionId"]
+    duplicated = server.handle_request(
+        _request(
+            "request-duplicate",
+            ArtifactRpcMethod.ARTIFACT_DUPLICATE,
+            {
+                "sourceArtifactId": "artifact-1",
+                "sourceRevisionId": source_revision_id,
+                "artifactId": "artifact-fork",
+                "title": "RPC local draft",
+                "contentOverride": _document("rpc-local-fork"),
+                "idempotencyKey": "duplicate-1",
+            },
+            idempotency_key="duplicate-1",
+        )
+    )
+    forked = server.handle_request(
+        _request(
+            "request-get-fork",
+            ArtifactRpcMethod.ARTIFACT_GET,
+            {"artifactId": "artifact-fork"},
+        )
+    )
 
     assert first.ok is True
     assert replay == first
@@ -97,6 +124,17 @@ def test_server_dispatches_service_calls_and_deduplicates_request_ids(tmp_path: 
     assert loaded.ok is True
     assert loaded.result is not None
     assert loaded.result["artifact"]["artifactId"] == "artifact-1"
+    assert duplicated.ok is True
+    assert duplicated.result is not None
+    assert duplicated.result["revision"]["mutationType"] == "duplicate"
+    assert duplicated.result["revision"]["baseRevisionId"] == source_revision_id
+    assert duplicated.result["artifact"]["metadata"] == {
+        "forkedFromArtifactId": "artifact-1",
+        "forkedFromRevisionId": source_revision_id,
+    }
+    assert forked.ok is True
+    assert forked.result is not None
+    assert forked.result["content"] == _document("rpc-local-fork")
     assert service.store.get_artifact("workspace-1", "artifact-1").current_revision_number == 1
 
 
@@ -147,3 +185,52 @@ def test_server_malformed_input_fails_closed_without_stdout_or_raw_diagnostic(
     assert stdout.getvalue() == b""
     assert b"raw-secret-frame" not in stderr.getvalue()
     assert b"ARTIFACT_RPC_PROTOCOL_MISMATCH" in stderr.getvalue()
+
+
+def test_startup_reconciliation_finishes_before_first_rpc_read(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    root = tmp_path / "artifacts"
+    crashed = ArtifactService(root)
+    artifact, revision = make_artifact_pair(b"orphan-before-admission")
+
+    def simulate_crash(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("simulated process crash")
+
+    monkeypatch.setattr(crashed.store, "_commit_create", simulate_crash)
+    with pytest.raises(RuntimeError, match="simulated process crash"):
+        crashed.store.create_artifact(artifact, revision, b"orphan-before-admission")
+    (crashed.store.filesystem.tmp_root / "stale.tmp").write_bytes(b"stale")
+
+    service = ArtifactService(root)
+
+    class ObservedInput(BytesIO):
+        observed = False
+
+        def read(self, size: int = -1) -> bytes:
+            raise AssertionError("buffered pipe reads must use read1")
+
+        def read1(self, size: int = -1) -> bytes:
+            if not self.observed:
+                self.observed = True
+                with service.store._connect() as connection:
+                    state = connection.execute(
+                        "SELECT state FROM artifact_write_journal WHERE revision_id = ?",
+                        (revision.revision_id,),
+                    ).fetchone()[0]
+                assert state == "quarantined"
+                assert not any(service.store.filesystem.tmp_root.rglob("*"))
+            return super().read1(size)
+
+    server = ArtifactRpcServer(service)
+    stdin = ObservedInput(
+        encode_frame(_request("hello", ArtifactRpcMethod.RPC_HANDSHAKE))
+        + encode_frame(_request("shutdown", ArtifactRpcMethod.RPC_SHUTDOWN))
+    )
+    stdout = BytesIO()
+    stderr = BytesIO()
+
+    assert server.serve(stdin, stdout, stderr) == 0
+    assert stdin.observed is True
+    assert stderr.getvalue() == b""

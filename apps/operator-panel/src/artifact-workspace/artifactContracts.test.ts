@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { ArtifactReadResultSchema } from './artifactContracts';
+import codeParityFixture from '../../../../contracts/artifacts/fixtures/code-content-parity.v1.json';
+
+import {
+  ArtifactContentSchema,
+  ArtifactFormSubmissionResultSchema,
+  ArtifactReadResultSchema,
+} from './artifactContracts';
 
 const valid = {
   artifact: {
@@ -26,5 +32,32 @@ describe('artifact read result contract', () => {
     ['content schema', { ...valid, content: { ...valid.content, schemaVersion: 2 } }],
   ])('rejects cross-boundary %s mismatches', (_label, payload) => {
     expect(ArtifactReadResultSchema.safeParse(payload).success).toBe(false);
+  });
+});
+
+describe('artifact form submission contract', () => {
+  const result = {
+    submissionId: 'submission-1',
+    artifactId: 'artifact-1',
+    schemaRevisionId: 'revision-1',
+    status: 'accepted',
+    responseSha256: 'b'.repeat(64),
+    continuationAction: 'none',
+    approvalId: null,
+    reasonCode: 'FORM_CONTINUATION_NOT_REQUIRED',
+    actionHash: null,
+    disposition: 'created',
+  };
+
+  it('accepts the bounded result and rejects unknown or unsafe fields', () => {
+    expect(ArtifactFormSubmissionResultSchema.safeParse(result).success).toBe(true);
+    expect(ArtifactFormSubmissionResultSchema.safeParse({ ...result, rawResponse: { secret: true } }).success).toBe(false);
+    expect(ArtifactFormSubmissionResultSchema.safeParse({ ...result, status: 'executed' }).success).toBe(false);
+  });
+});
+
+describe('code artifact content contract', () => {
+  it.each(codeParityFixture.cases)('$id', ({ content, expectedValid }) => {
+    expect(ArtifactContentSchema.safeParse(content).success).toBe(expectedValid);
   });
 });

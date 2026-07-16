@@ -1,4 +1,7 @@
 {
+  "$defs": {
+    "JsonValue": {}
+  },
   "$id": "https://schemas.imperaos.local/artifacts/artifact-duplicate-command.v1.schema.json",
   "additionalProperties": false,
   "properties": {
@@ -17,6 +20,21 @@
       "default": null,
       "title": "Artifactid"
     },
+    "contentOverride": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Contentoverride"
+    },
     "idempotencyKey": {
       "maxLength": 128,
       "minLength": 1,
@@ -31,6 +49,13 @@
       "title": "Sourceartifactid",
       "type": "string"
     },
+    "sourceRevisionId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "title": "Sourcerevisionid",
+      "type": "string"
+    },
     "title": {
       "maxLength": 200,
       "minLength": 1,
@@ -40,6 +65,7 @@
   },
   "required": [
     "sourceArtifactId",
+    "sourceRevisionId",
     "title",
     "idempotencyKey"
   ],

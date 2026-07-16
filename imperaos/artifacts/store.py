@@ -10,6 +10,7 @@ from typing import Literal
 
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.filesystem import GuardedArtifactFilesystem
+from imperaos.artifacts.exports import ArtifactExportRecord, ArtifactExportStatus
 from imperaos.artifacts.migrations import (
     DEFAULT_BUSY_TIMEOUT_MS,
     connect_artifact_metadata,
@@ -19,6 +20,7 @@ from imperaos.artifacts.models import (
     ArtifactDescriptor,
     ArtifactMutationType,
     ArtifactRevisionDescriptor,
+    can_transition_data_class,
     canonical_json,
 )
 
@@ -78,11 +80,334 @@ class ArtifactStore:
             busy_timeout_ms=self.busy_timeout_ms,
         )
 
+    def create_export(
+        self,
+        *,
+        export_id: str,
+        workspace_id: str,
+        artifact_id: str,
+        revision_id: str,
+        format_name: str,
+        basename: str,
+        actor_type: str,
+        actor_id: str,
+        idempotency_key: str,
+        request_sha256: str,
+    ) -> tuple[ArtifactExportRecord, bool]:
+        with self._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                artifact = connection.execute(
+                    "SELECT artifact_id FROM artifacts WHERE artifact_id = ? AND workspace_id = ?",
+                    (artifact_id, workspace_id),
+                ).fetchone()
+                revision = connection.execute(
+                    "SELECT artifact_id FROM artifact_revisions WHERE revision_id = ?",
+                    (revision_id,),
+                ).fetchone()
+                if artifact is None or revision is None or revision["artifact_id"] != artifact_id:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_NOT_FOUND,
+                        "artifact export revision does not exist",
+                    )
+                existing = connection.execute(
+                    "SELECT * FROM artifact_exports WHERE workspace_id = ? AND idempotency_key = ?",
+                    (workspace_id, idempotency_key),
+                ).fetchone()
+                if existing is not None:
+                    if existing["request_sha256"] != request_sha256:
+                        raise ArtifactDomainError(
+                            ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH,
+                            "artifact export idempotency key was already used",
+                        )
+                    connection.commit()
+                    return _export_from_row(existing), False
+                now = datetime.now(UTC).isoformat()
+                connection.execute(
+                    """
+                    INSERT INTO artifact_exports (
+                        export_id, workspace_id, artifact_id, revision_id, format, status,
+                        basename, actor_type, actor_id, idempotency_key, request_sha256,
+                        created_at_utc
+                    ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        export_id, workspace_id, artifact_id, revision_id, format_name,
+                        basename, actor_type, actor_id, idempotency_key, request_sha256, now,
+                    ),
+                )
+                row = connection.execute(
+                    "SELECT * FROM artifact_exports WHERE export_id = ?",
+                    (export_id,),
+                ).fetchone()
+                if row is None:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                        "artifact export record could not be read",
+                    )
+                connection.commit()
+                return _export_from_row(row), True
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
+            except sqlite3.Error as exc:
+                connection.rollback()
+                self._raise_storage_failure(exc, "artifact_export_begin_failed")
+
+    def get_export(self, workspace_id: str, export_id: str) -> ArtifactExportRecord:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM artifact_exports WHERE workspace_id = ? AND export_id = ?",
+                (workspace_id, export_id),
+            ).fetchone()
+        if row is None:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_NOT_FOUND,
+                "artifact export does not exist",
+            )
+        return _export_from_row(row)
+
+    def transition_export(
+        self,
+        *,
+        workspace_id: str,
+        export_id: str,
+        actor_type: str,
+        actor_id: str,
+        status: ArtifactExportStatus,
+        basename: str,
+        sha256: str | None,
+        size_bytes: int | None,
+        reason_code: str | None,
+        idempotency_key: str,
+        request_sha256: str,
+    ) -> tuple[ArtifactExportRecord, bool]:
+        if status == "pending":
+            raise ValueError("artifact export terminal transition is required")
+        with self._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    "SELECT * FROM artifact_exports WHERE workspace_id = ? AND export_id = ?",
+                    (workspace_id, export_id),
+                ).fetchone()
+                if row is None:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_NOT_FOUND,
+                        "artifact export does not exist",
+                    )
+                if row["actor_type"] != actor_type or row["actor_id"] != actor_id:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+                        "artifact export actor binding does not match",
+                    )
+                if row["status"] != "pending":
+                    if (
+                        row["status"] == status
+                        and row["terminal_idempotency_key"] == idempotency_key
+                        and row["terminal_request_sha256"] == request_sha256
+                    ):
+                        connection.commit()
+                        return _export_from_row(row), False
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_EXPORT_FAILED,
+                        "artifact export is already terminal",
+                    )
+                now = datetime.now(UTC).isoformat()
+                connection.execute(
+                    """
+                    UPDATE artifact_exports
+                    SET status = ?, basename = ?, sha256 = ?, size_bytes = ?, reason_code = ?,
+                        terminal_idempotency_key = ?, terminal_request_sha256 = ?, completed_at_utc = ?
+                    WHERE export_id = ? AND workspace_id = ? AND status = 'pending'
+                    """,
+                    (
+                        status, basename, sha256, size_bytes, reason_code, idempotency_key,
+                        request_sha256, now, export_id, workspace_id,
+                    ),
+                )
+                updated = connection.execute(
+                    "SELECT * FROM artifact_exports WHERE export_id = ? AND workspace_id = ?",
+                    (export_id, workspace_id),
+                ).fetchone()
+                if updated is None:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                        "artifact export terminal record is missing",
+                    )
+                connection.commit()
+                return _export_from_row(updated), True
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
+            except sqlite3.Error as exc:
+                connection.rollback()
+                self._raise_storage_failure(exc, "artifact_export_transition_failed")
+
+    def create_form_submission(
+        self,
+        *,
+        submission_id: str,
+        workspace_id: str,
+        artifact_id: str,
+        schema_revision_id: str,
+        principal_id: str,
+        persistence_policy: Literal["none"],
+        response_sha256: str,
+        idempotency_key: str,
+        continuation_required: bool = False,
+    ) -> bool:
+        with self._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                artifact = connection.execute(
+                    "SELECT artifact_id FROM artifacts WHERE artifact_id = ? AND workspace_id = ?",
+                    (artifact_id, workspace_id),
+                ).fetchone()
+                revision = connection.execute(
+                    "SELECT artifact_id FROM artifact_revisions WHERE revision_id = ?",
+                    (schema_revision_id,),
+                ).fetchone()
+                if artifact is None or revision is None or revision["artifact_id"] != artifact_id:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_NOT_FOUND,
+                        "form artifact revision does not exist",
+                    )
+                existing = connection.execute(
+                    """
+                    SELECT form_submissions.* FROM form_submissions
+                    JOIN artifacts ON artifacts.artifact_id = form_submissions.artifact_id
+                    WHERE artifacts.workspace_id = ? AND form_submissions.idempotency_key = ?
+                    """,
+                    (workspace_id, idempotency_key),
+                ).fetchone()
+                if existing is not None:
+                    expected = (
+                        artifact_id,
+                        schema_revision_id,
+                        principal_id,
+                        persistence_policy,
+                        response_sha256,
+                    )
+                    observed = (
+                        existing["artifact_id"],
+                        existing["schema_revision_id"],
+                        existing["principal_id"],
+                        existing["persistence_policy"],
+                        existing["response_sha256"],
+                    )
+                    if observed != expected:
+                        raise ArtifactDomainError(
+                            ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH,
+                            "form submission idempotency key was already used",
+                        )
+                    if continuation_required:
+                        now = datetime.now(UTC).isoformat()
+                        connection.execute(
+                            """
+                            INSERT OR IGNORE INTO artifact_form_continuation_outbox (
+                                submission_id, workspace_id, status, created_at_utc, updated_at_utc
+                            ) VALUES (?, ?, 'pending', ?, ?)
+                            """,
+                            (submission_id, workspace_id, now, now),
+                        )
+                    connection.commit()
+                    return False
+                connection.execute(
+                    """
+                    INSERT INTO form_submissions (
+                        submission_id, artifact_id, schema_revision_id, principal_id,
+                        persistence_policy, redacted_summary_json, response_sha256,
+                        idempotency_key, created_at_utc
+                    ) VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?)
+                    """,
+                    (
+                        submission_id,
+                        artifact_id,
+                        schema_revision_id,
+                        principal_id,
+                        persistence_policy,
+                        response_sha256,
+                        idempotency_key,
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                if continuation_required:
+                    now = datetime.now(UTC).isoformat()
+                    connection.execute(
+                        """
+                        INSERT INTO artifact_form_continuation_outbox (
+                            submission_id, workspace_id, status, created_at_utc, updated_at_utc
+                        ) VALUES (?, ?, 'pending', ?, ?)
+                        """,
+                        (submission_id, workspace_id, now, now),
+                    )
+                connection.commit()
+                return True
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
+            except sqlite3.Error as exc:
+                connection.rollback()
+                self._raise_storage_failure(exc, "form_submission_commit_failed")
+
+    def mark_form_continuation_ticketed(
+        self,
+        *,
+        submission_id: str,
+        workspace_id: str,
+        approval_id: str,
+        action_hash: str,
+    ) -> None:
+        with self._connect() as connection:
+            updated = connection.execute(
+                """
+                UPDATE artifact_form_continuation_outbox
+                SET status = 'ticketed', approval_id = ?, action_hash = ?,
+                    last_error_code = NULL, attempt_count = attempt_count + 1,
+                    updated_at_utc = ?
+                WHERE submission_id = ? AND workspace_id = ?
+                """,
+                (
+                    approval_id,
+                    action_hash,
+                    datetime.now(UTC).isoformat(),
+                    submission_id,
+                    workspace_id,
+                ),
+            ).rowcount
+            if updated != 1:
+                raise ArtifactDomainError(
+                    ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                    "form continuation outbox record is unavailable",
+                )
+
+    def mark_form_continuation_failed(
+        self,
+        *,
+        submission_id: str,
+        workspace_id: str,
+        error_code: str,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE artifact_form_continuation_outbox
+                SET status = 'failed', last_error_code = ?,
+                    attempt_count = attempt_count + 1, updated_at_utc = ?
+                WHERE submission_id = ? AND workspace_id = ?
+                """,
+                (error_code[:128], datetime.now(UTC).isoformat(), submission_id, workspace_id),
+            )
+
     def create_artifact(
         self,
         artifact: ArtifactDescriptor,
         revision: ArtifactRevisionDescriptor,
         content: bytes,
+        *,
+        operation: str | None = None,
+        request_hash: str | None = None,
     ) -> RevisionWriteResult:
         self._validate_payload(artifact, revision, content)
         if (
@@ -93,6 +418,16 @@ class ArtifactStore:
             or artifact.current_revision_number != 1
         ):
             self._raise_schema_invalid("invalid initial artifact revision contract")
+        if operation is not None or request_hash is not None:
+            if operation != "create" or request_hash is None or len(request_hash) != 64:
+                self._raise_schema_invalid("create operation replay binding is invalid")
+            return self._commit_create_operation(
+                artifact,
+                revision,
+                content,
+                operation=operation,
+                request_hash=request_hash,
+            )
 
         replay = self._find_idempotent_result(
             artifact.workspace_id,
@@ -110,6 +445,41 @@ class ArtifactStore:
         self._commit_create(artifact, revision)
         return RevisionWriteResult(artifact, revision, True, "created")
 
+    def create_duplicate_artifact(
+        self,
+        artifact: ArtifactDescriptor,
+        revision: ArtifactRevisionDescriptor,
+        content: bytes,
+        *,
+        source_artifact_id: str,
+        operation: str,
+        request_hash: str,
+    ) -> RevisionWriteResult:
+        self._validate_payload(artifact, revision, content)
+        source = self.get_artifact(artifact.workspace_id, source_artifact_id)
+        source_revision = self.get_revision(
+            artifact.workspace_id,
+            source_artifact_id,
+            revision.base_revision_id or "",
+        ).descriptor
+        self._validate_duplicate_contract(
+            source,
+            source_revision,
+            artifact,
+            revision,
+        )
+
+        if operation != "duplicate" or len(request_hash) != 64:
+            self._raise_schema_invalid("duplicate operation replay binding is invalid")
+        return self._commit_duplicate(
+            artifact,
+            revision,
+            content,
+            source_artifact_id,
+            operation=operation,
+            request_hash=request_hash,
+        )
+
     def append_revision(
         self,
         updated_artifact: ArtifactDescriptor,
@@ -117,12 +487,29 @@ class ArtifactStore:
         content: bytes,
         *,
         expected_revision_number: int,
+        operation: str | None = None,
+        request_hash: str | None = None,
     ) -> RevisionWriteResult:
         self._validate_payload(updated_artifact, revision, content)
         current = self.get_artifact(
             updated_artifact.workspace_id,
             updated_artifact.artifact_id,
         )
+        if operation is not None or request_hash is not None:
+            if (
+                operation not in {"mutate", "restore"}
+                or request_hash is None
+                or len(request_hash) != 64
+            ):
+                self._raise_schema_invalid("revision operation replay binding is invalid")
+            return self._commit_append_operation(
+                updated_artifact,
+                revision,
+                content,
+                expected_revision_number=expected_revision_number,
+                operation=operation,
+                request_hash=request_hash,
+            )
         replay = self._find_idempotent_result(
             updated_artifact.workspace_id,
             updated_artifact.artifact_id,
@@ -164,6 +551,8 @@ class ArtifactStore:
         *,
         source_revision_id: str,
         expected_revision_number: int,
+        operation: str | None = None,
+        request_hash: str | None = None,
     ) -> RevisionWriteResult:
         if (
             revision.mutation_type is not ArtifactMutationType.RESTORE
@@ -180,6 +569,8 @@ class ArtifactStore:
             revision,
             source.content,
             expected_revision_number=expected_revision_number,
+            operation=operation,
+            request_hash=request_hash,
         )
 
     def get_artifact(self, workspace_id: str, artifact_id: str) -> ArtifactDescriptor:
@@ -415,24 +806,79 @@ class ArtifactStore:
         with self._connect() as connection:
             try:
                 connection.execute("BEGIN IMMEDIATE")
-                connection.execute(
-                    """
-                    INSERT INTO artifact_write_journal (
-                        journal_id, workspace_id, artifact_id, revision_id,
-                        content_relpath, content_sha256, state, created_at_utc
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
-                    """,
-                    (
+                existing = connection.execute(
+                    "SELECT * FROM artifact_write_journal WHERE revision_id = ?",
+                    (revision.revision_id,),
+                ).fetchone()
+                if existing is None:
+                    connection.execute(
+                        """
+                        INSERT INTO artifact_write_journal (
+                            journal_id, workspace_id, artifact_id, revision_id,
+                            content_relpath, content_sha256, state, created_at_utc
+                        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+                        """,
+                        (
+                            revision.revision_id,
+                            artifact.workspace_id,
+                            artifact.artifact_id,
+                            revision.revision_id,
+                            revision.content_relpath,
+                            revision.content_sha256,
+                            datetime.now(UTC).isoformat(),
+                        ),
+                    )
+                elif existing["state"] == "quarantined":
+                    expected = (
                         revision.revision_id,
                         artifact.workspace_id,
                         artifact.artifact_id,
                         revision.revision_id,
                         revision.content_relpath,
                         revision.content_sha256,
-                        datetime.now(UTC).isoformat(),
-                    ),
-                )
+                    )
+                    observed = (
+                        existing["journal_id"],
+                        existing["workspace_id"],
+                        existing["artifact_id"],
+                        existing["revision_id"],
+                        existing["content_relpath"],
+                        existing["content_sha256"],
+                    )
+                    if observed != expected:
+                        self._raise_conflict(
+                            "quarantined journal payload mismatch",
+                            actual_revision=None,
+                        )
+                    cursor = connection.execute(
+                        """
+                        UPDATE artifact_write_journal
+                        SET state = 'pending', completed_at_utc = NULL
+                        WHERE revision_id = ? AND state = 'quarantined'
+                        """,
+                        (revision.revision_id,),
+                    )
+                    if cursor.rowcount != 1:
+                        raise ArtifactDomainError(
+                            ArtifactErrorCode.ARTIFACT_STORAGE_LOCKED,
+                            "artifact recovery reservation changed concurrently",
+                            retryable=True,
+                        )
+                elif existing["state"] == "pending":
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_STORAGE_LOCKED,
+                        "artifact revision write is already pending",
+                        retryable=True,
+                    )
+                else:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                        "artifact journal is committed without a revision replay",
+                    )
                 connection.commit()
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
             except sqlite3.IntegrityError as exc:
                 connection.rollback()
                 raise ArtifactDomainError(
@@ -470,6 +916,256 @@ class ArtifactStore:
                 connection.rollback()
                 self._raise_storage_failure(exc, "create_commit_failed")
 
+    def _commit_create_operation(
+        self,
+        artifact: ArtifactDescriptor,
+        revision: ArtifactRevisionDescriptor,
+        content: bytes,
+        *,
+        operation: str,
+        request_hash: str,
+    ) -> RevisionWriteResult:
+        with self._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                replay_row = connection.execute(
+                    """
+                    SELECT * FROM artifact_operation_dedup
+                    WHERE workspace_id = ? AND idempotency_key = ?
+                    """,
+                    (artifact.workspace_id, revision.idempotency_key),
+                ).fetchone()
+                if replay_row is not None:
+                    if (
+                        replay_row["operation"] != operation
+                        or replay_row["request_sha256"] != request_hash
+                    ):
+                        self._raise_conflict(
+                            "idempotency key payload mismatch",
+                            actual_revision=None,
+                        )
+                    result = json.loads(replay_row["result_json"])
+                    artifact_row = connection.execute(
+                        "SELECT * FROM artifacts WHERE artifact_id = ? AND workspace_id = ?",
+                        (result["artifactId"], artifact.workspace_id),
+                    ).fetchone()
+                    revision_row = connection.execute(
+                        """
+                        SELECT * FROM artifact_revisions
+                        WHERE artifact_id = ? AND revision_id = ?
+                        """,
+                        (result["artifactId"], result["revisionId"]),
+                    ).fetchone()
+                    if artifact_row is None or revision_row is None:
+                        raise ArtifactDomainError(
+                            ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                            "create replay metadata is missing or inconsistent",
+                        )
+                    connection.commit()
+                    return RevisionWriteResult(
+                        _artifact_from_row(artifact_row),
+                        _revision_from_row(revision_row),
+                        False,
+                        "idempotent_replay",
+                    )
+                connection.execute(
+                    """
+                    INSERT INTO artifact_write_journal (
+                        journal_id, workspace_id, artifact_id, revision_id,
+                        content_relpath, content_sha256, state, created_at_utc
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+                    """,
+                    (
+                        revision.revision_id,
+                        artifact.workspace_id,
+                        artifact.artifact_id,
+                        revision.revision_id,
+                        revision.content_relpath,
+                        revision.content_sha256,
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                self._publish_content(revision, content)
+                connection.execute(_ARTIFACT_INSERT_SQL, _artifact_record(artifact))
+                connection.execute(_REVISION_INSERT_SQL, _revision_record(revision))
+                self._commit_journal(connection, revision.revision_id)
+                connection.execute(
+                    """
+                    INSERT INTO artifact_operation_dedup (
+                        workspace_id, idempotency_key, operation, request_sha256,
+                        result_json, created_at_utc
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        artifact.workspace_id,
+                        revision.idempotency_key,
+                        operation,
+                        request_hash,
+                        canonical_json(
+                            {
+                                "artifactId": artifact.artifact_id,
+                                "revisionId": revision.revision_id,
+                            }
+                        ),
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                connection.commit()
+                return RevisionWriteResult(artifact, revision, True, "created")
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
+            except sqlite3.Error as exc:
+                connection.rollback()
+                self._raise_storage_failure(exc, "create_commit_failed")
+
+    def _commit_duplicate(
+        self,
+        artifact: ArtifactDescriptor,
+        revision: ArtifactRevisionDescriptor,
+        content: bytes,
+        source_artifact_id: str,
+        *,
+        operation: str,
+        request_hash: str,
+    ) -> RevisionWriteResult:
+        with self._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                replay_row = connection.execute(
+                    """
+                    SELECT * FROM artifact_operation_dedup
+                    WHERE workspace_id = ? AND idempotency_key = ?
+                    """,
+                    (artifact.workspace_id, revision.idempotency_key),
+                ).fetchone()
+                if replay_row is not None:
+                    if (
+                        replay_row["operation"] != operation
+                        or replay_row["request_sha256"] != request_hash
+                    ):
+                        self._raise_conflict(
+                            "idempotency key payload mismatch",
+                            actual_revision=None,
+                        )
+                    result = json.loads(replay_row["result_json"])
+                    artifact_row = connection.execute(
+                        "SELECT * FROM artifacts WHERE artifact_id = ? AND workspace_id = ?",
+                        (result["artifactId"], artifact.workspace_id),
+                    ).fetchone()
+                    revision_row = connection.execute(
+                        """
+                        SELECT * FROM artifact_revisions
+                        WHERE artifact_id = ? AND revision_id = ?
+                        """,
+                        (result["artifactId"], result["revisionId"]),
+                    ).fetchone()
+                    link_row = connection.execute(
+                        """
+                        SELECT target_id FROM artifact_links
+                        WHERE artifact_id = ? AND link_type = 'source'
+                        """,
+                        (result["artifactId"],),
+                    ).fetchone()
+                    if (
+                        artifact_row is None
+                        or revision_row is None
+                        or link_row is None
+                        or link_row["target_id"] != source_artifact_id
+                    ):
+                        raise ArtifactDomainError(
+                            ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                            "duplicate replay metadata is missing or inconsistent",
+                        )
+                    connection.commit()
+                    return RevisionWriteResult(
+                        _artifact_from_row(artifact_row),
+                        _revision_from_row(revision_row),
+                        False,
+                        "idempotent_replay",
+                    )
+                source_row = connection.execute(
+                    "SELECT workspace_id FROM artifacts WHERE artifact_id = ?",
+                    (source_artifact_id,),
+                ).fetchone()
+                base_row = connection.execute(
+                    "SELECT artifact_id FROM artifact_revisions WHERE revision_id = ?",
+                    (revision.base_revision_id,),
+                ).fetchone()
+                if (
+                    source_row is None
+                    or source_row["workspace_id"] != artifact.workspace_id
+                    or base_row is None
+                    or base_row["artifact_id"] != source_artifact_id
+                ):
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT,
+                        "duplicate source changed before commit",
+                    )
+                connection.execute(
+                    """
+                    INSERT INTO artifact_write_journal (
+                        journal_id, workspace_id, artifact_id, revision_id,
+                        content_relpath, content_sha256, state, created_at_utc
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+                    """,
+                    (
+                        revision.revision_id,
+                        artifact.workspace_id,
+                        artifact.artifact_id,
+                        revision.revision_id,
+                        revision.content_relpath,
+                        revision.content_sha256,
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                self._publish_content(revision, content)
+                connection.execute(_ARTIFACT_INSERT_SQL, _artifact_record(artifact))
+                connection.execute(_REVISION_INSERT_SQL, _revision_record(revision))
+                connection.execute(
+                    _SOURCE_LINK_INSERT_SQL,
+                    {
+                        "link_id": self._source_link_id(
+                            artifact.artifact_id,
+                            source_artifact_id,
+                        ),
+                        "artifact_id": artifact.artifact_id,
+                        "source_artifact_id": source_artifact_id,
+                        "created_by_id": artifact.created_by_id,
+                        "created_at_utc": artifact.created_at_utc.isoformat(),
+                    },
+                )
+                self._commit_journal(connection, revision.revision_id)
+                connection.execute(
+                    """
+                    INSERT INTO artifact_operation_dedup (
+                        workspace_id, idempotency_key, operation, request_sha256,
+                        result_json, created_at_utc
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        artifact.workspace_id,
+                        revision.idempotency_key,
+                        operation,
+                        request_hash,
+                        canonical_json(
+                            {
+                                "artifactId": artifact.artifact_id,
+                                "revisionId": revision.revision_id,
+                            }
+                        ),
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                connection.commit()
+                return RevisionWriteResult(artifact, revision, True, "created")
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
+            except sqlite3.Error as exc:
+                connection.rollback()
+                self._raise_storage_failure(exc, "duplicate_commit_failed")
+
     def _commit_append(
         self,
         artifact: ArtifactDescriptor,
@@ -490,6 +1186,172 @@ class ArtifactStore:
                     )
                 self._commit_journal(connection, revision.revision_id)
                 connection.commit()
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
+            except sqlite3.Error as exc:
+                connection.rollback()
+                self._raise_storage_failure(exc, "revision_commit_failed")
+
+    def _commit_append_operation(
+        self,
+        artifact: ArtifactDescriptor,
+        revision: ArtifactRevisionDescriptor,
+        content: bytes,
+        *,
+        expected_revision_number: int,
+        operation: str,
+        request_hash: str,
+    ) -> RevisionWriteResult:
+        with self._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                replay_row = connection.execute(
+                    """
+                    SELECT * FROM artifact_operation_dedup
+                    WHERE workspace_id = ? AND idempotency_key = ?
+                    """,
+                    (artifact.workspace_id, revision.idempotency_key),
+                ).fetchone()
+                if replay_row is not None:
+                    if (
+                        replay_row["operation"] != operation
+                        or replay_row["request_sha256"] != request_hash
+                    ):
+                        self._raise_conflict(
+                            "idempotency key payload mismatch",
+                            actual_revision=None,
+                        )
+                    result = json.loads(replay_row["result_json"])
+                    artifact_row = connection.execute(
+                        "SELECT * FROM artifacts WHERE artifact_id = ? AND workspace_id = ?",
+                        (result["artifactId"], artifact.workspace_id),
+                    ).fetchone()
+                    revision_row = connection.execute(
+                        """
+                        SELECT * FROM artifact_revisions
+                        WHERE artifact_id = ? AND revision_id = ?
+                        """,
+                        (result["artifactId"], result["revisionId"]),
+                    ).fetchone()
+                    if artifact_row is None or revision_row is None:
+                        raise ArtifactDomainError(
+                            ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                            "revision replay metadata is missing or inconsistent",
+                        )
+                    connection.commit()
+                    return RevisionWriteResult(
+                        _artifact_from_row(artifact_row),
+                        _revision_from_row(revision_row),
+                        False,
+                        "idempotent_replay",
+                    )
+                current_row = connection.execute(
+                    "SELECT * FROM artifacts WHERE artifact_id = ? AND workspace_id = ?",
+                    (artifact.artifact_id, artifact.workspace_id),
+                ).fetchone()
+                if current_row is None:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_NOT_FOUND,
+                        "artifact does not exist",
+                    )
+                current = _artifact_from_row(current_row)
+                if current.current_revision_number != expected_revision_number:
+                    self._raise_conflict(
+                        "artifact revision is stale",
+                        actual_revision=current.current_revision_number,
+                        expected_revision=expected_revision_number,
+                    )
+                current_revision_row = connection.execute(
+                    """
+                    SELECT * FROM artifact_revisions
+                    WHERE artifact_id = ? AND revision_id = ?
+                    """,
+                    (current.artifact_id, current.current_revision_id),
+                ).fetchone()
+                if current_revision_row is None:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                        "current artifact revision metadata is missing",
+                    )
+                current_revision = _revision_from_row(current_revision_row)
+                if current_revision.content_sha256 == revision.content_sha256:
+                    connection.execute(
+                        _OPERATION_DEDUP_INSERT_SQL,
+                        (
+                            artifact.workspace_id,
+                            revision.idempotency_key,
+                            operation,
+                            request_hash,
+                            canonical_json(
+                                {
+                                    "artifactId": current.artifact_id,
+                                    "revisionId": current_revision.revision_id,
+                                }
+                            ),
+                            datetime.now(UTC).isoformat(),
+                        ),
+                    )
+                    connection.commit()
+                    return RevisionWriteResult(
+                        current,
+                        current_revision,
+                        False,
+                        "no_op",
+                    )
+                self._validate_append_contract(
+                    current,
+                    artifact,
+                    revision,
+                    expected_revision_number,
+                )
+                connection.execute(
+                    """
+                    INSERT INTO artifact_write_journal (
+                        journal_id, workspace_id, artifact_id, revision_id,
+                        content_relpath, content_sha256, state, created_at_utc
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+                    """,
+                    (
+                        revision.revision_id,
+                        artifact.workspace_id,
+                        artifact.artifact_id,
+                        revision.revision_id,
+                        revision.content_relpath,
+                        revision.content_sha256,
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                self._publish_content(revision, content)
+                connection.execute(_REVISION_INSERT_SQL, _revision_record(revision))
+                record = _artifact_record(artifact)
+                record["expected_revision_number"] = expected_revision_number
+                cursor = connection.execute(_ARTIFACT_UPDATE_SQL, record)
+                if cursor.rowcount != 1:
+                    self._raise_conflict(
+                        "artifact revision changed during commit",
+                        actual_revision=None,
+                        expected_revision=expected_revision_number,
+                    )
+                self._commit_journal(connection, revision.revision_id)
+                connection.execute(
+                    _OPERATION_DEDUP_INSERT_SQL,
+                    (
+                        artifact.workspace_id,
+                        revision.idempotency_key,
+                        operation,
+                        request_hash,
+                        canonical_json(
+                            {
+                                "artifactId": artifact.artifact_id,
+                                "revisionId": revision.revision_id,
+                            }
+                        ),
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                connection.commit()
+                return RevisionWriteResult(artifact, revision, True, "created")
             except ArtifactDomainError:
                 connection.rollback()
                 raise
@@ -587,6 +1449,74 @@ class ArtifactStore:
             ArtifactStore._raise_schema_invalid("revision update contract is inconsistent")
 
     @staticmethod
+    def _validate_duplicate_contract(
+        source: ArtifactDescriptor,
+        source_revision: ArtifactRevisionDescriptor,
+        target: ArtifactDescriptor,
+        revision: ArtifactRevisionDescriptor,
+    ) -> None:
+        if (
+            target.artifact_id == source.artifact_id
+            or target.workspace_id != source.workspace_id
+            or target.kind is not source.kind
+            or target.schema_version != source.schema_version
+            or not can_transition_data_class(source.data_class, target.data_class)
+            or revision.revision_number != 1
+            or revision.parent_revision_id is not None
+            or revision.mutation_type is not ArtifactMutationType.DUPLICATE
+            or revision.base_revision_id != source_revision.revision_id
+            or target.current_revision_id != revision.revision_id
+            or target.current_revision_number != 1
+        ):
+            ArtifactStore._raise_schema_invalid("invalid duplicate artifact revision contract")
+
+    def _validate_duplicate_replay(
+        self,
+        *,
+        expected_artifact: ArtifactDescriptor,
+        expected_revision: ArtifactRevisionDescriptor,
+        existing: RevisionWriteResult,
+        source_artifact_id: str,
+    ) -> None:
+        artifact = existing.artifact
+        revision = existing.revision
+        if (
+            artifact.workspace_id != expected_artifact.workspace_id
+            or artifact.kind is not expected_artifact.kind
+            or artifact.title != expected_artifact.title
+            or artifact.schema_version != expected_artifact.schema_version
+            or artifact.data_class is not expected_artifact.data_class
+            or artifact.source_session_id != expected_artifact.source_session_id
+            or artifact.source_turn_id != expected_artifact.source_turn_id
+            or artifact.metadata != expected_artifact.metadata
+            or revision.mutation_type is not ArtifactMutationType.DUPLICATE
+            or revision.base_revision_id != expected_revision.base_revision_id
+            or revision.author_type is not expected_revision.author_type
+            or revision.author_id != expected_revision.author_id
+        ):
+            self._raise_conflict("idempotency key payload mismatch", actual_revision=None)
+        with self._connect() as connection:
+            link = connection.execute(
+                """
+                SELECT target_id FROM artifact_links
+                WHERE artifact_id = ? AND link_type = 'source'
+                """,
+                (artifact.artifact_id,),
+            ).fetchone()
+        if link is None or link["target_id"] != source_artifact_id:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                "duplicate source link is missing or inconsistent",
+            )
+
+    @staticmethod
+    def _source_link_id(artifact_id: str, source_artifact_id: str) -> str:
+        digest = hashlib.sha256(
+            f"{artifact_id}\x1fsource\x1f{source_artifact_id}".encode()
+        ).hexdigest()[:32]
+        return f"link-{digest}"
+
+    @staticmethod
     def _raise_schema_invalid(message: str) -> None:
         raise ArtifactDomainError(ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID, message)
 
@@ -636,6 +1566,13 @@ INSERT INTO artifacts (
 )
 """
 
+_OPERATION_DEDUP_INSERT_SQL = """
+INSERT INTO artifact_operation_dedup (
+    workspace_id, idempotency_key, operation, request_sha256,
+    result_json, created_at_utc
+) VALUES (?, ?, ?, ?, ?, ?)
+"""
+
 _ARTIFACT_UPDATE_SQL = """
 UPDATE artifacts SET
     kind = :kind,
@@ -660,12 +1597,21 @@ WHERE artifact_id = :artifact_id
 _REVISION_INSERT_SQL = """
 INSERT INTO artifact_revisions (
     revision_id, artifact_id, parent_revision_id, base_revision_id, revision_number,
-    mutation_type, content_relpath, content_sha256, content_size_bytes, content_encoding,
+    schema_version, mutation_type, content_relpath, content_sha256, content_size_bytes, content_encoding,
     change_summary, author_type, author_id, idempotency_key, created_at_utc
 ) VALUES (
     :revision_id, :artifact_id, :parent_revision_id, :base_revision_id, :revision_number,
-    :mutation_type, :content_relpath, :content_sha256, :content_size_bytes, :content_encoding,
+    :schema_version, :mutation_type, :content_relpath, :content_sha256, :content_size_bytes, :content_encoding,
     :change_summary, :author_type, :author_id, :idempotency_key, :created_at_utc
+)
+"""
+
+_SOURCE_LINK_INSERT_SQL = """
+INSERT INTO artifact_links (
+    link_id, artifact_id, link_type, target_id, created_by_id, created_at_utc
+) VALUES (
+    :link_id, :artifact_id, 'source', :source_artifact_id,
+    :created_by_id, :created_at_utc
 )
 """
 
@@ -703,6 +1649,7 @@ def _revision_record(revision: ArtifactRevisionDescriptor) -> dict[str, object]:
         "parent_revision_id": revision.parent_revision_id,
         "base_revision_id": revision.base_revision_id,
         "revision_number": revision.revision_number,
+        "schema_version": revision.schema_version,
         "mutation_type": revision.mutation_type.value,
         "content_relpath": revision.content_relpath,
         "content_sha256": revision.content_sha256,
@@ -749,6 +1696,7 @@ def _revision_from_row(row: sqlite3.Row) -> ArtifactRevisionDescriptor:
         parent_revision_id=row["parent_revision_id"],
         base_revision_id=row["base_revision_id"],
         revision_number=row["revision_number"],
+        schema_version=row["schema_version"],
         mutation_type=row["mutation_type"],
         content_relpath=row["content_relpath"],
         content_sha256=row["content_sha256"],
@@ -759,4 +1707,21 @@ def _revision_from_row(row: sqlite3.Row) -> ArtifactRevisionDescriptor:
         author_id=row["author_id"],
         idempotency_key=row["idempotency_key"],
         created_at_utc=datetime.fromisoformat(row["created_at_utc"]),
+    )
+
+
+def _export_from_row(row: sqlite3.Row) -> ArtifactExportRecord:
+    return ArtifactExportRecord(
+        export_id=row["export_id"],
+        workspace_id=row["workspace_id"],
+        artifact_id=row["artifact_id"],
+        revision_id=row["revision_id"],
+        format=row["format"],
+        status=row["status"],
+        basename=row["basename"],
+        sha256=row["sha256"],
+        size_bytes=row["size_bytes"],
+        actor_type=row["actor_type"],
+        actor_id=row["actor_id"],
+        reason_code=row["reason_code"],
     )

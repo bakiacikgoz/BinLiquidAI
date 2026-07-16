@@ -13,12 +13,14 @@ const LABELS: Record<ArtifactDiffChange, string> = {
 export function ArtifactDiffView({
   beforeRevisionNumber,
   afterRevisionNumber,
+  afterLabel,
   dirtyDraftExcluded,
   result,
   onClose,
 }: {
   beforeRevisionNumber: number;
   afterRevisionNumber: number;
+  afterLabel?: string;
   dirtyDraftExcluded: boolean;
   result: ArtifactDiffResult;
   onClose: () => void;
@@ -31,7 +33,7 @@ export function ArtifactDiffView({
       <header className="artifact-diff-head">
         <div>
           <h3 id="artifact-diff-title" ref={titleRef} tabIndex={-1}>Revision comparison</h3>
-          <p>Before revision {beforeRevisionNumber} · After revision {afterRevisionNumber}</p>
+          <p>Before revision {beforeRevisionNumber} · {afterLabel ?? `After revision ${afterRevisionNumber}`}</p>
         </div>
         <Button variant="ghost" onClick={onClose}>Close comparison</Button>
       </header>

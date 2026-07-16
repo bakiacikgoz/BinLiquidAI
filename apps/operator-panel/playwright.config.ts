@@ -43,6 +43,12 @@ export default defineConfig({
   webServer: hasE2eSpecs
     ? {
         command: 'node scripts/start-preview-server.mjs',
+        env: {
+          ...process.env,
+          VITE_ARTIFACT_FORM_EDITOR: '1',
+          VITE_ARTIFACT_CODE_EDITOR: '1',
+          VITE_ARTIFACT_FLOW_EDITOR: '1',
+        },
         url: 'http://127.0.0.1:5173',
         reuseExistingServer: true,
         timeout: 120_000,

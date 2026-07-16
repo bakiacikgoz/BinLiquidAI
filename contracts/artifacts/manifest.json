@@ -22,9 +22,21 @@
     },
     {
       "category": "content",
+      "file": "code.v2.schema.json",
+      "name": "code.v2",
+      "sha256": "b72f996fe48771593401551891586fb60c1ce1fb6a8c8379275dd1da6cac0ea2"
+    },
+    {
+      "category": "content",
       "file": "flow.v1.schema.json",
       "name": "flow.v1",
       "sha256": "afeb88068aef06cd4f3d87c8c8583e4e88c68e8d975afa551f7a09373216c67f"
+    },
+    {
+      "category": "content",
+      "file": "flow.v2.schema.json",
+      "name": "flow.v2",
+      "sha256": "3d4641d888a4a8ac7869d8ef697689afab8a7232bd01ff08df6e7dff0740fe54"
     },
     {
       "category": "content",
@@ -60,7 +72,7 @@
       "category": "contract",
       "file": "artifact-revision.v1.schema.json",
       "name": "artifact-revision.v1",
-      "sha256": "d814b4665f75dbc302cf955a42a29430eba3f99b98883d353dfe9ef67020a427"
+      "sha256": "cbadc5a67c3e86bae9e4eb4a05f4361871df01e205c42b2fcd061a7b393e8d67"
     },
     {
       "category": "contract",
@@ -132,7 +144,49 @@
       "category": "contract",
       "file": "artifact-duplicate-command.v1.schema.json",
       "name": "artifact-duplicate-command.v1",
-      "sha256": "799d6cc66e696a512ab322f36ea2f03c2a96c5d79624723d9127cbcface30f44"
+      "sha256": "7f9795ea53ce4b36a9809c885c773ea3bb8720de8c151d95566c22de53a2ed3b"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-form-submit-command.v1.schema.json",
+      "name": "artifact-form-submit-command.v1",
+      "sha256": "dcba3a4b34fd4b2a5cafe12d58b036eff1211b3b83db160abb064b6ce80a3f1e"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-form-submit-result.v1.schema.json",
+      "name": "artifact-form-submit-result.v1",
+      "sha256": "d1be03246a490e8a673f6017fbc1f412eb84a40d94cd8f23169ce336cb30d954"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-export-begin-command.v1.schema.json",
+      "name": "artifact-export-begin-command.v1",
+      "sha256": "c996218ebadc0e2c0adea4876a377dcdccc1c15837e3b4e0463d291a54214307"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-export-commit-command.v1.schema.json",
+      "name": "artifact-export-commit-command.v1",
+      "sha256": "f99825e4048ceb9243d288912a060a6eea98a44cac79e0d2e58a2556835ddf4b"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-export-cancel-command.v1.schema.json",
+      "name": "artifact-export-cancel-command.v1",
+      "sha256": "ea838e1f88a4a2f79063cbc7823020ff82f6d6b8281db0797e00653ad59ab189"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-export-begin-result.v1.schema.json",
+      "name": "artifact-export-begin-result.v1",
+      "sha256": "149126818ca39470ee84932979b1062c3907a81c7c9b99fcf9626294a8abe23f"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-export-result.v1.schema.json",
+      "name": "artifact-export-result.v1",
+      "sha256": "23ee1b68d96197fb54c60fb64de31bce0d143f5391725c8d87813c3924f904a9"
     },
     {
       "category": "contract",

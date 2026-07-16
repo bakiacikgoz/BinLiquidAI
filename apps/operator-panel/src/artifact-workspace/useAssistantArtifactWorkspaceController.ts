@@ -5,7 +5,11 @@ import { ArtifactAutosaveQueue } from './artifactAutosave';
 import { ArtifactBridgeError, artifactBridge as defaultBridge, type ArtifactBridge } from './artifactBridge';
 import { compareArtifactContent, type ArtifactDiffResult } from './artifactDiff';
 import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './artifactContracts';
+import type { ArtifactFormSubmissionRequest } from './artifactContracts';
+import { FormSessionRuntime } from './editors/form/formSessionRuntime';
+import { exportCodeArtifact } from './artifactCodeExport';
 import { exportDocumentArtifact, type DocumentArtifactExportFormat } from './artifactDocumentExport';
+import { exportFlowArtifact, type FlowArtifactExportFormat } from './artifactFlowExport';
 import { ArtifactWorkspaceController } from './workspaceController';
 
 export type LegacyWorkbenchArtifact = {
@@ -21,6 +25,7 @@ export type ArtifactWorkspaceUiError = {
 };
 
 export type ArtifactRevisionComparison = {
+  mode: 'history' | 'conflict';
   artifactId: string;
   selectedRevisionId: string;
   afterRevisionId: string;
@@ -67,6 +72,7 @@ export function useAssistantArtifactWorkspaceController({
 }: AssistantArtifactWorkspaceControllerOptions) {
   const [controller] = useState(() => new ArtifactWorkspaceController(bridge));
   const [autosave] = useState(() => new ArtifactAutosaveQueue(controller, bridge));
+  const [formRuntime] = useState(() => new FormSessionRuntime());
   const [open, setOpen] = useState(false);
   const [loadingArtifactId, setLoadingArtifactId] = useState<string | null>(null);
   const [error, setError] = useState<ArtifactWorkspaceUiError | null>(null);
@@ -78,7 +84,10 @@ export function useAssistantArtifactWorkspaceController({
   const [historyNextCursor, setHistoryNextCursor] = useState<Record<string, string | null>>({});
   const [historyLoadingArtifactId, setHistoryLoadingArtifactId] = useState<string | null>(null);
   const [comparison, setComparison] = useState<ArtifactRevisionComparison | null>(null);
+  const [conflictResolving, setConflictResolving] = useState<{ artifactId: string; action: 'refresh' | 'reload' | 'fork' } | null>(null);
   const comparisonRequestSequence = useRef(0);
+  const conflictForkKeys = useRef(new Map<string, string>());
+  const workspaceEpoch = useRef(0);
   const state = useSyncExternalStore(
     useCallback((listener) => controller.subscribe(listener), [controller]),
     useCallback(() => controller.getState(), [controller]),
@@ -100,6 +109,7 @@ export function useAssistantArtifactWorkspaceController({
 
   const loadCatalog = useCallback(
     async (append = false) => {
+      const requestEpoch = workspaceEpoch.current;
       setCatalogLoading(true);
       setError(null);
       setOperationNotice(null);
@@ -108,12 +118,14 @@ export function useAssistantArtifactWorkspaceController({
           cursor: append ? catalogNextCursor ?? undefined : undefined,
           limit: 50,
         });
+        if (requestEpoch !== workspaceEpoch.current) return;
         setCatalog((previous) => (append ? [...previous, ...result.items] : result.items));
         setCatalogNextCursor(result.nextCursor);
       } catch (caught) {
+        if (requestEpoch !== workspaceEpoch.current) return;
         setError(normalizeWorkspaceError(caught));
       } finally {
-        setCatalogLoading(false);
+        if (requestEpoch === workspaceEpoch.current) setCatalogLoading(false);
       }
     },
     [bridge, catalogNextCursor],
@@ -121,6 +133,7 @@ export function useAssistantArtifactWorkspaceController({
 
   const loadHistory = useCallback(
     async (artifactId: string, append = false) => {
+      const requestEpoch = workspaceEpoch.current;
       setHistoryLoadingArtifactId(artifactId);
       setError(null);
       setOperationNotice(null);
@@ -130,6 +143,7 @@ export function useAssistantArtifactWorkspaceController({
           cursor: append ? historyNextCursor[artifactId] ?? undefined : undefined,
           limit: 50,
         });
+        if (requestEpoch !== workspaceEpoch.current) return;
         setHistoryByArtifact((previous) => {
           const combined = append ? [...(previous[artifactId] ?? []), ...result.items] : result.items;
           const seen = new Set<string>();
@@ -144,18 +158,19 @@ export function useAssistantArtifactWorkspaceController({
         });
         setHistoryNextCursor((previous) => ({ ...previous, [artifactId]: result.nextCursor }));
       } catch (caught) {
+        if (requestEpoch !== workspaceEpoch.current) return;
         setError(normalizeWorkspaceError(caught));
       } finally {
-        setHistoryLoadingArtifactId(null);
+        if (requestEpoch === workspaceEpoch.current) setHistoryLoadingArtifactId(null);
       }
     },
     [bridge, historyNextCursor],
   );
 
   const openArtifact = useCallback(
-    async (artifactId: string) => {
+    async (artifactId: string, revealWorkbench = true) => {
       invalidateComparison();
-      setOpen(true);
+      if (revealWorkbench) setOpen(true);
       if (controller.getState().tabs.some((tab) => tab.artifact.artifactId === artifactId)) {
         controller.activate(artifactId);
         await loadHistory(artifactId, false);
@@ -187,6 +202,7 @@ export function useAssistantArtifactWorkspaceController({
       if (!tab) return;
       const requestSequence = ++comparisonRequestSequence.current;
       setComparison({
+        mode: 'history',
         artifactId,
         selectedRevisionId: revisionId,
         afterRevisionId: tab.revision.revisionId,
@@ -215,6 +231,7 @@ export function useAssistantArtifactWorkspaceController({
           throw new Error('Artifact comparison context changed.');
         }
         setComparison({
+          mode: 'history',
           artifactId,
           selectedRevisionId: revisionId,
           afterRevisionId: current.revision.revisionId,
@@ -228,6 +245,7 @@ export function useAssistantArtifactWorkspaceController({
       } catch (caught) {
         if (requestSequence !== comparisonRequestSequence.current) return;
         setComparison({
+          mode: 'history',
           artifactId,
           selectedRevisionId: revisionId,
           afterRevisionId: tab.revision.revisionId,
@@ -250,6 +268,110 @@ export function useAssistantArtifactWorkspaceController({
   const closeComparison = useCallback(() => {
     invalidateComparison();
   }, [invalidateComparison]);
+
+  const compareConflict = useCallback((artifactId: string) => {
+    invalidateComparison();
+    try {
+      const { remote, local } = controller.getConflictComparison(artifactId);
+      const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+      if (!tab) throw new Error('Artifact tab is not open.');
+      setComparison({
+        mode: 'conflict',
+        artifactId,
+        selectedRevisionId: remote.revision.revisionId,
+        afterRevisionId: tab.revision.revisionId,
+        status: 'ready',
+        beforeRevisionNumber: remote.revision.revisionNumber,
+        afterRevisionNumber: tab.revision.revisionNumber,
+        dirtyDraftExcluded: false,
+        result: compareArtifactContent(remote.content, local),
+        error: null,
+      });
+    } catch (caught) {
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_CONFLICT_COMPARISON_FAILED',
+        message: 'The remote revision and local draft could not be compared.',
+        retryable: true,
+      }));
+    }
+  }, [controller, invalidateComparison]);
+
+  const refreshConflict = useCallback(async (artifactId: string) => {
+    const requestEpoch = workspaceEpoch.current;
+    invalidateComparison();
+    setConflictResolving({ artifactId, action: 'refresh' });
+    setError(null);
+    try {
+      await controller.refreshConflict(artifactId);
+      if (requestEpoch !== workspaceEpoch.current) return;
+    } finally {
+      if (requestEpoch === workspaceEpoch.current) setConflictResolving(null);
+    }
+  }, [controller, invalidateComparison]);
+
+  const reloadConflict = useCallback(async (artifactId: string) => {
+    const requestEpoch = workspaceEpoch.current;
+    invalidateComparison();
+    setConflictResolving({ artifactId, action: 'reload' });
+    setError(null);
+    try {
+      const outcome = await controller.reloadConflict(artifactId);
+      if (requestEpoch !== workspaceEpoch.current) return;
+      if (outcome === 'remote_advanced') {
+        setOperationNotice('The remote revision changed again. Review it before reloading.');
+        return;
+      }
+      autosave.resolveConflict(artifactId);
+      await loadHistory(artifactId, false);
+      if (requestEpoch !== workspaceEpoch.current) return;
+      setOperationNotice('Latest remote revision loaded. Local draft was discarded.');
+    } catch (caught) {
+      if (requestEpoch !== workspaceEpoch.current) return;
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_CONFLICT_RELOAD_FAILED',
+        message: 'The latest remote revision could not be loaded.',
+        retryable: true,
+      }));
+    } finally {
+      if (requestEpoch === workspaceEpoch.current) setConflictResolving(null);
+    }
+  }, [autosave, controller, invalidateComparison, loadHistory]);
+
+  const forkConflict = useCallback(async (artifactId: string) => {
+    const requestEpoch = workspaceEpoch.current;
+    invalidateComparison();
+    setConflictResolving({ artifactId, action: 'fork' });
+    setError(null);
+    try {
+      const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+      if (!tab) throw new Error('Artifact tab is not open.');
+      if (!tab.conflict) throw new Error('Artifact is not conflicted.');
+      const logicalFork = `${artifactId}:${tab.conflict.baseRevisionId}`;
+      const idempotencyKey = conflictForkKeys.current.get(logicalFork)
+        ?? `fork-${artifactId.slice(0, 40)}-${tab.conflict.baseRevisionId.slice(0, 40)}-${globalThis.crypto.randomUUID()}`;
+      conflictForkKeys.current.set(logicalFork, idempotencyKey);
+      const outcome = await controller.forkConflict(artifactId, `${tab.artifact.title} (local draft)`, idempotencyKey);
+      if (requestEpoch !== workspaceEpoch.current) return;
+      conflictForkKeys.current.delete(logicalFork);
+      if (outcome.originalResolved) autosave.resolveConflict(artifactId);
+      await loadCatalog(false);
+      if (requestEpoch !== workspaceEpoch.current) return;
+      await loadHistory(outcome.forkId, false);
+      if (requestEpoch !== workspaceEpoch.current) return;
+      setOperationNotice(outcome.originalResolved
+        ? 'Local draft forked into a new artifact.'
+        : 'The captured draft was forked. A newer local draft remains preserved on the original artifact.');
+    } catch (caught) {
+      if (requestEpoch !== workspaceEpoch.current) return;
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_CONFLICT_FORK_FAILED',
+        message: 'The local draft could not be forked.',
+        retryable: true,
+      }));
+    } finally {
+      if (requestEpoch === workspaceEpoch.current) setConflictResolving(null);
+    }
+  }, [autosave, controller, invalidateComparison, loadCatalog, loadHistory]);
 
   const restoreArtifact = useCallback(
     async (artifactId: string, revisionId: string) => {
@@ -310,8 +432,86 @@ export function useAssistantArtifactWorkspaceController({
     [autosave, bridge, controller],
   );
 
+  const exportCode = useCallback(async (artifactId: string) => {
+    setError(null);
+    setOperationNotice(null);
+    try {
+      await autosave.flush(artifactId);
+      const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+      if (!tab) throw new Error('Artifact tab is not open.');
+      if (tab.dirty || tab.saveState === 'error' || tab.saveState === 'conflict') {
+        throw new Error('Artifact must be saved before export.');
+      }
+      const outcome = await exportCodeArtifact({
+        artifact: tab.artifact,
+        revision: tab.revision,
+        content: tab.draftContent,
+        bridge,
+      });
+      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      return outcome;
+    } catch (caught) {
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_EXPORT_FAILED',
+        message: 'The source could not be exported.',
+        retryable: true,
+      }));
+      return null;
+    }
+  }, [autosave, bridge, controller]);
+
+  const exportFlow = useCallback(async (artifactId: string, format: FlowArtifactExportFormat) => {
+    setError(null);
+    setOperationNotice(null);
+    try {
+      await autosave.flush(artifactId);
+      const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+      if (!tab) throw new Error('Artifact tab is not open.');
+      if (tab.dirty || tab.saveState === 'error' || tab.saveState === 'conflict') {
+        throw new Error('Artifact must be saved before export.');
+      }
+      const outcome = await exportFlowArtifact({
+        artifact: tab.artifact,
+        revision: tab.revision,
+        content: tab.draftContent,
+        format,
+        bridge,
+      });
+      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      return outcome;
+    } catch (caught) {
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_EXPORT_FAILED',
+        message: 'The flow could not be exported.',
+        retryable: true,
+      }));
+      return null;
+    }
+  }, [autosave, bridge, controller]);
+
+  const submitForm = useCallback(async (request: ArtifactFormSubmissionRequest) => {
+    setError(null);
+    setOperationNotice(null);
+    try {
+      const result = await bridge.submitForm(request);
+      setOperationNotice(result.status === 'pending_continuation'
+        ? 'Form submitted. External continuation is awaiting approval.'
+        : 'Form submitted.');
+      return result;
+    } catch (caught) {
+      setError(normalizeWorkspaceError(caught, {
+        code: 'FORM_SUBMISSION_FAILED',
+        message: 'The form could not be submitted.',
+        retryable: true,
+      }));
+      throw caught;
+    }
+  }, [bridge]);
+
   const reset = useCallback(() => {
+    workspaceEpoch.current += 1;
     autosave.dispose();
+    formRuntime.resetAll();
     controller.getState().tabs.forEach((tab) => controller.discardAndClose(tab.artifact.artifactId));
     setOpen(false);
     setLoadingArtifactId(null);
@@ -319,10 +519,14 @@ export function useAssistantArtifactWorkspaceController({
     setOperationNotice(null);
     setCatalog([]);
     setCatalogNextCursor(null);
+    setCatalogLoading(false);
     setHistoryByArtifact({});
     setHistoryNextCursor({});
+    setHistoryLoadingArtifactId(null);
+    conflictForkKeys.current.clear();
+    setConflictResolving(null);
     invalidateComparison();
-  }, [autosave, controller, invalidateComparison]);
+  }, [autosave, controller, formRuntime, invalidateComparison]);
 
   const toggle = useCallback(() => {
     if (!open && catalog.length === 0 && !catalogLoading) void loadCatalog(false);
@@ -335,20 +539,38 @@ export function useAssistantArtifactWorkspaceController({
       reset,
       selectLegacyArtifact: onSelectLegacyArtifact,
       openArtifact,
+      openInlineArtifact: (artifactId: string) => openArtifact(artifactId, false),
       activate: (artifactId: string) => {
         invalidateComparison();
         controller.activate(artifactId);
       },
       edit,
       compareRevision,
+      compareConflict,
       closeComparison,
+      refreshConflict,
+      reloadConflict,
+      forkConflict,
       flush: (artifactId?: string) => autosave.flush(artifactId),
       retrySave: (artifactId: string) => autosave.retry(artifactId),
-      requestClose: (artifactId: string) => controller.requestClose(artifactId),
+      requestClose: (artifactId: string) => {
+        controller.requestClose(artifactId);
+        if (!controller.getState().tabs.some((tab) => tab.artifact.artifactId === artifactId)) {
+          formRuntime.resetArtifact(artifactId);
+        }
+      },
       cancelClose: () => controller.cancelClose(),
-      discardAndClose: (artifactId: string) => controller.discardAndClose(artifactId),
+      discardAndClose: (artifactId: string) => {
+        workspaceEpoch.current += 1;
+        autosave.retire(artifactId);
+        formRuntime.resetArtifact(artifactId);
+        controller.discardAndClose(artifactId);
+      },
       restore: restoreArtifact,
-      exportDocument,
+        exportDocument,
+        exportCode,
+        exportFlow,
+      submitForm,
       archive: (artifactId: string) => controller.archive(artifactId),
       clearError: () => setError(null),
       clearOperationNotice: () => setOperationNotice(null),
@@ -357,7 +579,7 @@ export function useAssistantArtifactWorkspaceController({
       loadHistory: (artifactId: string) => loadHistory(artifactId, false),
       loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [autosave, closeComparison, compareRevision, controller, edit, exportDocument, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, reset, restoreArtifact, toggle],
+    [autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCode, exportDocument, exportFlow, formRuntime, forkConflict, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, restoreArtifact, submitForm, toggle],
   );
 
   const activeTab =
@@ -390,6 +612,8 @@ export function useAssistantArtifactWorkspaceController({
     historyNextCursor: activeTab ? historyNextCursor[activeTab.artifact.artifactId] ?? null : null,
     historyLoadingArtifactId,
     comparison: visibleComparison,
+    conflictResolving,
+    formRuntime,
     actions,
   };
 }

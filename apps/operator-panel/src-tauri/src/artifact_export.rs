@@ -18,6 +18,11 @@ const MAX_TICKET_TTL: Duration = Duration::from_secs(15 * 60);
 pub struct ExportBinding {
     workspace_id: String,
     principal_id: String,
+    principal_type: String,
+    export_id: String,
+    artifact_id: String,
+    revision_id: String,
+    format: String,
 }
 
 impl ExportBinding {
@@ -28,11 +33,56 @@ impl ExportBinding {
         let binding = Self {
             workspace_id: workspace_id.into(),
             principal_id: principal_id.into(),
+            principal_type: "user".to_string(),
+            export_id: "legacy-export".to_string(),
+            artifact_id: "legacy-artifact".to_string(),
+            revision_id: "legacy-revision".to_string(),
+            format: "json".to_string(),
         };
         if !is_bounded_id(&binding.workspace_id) || !is_bounded_id(&binding.principal_id) {
             return Err(ExportBoundaryError::permission_denied());
         }
         Ok(binding)
+    }
+
+    pub fn authorized(
+        workspace_id: impl Into<String>,
+        principal_id: impl Into<String>,
+        principal_type: impl Into<String>,
+        export_id: impl Into<String>,
+        artifact_id: impl Into<String>,
+        revision_id: impl Into<String>,
+        format: impl Into<String>,
+    ) -> Result<Self, ExportBoundaryError> {
+        let binding = Self {
+            workspace_id: workspace_id.into(),
+            principal_id: principal_id.into(),
+            principal_type: principal_type.into(),
+            export_id: export_id.into(),
+            artifact_id: artifact_id.into(),
+            revision_id: revision_id.into(),
+            format: format.into(),
+        };
+        if !is_bounded_id(&binding.workspace_id)
+            || !is_bounded_id(&binding.principal_id)
+            || binding.principal_type != "user"
+            || !is_bounded_id(&binding.export_id)
+            || !is_bounded_id(&binding.artifact_id)
+            || !is_bounded_id(&binding.revision_id)
+            || binding.format.is_empty()
+            || binding.format.len() > 32
+        {
+            return Err(ExportBoundaryError::permission_denied());
+        }
+        Ok(binding)
+    }
+
+    pub fn export_id(&self) -> &str {
+        &self.export_id
+    }
+
+    fn same_actor(&self, other: &Self) -> bool {
+        self.workspace_id == other.workspace_id && self.principal_id == other.principal_id
     }
 }
 
@@ -50,12 +100,16 @@ pub struct ArtifactExportResult {
     pub basename: String,
     pub sha256: String,
     pub size_bytes: usize,
+    #[serde(skip_serializing)]
+    pub binding: ExportBinding,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactExportCancelResult {
     pub cancelled: bool,
+    #[serde(skip_serializing)]
+    pub binding: ExportBinding,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -109,6 +163,25 @@ pub struct ArtifactExportState {
 }
 
 impl ArtifactExportState {
+    pub async fn binding_for_ticket(
+        &self,
+        ticket: &str,
+        binding: &ExportBinding,
+    ) -> Result<ExportBinding, ExportBoundaryError> {
+        let mut tickets = self.tickets.lock().await;
+        let record = tickets
+            .get(ticket)
+            .ok_or_else(ExportBoundaryError::cancelled)?;
+        if !record.binding.same_actor(binding) {
+            return Err(ExportBoundaryError::permission_denied());
+        }
+        if record.expires_at <= Instant::now() {
+            tickets.remove(ticket);
+            return Err(ExportBoundaryError::cancelled());
+        }
+        Ok(record.binding.clone())
+    }
+
     pub async fn issue_ticket(
         &self,
         target: PathBuf,
@@ -177,6 +250,7 @@ impl ArtifactExportState {
             ));
         }
         let target = record.target;
+        let result_binding = record.binding;
         let basename = target
             .file_name()
             .and_then(|value| value.to_str())
@@ -193,6 +267,7 @@ impl ArtifactExportState {
             basename,
             sha256: observed_sha256,
             size_bytes,
+            binding: result_binding,
         })
     }
 
@@ -201,8 +276,8 @@ impl ArtifactExportState {
         ticket: &str,
         binding: &ExportBinding,
     ) -> Result<ArtifactExportCancelResult, ExportBoundaryError> {
-        self.take_ticket(ticket, binding).await?;
-        Ok(ArtifactExportCancelResult { cancelled: true })
+        let record = self.take_ticket(ticket, binding).await?;
+        Ok(ArtifactExportCancelResult { cancelled: true, binding: record.binding })
     }
 
     async fn take_ticket(
@@ -214,7 +289,7 @@ impl ArtifactExportState {
         let record = tickets
             .get(ticket)
             .ok_or_else(ExportBoundaryError::cancelled)?;
-        if &record.binding != binding {
+        if !record.binding.same_actor(binding) {
             return Err(ExportBoundaryError::permission_denied());
         }
         if record.expires_at <= Instant::now() {
@@ -355,6 +430,34 @@ mod tests {
                 .cancel(&issued.ticket, &binding("user-1"))
                 .await
                 .is_err());
+        });
+    }
+
+    #[test]
+    fn authorized_ticket_retains_exact_revision_binding_without_renderer_leakage() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let state = ArtifactExportState::default();
+            let root = tempfile::tempdir().expect("tempdir");
+            let exact = ExportBinding::authorized(
+                "workspace-1", "user-1", "user", "export-1", "artifact-1",
+                "revision-7", "source",
+            ).expect("authorized binding");
+            let issued = state.issue_ticket(
+                root.path().join("main.py"), exact.clone(), 1024, Duration::from_secs(60),
+            ).await.expect("ticket");
+
+            let observed = state.binding_for_ticket(&issued.ticket, &binding("user-1"))
+                .await.expect("binding lookup");
+            assert_eq!(observed, exact);
+            let cancelled = state.cancel(&issued.ticket, &binding("user-1"))
+                .await.expect("cancel");
+            let serialized = serde_json::to_string(&cancelled).expect("serialize");
+            assert!(!serialized.contains("revision-7"));
+            assert!(!serialized.contains("export-1"));
         });
     }
 

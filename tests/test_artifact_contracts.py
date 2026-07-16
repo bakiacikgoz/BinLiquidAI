@@ -64,6 +64,8 @@ def test_artifact_contract_manifest_covers_seven_content_kinds_and_hashes() -> N
         "artifact-restore-command.v1",
         "artifact-archive-command.v1",
         "artifact-duplicate-command.v1",
+        "artifact-form-submit-command.v1",
+        "artifact-form-submit-result.v1",
         "artifact-evidence-event.v1",
         "artifact-rpc-principal.v1",
         "artifact-rpc-request.v1",

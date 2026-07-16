@@ -13,17 +13,6 @@ export type DocumentArtifactExportOutcome =
   | { status: 'cancelled' }
   | { status: 'exported'; basename: string; sha256: string; sizeBytes: number };
 
-function suggestedExportName(title: string, format: DocumentArtifactExportFormat): string {
-  const base = title
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 120) || 'artifact';
-  return `${base}.${format === 'markdown' ? 'md' : 'html'}`;
-}
-
 export async function exportDocumentArtifact({
   artifact,
   revision,
@@ -47,7 +36,7 @@ export async function exportDocumentArtifact({
     artifactId: artifact.artifactId,
     revisionId: revision.revisionId,
     format,
-    suggestedName: suggestedExportName(artifact.title, format),
+    idempotencyKey: `export-${artifact.artifactId.slice(0, 48)}-${revision.revisionId.slice(0, 48)}-${globalThis.crypto.randomUUID()}`,
   });
   if (begin.cancelled) return { status: 'cancelled' };
   if (!begin.ticket) throw new Error('Native export did not return a ticket.');

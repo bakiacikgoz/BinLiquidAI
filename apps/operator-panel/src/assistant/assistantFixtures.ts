@@ -80,11 +80,29 @@ export function previewAssistantEvents(
     },
     {
       contractVersion: CONTRACT_VERSION,
+      eventId: 'event-preview-form-requested',
+      assistantTurnId,
+      sessionId,
+      event: 'form_requested',
+      sequence: 5,
+      timestampUtc: '2026-03-08T09:20:04Z',
+      traceId: 'trace-preview-assistant',
+      dataClass: 'confidential',
+      data: {
+        artifactId: 'artifact-preview-form',
+        revisionId: 'form-revision-1',
+        kind: 'form',
+        title: 'Intake form',
+        summary: 'Governed form artifact',
+      },
+    },
+    {
+      contractVersion: CONTRACT_VERSION,
       assistantTurnId,
       sessionId,
       event: 'final',
-      sequence: 5,
-      timestampUtc: '2026-03-08T09:20:04Z',
+      sequence: 6,
+      timestampUtc: '2026-03-08T09:20:05Z',
       data: {
         final_text:
           'The selected run is blocked by an approval gate. Review the pending approval before continuing.',

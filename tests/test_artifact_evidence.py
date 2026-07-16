@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from imperaos.artifacts.commands import CreateArtifactCommand, MutateArtifactCommand
+from imperaos.artifacts.commands import (
+    CreateArtifactCommand,
+    MutateArtifactCommand,
+    SubmitArtifactFormCommand,
+)
 from imperaos.artifacts.errors import ArtifactDomainError
 from imperaos.artifacts.models import (
     ArtifactDataClass,
@@ -109,3 +113,46 @@ def test_evidence_chain_verification_detects_tampering(tmp_path: Path) -> None:
         connection.commit()
 
     assert service.evidence.verify_chain("workspace-1") is False
+
+
+def test_form_submission_evidence_binds_response_hash_without_raw_values(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifacts")
+    context = _context(principal_type=PrincipalType.USER, roles=("artifact_admin",))
+    created = service.create(
+        CreateArtifactCommand(
+            artifact_id="artifact-form-evidence",
+            kind=ArtifactKind.FORM,
+            title="Evidence form",
+            data_class=ArtifactDataClass.CONFIDENTIAL,
+            content={
+                "kind": "form",
+                "schemaVersion": 1,
+                "schema": {
+                    "type": "object",
+                    "properties": {"secret": {"type": "string"}},
+                    "required": ["secret"],
+                    "additionalProperties": False,
+                },
+                "sensitivePaths": ["/secret"],
+            },
+            idempotency_key="create-form-evidence",
+        ),
+        context,
+    )
+    canary = "private-form-evidence-canary"
+    submitted = service.submit_form(
+        SubmitArtifactFormCommand(
+            artifact_id=created.artifact.artifact_id,
+            schema_revision_id=created.revision.revision_id,
+            response={"secret": canary},
+            persistence_policy="none",
+            idempotency_key="submit-form-evidence",
+        ),
+        context,
+    )
+
+    snapshot = service.evidence.support_bundle_snapshot("workspace-1")
+    submit_event = snapshot["events"][-1]
+    assert submit_event["operation"] == "artifact.form.submitted"
+    assert submit_event["contentSha256"] == submitted.response_sha256
+    assert canary not in json.dumps(snapshot, sort_keys=True)

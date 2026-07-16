@@ -86,6 +86,7 @@ import {
 } from './missionMappers';
 import { useAssistantRuntimeSession } from './assistant/useAssistantRuntimeSession';
 import { useAssistantArtifactWorkspaceController } from './artifact-workspace/useAssistantArtifactWorkspaceController';
+import { AssistantInlineFormPart } from './artifact-workspace/AssistantInlineFormPart';
 import { useAssistantModels } from './assistant/useAssistantModels';
 import type { AssistantProviderKind } from './assistant/modelDiscovery';
 import { MissionControlView } from './components/mission/MissionControlView';
@@ -1697,8 +1698,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         historyNextCursor={assistantArtifactWorkspace.historyNextCursor}
         historyLoading={Boolean(assistantArtifactWorkspace.historyLoadingArtifactId)}
         comparison={assistantArtifactWorkspace.comparison}
+        conflictResolving={assistantArtifactWorkspace.conflictResolving}
         workspaceError={assistantArtifactWorkspace.error}
         operationNotice={assistantArtifactWorkspace.operationNotice}
+        formRuntime={assistantArtifactWorkspace.formRuntime}
+        onSubmitForm={assistantArtifactWorkspace.actions.submitForm}
         onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
         onActivateArtifact={assistantArtifactWorkspace.actions.activate}
         onRequestClose={assistantArtifactWorkspace.actions.requestClose}
@@ -1710,13 +1714,21 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           void assistantArtifactWorkspace.actions.compareRevision(artifactId, revisionId)
         }
         onCloseComparison={assistantArtifactWorkspace.actions.closeComparison}
+        onRefreshConflict={(artifactId) => void assistantArtifactWorkspace.actions.refreshConflict(artifactId)}
+        onCompareConflict={assistantArtifactWorkspace.actions.compareConflict}
+        onReloadConflict={(artifactId) => void assistantArtifactWorkspace.actions.reloadConflict(artifactId)}
+        onForkConflict={(artifactId) => void assistantArtifactWorkspace.actions.forkConflict(artifactId)}
         onEditArtifact={assistantArtifactWorkspace.actions.edit}
+        onRetrySave={(artifactId) => void assistantArtifactWorkspace.actions.retrySave(artifactId)}
         onRestoreArtifact={(artifactId, revisionId) =>
           void assistantArtifactWorkspace.actions.restore(artifactId, revisionId)
         }
-        onExportArtifact={(artifactId, format) =>
-          void assistantArtifactWorkspace.actions.exportDocument(artifactId, format)
-        }
+        onExportArtifact={(artifactId, format) => {
+          if (format === 'source') void assistantArtifactWorkspace.actions.exportCode(artifactId);
+          else if (format === 'json' || format === 'svg' || format === 'png') {
+            void assistantArtifactWorkspace.actions.exportFlow(artifactId, format);
+          } else void assistantArtifactWorkspace.actions.exportDocument(artifactId, format);
+        }}
         onViewRuns={() => {
           setRunTab('artifacts');
           setActiveView('runs');
@@ -1997,6 +2009,24 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onExecute={(approvalId) => void onExecuteAssistantApproval(approvalId)}
             onRegenerate={(turnId) => void assistantSession.actions.regenerate(turnId, assistantRuntimeSettings)}
             onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
+            renderInlineArtifact={(artifact) => {
+              if (artifact.kind !== 'form' || !artifact.artifactId) return null;
+              const inlineTab = assistantArtifactWorkspace.state.tabs.find(
+                (tab) => tab.artifact.artifactId === artifact.artifactId,
+              ) ?? null;
+              return (
+                <AssistantInlineFormPart
+                  artifactId={artifact.artifactId}
+                  tab={inlineTab}
+                  loading={assistantArtifactWorkspace.loadingArtifactId === artifact.artifactId}
+                  locale={locale}
+                  formRuntime={assistantArtifactWorkspace.formRuntime}
+                  onLoad={assistantArtifactWorkspace.actions.openInlineArtifact}
+                  onExpand={assistantArtifactWorkspace.actions.openArtifact}
+                  onSubmit={assistantArtifactWorkspace.actions.submitForm}
+                />
+              );
+            }}
             onCancel={() => void onCancelAssistantTurn()}
             onOpenTerminal={openRunTerminalView}
           />

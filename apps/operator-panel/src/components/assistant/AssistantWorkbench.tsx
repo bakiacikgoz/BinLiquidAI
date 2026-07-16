@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import type { ArtifactDescriptor, ArtifactRevision } from '../../artifact-workspace/artifactContracts';
+import type { ArtifactFormSubmissionRequest, ArtifactFormSubmissionResult } from '../../artifact-workspace/artifactContracts';
+import type { FormSessionRuntime } from '../../artifact-workspace/editors/form/formSessionRuntime';
 import type { ArtifactWorkspaceState } from '../../artifact-workspace/workspaceController';
 import type {
   ArtifactRevisionComparison,
   ArtifactWorkspaceUiError,
 } from '../../artifact-workspace/useAssistantArtifactWorkspaceController';
-import { ArtifactEditorHost } from '../../artifact-workspace/editors/ArtifactEditorHost';
+import { ArtifactEditorHost, type ArtifactSelection } from '../../artifact-workspace/editors/ArtifactEditorHost';
 import { ArtifactDiffView } from '../../artifact-workspace/ui/ArtifactDiffView';
+import { ArtifactConflictPanel } from '../../artifact-workspace/ui/ArtifactConflictPanel';
 import { translateAssistantText, type UiLocale } from '../../i18n';
 import { Badge } from '../primitives/Badge';
 import { Button } from '../primitives/Button';
@@ -29,6 +32,7 @@ type WorkspaceProps = {
   historyNextCursor?: string | null;
   historyLoading?: boolean;
   comparison?: ArtifactRevisionComparison | null;
+  conflictResolving?: { artifactId: string; action: 'refresh' | 'reload' | 'fork' } | null;
   onOpenArtifact?: (artifactId: string) => void;
   onActivateArtifact?: (artifactId: string) => void;
   onRequestClose?: (artifactId: string) => void;
@@ -38,9 +42,16 @@ type WorkspaceProps = {
   onLoadMoreHistory?: (artifactId: string) => void;
   onCompareRevision?: (artifactId: string, revisionId: string) => void;
   onCloseComparison?: () => void;
+  onRefreshConflict?: (artifactId: string) => void;
+  onCompareConflict?: (artifactId: string) => void;
+  onReloadConflict?: (artifactId: string) => void;
+  onForkConflict?: (artifactId: string) => void;
   onEditArtifact?: (artifactId: string, content: ArtifactWorkspaceState['tabs'][number]['draftContent']) => void;
+  onRetrySave?: (artifactId: string) => void;
   onRestoreArtifact?: (artifactId: string, revisionId: string) => void;
-  onExportArtifact?: (artifactId: string, format: 'markdown' | 'html') => void;
+  onExportArtifact?: (artifactId: string, format: 'markdown' | 'html' | 'source' | 'json' | 'svg' | 'png') => void;
+  formRuntime?: FormSessionRuntime;
+  onSubmitForm?: (request: ArtifactFormSubmissionRequest) => Promise<ArtifactFormSubmissionResult>;
   workspaceError?: ArtifactWorkspaceUiError | null;
   operationNotice?: string | null;
 };
@@ -72,6 +83,17 @@ function licenseLabel(artifact: ArtifactDescriptor): string {
   return metadataLabel(artifact, 'licenseStatus', 'built-in');
 }
 
+function artifactSelectionLabel(selection: ArtifactSelection | null): string {
+  if (!selection) return 'No editor selection';
+  if (selection.kind === 'flow') {
+    return `${selection.nodeIds.length} flow nodes, ${selection.edgeIds.length} flow edges selected`;
+  }
+  if (selection.kind === 'code') {
+    return `Code selection line ${selection.startLineNumber}, column ${selection.startColumn}`;
+  }
+  return `${selection.blockIds.length} document blocks selected`;
+}
+
 export function AssistantWorkbench({
   state,
   artifacts,
@@ -87,6 +109,7 @@ export function AssistantWorkbench({
   historyNextCursor = null,
   historyLoading = false,
   comparison = null,
+  conflictResolving = null,
   onOpenArtifact,
   onActivateArtifact,
   onRequestClose,
@@ -96,9 +119,16 @@ export function AssistantWorkbench({
   onLoadMoreHistory,
   onCompareRevision,
   onCloseComparison,
+  onRefreshConflict,
+  onCompareConflict,
+  onReloadConflict,
+  onForkConflict,
   onEditArtifact,
+  onRetrySave,
   onRestoreArtifact,
   onExportArtifact,
+  formRuntime,
+  onSubmitForm,
   workspaceError = null,
   operationNotice = null,
 }: {
@@ -112,6 +142,10 @@ export function AssistantWorkbench({
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [editorSelection, setEditorSelection] = useState<ArtifactSelection | null>(null);
+  const activeTabButtonRef = useRef<HTMLButtonElement>(null);
+  const previousConflictArtifactId = useRef<string | null>(null);
+  const previousSaveState = useRef<string | null>(null);
   const activeTurn = state.turns.find((turn) => turn.id === state.activeTurnId) ?? state.turns.at(-1);
   const message = activeTurn?.assistantMessage;
   const selectedArtifact = artifacts.find((artifact) => artifact.name === selectedArtifactName) ?? artifacts[0];
@@ -122,6 +156,10 @@ export function AssistantWorkbench({
   const activeTab = workspaceState?.tabs.find(
     (tab) => tab.artifact.artifactId === workspaceState.activeArtifactId,
   );
+
+  useEffect(() => {
+    setEditorSelection(null);
+  }, [activeTab?.artifact.artifactId]);
   const filteredCatalog = useMemo(() => {
     const localeCode = locale === 'tr' ? 'tr' : 'en';
     const needle = search.trim().toLocaleLowerCase(localeCode);
@@ -140,6 +178,29 @@ export function AssistantWorkbench({
   const activeComparison = activeTab && comparison?.artifactId === activeTab.artifact.artifactId
     ? comparison
     : null;
+
+  useEffect(() => {
+    const currentConflictArtifactId = activeTab?.conflict ? activeTab.artifact.artifactId : null;
+    if (previousConflictArtifactId.current && !currentConflictArtifactId) {
+      queueMicrotask(() => {
+        if (document.activeElement === document.body) {
+          activeTabButtonRef.current?.focus();
+        }
+      });
+    }
+    previousConflictArtifactId.current = currentConflictArtifactId;
+  }, [activeTab?.artifact.artifactId, activeTab?.conflict]);
+  useEffect(() => {
+    const currentSaveState = activeTab?.saveState ?? null;
+    if (previousSaveState.current === 'error' && currentSaveState !== 'error') {
+      queueMicrotask(() => {
+        if (document.activeElement === document.body) {
+          activeTabButtonRef.current?.focus();
+        }
+      });
+    }
+    previousSaveState.current = currentSaveState;
+  }, [activeTab?.artifact.artifactId, activeTab?.saveState]);
 
   return (
     <aside className="assistant-workbench" aria-label={title}>
@@ -210,19 +271,17 @@ export function AssistantWorkbench({
           {workspaceState.tabs.length > 0 ? (
             <div className="artifact-workspace-tabs" role="tablist" aria-label="Open artifacts">
               {workspaceState.tabs.map((tab) => (
-                <div key={tab.artifact.artifactId} className="artifact-workspace-tab-wrap">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={tab.artifact.artifactId === workspaceState.activeArtifactId}
-                    onClick={() => onActivateArtifact?.(tab.artifact.artifactId)}
-                  >
-                    {tab.artifact.title}{tab.dirty ? ' •' : ''}
-                  </button>
-                  <button type="button" aria-label={`Close ${tab.artifact.title}`} onClick={() => onRequestClose?.(tab.artifact.artifactId)}>
-                    ×
-                  </button>
-                </div>
+                <button
+                  className="artifact-workspace-tab-button"
+                  key={tab.artifact.artifactId}
+                  ref={tab.artifact.artifactId === workspaceState.activeArtifactId ? activeTabButtonRef : undefined}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab.artifact.artifactId === workspaceState.activeArtifactId}
+                  onClick={() => onActivateArtifact?.(tab.artifact.artifactId)}
+                >
+                  {tab.artifact.title}{tab.dirty ? ' •' : ''}
+                </button>
               ))}
             </div>
           ) : null}
@@ -230,7 +289,7 @@ export function AssistantWorkbench({
           {activeTab ? (
             <div className="artifact-workspace-active" role="tabpanel">
               <div className="artifact-workspace-status-row" aria-label="Artifact status">
-                <Badge tone={activeTab.dirty ? 'warning' : activeTab.saveState === 'error' ? 'error' : 'success'}>
+                <Badge tone={activeTab.saveState === 'conflict' || activeTab.saveState === 'error' ? 'error' : activeTab.dirty ? 'warning' : 'success'}>
                   {activeTab.saveState}
                 </Badge>
                 <Badge tone="info">Revision {activeTab.revision.revisionNumber}</Badge>
@@ -239,9 +298,38 @@ export function AssistantWorkbench({
                 <Badge tone={licenseLabel(activeTab.artifact).includes('required') ? 'warning' : 'success'}>
                   {licenseLabel(activeTab.artifact)}
                 </Badge>
+                <button
+                  type="button"
+                  aria-label={`Close ${activeTab.artifact.title}`}
+                  onClick={() => onRequestClose?.(activeTab.artifact.artifactId)}
+                >
+                  Close
+                </button>
               </div>
               {activeTab.artifact.status === 'archived' ? (
                 <p className="artifact-workspace-banner">Archived artifacts are read-only.</p>
+              ) : null}
+              {activeTab.saveState === 'error' ? (
+                <div className="artifact-workspace-banner" role="alert">
+                  <p>{activeTab.saveError ?? 'Artifact autosave failed.'}</p>
+                  <Button
+                    variant="ghost"
+                    onClick={() => onRetrySave?.(activeTab.artifact.artifactId)}
+                  >
+                    Retry save
+                  </Button>
+                </div>
+              ) : null}
+              {activeTab.conflict ? (
+                <ArtifactConflictPanel
+                  conflict={activeTab.conflict}
+                  resolvingAction={conflictResolving?.artifactId === activeTab.artifact.artifactId ? conflictResolving.action : null}
+                  comparisonOpen={activeComparison?.status === 'ready'}
+                  onRefresh={() => onRefreshConflict?.(activeTab.artifact.artifactId)}
+                  onCompare={() => onCompareConflict?.(activeTab.artifact.artifactId)}
+                  onReload={() => onReloadConflict?.(activeTab.artifact.artifactId)}
+                  onFork={() => onForkConflict?.(activeTab.artifact.artifactId)}
+                />
               ) : null}
               {activeComparison?.status === 'loading' ? (
                 <p className="artifact-workspace-banner" role="status">Loading revision comparison…</p>
@@ -253,6 +341,7 @@ export function AssistantWorkbench({
                 <ArtifactDiffView
                   beforeRevisionNumber={activeComparison.beforeRevisionNumber}
                   afterRevisionNumber={activeComparison.afterRevisionNumber}
+                  afterLabel={activeComparison.mode === 'conflict' ? 'Local draft' : undefined}
                   dirtyDraftExcluded={activeComparison.dirtyDraftExcluded}
                   result={activeComparison.result}
                   onClose={() => onCloseComparison?.()}
@@ -266,30 +355,61 @@ export function AssistantWorkbench({
                   mode={activeTab.artifact.status === 'archived' ? 'view' : 'edit'}
                   saveState={activeTab.saveState}
                   onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
-                  onSelectionChange={() => undefined}
+                  onSelectionChange={setEditorSelection}
                   onRequestExport={(format) => {
-                    if (format === 'markdown' || format === 'html') {
+                    if (format === 'markdown' || format === 'html' || format === 'source' || format === 'json' || format === 'svg' || format === 'png') {
                       onExportArtifact?.(activeTab.artifact.artifactId, format);
                     }
                   }}
+                  formRuntime={formRuntime}
+                  onSubmitForm={onSubmitForm}
+                  locale={locale}
                 />
+                <p className="artifact-workspace-selection-status" role="status" aria-live="polite">
+                  {artifactSelectionLabel(editorSelection)}
+                </p>
               </div>
               {activeTab.artifact.kind === 'document' && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Document export">
                   <Button
                     variant="ghost"
-                    disabled={activeTab.dirty || activeTab.saveState === 'saving'}
+                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
                     onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'markdown')}
                   >
                     Export Markdown
                   </Button>
                   <Button
                     variant="ghost"
-                    disabled={activeTab.dirty || activeTab.saveState === 'saving'}
+                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
                     onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'html')}
                   >
                     Export HTML
                   </Button>
+                </div>
+              ) : null}
+              {activeTab.artifact.kind === 'code' && activeComparison?.status !== 'ready' ? (
+                <div className="artifact-workspace-export-actions" aria-label="Code export">
+                  <Button
+                    variant="ghost"
+                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
+                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'source')}
+                  >
+                    Export source
+                  </Button>
+                </div>
+              ) : null}
+              {activeTab.artifact.kind === 'flow' && activeComparison?.status !== 'ready' ? (
+                <div className="artifact-workspace-export-actions" aria-label="Flow export">
+                  {(['json', 'svg', 'png'] as const).map((format) => (
+                    <Button
+                      key={format}
+                      variant="ghost"
+                      disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
+                      onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, format)}
+                    >
+                      Export {format.toUpperCase()}
+                    </Button>
+                  ))}
                 </div>
               ) : null}
               <div className="artifact-workspace-history" aria-label="Revision history">
@@ -318,7 +438,7 @@ export function AssistantWorkbench({
                         <Button
                           variant="ghost"
                           aria-label={`Restore revision ${item.revisionNumber}`}
-                          disabled={activeTab.artifact.status === 'archived' || activeTab.dirty || activeTab.saveState === 'saving'}
+                          disabled={activeTab.artifact.status === 'archived' || activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
                           onClick={() => onRestoreArtifact?.(activeTab.artifact.artifactId, item.revisionId)}
                         >
                           Restore
@@ -368,6 +488,8 @@ export function AssistantWorkbench({
               {artifacts.map((artifact) => (
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={artifact.name === selectedArtifact?.name}
                   key={artifact.name}
                   className={artifact.name === selectedArtifact?.name ? 'assistant-workbench-artifact-active' : ''}
                   onClick={() => onSelectArtifact(artifact.name)}

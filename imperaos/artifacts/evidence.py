@@ -281,9 +281,12 @@ def _result_bindings(result: object, subject: object) -> tuple[str | None, str |
     artifact = getattr(result, "artifact", None)
     revision = getattr(result, "revision", None)
     artifact_id = getattr(artifact, "artifact_id", None) or getattr(result, "artifact_id", None)
-    revision_id = getattr(revision, "revision_id", None)
-    content_sha256 = getattr(revision, "content_sha256", None) or getattr(
-        result, "content_sha256", None
+    revision_id = getattr(revision, "revision_id", None) or getattr(result, "revision_id", None)
+    content_sha256 = (
+        getattr(revision, "content_sha256", None)
+        or getattr(result, "content_sha256", None)
+        or getattr(result, "response_sha256", None)
+        or getattr(result, "sha256", None)
     )
     return artifact_id or _subject_artifact_id(subject), revision_id, content_sha256
 

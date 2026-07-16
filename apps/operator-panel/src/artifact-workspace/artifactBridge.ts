@@ -5,6 +5,7 @@ import {
   ArtifactExportBeginResultSchema,
   ArtifactExportCancelResultSchema,
   ArtifactExportResultSchema,
+  ArtifactFormSubmissionResultSchema,
   ArtifactHistoryWireSchema,
   ArtifactListWireSchema,
   ArtifactMutationProposalResultSchema,
@@ -16,6 +17,8 @@ import {
   type ArtifactExportBeginRequest,
   type ArtifactExportBeginResult,
   type ArtifactExportResult,
+  type ArtifactFormSubmissionRequest,
+  type ArtifactFormSubmissionResult,
   type ArtifactGetRequest,
   type ArtifactHistoryRequest,
   type ArtifactHistoryResult,
@@ -205,6 +208,15 @@ export const artifactBridge = {
       'bridge_artifact_duplicate',
       { ...request },
       ArtifactOperationResultSchema,
+      request.idempotencyKey,
+    );
+  },
+
+  submitForm(request: ArtifactFormSubmissionRequest): Promise<ArtifactFormSubmissionResult> {
+    return callArtifact(
+      'bridge_artifact_form_submit',
+      { ...request },
+      ArtifactFormSubmissionResultSchema,
       request.idempotencyKey,
     );
   },

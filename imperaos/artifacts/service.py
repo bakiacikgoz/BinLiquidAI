@@ -12,6 +12,9 @@ from imperaos.artifacts.commands import (
     ApplyArtifactProposalCommand,
     ArchiveArtifactCommand,
     ArtifactHistoryQuery,
+    BeginArtifactExportCommand,
+    CancelArtifactExportCommand,
+    CommitArtifactExportCommand,
     CreateArtifactCommand,
     DuplicateArtifactCommand,
     GetArtifactQuery,
@@ -19,13 +22,21 @@ from imperaos.artifacts.commands import (
     MutateArtifactCommand,
     ProposeArtifactMutationCommand,
     RestoreArtifactCommand,
+    SubmitArtifactFormCommand,
 )
-from imperaos.artifacts.content import ArtifactContent, validate_artifact_content
+from imperaos.artifacts.content import ArtifactContent, FormContentV1, validate_artifact_content
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
+from imperaos.artifacts.exports import (
+    DEFAULT_ARTIFACT_EXPORT_MAX_BYTES,
+    canonical_export_basename,
+    require_export_format,
+)
 from imperaos.artifacts.evidence import (
     ArtifactEvidenceRecorder,
     record_artifact_evidence,
 )
+from imperaos.artifacts.form_continuation import ArtifactFormContinuationGateway
+from imperaos.artifacts.forms import validate_form_response
 from imperaos.artifacts.models import (
     ArtifactDescriptor,
     ArtifactKind,
@@ -38,6 +49,9 @@ from imperaos.artifacts.models import (
 )
 from imperaos.artifacts.policy import ArtifactPermission, ArtifactPolicyGateway
 from imperaos.artifacts.results import (
+    ArtifactExportBeginResult,
+    ArtifactExportResult,
+    ArtifactFormSubmissionResult,
     ArtifactHistoryResult,
     ArtifactListResult,
     ArtifactMutationProposalResult,
@@ -45,6 +59,10 @@ from imperaos.artifacts.results import (
     ArtifactReadResult,
 )
 from imperaos.artifacts.store import ArtifactStore, revision_content_relpath
+from imperaos.governance.approval_store import ApprovalStore
+from imperaos.runtime.paths import state_path
+
+_DEFAULT_CONTINUATION_GATEWAY = object()
 
 
 class ArtifactService:
@@ -56,10 +74,14 @@ class ArtifactService:
         *,
         policy: ArtifactPolicyGateway | None = None,
         evidence: ArtifactEvidenceRecorder | None = None,
+        continuation_gateway: ArtifactFormContinuationGateway | None | object = (
+            _DEFAULT_CONTINUATION_GATEWAY
+        ),
     ) -> None:
         self.store = ArtifactStore(root)
         self.policy = policy or ArtifactPolicyGateway()
         self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
+        self._continuation_gateway = continuation_gateway
 
     @record_artifact_evidence("artifact.create")
     def create(
@@ -90,6 +112,7 @@ class ArtifactService:
             revision_id=revision_id,
             artifact_id=artifact_id,
             revision_number=1,
+            schema_version=content.schema_version,
             mutation_type=ArtifactMutationType.CREATE,
             content_relpath=revision_content_relpath(
                 context.workspace_id, artifact_id, 1, revision_id, "json"
@@ -109,7 +132,7 @@ class ArtifactService:
             kind=command.kind,
             title=command.title,
             status=ArtifactStatus.DRAFT,
-            schema_version=1,
+            schema_version=content.schema_version,
             data_class=command.data_class,
             current_revision_id=revision_id,
             current_revision_number=1,
@@ -123,19 +146,18 @@ class ArtifactService:
             etag=digest,
             metadata=command.metadata,
         )
-        result = self.store.create_artifact(artifact, revision, payload)
+        result = self.store.create_artifact(
+            artifact,
+            revision,
+            payload,
+            operation="create",
+            request_hash=request_hash,
+        )
         operation = ArtifactOperationResult(
             artifact=result.artifact,
             revision=result.revision,
             created=result.created,
             disposition=result.disposition,
-        )
-        self._save_operation_replay(
-            context.workspace_id,
-            command.idempotency_key,
-            "create",
-            request_hash,
-            operation,
         )
         return operation
 
@@ -156,7 +178,9 @@ class ArtifactService:
             query.artifact_id,
             query.revision_id or artifact.current_revision_id,
         )
-        content = self._decode_content(artifact.kind, revision.content)
+        content = self._decode_content(
+            artifact.kind, revision.content, schema_version=revision.descriptor.schema_version
+        )
         return ArtifactReadResult(artifact, revision.descriptor, content)
 
     @record_artifact_evidence("artifact.list")
@@ -200,6 +224,15 @@ class ArtifactService:
             target_data_class=current.data_class,
             approval_granted=command.approval_granted,
         )
+        request_hash = self._request_hash(command)
+        replay = self._load_operation_replay(
+            context.workspace_id,
+            command.idempotency_key,
+            "mutate",
+            request_hash,
+        )
+        if replay is not None:
+            return replay
         if current.status is ArtifactStatus.ARCHIVED:
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
@@ -211,7 +244,9 @@ class ArtifactService:
                 "assistant mutations require an approved proposal",
             )
 
-        content = self._validate_content(current.kind, command.content)
+        content = self._validate_content(
+            current.kind, command.content, schema_version=current.schema_version
+        )
         payload = canonical_json(content).encode("utf-8")
         revision_number = command.expected_revision_number + 1
         revision_id = self._stable_id(
@@ -224,6 +259,7 @@ class ArtifactService:
             artifact_id=current.artifact_id,
             parent_revision_id=current.current_revision_id,
             revision_number=revision_number,
+            schema_version=current.schema_version,
             mutation_type=command.mutation_type,
             content_relpath=revision_content_relpath(
                 context.workspace_id,
@@ -256,13 +292,16 @@ class ArtifactService:
             revision,
             payload,
             expected_revision_number=command.expected_revision_number,
+            operation="mutate",
+            request_hash=request_hash,
         )
-        return ArtifactOperationResult(
+        operation = ArtifactOperationResult(
             stored.artifact,
             stored.revision,
             stored.created,
             stored.disposition,
         )
+        return operation
 
     @record_artifact_evidence("artifact.propose_mutation")
     def propose_mutation(
@@ -276,7 +315,9 @@ class ArtifactService:
             context,
             artifact_workspace_id=artifact.workspace_id,
         )
-        content = self._validate_content(artifact.kind, command.content)
+        content = self._validate_content(
+            artifact.kind, command.content, schema_version=artifact.schema_version
+        )
         content_json = canonical_json(content)
         digest = hashlib.sha256(content_json.encode("utf-8")).hexdigest()
         proposal_id = command.proposal_id or self._stable_id(
@@ -435,6 +476,15 @@ class ArtifactService:
             context,
             artifact_workspace_id=current.workspace_id,
         )
+        request_hash = self._request_hash(command)
+        replay = self._load_operation_replay(
+            context.workspace_id,
+            command.idempotency_key,
+            "restore",
+            request_hash,
+        )
+        if replay is not None:
+            return replay
         if current.status is ArtifactStatus.ARCHIVED:
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
@@ -443,7 +493,9 @@ class ArtifactService:
         source = self.store.get_revision(
             context.workspace_id, command.artifact_id, command.source_revision_id
         )
-        content = self._decode_content(current.kind, source.content)
+        content = self._decode_content(
+            current.kind, source.content, schema_version=source.descriptor.schema_version
+        )
         payload = canonical_json(content).encode("utf-8")
         revision_number = command.expected_revision_number + 1
         revision_id = self._stable_id(
@@ -457,6 +509,7 @@ class ArtifactService:
             parent_revision_id=current.current_revision_id,
             base_revision_id=command.source_revision_id,
             revision_number=revision_number,
+            schema_version=source.descriptor.schema_version,
             mutation_type=ArtifactMutationType.RESTORE,
             content_relpath=revision_content_relpath(
                 context.workspace_id,
@@ -479,6 +532,7 @@ class ArtifactService:
                 **current.model_dump(mode="python"),
                 "current_revision_id": revision_id,
                 "current_revision_number": revision_number,
+                "schema_version": source.descriptor.schema_version,
                 "updated_by_id": context.principal_id,
                 "updated_at_utc": now,
                 "etag": digest,
@@ -489,13 +543,16 @@ class ArtifactService:
             revision,
             source_revision_id=command.source_revision_id,
             expected_revision_number=command.expected_revision_number,
+            operation="restore",
+            request_hash=request_hash,
         )
-        return ArtifactOperationResult(
+        operation = ArtifactOperationResult(
             stored.artifact,
             stored.revision,
             stored.created,
             stored.disposition,
         )
+        return operation
 
     @record_artifact_evidence("artifact.archive")
     def archive(
@@ -542,35 +599,391 @@ class ArtifactService:
             context,
             artifact_workspace_id=source.workspace_id,
         )
-        loaded = self.get(GetArtifactQuery(artifact_id=source.artifact_id), context)
-        return self.create(
-            CreateArtifactCommand(
-                artifact_id=command.artifact_id,
-                kind=source.kind,
-                title=command.title,
-                data_class=source.data_class,
-                content=loaded.content.model_dump(mode="json", by_alias=True),
-                idempotency_key=command.idempotency_key,
-                source_session_id=source.source_session_id,
-                source_turn_id=source.source_turn_id,
-                metadata=source.metadata,
+        request_hash = self._request_hash(command)
+        replay = self._load_operation_replay(
+            context.workspace_id,
+            command.idempotency_key,
+            "duplicate",
+            request_hash,
+        )
+        if replay is not None:
+            return replay
+        loaded = self.get(
+            GetArtifactQuery(
+                artifact_id=source.artifact_id,
+                revision_id=command.source_revision_id,
             ),
             context,
         )
+        content_input = (
+            command.content_override
+            if command.content_override is not None
+            else loaded.content.model_dump(mode="json", by_alias=True)
+        )
+        content = self._validate_content(
+            source.kind,
+            content_input,
+            schema_version=loaded.revision.schema_version,
+        )
+        payload = canonical_json(content).encode("utf-8")
+        digest = hashlib.sha256(payload).hexdigest()
+        artifact_id = command.artifact_id or self._stable_id(
+            "artifact", context.workspace_id, command.idempotency_key
+        )
+        revision_id = self._stable_id("revision", artifact_id, command.idempotency_key)
+        now = datetime.now(UTC)
+        revision = ArtifactRevisionDescriptor(
+            revision_id=revision_id,
+            artifact_id=artifact_id,
+            base_revision_id=loaded.revision.revision_id,
+            revision_number=1,
+            schema_version=loaded.revision.schema_version,
+            mutation_type=ArtifactMutationType.DUPLICATE,
+            content_relpath=revision_content_relpath(
+                context.workspace_id, artifact_id, 1, revision_id, "json"
+            ),
+            content_sha256=digest,
+            content_size_bytes=len(payload),
+            content_encoding="json",
+            change_summary="Artifact duplicated",
+            author_type=context.principal_type,
+            author_id=context.principal_id,
+            idempotency_key=command.idempotency_key,
+            created_at_utc=now,
+        )
+        artifact = ArtifactDescriptor(
+            artifact_id=artifact_id,
+            workspace_id=context.workspace_id,
+            kind=source.kind,
+            title=command.title,
+            status=ArtifactStatus.DRAFT,
+            schema_version=loaded.revision.schema_version,
+            data_class=source.data_class,
+            current_revision_id=revision_id,
+            current_revision_number=1,
+            source_session_id=source.source_session_id,
+            source_turn_id=source.source_turn_id,
+            created_by_type=context.principal_type,
+            created_by_id=context.principal_id,
+            updated_by_id=context.principal_id,
+            created_at_utc=now,
+            updated_at_utc=now,
+            etag=digest,
+            metadata={
+                **source.metadata,
+                "forkedFromArtifactId": source.artifact_id,
+                "forkedFromRevisionId": loaded.revision.revision_id,
+            },
+        )
+        stored = self.store.create_duplicate_artifact(
+            artifact,
+            revision,
+            payload,
+            source_artifact_id=source.artifact_id,
+            operation="duplicate",
+            request_hash=request_hash,
+        )
+        operation = ArtifactOperationResult(
+            artifact=stored.artifact,
+            revision=stored.revision,
+            created=stored.created,
+            disposition=stored.disposition,
+        )
+        return operation
+
+    @record_artifact_evidence("artifact.export.started")
+    def begin_export(
+        self,
+        command: BeginArtifactExportCommand,
+        context: OperationContext,
+    ) -> ArtifactExportBeginResult:
+        artifact = self.store.get_artifact(context.workspace_id, command.artifact_id)
+        self.policy.authorize(
+            ArtifactPermission.EXPORT,
+            context,
+            artifact_workspace_id=artifact.workspace_id,
+            current_data_class=artifact.data_class,
+            approval_granted=False,
+        )
+        if command.approval_id is not None:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+                "artifact export approval cannot be asserted by the caller",
+            )
+        format_name = require_export_format(artifact.kind, command.format)
+        stored_revision = self.store.get_revision(
+            context.workspace_id,
+            artifact.artifact_id,
+            command.revision_id,
+        )
+        content = self._decode_content(
+            artifact.kind,
+            stored_revision.content,
+            schema_version=stored_revision.descriptor.schema_version,
+        )
+        basename = canonical_export_basename(artifact, content, format_name)
+        request_hash = self._request_hash(command)
+        export_id = self._stable_id(
+            "export", context.workspace_id, command.idempotency_key
+        )
+        record, created = self.store.create_export(
+            export_id=export_id,
+            workspace_id=context.workspace_id,
+            artifact_id=artifact.artifact_id,
+            revision_id=stored_revision.descriptor.revision_id,
+            format_name=format_name,
+            basename=basename,
+            actor_type=context.principal_type.value,
+            actor_id=context.principal_id,
+            idempotency_key=command.idempotency_key,
+            request_sha256=request_hash,
+        )
+        return ArtifactExportBeginResult(
+            export_id=record.export_id,
+            artifact_id=record.artifact_id,
+            revision_id=record.revision_id,
+            format=record.format,
+            basename=record.basename,
+            max_bytes=DEFAULT_ARTIFACT_EXPORT_MAX_BYTES,
+            disposition="created" if created else "idempotent_replay",
+        )
+
+    @record_artifact_evidence("artifact.export.completed")
+    def commit_export(
+        self,
+        command: CommitArtifactExportCommand,
+        context: OperationContext,
+    ) -> ArtifactExportResult:
+        current = self.store.get_export(context.workspace_id, command.export_id)
+        artifact = self.store.get_artifact(context.workspace_id, current.artifact_id)
+        self.policy.authorize(
+            ArtifactPermission.EXPORT,
+            context,
+            artifact_workspace_id=artifact.workspace_id,
+            current_data_class=artifact.data_class,
+            approval_granted=False,
+        )
+        if command.basename != current.basename:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_EXPORT_FAILED,
+                "artifact export basename does not match the authorized record",
+            )
+        record, updated = self.store.transition_export(
+            workspace_id=context.workspace_id,
+            export_id=current.export_id,
+            actor_type=context.principal_type.value,
+            actor_id=context.principal_id,
+            status="completed",
+            basename=command.basename,
+            sha256=command.sha256,
+            size_bytes=command.size_bytes,
+            reason_code=None,
+            idempotency_key=command.idempotency_key,
+            request_sha256=self._request_hash(command),
+        )
+        return ArtifactExportResult(
+            export_id=record.export_id,
+            artifact_id=record.artifact_id,
+            revision_id=record.revision_id,
+            format=record.format,
+            status=record.status,
+            basename=record.basename,
+            sha256=record.sha256,
+            size_bytes=record.size_bytes,
+            reason_code=record.reason_code,
+            disposition="updated" if updated else "idempotent_replay",
+        )
+
+    @record_artifact_evidence("artifact.export.cancelled")
+    def cancel_export(
+        self,
+        command: CancelArtifactExportCommand,
+        context: OperationContext,
+    ) -> ArtifactExportResult:
+        current = self.store.get_export(context.workspace_id, command.export_id)
+        artifact = self.store.get_artifact(context.workspace_id, current.artifact_id)
+        self.policy.authorize(
+            ArtifactPermission.EXPORT,
+            context,
+            artifact_workspace_id=artifact.workspace_id,
+            current_data_class=artifact.data_class,
+            approval_granted=False,
+        )
+        status = "failed" if command.reason != "user_cancelled" else "cancelled"
+        record, updated = self.store.transition_export(
+            workspace_id=context.workspace_id,
+            export_id=current.export_id,
+            actor_type=context.principal_type.value,
+            actor_id=context.principal_id,
+            status=status,
+            basename=current.basename,
+            sha256=None,
+            size_bytes=None,
+            reason_code=command.reason,
+            idempotency_key=command.idempotency_key,
+            request_sha256=self._request_hash(command),
+        )
+        return ArtifactExportResult(
+            export_id=record.export_id,
+            artifact_id=record.artifact_id,
+            revision_id=record.revision_id,
+            format=record.format,
+            status=record.status,
+            basename=record.basename,
+            sha256=record.sha256,
+            size_bytes=record.size_bytes,
+            reason_code=record.reason_code,
+            disposition="updated" if updated else "idempotent_replay",
+        )
+
+    @record_artifact_evidence("artifact.form.submitted")
+    def submit_form(
+        self,
+        command: SubmitArtifactFormCommand,
+        context: OperationContext,
+    ) -> ArtifactFormSubmissionResult:
+        if command.persistence_policy != "none":
+            raise ArtifactDomainError(
+                ArtifactErrorCode.FORM_SENSITIVE_PERSISTENCE_DENIED,
+                "form response persistence is disabled",
+            )
+        artifact = self.store.get_artifact(context.workspace_id, command.artifact_id)
+        self.policy.authorize(
+            ArtifactPermission.FORM_SUBMIT,
+            context,
+            artifact_workspace_id=artifact.workspace_id,
+            current_data_class=artifact.data_class,
+        )
+        if artifact.kind is not ArtifactKind.FORM:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID,
+                "form submission requires a form artifact",
+            )
+        stored_revision = self.store.get_revision(
+            context.workspace_id,
+            artifact.artifact_id,
+            command.schema_revision_id,
+        )
+        content = self._decode_content(artifact.kind, stored_revision.content)
+        if not isinstance(content, FormContentV1):
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                "stored form schema has an invalid type",
+            )
+        validate_form_response(content.json_schema, command.response)
+        response_sha256 = hashlib.sha256(
+            canonical_json(command.response).encode("utf-8")
+        ).hexdigest()
+        submission_id = self._stable_id(
+            "submission", artifact.artifact_id, command.idempotency_key
+        )
+        pending = content.behavior.external_continuation == "approval_required"
+        created = self.store.create_form_submission(
+            submission_id=submission_id,
+            workspace_id=context.workspace_id,
+            artifact_id=artifact.artifact_id,
+            schema_revision_id=command.schema_revision_id,
+            principal_id=context.principal_id,
+            persistence_policy=command.persistence_policy,
+            response_sha256=response_sha256,
+            idempotency_key=command.idempotency_key,
+            continuation_required=pending,
+        )
+        approval = None
+        if pending:
+            gateway = self._continuation_gateway
+            if gateway is _DEFAULT_CONTINUATION_GATEWAY:
+                gateway = ArtifactFormContinuationGateway(
+                    ApprovalStore(state_path("governance", "approvals.sqlite3"))
+                )
+                self._continuation_gateway = gateway
+            if not isinstance(gateway, ArtifactFormContinuationGateway):
+                raise ArtifactDomainError(
+                    ArtifactErrorCode.ARTIFACT_POLICY_UNAVAILABLE,
+                    "form continuation approval is unavailable",
+                )
+            try:
+                approval = gateway.request_approval(
+                    context=context,
+                    artifact_id=artifact.artifact_id,
+                    schema_revision_id=command.schema_revision_id,
+                    submission_id=submission_id,
+                    response_sha256=response_sha256,
+                    idempotency_key=command.idempotency_key,
+                )
+                self.store.mark_form_continuation_ticketed(
+                    submission_id=submission_id,
+                    workspace_id=context.workspace_id,
+                    approval_id=approval.approval_id,
+                    action_hash=approval.action_hash,
+                )
+            except ArtifactDomainError as exc:
+                self.store.mark_form_continuation_failed(
+                    submission_id=submission_id,
+                    workspace_id=context.workspace_id,
+                    error_code=exc.code.value,
+                )
+                raise
+            except Exception as exc:
+                self.store.mark_form_continuation_failed(
+                    submission_id=submission_id,
+                    workspace_id=context.workspace_id,
+                    error_code=ArtifactErrorCode.ARTIFACT_POLICY_UNAVAILABLE.value,
+                )
+                raise ArtifactDomainError(
+                    ArtifactErrorCode.ARTIFACT_POLICY_UNAVAILABLE,
+                    "form continuation approval is unavailable",
+                ) from exc
+        return ArtifactFormSubmissionResult(
+            submission_id=submission_id,
+            artifact_id=artifact.artifact_id,
+            schema_revision_id=command.schema_revision_id,
+            status="pending_continuation" if pending else "accepted",
+            response_sha256=response_sha256,
+            continuation_action="require_approval" if pending else "none",
+            approval_id=approval.approval_id if approval is not None else None,
+            reason_code=(
+                "FORM_CONTINUATION_APPROVAL_REQUIRED"
+                if pending
+                else "FORM_CONTINUATION_NOT_REQUIRED"
+            ),
+            action_hash=approval.action_hash if approval is not None else None,
+            disposition="created" if created else "idempotent_replay",
+        )
 
     @staticmethod
-    def _validate_content(kind: ArtifactKind, payload: object) -> ArtifactContent:
+    def _validate_content(
+        kind: ArtifactKind,
+        payload: object,
+        *,
+        schema_version: int | None = None,
+    ) -> ArtifactContent:
         try:
-            return validate_artifact_content(kind, payload)
+            return validate_artifact_content(kind, payload, schema_version=schema_version)
         except ArtifactDomainError:
             raise
         except (ValidationError, ValueError, TypeError) as exc:
+            code = (
+                ArtifactErrorCode.FORM_SCHEMA_UNSAFE
+                if kind is ArtifactKind.FORM
+                else ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID
+            )
             raise ArtifactDomainError(
-                ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID,
-                "artifact content does not match its versioned schema",
+                code,
+                (
+                    "form schema is outside the safe supported subset"
+                    if kind is ArtifactKind.FORM
+                    else "artifact content does not match its versioned schema"
+                ),
             ) from exc
 
-    def _decode_content(self, kind: ArtifactKind, payload: bytes) -> ArtifactContent:
+    def _decode_content(
+        self,
+        kind: ArtifactKind,
+        payload: bytes,
+        *,
+        schema_version: int | None = None,
+    ) -> ArtifactContent:
         try:
             decoded = json.loads(payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -578,7 +991,7 @@ class ArtifactService:
                 ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
                 "stored artifact content is not valid JSON",
             ) from exc
-        return self._validate_content(kind, decoded)
+        return self._validate_content(kind, decoded, schema_version=schema_version)
 
     @staticmethod
     def _request_hash(command: ArtifactModel) -> str:

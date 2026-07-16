@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
-import type { AssistantTurn } from '../../assistant/assistantTypes';
+import type { AssistantArtifactRef, AssistantTurn } from '../../assistant/assistantTypes';
 import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import { Card } from '../primitives/Card';
 import { Icon } from '../primitives/Icon';
@@ -285,6 +285,7 @@ export function AssistantMessage({
   onExecute,
   onRegenerate,
   onOpenArtifact,
+  renderInlineArtifact,
 }: {
   turn: AssistantTurn;
   approvalDisabled: boolean;
@@ -298,6 +299,7 @@ export function AssistantMessage({
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
+  renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
 }) {
   const text = assistantUiText[locale];
   const message = turn.assistantMessage;
@@ -393,6 +395,13 @@ export function AssistantMessage({
             onExecute={onExecute}
           />
         ) : null}
+        {renderInlineArtifact ? message.referencedArtifacts
+          .filter((artifact) => artifact.kind === 'form' && artifact.artifactId)
+          .map((artifact) => (
+            <div key={`inline-${artifact.artifactId}-${artifact.revisionId ?? ''}`}>
+              {renderInlineArtifact(artifact)}
+            </div>
+          )) : null}
         <AssistantRunReferences
           runs={message.referencedRuns}
           artifacts={message.referencedArtifacts}

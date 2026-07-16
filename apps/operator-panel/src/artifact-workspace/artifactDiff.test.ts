@@ -38,7 +38,7 @@ describe('bounded artifact revision comparisons', () => {
   });
 
   it('compares code by bounded line position', () => {
-    const before = { ...base, kind: 'code' as const, filename: 'a.ts', language: 'ts', text: 'one\ntwo', lineEnding: 'lf', executionPolicy: 'deny' };
+    const before = { ...base, kind: 'code' as const, filename: 'a.ts', language: 'typescript' as const, text: 'one\ntwo', lineEnding: 'lf' as const, executionPolicy: 'deny' as const };
     const after = { ...before, text: 'one\nchanged\nthree' };
 
     expect(compareArtifactContent(before, after).entries).toEqual([
@@ -84,7 +84,7 @@ describe('bounded artifact revision comparisons', () => {
 
   it('fails closed on kind/schema mismatch and malformed document identity', () => {
     expect(() => compareArtifactContent(
-      { ...base, kind: 'code', filename: 'a', language: 'text', text: '', lineEnding: 'lf', executionPolicy: 'deny' },
+      { ...base, kind: 'code', filename: 'a', language: 'plaintext', text: '', lineEnding: 'lf', executionPolicy: 'deny' },
       { ...base, kind: 'flow', nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
     )).toThrow('Artifact diff kind mismatch.');
     expect(() => compareArtifactContent(
@@ -114,8 +114,8 @@ describe('bounded artifact revision comparisons', () => {
         { ...base, kind: 'document', language: 'tr', pageMode: 'paginated', blocks: [] },
       ],
       [
-        { ...base, kind: 'code', filename: 'a.ts', language: 'ts', text: '', lineEnding: 'lf', executionPolicy: 'deny' },
-        { ...base, kind: 'code', filename: 'b.ts', language: 'tsx', text: '', lineEnding: 'crlf', executionPolicy: 'deny' },
+        { ...base, kind: 'code', filename: 'a.ts', language: 'typescript', text: '', lineEnding: 'lf', executionPolicy: 'deny' },
+        { ...base, kind: 'code', filename: 'b.js', language: 'javascript', text: '', lineEnding: 'crlf', executionPolicy: 'deny' },
       ],
       [
         { ...base, kind: 'flow', nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },

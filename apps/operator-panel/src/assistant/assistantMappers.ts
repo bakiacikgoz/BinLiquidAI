@@ -352,6 +352,7 @@ export function mapCliAssistantEvent(
         artifactId: artifactId || undefined,
         revisionId: revisionId || undefined,
         kind: 'form',
+        openable: Boolean(artifactId),
         summary: event.event.replaceAll('_', ' '),
       };
       turn.assistantMessage.referencedArtifacts.push(artifact);

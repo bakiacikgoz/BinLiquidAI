@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createAssistantSession } from '../assistant/assistantMappers';
-import type { ArtifactBridge } from './artifactBridge';
+import { ArtifactBridgeError, type ArtifactBridge } from './artifactBridge';
 import type { ArtifactReadResult } from './artifactContracts';
 import { useAssistantArtifactWorkspaceController } from './useAssistantArtifactWorkspaceController';
 
@@ -35,6 +35,7 @@ function documentResult(): ArtifactReadResult {
       parentRevisionId: null,
       baseRevisionId: null,
       revisionNumber: 1,
+      schemaVersion: 1,
       mutationType: 'create',
       contentRelpath: 'workspace-1/artifact-1/revision-1.json',
       contentSha256: 'a'.repeat(64),
@@ -182,6 +183,109 @@ describe('assistant artifact workspace controller hook', () => {
 
     expect(bridge.get).toHaveBeenCalledTimes(1);
     expect(result.current.activeTab).toMatchObject({ dirty: true, draftContent: edited });
+  });
+
+  it('compares the remote conflict to the local draft and forks it without a silent merge', async () => {
+    const initial = documentResult();
+    const remote = documentResult();
+    remote.artifact = { ...remote.artifact, currentRevisionId: 'revision-2', currentRevisionNumber: 2 };
+    remote.revision = { ...remote.revision, revisionId: 'revision-2', revisionNumber: 2 };
+    remote.content = {
+      kind: 'document', schemaVersion: 1, language: 'en', pageMode: 'document',
+      blocks: [{ id: 'remote-block', type: 'paragraph', props: {}, content: [], children: [] }],
+    };
+    const forkArtifact = { ...remote.artifact, artifactId: 'artifact-fork', title: 'Launch plan (local draft)', currentRevisionId: 'fork-revision-1', currentRevisionNumber: 1 };
+    const forkRevision = { ...remote.revision, artifactId: 'artifact-fork', revisionId: 'fork-revision-1', revisionNumber: 1 };
+    const duplicate = vi.fn()
+      .mockRejectedValueOnce(new ArtifactBridgeError('ARTIFACT_RPC_UNAVAILABLE', 'lost response', true, 'bridge_artifact_create'))
+      .mockResolvedValueOnce({ artifact: forkArtifact, revision: forkRevision, created: true, disposition: 'created' });
+    const bridge = {
+      get: vi.fn().mockResolvedValueOnce(initial).mockResolvedValueOnce(remote).mockResolvedValueOnce(remote),
+      mutate: vi.fn().mockRejectedValue(new ArtifactBridgeError(
+        'ARTIFACT_REVISION_CONFLICT', 'stale', false, 'bridge_artifact_mutate',
+      )),
+      duplicate,
+      history: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+      list: vi.fn().mockResolvedValue({ items: [forkArtifact], nextCursor: null }),
+    } as unknown as ArtifactBridge;
+    const { result } = renderHook(() => useAssistantArtifactWorkspaceController({
+      assistantState: createAssistantSession('session-1'),
+      legacyArtifacts: [],
+      selectedLegacyArtifactName: '',
+      onSelectLegacyArtifact: vi.fn(),
+      bridge,
+    }));
+    const local = {
+      kind: 'document' as const, schemaVersion: 1 as const, language: 'en', pageMode: 'document' as const,
+      blocks: [{ id: 'local-block', type: 'paragraph', props: {}, content: [], children: [] }],
+    };
+
+    await act(async () => result.current.actions.openArtifact('artifact-1'));
+    act(() => result.current.actions.edit('artifact-1', local));
+    await act(async () => result.current.actions.flush('artifact-1'));
+    expect(result.current.activeTab).toMatchObject({ saveState: 'conflict', draftContent: local });
+
+    act(() => result.current.actions.compareConflict('artifact-1'));
+    expect(result.current.comparison).toMatchObject({ mode: 'conflict', status: 'ready', dirtyDraftExcluded: false });
+    expect(result.current.comparison?.result?.entries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'remote-block', change: 'removed' }),
+      expect.objectContaining({ key: 'local-block', change: 'added' }),
+    ]));
+
+    await act(async () => result.current.actions.forkConflict('artifact-1'));
+    expect(result.current.activeTab).toMatchObject({ artifact: { artifactId: 'artifact-1' }, draftContent: local, saveState: 'conflict' });
+    await act(async () => result.current.actions.forkConflict('artifact-1'));
+    expect(duplicate).toHaveBeenCalledWith(expect.objectContaining({ contentOverride: local, title: 'Launch plan (local draft)' }));
+    expect(duplicate.mock.calls[1][0].idempotencyKey).toBe(duplicate.mock.calls[0][0].idempotencyKey);
+    expect(result.current.activeTab).toMatchObject({ artifact: { artifactId: 'artifact-fork' }, draftContent: local, dirty: false });
+    expect(result.current.state.tabs.find((tab) => tab.artifact.artifactId === 'artifact-1')).toMatchObject({
+      draftContent: remote.content, conflict: null, dirty: false,
+    });
+  });
+
+  it('surfaces reload failure while preserving the conflicted local draft', async () => {
+    const initial = documentResult();
+    const remote = documentResult();
+    remote.artifact = { ...remote.artifact, currentRevisionId: 'revision-2', currentRevisionNumber: 2 };
+    remote.revision = { ...remote.revision, revisionId: 'revision-2', revisionNumber: 2 };
+    const bridge = {
+      get: vi.fn()
+        .mockResolvedValueOnce(initial)
+        .mockResolvedValueOnce(remote)
+        .mockRejectedValueOnce(new Error('controlled reload failure')),
+      mutate: vi.fn().mockRejectedValue(new ArtifactBridgeError(
+        'ARTIFACT_REVISION_CONFLICT', 'stale', false, 'bridge_artifact_mutate',
+      )),
+      history: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+    } as unknown as ArtifactBridge;
+    const { result } = renderHook(() => useAssistantArtifactWorkspaceController({
+      assistantState: createAssistantSession('session-1'),
+      legacyArtifacts: [],
+      selectedLegacyArtifactName: '',
+      onSelectLegacyArtifact: vi.fn(),
+      bridge,
+    }));
+    const local = {
+      kind: 'document' as const, schemaVersion: 1 as const, language: 'en', pageMode: 'document' as const,
+      blocks: [{ id: 'local-block', type: 'paragraph', props: {}, content: [], children: [] }],
+    };
+
+    await act(async () => result.current.actions.openArtifact('artifact-1'));
+    act(() => result.current.actions.edit('artifact-1', local));
+    await act(async () => result.current.actions.flush('artifact-1'));
+    await act(async () => result.current.actions.reloadConflict('artifact-1'));
+
+    expect(result.current.error).toEqual({
+      code: 'ARTIFACT_CONFLICT_RELOAD_FAILED',
+      message: 'The latest remote revision could not be loaded.',
+      retryable: true,
+    });
+    expect(result.current.conflictResolving).toBeNull();
+    expect(result.current.activeTab).toMatchObject({
+      saveState: 'conflict',
+      draftContent: local,
+      conflict: { status: 'ready' },
+    });
   });
 
   it('normalizes bridge failures and resets shell state for a new chat', async () => {

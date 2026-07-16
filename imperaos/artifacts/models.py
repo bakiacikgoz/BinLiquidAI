@@ -203,6 +203,7 @@ class ArtifactRevisionDescriptor(ArtifactModel):
     parent_revision_id: BoundedId | None = None
     base_revision_id: BoundedId | None = None
     revision_number: int = Field(ge=1)
+    schema_version: int = Field(default=1, ge=1, le=1000)
     mutation_type: ArtifactMutationType = Field(strict=False)
     content_relpath: Annotated[str, StringConstraints(min_length=1, max_length=512, strict=True)]
     content_sha256: Sha256

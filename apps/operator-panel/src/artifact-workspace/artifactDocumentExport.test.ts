@@ -50,7 +50,7 @@ describe('document artifact native export', () => {
       artifactId: 'artifact-document',
       revisionId: 'revision-2',
       format: 'markdown',
-      suggestedName: 'launch-plan.md',
+      idempotencyKey: expect.stringMatching(/^export-/),
     });
     expect(new TextDecoder().decode(commitExport.mock.calls[0][1])).toBe('# Launch plan\n');
     expect(result).toEqual({

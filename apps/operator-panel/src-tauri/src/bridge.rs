@@ -177,7 +177,19 @@ pub struct ArtifactExportBeginRequest {
     artifact_id: String,
     revision_id: String,
     format: String,
-    suggested_name: String,
+    idempotency_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthorizedExportBegin {
+    export_id: String,
+    artifact_id: String,
+    revision_id: String,
+    format: String,
+    basename: String,
+    max_bytes: usize,
+    disposition: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -221,19 +233,88 @@ pub async fn bridge_artifact_export_begin(
             false,
         ));
     }
-    let (filter_name, extensions) = match export_format(&request.format) {
-        Ok(format) => format,
-        Err(error) => return BridgeResult::err(error),
-    };
-    let suggested_name = sanitize_export_filename(&request.suggested_name, extensions[0]);
     let identity =
         match resolve_trusted_artifact_identity(&trusted_artifact_bridge_config(), &app).await {
             Ok(identity) => identity,
             Err(error) => return BridgeResult::err(error),
         };
-    let binding = match ExportBinding::new(identity.workspace_id(), identity.principal_id()) {
+    let authority = bridge_artifact_rpc_call(
+        app.clone(),
+        "artifact.export.begin".to_string(),
+        ArtifactBridgePayload {
+            params: json!({
+                "artifactId": request.artifact_id.clone(),
+                "revisionId": request.revision_id.clone(),
+                "format": request.format.clone(),
+                "idempotencyKey": request.idempotency_key.clone(),
+            }),
+            idempotency_key: Some(request.idempotency_key.clone()),
+            timeout_ms: Some(DEFAULT_TIMEOUT_MS),
+        },
+    )
+    .await;
+    let authorized: AuthorizedExportBegin = match authority.data {
+        Some(value) => match serde_json::from_value(value) {
+            Ok(value) => value,
+            Err(_) => {
+                return BridgeResult::err(BridgeError::new(
+                    "ARTIFACT_RPC_PROTOCOL_MISMATCH",
+                    "Artifact export authority returned an invalid result.",
+                    "",
+                    "artifact export begin",
+                    false,
+                ))
+            }
+        },
+        None => return BridgeResult::err(authority.error.unwrap_or_else(|| BridgeError::new(
+            "ARTIFACT_RPC_UNAVAILABLE",
+            "Artifact export authority is unavailable.",
+            "",
+            "artifact export begin",
+            true,
+        ))),
+    };
+    let _ = &authorized.disposition;
+    let (filter_name, extensions) = match export_format(&authorized.format) {
+        Ok(format) => format,
+        Err(error) => {
+            let _ = cancel_export_authority(
+                app.clone(), &authorized.export_id, "native_write_failed",
+            ).await;
+            return BridgeResult::err(error);
+        }
+    };
+    let suggested_name = if authorized.format == "source" {
+        authorized.basename.clone()
+    } else {
+        sanitize_export_filename(&authorized.basename, extensions[0])
+    };
+    if suggested_name != authorized.basename {
+        let _ = cancel_export_authority(
+            app.clone(), &authorized.export_id, "native_write_failed",
+        ).await;
+        return BridgeResult::err(BridgeError::new(
+            "ARTIFACT_EXPORT_FAILED",
+            "Backend export basename is not portable.",
+            "",
+            "artifact export begin",
+            false,
+        ));
+    }
+    let binding = match ExportBinding::authorized(
+        identity.workspace_id(),
+        identity.principal_id(),
+        identity.principal_type(),
+        &authorized.export_id,
+        &authorized.artifact_id,
+        &authorized.revision_id,
+        &authorized.format,
+    ) {
         Ok(binding) => binding,
         Err(error) => {
+            let _ = cancel_export_authority(
+                app.clone(), &authorized.export_id, "native_write_failed",
+            ).await;
             return BridgeResult::err(export_bridge_error("artifact export begin", error))
         }
     };
@@ -250,6 +331,9 @@ pub async fn bridge_artifact_export_begin(
     {
         Ok(selection) => selection,
         Err(_) => {
+            let _ = cancel_export_authority(
+                app.clone(), &authorized.export_id, "native_write_failed",
+            ).await;
             return BridgeResult::err(BridgeError::new(
                 "ARTIFACT_EXPORT_FAILED",
                 "Native export dialog failed.",
@@ -260,6 +344,15 @@ pub async fn bridge_artifact_export_begin(
         }
     };
     let Some(selection) = selection else {
+        if let Err(error) = cancel_export_authority(
+            app.clone(),
+            &authorized.export_id,
+            "user_cancelled",
+        )
+        .await
+        {
+            return BridgeResult::err(error);
+        }
         return BridgeResult::ok(ArtifactExportBeginResult {
             cancelled: true,
             ticket: None,
@@ -270,6 +363,9 @@ pub async fn bridge_artifact_export_begin(
     let target = match selection.into_path() {
         Ok(path) => path,
         Err(_) => {
+            let _ = cancel_export_authority(
+                app.clone(), &authorized.export_id, "native_write_failed",
+            ).await;
             return BridgeResult::err(BridgeError::new(
                 "ARTIFACT_EXPORT_FAILED",
                 "Native export target is not a local filesystem path.",
@@ -279,12 +375,22 @@ pub async fn bridge_artifact_export_begin(
             ))
         }
     };
+    if target.file_name().and_then(|value| value.to_str()) != Some(authorized.basename.as_str()) {
+        let _ = cancel_export_authority(app.clone(), &authorized.export_id, "user_cancelled").await;
+        return BridgeResult::err(BridgeError::new(
+            "ARTIFACT_EXPORT_FAILED",
+            "The export filename must match the backend-authorized basename.",
+            "",
+            "artifact export begin",
+            false,
+        ));
+    }
     let state = app.state::<ArtifactExportState>();
     match state
         .issue_ticket(
             target,
             binding,
-            configured_max_export_bytes(),
+            configured_max_export_bytes().min(authorized.max_bytes),
             DEFAULT_TICKET_TTL,
         )
         .await
@@ -295,7 +401,12 @@ pub async fn bridge_artifact_export_begin(
             expires_in_ms: Some(issued.expires_in_ms),
             max_bytes: issued.max_bytes,
         }),
-        Err(error) => BridgeResult::err(export_bridge_error("artifact export begin", error)),
+        Err(error) => {
+            let _ = cancel_export_authority(
+                app.clone(), &authorized.export_id, "native_write_failed",
+            ).await;
+            BridgeResult::err(export_bridge_error("artifact export begin", error))
+        }
     }
 }
 
@@ -311,18 +422,52 @@ pub async fn bridge_artifact_export_commit(
         };
     let binding = match ExportBinding::new(identity.workspace_id(), identity.principal_id()) {
         Ok(binding) => binding,
-        Err(error) => {
-            return BridgeResult::err(export_bridge_error("artifact export commit", error))
-        }
+        Err(error) => return BridgeResult::err(export_bridge_error("artifact export commit", error)),
     };
-    match app
-        .state::<ArtifactExportState>()
+    let state = app.state::<ArtifactExportState>();
+    let authorized_binding = match state.binding_for_ticket(&request.ticket, &binding).await {
+        Ok(binding) => binding,
+        Err(error) => return BridgeResult::err(export_bridge_error("artifact export commit", error)),
+    };
+    let result = match state
         .commit(&request.ticket, &binding, request.bytes, &request.sha256)
         .await
     {
-        Ok(result) => BridgeResult::ok(result),
-        Err(error) => BridgeResult::err(export_bridge_error("artifact export commit", error)),
+        Ok(result) => result,
+        Err(error) => {
+            let _ = cancel_export_authority(
+                app.clone(), authorized_binding.export_id(), "native_write_failed",
+            ).await;
+            return BridgeResult::err(export_bridge_error("artifact export commit", error));
+        }
+    };
+    let export_id = result.binding.export_id().to_string();
+    let authority = bridge_artifact_rpc_call(
+        app.clone(),
+        "artifact.export.commit".to_string(),
+        ArtifactBridgePayload {
+            params: json!({
+                "exportId": export_id,
+                "basename": result.basename.clone(),
+                "sha256": result.sha256.clone(),
+                "sizeBytes": result.size_bytes,
+                "idempotencyKey": format!("commit-{}", result.binding.export_id()),
+            }),
+            idempotency_key: Some(format!("commit-{}", result.binding.export_id())),
+            timeout_ms: Some(DEFAULT_TIMEOUT_MS),
+        },
+    )
+    .await;
+    if authority.data.is_none() {
+        return BridgeResult::err(authority.error.unwrap_or_else(|| BridgeError::new(
+            "ARTIFACT_RPC_UNAVAILABLE",
+            "Artifact export completion could not be acknowledged.",
+            "",
+            "artifact export commit",
+            true,
+        )));
     }
+    BridgeResult::ok(result)
 }
 
 #[tauri::command]
@@ -341,14 +486,24 @@ pub async fn bridge_artifact_export_cancel(
             return BridgeResult::err(export_bridge_error("artifact export cancel", error))
         }
     };
-    match app
+    let result = match app
         .state::<ArtifactExportState>()
         .cancel(&request.ticket, &binding)
         .await
     {
-        Ok(result) => BridgeResult::ok(result),
-        Err(error) => BridgeResult::err(export_bridge_error("artifact export cancel", error)),
+        Ok(result) => result,
+        Err(error) => return BridgeResult::err(export_bridge_error("artifact export cancel", error)),
+    };
+    if let Err(error) = cancel_export_authority(
+        app.clone(),
+        result.binding.export_id(),
+        "user_cancelled",
+    )
+    .await
+    {
+        return BridgeResult::err(error);
     }
+    BridgeResult::ok(result)
 }
 
 fn export_format(format: &str) -> Result<(&'static str, Vec<&'static str>), BridgeError> {
@@ -362,6 +517,7 @@ fn export_format(format: &str) -> Result<(&'static str, Vec<&'static str>), Brid
         "svg" => Ok(("SVG", vec!["svg"])),
         "pptx" => Ok(("PowerPoint", vec!["pptx"])),
         "zip" => Ok(("ZIP", vec!["zip"])),
+        "source" => Ok(("Source", vec!["txt"])),
         _ => Err(BridgeError::new(
             "ARTIFACT_EXPORT_FAILED",
             "Artifact export format is unsupported.",
@@ -409,6 +565,39 @@ fn configured_max_export_bytes() -> usize {
 
 fn export_bridge_error(command: &str, error: ExportBoundaryError) -> BridgeError {
     BridgeError::new(&error.code, error.message, "", command, error.retryable)
+}
+
+async fn cancel_export_authority(
+    app: tauri::AppHandle,
+    export_id: &str,
+    reason: &str,
+) -> Result<(), BridgeError> {
+    let idempotency_key = format!("cancel-{export_id}-{reason}");
+    let response = bridge_artifact_rpc_call(
+        app,
+        "artifact.export.cancel".to_string(),
+        ArtifactBridgePayload {
+            params: json!({
+                "exportId": export_id,
+                "reason": reason,
+                "idempotencyKey": idempotency_key,
+            }),
+            idempotency_key: Some(idempotency_key.clone()),
+            timeout_ms: Some(DEFAULT_TIMEOUT_MS),
+        },
+    )
+    .await;
+    if response.data.is_some() {
+        Ok(())
+    } else {
+        Err(response.error.unwrap_or_else(|| BridgeError::new(
+            "ARTIFACT_RPC_UNAVAILABLE",
+            "Artifact export cancellation could not be acknowledged.",
+            "",
+            "artifact export cancel",
+            true,
+        )))
+    }
 }
 
 async fn bridge_artifact_rpc_call(

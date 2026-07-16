@@ -31,6 +31,7 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
       parentRevisionId: null,
       baseRevisionId: null,
       revisionNumber: 1,
+      schemaVersion: 1,
       mutationType: 'create',
       contentRelpath: 'workspace-preview/artifact-preview-document/revision-1.json',
       contentSha256: 'a'.repeat(64),
@@ -59,10 +60,19 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
     };
     const history = [revision];
     contents.set(revision.revisionId, content);
+    const forks = new Map<string, {
+      descriptor: typeof descriptor;
+      revision: typeof revision;
+      content: typeof content;
+      history: Array<typeof revision>;
+      contents: Map<string, typeof content>;
+    }>();
+    const mutationRequests: Array<Record<string, unknown>> = [];
     const exportRequests: Array<{ command: string; request: Record<string, unknown> }> = [];
     let pendingExportFormat = 'markdown';
     let mutationGate: Promise<void> | null = null;
     let releaseMutationGate: (() => void) | null = null;
+    let failNextGet = false;
 
     const ok = (data: unknown) => ({ ok: true, data, error: null });
     const operation = () => ({ artifact: descriptor, revision, created: false, disposition: 'updated' });
@@ -94,7 +104,19 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
 
     (window as unknown as { __artifactE2eState: unknown }).__artifactE2eState = {
       exportRequests,
-      snapshot: () => ({ descriptor, revision, content, history: [...history] }),
+      snapshot: () => ({
+        descriptor,
+        revision,
+        content,
+        history: [...history],
+        forks: Array.from(forks.values()).map((item) => ({
+          descriptor: item.descriptor,
+          revision: item.revision,
+          content: item.content,
+          history: [...item.history],
+        })),
+        mutationRequests: [...mutationRequests],
+      }),
       holdMutations: () => {
         if (mutationGate) return;
         mutationGate = new Promise<void>((resolve) => { releaseMutationGate = resolve; });
@@ -104,6 +126,7 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
         releaseMutationGate = null;
         mutationGate = null;
       },
+      failNextGet: () => { failNextGet = true; },
       seedBulkRevision: (addedBlocks: number) => {
         nextRevision({
           ...content,
@@ -119,24 +142,108 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
           ],
         }, 'replace_content', 'Seed bounded diff fixture');
       },
+      seedRemoteConflict: () => {
+        nextRevision({
+          ...content,
+          blocks: content.blocks.map((block) => ({ ...block })),
+        }, 'replace_content', 'Remote concurrent edit');
+      },
     };
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: Record<string, unknown>) => {
-        if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
-        if (command === 'bridge_artifact_get') {
-          const params = (args.payload as { params: Record<string, unknown> }).params;
-          const requestedRevisionId = typeof params.revisionId === 'string' ? params.revisionId : revision.revisionId;
-          const requestedRevision = history.find((item) => item.revisionId === requestedRevisionId);
-          const requestedContent = contents.get(requestedRevisionId);
-          if (!requestedRevision || !requestedContent) throw new Error('Unknown artifact revision');
-          return ok({ artifact: descriptor, revision: requestedRevision, content: requestedContent });
+        if (command === 'bridge_artifact_list') {
+          return ok({ items: [descriptor, ...Array.from(forks.values(), (item) => item.descriptor)], next_cursor: null });
         }
-        if (command === 'bridge_artifact_history') return ok({ items: history, next_cursor: null });
+        if (command === 'bridge_artifact_get') {
+          if (failNextGet) {
+            failNextGet = false;
+            throw new Error('Controlled artifact reload failure');
+          }
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          const artifactId = String(params.artifactId);
+          const record = artifactId === descriptor.artifactId ? null : forks.get(artifactId);
+          if (artifactId !== descriptor.artifactId && !record) throw new Error('Unknown artifact');
+          const activeDescriptor = record?.descriptor ?? descriptor;
+          const activeRevision = record?.revision ?? revision;
+          const activeHistory = record?.history ?? history;
+          const activeContents = record?.contents ?? contents;
+          const requestedRevisionId = typeof params.revisionId === 'string' ? params.revisionId : activeRevision.revisionId;
+          const requestedRevision = activeHistory.find((item) => item.revisionId === requestedRevisionId);
+          const requestedContent = activeContents.get(requestedRevisionId);
+          if (!requestedRevision || !requestedContent) throw new Error('Unknown artifact revision');
+          return ok({ artifact: activeDescriptor, revision: requestedRevision, content: requestedContent });
+        }
+        if (command === 'bridge_artifact_history') {
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          const artifactId = String(params.artifactId);
+          const record = artifactId === descriptor.artifactId ? null : forks.get(artifactId);
+          if (artifactId !== descriptor.artifactId && !record) throw new Error('Unknown artifact');
+          return ok({ items: record?.history ?? history, next_cursor: null });
+        }
         if (command === 'bridge_artifact_mutate') {
           const params = (args.payload as { params: Record<string, unknown> }).params;
+          mutationRequests.push(params);
           if (mutationGate) await mutationGate;
+          if (
+            params.artifactId !== descriptor.artifactId
+            || params.expectedRevisionNumber !== descriptor.currentRevisionNumber
+          ) {
+            return {
+              ok: false,
+              data: null,
+              error: {
+                code: 'ARTIFACT_REVISION_CONFLICT',
+                message: 'The artifact changed remotely.',
+                stderrPreview: '',
+                command,
+                retryable: false,
+              },
+            };
+          }
           nextRevision(params.content as typeof content, 'replace_content', String(params.changeSummary ?? 'Autosave'));
           return ok(operation());
+        }
+        if (command === 'bridge_artifact_duplicate') {
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          if (params.sourceArtifactId !== descriptor.artifactId) throw new Error('Unknown duplicate source');
+          const sourceRevisionId = String(params.sourceRevisionId);
+          if (!contents.has(sourceRevisionId)) throw new Error('Unknown duplicate source revision');
+          const forkArtifact = {
+            ...descriptor,
+            artifactId: 'artifact-conflict-fork',
+            title: String(params.title),
+            currentRevisionId: 'fork-revision-1',
+            currentRevisionNumber: 1,
+            etag: 'fork-etag-1',
+          };
+          const forkRevision = {
+            ...revision,
+            revisionId: 'fork-revision-1',
+            artifactId: forkArtifact.artifactId,
+            parentRevisionId: null,
+            baseRevisionId: sourceRevisionId,
+            revisionNumber: 1,
+            mutationType: 'duplicate',
+            idempotencyKey: String(params.idempotencyKey),
+            changeSummary: 'Created conflict fork',
+            contentRelpath: `workspace-preview/${forkArtifact.artifactId}/fork-revision-1.json`,
+          };
+          const forkContent = (params.contentOverride ?? contents.get(sourceRevisionId)) as typeof content;
+          const forkContents = new Map<string, typeof content>();
+          forkContents.set(forkRevision.revisionId, forkContent);
+          forkArtifact.metadata = {
+            ...descriptor.metadata,
+            forkedFromArtifactId: descriptor.artifactId,
+            forkedFromRevisionId: sourceRevisionId,
+          };
+          forks.set(forkArtifact.artifactId, {
+            descriptor: forkArtifact,
+            revision: forkRevision,
+            content: forkContent,
+            history: [forkRevision],
+            contents: forkContents,
+          });
+          return ok({ artifact: forkArtifact, revision: forkRevision, created: true, disposition: 'created' });
         }
         if (command === 'bridge_artifact_restore') {
           const params = (args.payload as { params: Record<string, unknown> }).params;
@@ -173,5 +280,238 @@ export async function artifactExportCommands(page: Page): Promise<string[]> {
       __artifactE2eState: { exportRequests: Array<{ command: string }> };
     }).__artifactE2eState;
     return state.exportRequests.map((item) => item.command);
+  });
+}
+
+export async function installFormArtifactBridgeStub(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.addEventListener('keydown', (event) => {
+      if (event.key !== 'F8') return;
+    const now = '2026-07-16T09:00:00Z';
+    const descriptor = {
+      artifactId: 'artifact-preview-form', workspaceId: 'workspace-preview', kind: 'form', title: 'Intake form',
+      status: 'active', schemaVersion: 1, dataClass: 'confidential', currentRevisionId: 'form-revision-1',
+      currentRevisionNumber: 1, sourceSessionId: 'assistant-preview-session', sourceTurnId: 'assistant-preview-turn',
+      createdByType: 'assistant', createdById: 'assistant-preview', updatedById: 'assistant-preview',
+      createdAtUtc: now, updatedAtUtc: now, archivedAtUtc: null, etag: 'form-etag-1',
+      metadata: { policyStatus: 'governed' },
+    };
+    const revision = {
+      revisionId: 'form-revision-1', artifactId: descriptor.artifactId, parentRevisionId: null, baseRevisionId: null,
+      revisionNumber: 1, schemaVersion: 1, mutationType: 'create', contentRelpath: 'workspace-preview/artifact-preview-form/form-revision-1.json',
+      contentSha256: 'a'.repeat(64), contentSizeBytes: 256, contentEncoding: 'json', changeSummary: 'Created form',
+      authorType: 'assistant', authorId: 'assistant-preview', idempotencyKey: 'create-preview-form', createdAtUtc: now,
+    };
+    const content = {
+      kind: 'form', schemaVersion: 1,
+      schema: {
+        type: 'object', title: 'Private intake',
+        properties: { name: { type: 'string', title: 'Name', minLength: 2 } },
+        required: ['name'], additionalProperties: false,
+      },
+      uiSchema: {}, behavior: { submitMode: 'explicit', externalContinuation: 'approval_required' },
+      sensitivePaths: ['/name'],
+    };
+    const submissions: Array<Record<string, unknown>> = [];
+    const ok = (data: unknown) => ({ ok: true, data, error: null });
+    (window as unknown as { __artifactFormE2eState: unknown }).__artifactFormE2eState = {
+      snapshot: () => ({ submissions: [...submissions] }),
+    };
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
+      invoke: async (command: string, args: Record<string, unknown>) => {
+        if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
+        if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
+        if (command === 'bridge_artifact_history') return ok({ items: [revision], next_cursor: null });
+        if (command === 'bridge_artifact_form_submit') {
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          submissions.push(params);
+          const evidence = document.createElement('meta');
+          evidence.setAttribute('name', 'artifact-form-submission');
+          evidence.setAttribute('content', JSON.stringify(params));
+          document.head.append(evidence);
+          return ok({
+            submissionId: 'submission-preview-1', artifactId: descriptor.artifactId,
+            schemaRevisionId: revision.revisionId, status: 'pending_continuation',
+            responseSha256: 'b'.repeat(64), continuationAction: 'require_approval',
+            approvalId: 'approval-preview-1', reasonCode: 'FORM_CONTINUATION_APPROVAL_REQUIRED',
+            actionHash: 'c'.repeat(64), disposition: submissions.length === 1 ? 'created' : 'idempotent_replay',
+          });
+        }
+        throw new Error(`Unexpected form artifact E2E command: ${command}`);
+      },
+    };
+    });
+  });
+}
+
+export async function installCodeArtifactBridgeStub(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const now = '2026-07-16T09:00:00Z';
+    let descriptor = {
+      artifactId: 'artifact-preview-document', workspaceId: 'workspace-preview', kind: 'code', title: 'Safe code',
+      status: 'active', schemaVersion: 2, dataClass: 'internal', currentRevisionId: 'code-revision-1',
+      currentRevisionNumber: 1, sourceSessionId: 'assistant-preview-session', sourceTurnId: 'assistant-preview-turn',
+      createdByType: 'assistant', createdById: 'assistant-preview', updatedById: 'assistant-preview',
+      createdAtUtc: now, updatedAtUtc: now, archivedAtUtc: null, etag: 'code-etag-1',
+      metadata: { policyStatus: 'governed' },
+    };
+    let revision = {
+      revisionId: 'code-revision-1', artifactId: descriptor.artifactId, parentRevisionId: null as string | null,
+      baseRevisionId: null as string | null, revisionNumber: 1, schemaVersion: 2, mutationType: 'create',
+      contentRelpath: 'workspace-preview/artifact-preview-document/code-revision-1.json',
+      contentSha256: 'a'.repeat(64), contentSizeBytes: 128, contentEncoding: 'json',
+      changeSummary: 'Created safe code', authorType: 'assistant', authorId: 'assistant-preview',
+      idempotencyKey: 'create-preview-code', createdAtUtc: now,
+    };
+    let content = {
+      kind: 'code', schemaVersion: 2, filename: 'main.py', language: 'python',
+      text: "print('display only')\n", lineEnding: 'lf', executionPolicy: 'deny',
+    };
+    const history = [revision];
+    const commands: string[] = [];
+    let exportedBytes: number[] | null = null;
+    const ok = (data: unknown) => ({ ok: true, data, error: null });
+    (window as unknown as { __codeArtifactE2eState: unknown }).__codeArtifactE2eState = {
+      commands,
+      snapshot: () => ({ descriptor, revision, content, history: [...history], exportedBytes }),
+    };
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
+      invoke: async (command: string, args: Record<string, unknown>) => {
+        commands.push(command);
+        if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
+        if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
+        if (command === 'bridge_artifact_history') return ok({ items: history, next_cursor: null });
+        if (command === 'bridge_artifact_mutate') {
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          const previous = revision;
+          const revisionNumber = previous.revisionNumber + 1;
+          content = params.content as typeof content;
+          revision = {
+            ...previous, revisionId: `code-revision-${revisionNumber}`, parentRevisionId: previous.revisionId,
+            revisionNumber, mutationType: 'replace_content', authorType: 'user', authorId: 'code-operator',
+            idempotencyKey: String(params.idempotencyKey), changeSummary: String(params.changeSummary),
+          };
+          descriptor = {
+            ...descriptor, currentRevisionId: revision.revisionId, currentRevisionNumber: revisionNumber,
+            updatedById: 'code-operator', etag: `code-etag-${revisionNumber}`,
+          };
+          history.unshift(revision);
+          return ok({ artifact: descriptor, revision, created: false, disposition: 'updated' });
+        }
+        if (command === 'bridge_artifact_export_begin') {
+          return ok({ cancelled: false, ticket: 'code-ticket-1', expiresInMs: 60_000, maxBytes: 1_000_000 });
+        }
+        if (command === 'bridge_artifact_export_commit') {
+          const request = args.request as { bytes: number[]; sha256: string };
+          exportedBytes = [...request.bytes];
+          return ok({ basename: 'main.py', sha256: request.sha256, sizeBytes: request.bytes.length });
+        }
+        if (command === 'bridge_artifact_export_cancel') return ok({ cancelled: true });
+        throw new Error(`Unexpected code artifact E2E command: ${command}`);
+      },
+    };
+  });
+}
+
+export async function codeArtifactCommands(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const state = (window as unknown as { __codeArtifactE2eState: { commands: string[] } }).__codeArtifactE2eState;
+    return [...state.commands];
+  });
+}
+
+export async function codeArtifactExportedText(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const state = (window as unknown as {
+      __codeArtifactE2eState: { snapshot(): { exportedBytes: number[] | null } };
+    }).__codeArtifactE2eState;
+    const bytes = state.snapshot().exportedBytes;
+    return bytes ? new TextDecoder().decode(new Uint8Array(bytes)) : null;
+  });
+}
+
+export async function installFlowArtifactBridgeStub(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const now = '2026-07-16T10:00:00Z';
+    let descriptor = {
+      artifactId: 'artifact-preview-document', workspaceId: 'workspace-preview', kind: 'flow', title: 'Approval flow',
+      status: 'active', schemaVersion: 2, dataClass: 'internal', currentRevisionId: 'flow-revision-1',
+      currentRevisionNumber: 1, sourceSessionId: 'assistant-preview-session', sourceTurnId: 'assistant-preview-turn',
+      createdByType: 'assistant', createdById: 'assistant-preview', updatedById: 'assistant-preview',
+      createdAtUtc: now, updatedAtUtc: now, archivedAtUtc: null, etag: 'flow-etag-1', metadata: { policyStatus: 'governed' },
+    };
+    let revision = {
+      revisionId: 'flow-revision-1', artifactId: descriptor.artifactId, parentRevisionId: null as string | null,
+      baseRevisionId: null as string | null, revisionNumber: 1, schemaVersion: 2, mutationType: 'create',
+      contentRelpath: 'workspace-preview/artifact-preview-document/flow-revision-1.json',
+      contentSha256: 'a'.repeat(64), contentSizeBytes: 256, contentEncoding: 'json',
+      changeSummary: 'Created approval flow', authorType: 'assistant', authorId: 'assistant-preview',
+      idempotencyKey: 'create-preview-flow', createdAtUtc: now,
+    };
+    let content = {
+      kind: 'flow', schemaVersion: 2,
+      nodes: [
+        { id: 'start', type: 'input', position: { x: 0, y: 0 }, data: { label: '<Start>' } },
+        { id: 'review', type: 'process', position: { x: 240, y: 0 }, data: { label: 'Review' } },
+      ],
+      edges: [{ id: 'edge-1', source: 'start', target: 'review', label: 'submit' }],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    const history = [revision];
+    const commands: string[] = [];
+    let exportedBytes: number[] | null = null;
+    const ok = (data: unknown) => ({ ok: true, data, error: null });
+    (window as unknown as { __flowArtifactE2eState: unknown }).__flowArtifactE2eState = {
+      commands,
+      snapshot: () => ({ descriptor, revision, content, exportedBytes }),
+    };
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
+      invoke: async (command: string, args: Record<string, unknown>) => {
+        commands.push(command);
+        if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
+        if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
+        if (command === 'bridge_artifact_history') return ok({ items: history, next_cursor: null });
+        if (command === 'bridge_artifact_mutate') {
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          const previous = revision;
+          const revisionNumber = previous.revisionNumber + 1;
+          content = params.content as typeof content;
+          revision = {
+            ...previous, revisionId: `flow-revision-${revisionNumber}`, parentRevisionId: previous.revisionId,
+            revisionNumber, mutationType: 'replace_content', authorType: 'user', authorId: 'flow-operator',
+            idempotencyKey: String(params.idempotencyKey), changeSummary: String(params.changeSummary),
+          };
+          descriptor = {
+            ...descriptor, currentRevisionId: revision.revisionId, currentRevisionNumber: revisionNumber,
+            updatedById: 'flow-operator', etag: `flow-etag-${revisionNumber}`,
+          };
+          history.unshift(revision);
+          return ok({ artifact: descriptor, revision, created: false, disposition: 'updated' });
+        }
+        if (command === 'bridge_artifact_export_begin') {
+          return ok({ cancelled: false, ticket: 'flow-ticket-1', expiresInMs: 60_000, maxBytes: 1_000_000 });
+        }
+        if (command === 'bridge_artifact_export_commit') {
+          const request = args.request as { bytes: number[]; sha256: string };
+          exportedBytes = [...request.bytes];
+          return ok({ basename: 'approval-flow.svg', sha256: request.sha256, sizeBytes: request.bytes.length });
+        }
+        if (command === 'bridge_artifact_export_cancel') return ok({ cancelled: true });
+        throw new Error(`Unexpected flow artifact E2E command: ${command}`);
+      },
+    };
+  });
+}
+
+export async function flowArtifactEvidence(page: Page): Promise<{ commands: string[]; exportedText: string | null }> {
+  return page.evaluate(() => {
+    const state = (window as unknown as {
+      __flowArtifactE2eState: { commands: string[]; snapshot(): { exportedBytes: number[] | null } };
+    }).__flowArtifactE2eState;
+    const bytes = state.snapshot().exportedBytes;
+    return {
+      commands: [...state.commands],
+      exportedText: bytes ? new TextDecoder().decode(new Uint8Array(bytes)) : null,
+    };
   });
 }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, JsonValue, StringConstraints
 
@@ -12,6 +12,7 @@ from imperaos.artifacts.models import (
     ArtifactStatus,
     BoundedId,
 )
+from imperaos.artifacts.exports import ArtifactExportFormat
 
 
 class CreateArtifactCommand(ArtifactModel):
@@ -86,6 +87,43 @@ class ArchiveArtifactCommand(ArtifactModel):
 
 class DuplicateArtifactCommand(ArtifactModel):
     source_artifact_id: BoundedId
+    source_revision_id: BoundedId
     artifact_id: BoundedId | None = None
     title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    content_override: dict[str, JsonValue] | None = None
+    idempotency_key: BoundedId
+
+
+class SubmitArtifactFormCommand(ArtifactModel):
+    artifact_id: BoundedId
+    schema_revision_id: BoundedId
+    response: dict[str, JsonValue]
+    persistence_policy: Literal["none", "redacted", "encrypted"] = "none"
+    idempotency_key: BoundedId
+
+
+class BeginArtifactExportCommand(ArtifactModel):
+    artifact_id: BoundedId
+    revision_id: BoundedId
+    format: ArtifactExportFormat
+    approval_id: BoundedId | None = None
+    idempotency_key: BoundedId
+
+
+class CommitArtifactExportCommand(ArtifactModel):
+    export_id: BoundedId
+    basename: Annotated[str, StringConstraints(min_length=1, max_length=255, strict=True)]
+    sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$", strict=True)]
+    size_bytes: int = Field(ge=0, le=100 * 1024 * 1024)
+    idempotency_key: BoundedId
+
+
+class CancelArtifactExportCommand(ArtifactModel):
+    export_id: BoundedId
+    reason: Literal[
+        "user_cancelled",
+        "serialization_failed",
+        "native_write_failed",
+        "ticket_expired",
+    ]
     idempotency_key: BoundedId

@@ -62,6 +62,7 @@ describe('artifact bridge', () => {
         parentRevisionId: 'revision-1',
         baseRevisionId: null,
         revisionNumber: 2,
+        schemaVersion: 1,
         mutationType: 'replace_content',
         contentRelpath: 'workspace-1/artifact-1/2/revision-2.json',
         contentSha256: 'a'.repeat(64),
@@ -97,6 +98,44 @@ describe('artifact bridge', () => {
     const { ArtifactContractError, artifactBridge } = await import('./artifactBridge');
 
     await expect(artifactBridge.list({ limit: 25 })).rejects.toBeInstanceOf(ArtifactContractError);
+  });
+
+  it('binds form submission idempotency and never adds continuation authority', async () => {
+    const invoke = mockInvoke({
+      submissionId: 'submission-1',
+      artifactId: 'artifact-1',
+      schemaRevisionId: 'revision-1',
+      status: 'pending_continuation',
+      responseSha256: 'b'.repeat(64),
+      continuationAction: 'require_approval',
+      approvalId: 'approval-1',
+      reasonCode: 'FORM_CONTINUATION_APPROVAL_REQUIRED',
+      actionHash: 'c'.repeat(64),
+      disposition: 'created',
+    });
+    const { artifactBridge } = await import('./artifactBridge');
+
+    await artifactBridge.submitForm({
+      artifactId: 'artifact-1',
+      schemaRevisionId: 'revision-1',
+      response: { name: 'Ada' },
+      persistencePolicy: 'none',
+      idempotencyKey: 'submit-form-1',
+    });
+
+    expect(invoke).toHaveBeenCalledWith('bridge_artifact_form_submit', {
+      payload: {
+        params: {
+          artifactId: 'artifact-1',
+          schemaRevisionId: 'revision-1',
+          response: { name: 'Ada' },
+          persistencePolicy: 'none',
+          idempotencyKey: 'submit-form-1',
+        },
+        idempotencyKey: 'submit-form-1',
+        timeoutMs: 15_000,
+      },
+    });
   });
 
   it('preserves typed governed errors without exposing raw payloads', async () => {

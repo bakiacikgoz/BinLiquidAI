@@ -45,7 +45,8 @@ def test_ticket_boundary_is_bounded_bound_single_use_and_atomic() -> None:
 
     assert "DEFAULT_MAX_EXPORT_BYTES" in boundary
     assert "MAX_TICKET_TTL" in boundary
-    assert "record.binding != binding" in boundary
+    assert "record.binding.same_actor(binding)" in boundary
+    assert "pub async fn binding_for_ticket" in boundary
     assert ".remove(ticket)" in boundary
     assert "create_new(true)" in boundary
     assert "temp.sync_all()" in boundary

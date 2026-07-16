@@ -1,6 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
+import './zodCsp'
+
 // Import new modular CSS architecture
 import './styles/tokens.css'
 import './styles/themes/dark.css'

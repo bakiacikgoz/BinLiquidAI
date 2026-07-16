@@ -40,6 +40,10 @@ const MUTATION_METHODS_WITH_KEYS: &[&str] = &[
     "artifact.propose_mutation",
     "artifact.restore",
     "artifact.duplicate",
+    "artifact.form.submit",
+    "artifact.export.begin",
+    "artifact.export.commit",
+    "artifact.export.cancel",
 ];
 static REQUEST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -141,6 +145,10 @@ impl TrustedArtifactIdentity {
 
     pub fn principal_id(&self) -> &str {
         &self.principal_id
+    }
+
+    pub fn principal_type(&self) -> &str {
+        &self.principal_type
     }
 }
 
@@ -280,7 +288,7 @@ impl RestartCircuit {
         self.open
     }
 
-    fn record_success(&mut self) {
+    fn record_application_response(&mut self) {
         self.consecutive_failures = 0;
     }
 
@@ -436,7 +444,6 @@ impl WorkspaceRpcSupervisor {
             }
         };
         process.max_frame_bytes = handshake_result.max_frame_bytes;
-        state.circuit.record_success();
         state.process = Some(process);
         Ok(Self::health_snapshot(&state))
     }
@@ -463,7 +470,10 @@ impl WorkspaceRpcSupervisor {
             tokio::time::timeout(timeout, exchange(process, &request, &request_id)).await
         };
         match outcome {
-            Ok(Ok(response)) => response.into_result(),
+            Ok(Ok(response)) => {
+                state.circuit.record_application_response();
+                response.into_result()
+            }
             Ok(Err(error)) => {
                 self.invalidate_process(&mut state).await;
                 Err(error)
@@ -777,6 +787,16 @@ mod tests {
         assert!(!circuit.record_failure());
         assert!(circuit.record_failure());
         assert!(circuit.is_open());
+    }
+
+    #[test]
+    fn valid_application_response_resets_transport_failure_sequence() {
+        let mut circuit = RestartCircuit::default();
+        assert!(!circuit.record_failure());
+        assert!(!circuit.record_failure());
+        circuit.record_application_response();
+        assert!(!circuit.record_failure());
+        assert!(!circuit.is_open());
     }
 
     #[test]

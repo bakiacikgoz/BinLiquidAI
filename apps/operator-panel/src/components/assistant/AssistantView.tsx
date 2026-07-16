@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 
-import type { AssistantSessionState } from '../../assistant/assistantTypes';
+import type { AssistantArtifactRef, AssistantSessionState } from '../../assistant/assistantTypes';
 import type { AssistantComposerControls } from '../../assistant/assistantTypes';
 import { useImperaAssistantUiRuntime } from '../../assistant/assistantUiRuntime';
 import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
@@ -62,6 +62,7 @@ export function AssistantView({
   onExecute,
   onRegenerate,
   onOpenArtifact,
+  renderInlineArtifact,
   onCancel,
   onOpenTerminal,
 }: {
@@ -91,6 +92,7 @@ export function AssistantView({
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
+  renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
   onCancel: () => void;
   onOpenTerminal?: () => void;
 }) {
@@ -327,6 +329,7 @@ export function AssistantView({
               onExecute={onExecute}
               onRegenerate={onRegenerate}
               onOpenArtifact={onOpenArtifact}
+              renderInlineArtifact={renderInlineArtifact}
             />
           )}
 

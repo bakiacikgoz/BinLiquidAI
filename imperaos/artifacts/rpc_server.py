@@ -13,6 +13,9 @@ from imperaos.artifacts.commands import (
     ApplyArtifactProposalCommand,
     ArchiveArtifactCommand,
     ArtifactHistoryQuery,
+    BeginArtifactExportCommand,
+    CancelArtifactExportCommand,
+    CommitArtifactExportCommand,
     CreateArtifactCommand,
     DuplicateArtifactCommand,
     GetArtifactQuery,
@@ -20,6 +23,7 @@ from imperaos.artifacts.commands import (
     MutateArtifactCommand,
     ProposeArtifactMutationCommand,
     RestoreArtifactCommand,
+    SubmitArtifactFormCommand,
 )
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import OperationContext, canonical_json
@@ -35,6 +39,7 @@ from imperaos.artifacts.rpc_protocol import (
     parse_request_payload,
 )
 from imperaos.artifacts.service import ArtifactService
+from imperaos.artifacts.store import StorageReconciliationReport
 
 _READ_CHUNK_BYTES = 64 * 1024
 _MAX_DEDUP_RESPONSES = 1024
@@ -44,6 +49,10 @@ _MUTATION_METHODS_WITH_KEYS = {
     ArtifactRpcMethod.ARTIFACT_PROPOSE_MUTATION,
     ArtifactRpcMethod.ARTIFACT_RESTORE,
     ArtifactRpcMethod.ARTIFACT_DUPLICATE,
+    ArtifactRpcMethod.ARTIFACT_FORM_SUBMIT,
+    ArtifactRpcMethod.ARTIFACT_EXPORT_BEGIN,
+    ArtifactRpcMethod.ARTIFACT_EXPORT_COMMIT,
+    ArtifactRpcMethod.ARTIFACT_EXPORT_CANCEL,
 }
 
 
@@ -55,6 +64,8 @@ class ArtifactRpcServer:
         self._server_sequence = 0
         self._shutdown_requested = False
         self._responses: OrderedDict[str, tuple[str, RpcResponse]] = OrderedDict()
+        self._startup_reconciled = False
+        self._startup_recovery_report: StorageReconciliationReport | None = None
 
     @property
     def shutdown_requested(self) -> bool:
@@ -62,6 +73,18 @@ class ArtifactRpcServer:
 
     def handle_request(self, request: RpcRequest) -> RpcResponse:
         request_hash = hashlib.sha256(canonical_json(request).encode("utf-8")).hexdigest()
+        try:
+            self._ensure_startup_reconciled()
+        except ArtifactDomainError as exc:
+            response = self._error_response(
+                request.request_id,
+                exc.code,
+                exc.message,
+                retryable=exc.retryable,
+                details=exc.details,
+            )
+            self._remember(request.request_id, request_hash, response)
+            return response
         cached = self._responses.get(request.request_id)
         if cached is not None:
             cached_hash, cached_response = cached
@@ -103,9 +126,11 @@ class ArtifactRpcServer:
 
     def serve(self, stdin: BinaryIO, stdout: BinaryIO, stderr: BinaryIO) -> int:
         decoder = RpcFrameDecoder()
+        read_chunk = getattr(stdin, "read1", stdin.read)
         try:
+            self._ensure_startup_reconciled()
             while not self._shutdown_requested:
-                chunk = stdin.read(_READ_CHUNK_BYTES)
+                chunk = read_chunk(_READ_CHUNK_BYTES)
                 if not chunk:
                     if decoder.buffered_bytes:
                         raise ArtifactDomainError(
@@ -129,6 +154,18 @@ class ArtifactRpcServer:
             stderr.write(b"ARTIFACT_RPC_UNAVAILABLE\n")
             stderr.flush()
             return 1
+
+    def _ensure_startup_reconciled(self) -> StorageReconciliationReport:
+        if not self._startup_reconciled:
+            report = self.service.store.reconcile_storage()
+            self._startup_recovery_report = report
+            self._startup_reconciled = True
+        if self._startup_recovery_report is None:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                "artifact startup recovery did not produce a report",
+            )
+        return self._startup_recovery_report
 
     def shutdown(self) -> None:
         self._shutdown_requested = True
@@ -182,6 +219,22 @@ class ArtifactRpcServer:
             ArtifactRpcMethod.ARTIFACT_DUPLICATE: (
                 DuplicateArtifactCommand,
                 self.service.duplicate,
+            ),
+            ArtifactRpcMethod.ARTIFACT_FORM_SUBMIT: (
+                SubmitArtifactFormCommand,
+                self.service.submit_form,
+            ),
+            ArtifactRpcMethod.ARTIFACT_EXPORT_BEGIN: (
+                BeginArtifactExportCommand,
+                self.service.begin_export,
+            ),
+            ArtifactRpcMethod.ARTIFACT_EXPORT_COMMIT: (
+                CommitArtifactExportCommand,
+                self.service.commit_export,
+            ),
+            ArtifactRpcMethod.ARTIFACT_EXPORT_CANCEL: (
+                CancelArtifactExportCommand,
+                self.service.cancel_export,
             ),
         }
         route = handlers.get(request.method)

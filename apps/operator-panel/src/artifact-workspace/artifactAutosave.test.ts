@@ -35,6 +35,7 @@ function readResult(text = 'v1', revisionNumber = 1): ArtifactReadResult {
       parentRevisionId: revisionNumber > 1 ? `revision-${revisionNumber - 1}` : null,
       baseRevisionId: null,
       revisionNumber,
+      schemaVersion: 1,
       mutationType: revisionNumber > 1 ? 'replace_content' : 'create',
       contentRelpath: `workspace-1/artifact-1/${revisionNumber}/revision-${revisionNumber}.json`,
       contentSha256: 'a'.repeat(64),
@@ -156,7 +157,65 @@ describe('artifact autosave queue', () => {
       dirty: true,
       saveState: 'conflict',
       draftContent: documentContent('local'),
-      conflict: { remoteRevisionNumber: 2 },
+      conflict: { status: 'ready', remote: { revision: { revisionNumber: 2 } } },
+    });
+    expect(queue.isConflictBlocked('artifact-1')).toBe(true);
+
+    queue.schedule('artifact-1', documentContent('newer local'));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(bridge.mutate).toHaveBeenCalledTimes(1);
+    expect(controller.getState().tabs[0]).toMatchObject({
+      saveState: 'conflict', draftContent: documentContent('newer local'),
+    });
+  });
+
+  it('keeps autosave blocked when the remote conflict snapshot cannot be loaded', async () => {
+    const bridge = {
+      get: vi.fn().mockResolvedValueOnce(readResult()).mockRejectedValueOnce(new Error('remote unavailable')),
+      mutate: vi.fn().mockRejectedValue(new ArtifactBridgeError(
+        'ARTIFACT_REVISION_CONFLICT', 'stale revision', false, 'bridge_artifact_mutate',
+      )),
+    } as unknown as ArtifactBridge;
+    const controller = new ArtifactWorkspaceController(bridge);
+    await controller.open('artifact-1');
+    const queue = new ArtifactAutosaveQueue(controller, bridge);
+
+    queue.schedule('artifact-1', documentContent('local'));
+    await expect(queue.flush('artifact-1')).resolves.toBeUndefined();
+
+    expect(queue.isConflictBlocked('artifact-1')).toBe(true);
+    expect(controller.getState().tabs[0]).toMatchObject({
+      dirty: true, saveState: 'conflict', draftContent: documentContent('local'),
+      conflict: { status: 'error', remote: null },
+    });
+    queue.schedule('artifact-1', documentContent('newer local'));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(bridge.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a misrouted or non-advanced remote conflict snapshot', async () => {
+    const wrongArtifact = readResult('wrong', 2);
+    wrongArtifact.artifact.artifactId = 'artifact-2';
+    wrongArtifact.revision.artifactId = 'artifact-2';
+    const bridge = {
+      get: vi.fn().mockResolvedValueOnce(readResult()).mockResolvedValueOnce(wrongArtifact),
+      mutate: vi.fn().mockRejectedValue(new ArtifactBridgeError(
+        'ARTIFACT_REVISION_CONFLICT', 'stale revision', false, 'bridge_artifact_mutate',
+      )),
+    } as unknown as ArtifactBridge;
+    const controller = new ArtifactWorkspaceController(bridge);
+    await controller.open('artifact-1');
+    const queue = new ArtifactAutosaveQueue(controller, bridge);
+
+    queue.schedule('artifact-1', documentContent('local'));
+    await queue.flush('artifact-1');
+
+    expect(queue.isConflictBlocked('artifact-1')).toBe(true);
+    expect(controller.getState().tabs[0]).toMatchObject({
+      dirty: true,
+      saveState: 'conflict',
+      draftContent: documentContent('local'),
+      conflict: { status: 'error', remote: null },
     });
   });
 
@@ -166,9 +225,15 @@ describe('artifact autosave queue', () => {
       mutate: vi
         .fn()
         .mockRejectedValueOnce(
-          new ArtifactBridgeError('ARTIFACT_RPC_UNAVAILABLE', 'offline', true, 'bridge_artifact_mutate'),
+          new ArtifactBridgeError(
+            'ARTIFACT_RPC_UNAVAILABLE',
+            'C:\\private\\draft-canary.txt stack=secret-draft-canary',
+            true,
+            'bridge_artifact_mutate',
+          ),
         )
-        .mockResolvedValueOnce(operation('v2', 2)),
+        .mockResolvedValueOnce(operation('v2', 2))
+        .mockResolvedValueOnce(operation('v3', 3)),
     } as unknown as ArtifactBridge;
     const controller = new ArtifactWorkspaceController(bridge);
     await controller.open('artifact-1');
@@ -182,9 +247,65 @@ describe('artifact autosave queue', () => {
     queue.schedule('artifact-1', documentContent('v2'));
     await queue.flush('artifact-1');
     expect(controller.getState().tabs[0].saveState).toBe('error');
+    expect(controller.getState().tabs[0].saveError).toBe('Artifact autosave failed. Retry the same save.');
+    expect(controller.getState().tabs[0].saveError).not.toContain('secret-draft-canary');
+    const failedRequest = vi.mocked(bridge.mutate).mock.calls[0][0];
+    queue.schedule('artifact-1', documentContent('v3'));
     await queue.retry('artifact-1');
 
-    expect(bridge.mutate).toHaveBeenCalledTimes(2);
+    expect(bridge.mutate).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(bridge.mutate).mock.calls[1][0]).toEqual(failedRequest);
+    expect(vi.mocked(bridge.mutate).mock.calls[2][0]).toEqual(expect.objectContaining({
+      expectedRevisionNumber: 2,
+      content: documentContent('v3'),
+    }));
+    expect(vi.mocked(bridge.mutate).mock.calls[2][0].idempotencyKey).not.toBe(failedRequest.idempotencyKey);
     expect(controller.getState().tabs[0]).toMatchObject({ dirty: false, saveState: 'saved' });
+  });
+
+  it('retires pending and conflict-blocked state before discard and reopen', async () => {
+    const bridge = {
+      get: vi.fn().mockResolvedValue(readResult()),
+      mutate: vi.fn().mockResolvedValue(operation('fresh', 2)),
+    } as unknown as ArtifactBridge;
+    const controller = new ArtifactWorkspaceController(bridge);
+    await controller.open('artifact-1');
+    const queue = new ArtifactAutosaveQueue(controller, bridge);
+
+    queue.schedule('artifact-1', documentContent('discarded'));
+    queue.retire('artifact-1');
+    controller.discardAndClose('artifact-1');
+    await controller.open('artifact-1');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(bridge.mutate).not.toHaveBeenCalled();
+
+    queue.schedule('artifact-1', documentContent('fresh'));
+    await queue.flush('artifact-1');
+    expect(bridge.mutate).toHaveBeenCalledOnce();
+    expect(controller.getState().tabs[0]).toMatchObject({ dirty: false, saveState: 'saved' });
+  });
+
+  it('ignores an in-flight completion after the tab incarnation is retired', async () => {
+    let resolveMutation!: (value: ReturnType<typeof operation>) => void;
+    const mutation = new Promise<ReturnType<typeof operation>>((resolve) => { resolveMutation = resolve; });
+    const bridge = {
+      get: vi.fn().mockResolvedValue(readResult()),
+      mutate: vi.fn().mockReturnValue(mutation),
+    } as unknown as ArtifactBridge;
+    const controller = new ArtifactWorkspaceController(bridge);
+    await controller.open('artifact-1');
+    const queue = new ArtifactAutosaveQueue(controller, bridge);
+    queue.schedule('artifact-1', documentContent('discarded'));
+    await vi.advanceTimersByTimeAsync(900);
+
+    queue.retire('artifact-1');
+    controller.discardAndClose('artifact-1');
+    await controller.open('artifact-1');
+    resolveMutation(operation('discarded', 2));
+    await settle();
+
+    expect(controller.getState().tabs[0]).toMatchObject({
+      revision: { revisionNumber: 1 }, draftContent: documentContent('v1'), dirty: false, saveState: 'idle',
+    });
   });
 });

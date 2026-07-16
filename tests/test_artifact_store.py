@@ -76,3 +76,65 @@ def test_store_suppresses_noop_and_restores_as_a_new_revision(tmp_path: Path) ->
         2,
         1,
     ]
+
+
+def test_store_creates_an_atomic_duplicate_revision_with_a_durable_source_link(
+    tmp_path: Path,
+) -> None:
+    store = ArtifactStore(tmp_path / "artifact-root")
+    payload = b'{"version":1}'
+    source_artifact, source_revision = make_artifact_pair(payload)
+    store.create_artifact(source_artifact, source_revision, payload)
+    duplicate_revision_id = "revision-duplicate-1"
+    duplicate_artifact = source_artifact.model_copy(
+        update={
+            "artifact_id": "artifact-duplicate",
+            "title": "Quarterly plan copy",
+            "current_revision_id": duplicate_revision_id,
+        }
+    )
+    duplicate_revision = source_revision.model_copy(
+        update={
+            "revision_id": duplicate_revision_id,
+            "artifact_id": duplicate_artifact.artifact_id,
+            "base_revision_id": source_revision.revision_id,
+            "mutation_type": ArtifactMutationType.DUPLICATE,
+            "content_relpath": (
+                "content/workspace-1/artifact-duplicate/revisions/"
+                "00000001-revision-duplicate-1.json"
+            ),
+            "idempotency_key": "duplicate-1",
+        }
+    )
+
+    created = store.create_duplicate_artifact(
+        duplicate_artifact,
+        duplicate_revision,
+        payload,
+        source_artifact_id=source_artifact.artifact_id,
+        operation="duplicate",
+        request_hash="a" * 64,
+    )
+    replay = store.create_duplicate_artifact(
+        duplicate_artifact,
+        duplicate_revision,
+        payload,
+        source_artifact_id=source_artifact.artifact_id,
+        operation="duplicate",
+        request_hash="a" * 64,
+    )
+
+    assert created.created is True
+    assert created.revision.mutation_type is ArtifactMutationType.DUPLICATE
+    assert created.revision.base_revision_id == source_revision.revision_id
+    assert replay.created is False
+    assert replay.disposition == "idempotent_replay"
+    with store._connect() as connection:
+        links = connection.execute(
+            "SELECT link_type, target_id FROM artifact_links WHERE artifact_id = ?",
+            (duplicate_artifact.artifact_id,),
+        ).fetchall()
+    assert [(row["link_type"], row["target_id"]) for row in links] == [
+        ("source", source_artifact.artifact_id)
+    ]
+    assert store.get_artifact("workspace-1", source_artifact.artifact_id) == source_artifact

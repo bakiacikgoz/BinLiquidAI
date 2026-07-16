@@ -7,6 +7,8 @@
     "dev": "vite",
     "tauri:dev": "tauri dev",
     "build": "tsc -b && vite build",
+    "artifact-code:bundle": "node scripts/assert-artifact-code-bundle.mjs",
+    "artifact-flow:bundle": "node scripts/assert-artifact-flow-bundle.mjs",
     "tauri:build": "tauri build",
     "test": "vitest run",
     "test:unit": "vitest run",

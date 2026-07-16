@@ -304,6 +304,54 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
             """,
         ),
     ),
+    ArtifactMigration(
+        version=5,
+        name="form_continuation_outbox",
+        statements=(
+            """
+            CREATE TABLE artifact_form_continuation_outbox (
+                submission_id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('pending', 'ticketed', 'failed')),
+                approval_id TEXT,
+                action_hash TEXT CHECK (action_hash IS NULL OR length(action_hash) = 64),
+                last_error_code TEXT,
+                attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL,
+                FOREIGN KEY (submission_id)
+                    REFERENCES form_submissions(submission_id) ON DELETE RESTRICT
+            ) STRICT
+            """,
+            """
+            CREATE INDEX idx_artifact_form_continuation_outbox_status
+            ON artifact_form_continuation_outbox (workspace_id, status, created_at_utc)
+            """,
+        ),
+    ),
+    ArtifactMigration(
+        version=6,
+        name="governed_export_authority",
+        statements=(
+            "ALTER TABLE artifact_exports ADD COLUMN workspace_id TEXT",
+            "ALTER TABLE artifact_exports ADD COLUMN actor_type TEXT",
+            "ALTER TABLE artifact_exports ADD COLUMN idempotency_key TEXT",
+            "ALTER TABLE artifact_exports ADD COLUMN request_sha256 TEXT",
+            "ALTER TABLE artifact_exports ADD COLUMN reason_code TEXT",
+            "ALTER TABLE artifact_exports ADD COLUMN terminal_idempotency_key TEXT",
+            "ALTER TABLE artifact_exports ADD COLUMN terminal_request_sha256 TEXT",
+            "CREATE UNIQUE INDEX idx_artifact_exports_workspace_idempotency ON artifact_exports (workspace_id, idempotency_key)",
+            "CREATE INDEX idx_artifact_exports_workspace_status ON artifact_exports (workspace_id, status, created_at_utc)",
+        ),
+    ),
+    ArtifactMigration(
+        version=7,
+        name="revision_schema_version",
+        statements=(
+            "ALTER TABLE artifact_revisions ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version >= 1)",
+            "CREATE INDEX idx_artifact_revisions_artifact_schema ON artifact_revisions (artifact_id, schema_version, revision_number)",
+        ),
+    ),
 )
 
 
@@ -317,6 +365,7 @@ _ROW_COUNT_TABLES = (
     "form_submissions",
     "artifact_mutation_proposals",
     "artifact_evidence_events",
+    "artifact_form_continuation_outbox",
 )
 
 

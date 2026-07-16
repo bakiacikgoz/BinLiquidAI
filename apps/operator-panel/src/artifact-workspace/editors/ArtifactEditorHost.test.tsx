@@ -1,0 +1,155 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { ArtifactDescriptor, ArtifactRevision } from '../artifactContracts';
+import { ArtifactEditorHost } from './ArtifactEditorHost';
+import { FormSessionRuntime } from './form/formSessionRuntime';
+
+vi.mock('./code/CodeArtifactEditor', () => ({
+  CodeArtifactEditor: () => <div aria-label="Secure code editor">Execution is disabled.</div>,
+}));
+vi.mock('./flow/FlowArtifactEditor', () => ({
+  FlowArtifactEditor: () => <div aria-label="Governed flow editor">Text outline</div>,
+}));
+
+const artifact = {
+  artifactId: 'artifact-form-host', workspaceId: 'workspace-1', kind: 'form', title: 'Host form', status: 'active',
+  schemaVersion: 1, dataClass: 'internal', currentRevisionId: 'revision-form-host', currentRevisionNumber: 4,
+  sourceSessionId: null, sourceTurnId: null, createdByType: 'user', createdById: 'user-1', updatedById: 'user-1',
+  createdAtUtc: '2026-07-16T08:00:00Z', updatedAtUtc: '2026-07-16T08:00:00Z', archivedAtUtc: null,
+  etag: 'etag-4', metadata: {},
+} satisfies ArtifactDescriptor;
+
+const revision = {
+  revisionId: 'revision-form-host', artifactId: artifact.artifactId, parentRevisionId: 'revision-form-3', baseRevisionId: null,
+  revisionNumber: 4, schemaVersion: 1, mutationType: 'replace_content', contentRelpath: 'content/form.json', contentSha256: 'a'.repeat(64),
+  contentSizeBytes: 100, contentEncoding: 'json', changeSummary: 'Updated', authorType: 'user', authorId: 'user-1',
+  idempotencyKey: 'update-form-4', createdAtUtc: '2026-07-16T08:00:00Z',
+} satisfies ArtifactRevision;
+
+describe('ArtifactEditorHost form integration', () => {
+  it('keeps the form editor forced off unless explicitly enabled', () => {
+    render(
+      <ArtifactEditorHost
+        artifact={artifact}
+        revision={revision}
+        content={{ kind: 'form', schemaVersion: 1 }}
+        mode="edit"
+        saveState="idle"
+        onChange={() => undefined}
+        onSelectionChange={() => undefined}
+        onRequestExport={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('disabled by policy');
+    expect(screen.queryByRole('button', { name: 'Submit form' })).not.toBeInTheDocument();
+  });
+
+  it('lazy-loads the governed form editor and binds exact revision submission', async () => {
+    const user = userEvent.setup();
+    const onSubmitForm = vi.fn().mockResolvedValue({
+      submissionId: 'submission-1', artifactId: artifact.artifactId, schemaRevisionId: revision.revisionId,
+      status: 'accepted', responseSha256: 'b'.repeat(64), continuationAction: 'none',
+      approvalId: null, reasonCode: 'FORM_CONTINUATION_NOT_REQUIRED', actionHash: null, disposition: 'created',
+    });
+    render(
+      <ArtifactEditorHost
+        artifact={artifact}
+        revision={revision}
+        content={{
+          kind: 'form', schemaVersion: 1,
+          schema: { type: 'object', properties: { email: { type: 'string', title: 'Email' } }, required: ['email'], additionalProperties: false },
+          behavior: { submitMode: 'explicit', externalContinuation: 'deny' },
+        }}
+        mode="edit"
+        saveState="idle"
+        formRuntime={new FormSessionRuntime()}
+        formEnabled
+        onSubmitForm={onSubmitForm}
+        onChange={() => undefined}
+        onSelectionChange={() => undefined}
+        onRequestExport={() => undefined}
+      />,
+    );
+    await user.type(await screen.findByLabelText(/Email/, {}, { timeout: 5_000 }), 'ada@example.test');
+    await user.click(screen.getByRole('button', { name: 'Submit form' }));
+    expect(onSubmitForm).toHaveBeenCalledWith(expect.objectContaining({
+      artifactId: artifact.artifactId,
+      schemaRevisionId: revision.revisionId,
+      response: { email: 'ada@example.test' },
+      persistencePolicy: 'none',
+      idempotencyKey: expect.stringMatching(/^form-submit-/),
+    }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Form submitted.');
+  });
+});
+
+describe('ArtifactEditorHost code integration', () => {
+  const codeArtifact = { ...artifact, artifactId: 'artifact-code-host', kind: 'code' as const, title: 'Code', schemaVersion: 2 };
+  const codeRevision = { ...revision, artifactId: codeArtifact.artifactId, revisionId: 'revision-code-host', schemaVersion: 2 };
+  const codeContent = {
+    kind: 'code' as const, schemaVersion: 2 as const, filename: 'main.ts', language: 'typescript' as const,
+    text: 'export {};\n', lineEnding: 'lf' as const, executionPolicy: 'deny' as const,
+  };
+
+  it('keeps the code editor forced off unless explicitly enabled', () => {
+    render(
+      <ArtifactEditorHost
+        artifact={codeArtifact}
+        revision={codeRevision}
+        content={codeContent}
+        mode="edit"
+        saveState="idle"
+        onChange={() => undefined}
+        onSelectionChange={() => undefined}
+        onRequestExport={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('disabled by policy');
+    expect(screen.queryByLabelText('Secure code editor')).not.toBeInTheDocument();
+  });
+
+  it('lazy-loads the governed code editor only when enabled', async () => {
+    render(
+      <ArtifactEditorHost
+        artifact={codeArtifact}
+        revision={codeRevision}
+        content={codeContent}
+        mode="edit"
+        saveState="idle"
+        codeEnabled
+        onChange={() => undefined}
+        onSelectionChange={() => undefined}
+        onRequestExport={() => undefined}
+      />,
+    );
+    expect(await screen.findByLabelText('Secure code editor')).toHaveTextContent('Execution is disabled');
+  });
+});
+
+describe('ArtifactEditorHost flow integration', () => {
+  const flowArtifact = { ...artifact, artifactId: 'artifact-flow-host', kind: 'flow' as const, title: 'Flow', schemaVersion: 2 };
+  const flowRevision = { ...revision, artifactId: flowArtifact.artifactId, revisionId: 'revision-flow-host', schemaVersion: 2 };
+  const flowContent = {
+    kind: 'flow' as const, schemaVersion: 2 as const,
+    nodes: [{ id: 'start', type: 'input' as const, position: { x: 0, y: 0 }, data: { label: 'Start' } }],
+    edges: [], viewport: { x: 0, y: 0, zoom: 1 },
+  };
+
+  it('keeps the flow editor forced off unless explicitly enabled', () => {
+    render(<ArtifactEditorHost
+      artifact={flowArtifact} revision={flowRevision} content={flowContent} mode="edit" saveState="idle"
+      onChange={() => undefined} onSelectionChange={() => undefined} onRequestExport={() => undefined}
+    />);
+    expect(screen.getByRole('status')).toHaveTextContent('disabled by policy');
+  });
+
+  it('lazy-loads the governed flow editor only when enabled', async () => {
+    render(<ArtifactEditorHost
+      artifact={flowArtifact} revision={flowRevision} content={flowContent} mode="edit" saveState="idle" flowEnabled
+      onChange={() => undefined} onSelectionChange={() => undefined} onRequestExport={() => undefined}
+    />);
+    expect(await screen.findByLabelText('Governed flow editor')).toHaveTextContent('Text outline');
+  });
+});

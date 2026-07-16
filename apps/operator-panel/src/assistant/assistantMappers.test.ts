@@ -151,7 +151,7 @@ describe('assistant mappers', () => {
     expect(withForm.referencedArtifacts).toEqual([
       expect.objectContaining({ artifactId: 'artifact-1', revisionId: 'revision-1', kind: 'document', openable: true }),
       expect.objectContaining({ artifactId: 'artifact-proposal', kind: 'document', openable: false }),
-      expect.objectContaining({ artifactId: 'form-1', revisionId: 'revision-form-1', kind: 'form' }),
+      expect.objectContaining({ artifactId: 'form-1', revisionId: 'revision-form-1', kind: 'form', openable: true }),
     ]);
   });
 

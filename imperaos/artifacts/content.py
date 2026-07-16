@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from typing import Annotated, ClassVar, Literal
 
+from jsonschema import Draft7Validator
+from jsonschema.exceptions import SchemaError
 from pydantic import Field, JsonValue, StringConstraints, field_validator, model_validator
 
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
@@ -48,7 +51,6 @@ class DocumentContentV1(ArtifactContentModel):
 _FORM_ALLOWED_KEYS = {
     "$schema",
     "$ref",
-    "$defs",
     "definitions",
     "title",
     "description",
@@ -77,14 +79,28 @@ _FORM_ALLOWED_KEYS = {
 }
 _FORM_TYPES = {"object", "array", "string", "number", "integer", "boolean", "null"}
 _FORM_FORMATS = {"date", "date-time", "email", "hostname", "ipv4", "ipv6", "uri-reference", "uuid"}
-_NESTED_QUANTIFIER = re.compile(r"\([^)]*[+*][^)]*\)[+*{]")
+_DRAFT7_SCHEMA_URI = "http://json-schema.org/draft-07/schema#"
 _FORM_MAX_FIELDS = 100
 _FORM_MAX_DEPTH = 6
 _FORM_MAX_BYTES = 512 * 1024
+_FORM_FIELD_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_FORM_FORBIDDEN_KEYS = {"__proto__", "prototype", "constructor"}
 
 
 def _validate_form_schema(schema: dict[str, JsonValue]) -> None:
+    if schema.get("type") != "object":
+        raise ValueError("form schema root must be an object")
     field_count = 0
+    local_refs: set[tuple[str, str]] = set()
+
+    def validate_field_key(value: object) -> str:
+        if (
+            not isinstance(value, str)
+            or value in _FORM_FORBIDDEN_KEYS
+            or _FORM_FIELD_KEY.fullmatch(value) is None
+        ):
+            raise ValueError("form schema contains an unsafe field key")
+        return value
 
     def visit(node: JsonValue, depth: int) -> None:
         nonlocal field_count
@@ -96,17 +112,24 @@ def _validate_form_schema(schema: dict[str, JsonValue]) -> None:
         if unknown:
             raise ValueError(f"form schema contains unsupported keys: {sorted(unknown)}")
         raw_ref = node.get("$ref")
-        if isinstance(raw_ref, str) and not raw_ref.startswith(("#/definitions/", "#/$defs/")):
-            raise ValueError("remote refs are forbidden")
+        if isinstance(raw_ref, str):
+            parts = raw_ref.split("/")
+            if len(parts) != 3 or parts[0] != "#" or parts[1] != "definitions":
+                raise ValueError("remote refs are forbidden")
+            local_refs.add((parts[1], validate_field_key(parts[2])))
         raw_type = node.get("type")
-        if isinstance(raw_type, str) and raw_type not in _FORM_TYPES:
-            raise ValueError(f"unsupported form type: {raw_type}")
+        if "type" in node and (not isinstance(raw_type, str) or raw_type not in _FORM_TYPES):
+            raise ValueError("unsupported form type")
         raw_format = node.get("format")
-        if isinstance(raw_format, str) and raw_format not in _FORM_FORMATS:
-            raise ValueError(f"unsupported form format: {raw_format}")
+        if "format" in node and (
+            not isinstance(raw_format, str) or raw_format not in _FORM_FORMATS
+        ):
+            raise ValueError("unsupported form format")
         pattern = node.get("pattern")
-        if isinstance(pattern, str):
-            if len(pattern) > 256 or _NESTED_QUANTIFIER.search(pattern):
+        if "pattern" in node:
+            if not isinstance(pattern, str):
+                raise ValueError("invalid pattern in form schema")
+            if len(pattern) > 256 or not _is_safe_form_pattern(pattern):
                 raise ValueError("unsafe pattern in form schema")
             try:
                 re.compile(pattern)
@@ -120,16 +143,19 @@ def _validate_form_schema(schema: dict[str, JsonValue]) -> None:
                 visit(item, depth + 1)
         properties = node.get("properties")
         if isinstance(properties, dict):
+            for key in properties:
+                validate_field_key(key)
             field_count += len(properties)
             if field_count > _FORM_MAX_FIELDS:
                 raise ValueError(f"form schema exceeds {_FORM_MAX_FIELDS} fields")
             for child in properties.values():
                 visit(child, depth + 1)
-        for definitions_key in ("definitions", "$defs"):
-            definitions = node.get(definitions_key)
-            if isinstance(definitions, dict):
-                for child in definitions.values():
-                    visit(child, depth + 1)
+        definitions = node.get("definitions")
+        if isinstance(definitions, dict):
+            for key in definitions:
+                validate_field_key(key)
+            for child in definitions.values():
+                visit(child, depth + 1)
         items = node.get("items")
         if isinstance(items, dict):
             visit(items, depth + 1)
@@ -140,7 +166,82 @@ def _validate_form_schema(schema: dict[str, JsonValue]) -> None:
     serialized = json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
     if len(serialized.encode("utf-8")) > _FORM_MAX_BYTES:
         raise ValueError(f"form schema exceeds {_FORM_MAX_BYTES} bytes")
+    raw_dialect = schema.get("$schema")
+    if raw_dialect is not None and raw_dialect != _DRAFT7_SCHEMA_URI:
+        raise ValueError("unsupported form schema dialect")
+    try:
+        Draft7Validator.check_schema(schema)
+    except SchemaError as error:
+        raise ValueError("form schema is not valid Draft-07") from error
     visit(schema, 1)
+    for definitions_key, definition_name in local_refs:
+        definitions = schema.get(definitions_key)
+        if not isinstance(definitions, dict) or definition_name not in definitions:
+            raise ValueError("form schema contains an unresolved local ref")
+    _reject_cyclic_form_refs(schema)
+
+
+def _is_safe_form_pattern(pattern: str) -> bool:
+    outside_classes: list[str] = []
+    index = 0
+    while index < len(pattern):
+        character = pattern[index]
+        if character == "\\":
+            index += 2
+            continue
+        if character == "[":
+            index += 1
+            while index < len(pattern) and pattern[index] != "]":
+                if pattern[index] == "\\":
+                    index += 2
+                else:
+                    index += 1
+            index += 1
+            continue
+        outside_classes.append(character)
+        index += 1
+    operators = "".join(outside_classes)
+    return (
+        not any(character in operators for character in "()|*+")
+        and re.search(r"\{\d+,\}", operators) is None
+    )
+
+
+def _reject_cyclic_form_refs(schema: dict[str, JsonValue]) -> None:
+    definitions = schema.get("definitions")
+    if not isinstance(definitions, dict):
+        return
+
+    def references(value: JsonValue) -> set[str]:
+        found: set[str] = set()
+        if isinstance(value, dict):
+            raw_ref = value.get("$ref")
+            if isinstance(raw_ref, str) and raw_ref.startswith("#/definitions/"):
+                found.add(raw_ref.removeprefix("#/definitions/"))
+            for child in value.values():
+                found.update(references(child))
+        elif isinstance(value, list):
+            for child in value:
+                found.update(references(child))
+        return found
+
+    graph = {name: references(value) for name, value in definitions.items()}
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit_definition(name: str) -> None:
+        if name in visiting:
+            raise ValueError("form schema contains cyclic local refs")
+        if name in visited:
+            return
+        visiting.add(name)
+        for dependency in graph.get(name, set()):
+            visit_definition(dependency)
+        visiting.remove(name)
+        visited.add(name)
+
+    for definition_name in graph:
+        visit_definition(definition_name)
 
 
 _UI_KEYS = {"ui:widget", "ui:options", "ui:placeholder", "ui:help", "ui:title", "ui:description"}
@@ -212,6 +313,65 @@ class CodeContentV1(ArtifactContentModel):
     execution_policy: Literal["deny"] = "deny"
 
 
+class CodeContentV2(ArtifactModel):
+    schema_version: Literal[2] = 2
+    kind: Literal["code"] = "code"
+    filename: Annotated[str, StringConstraints(min_length=1, max_length=255, strict=True)]
+    language: Literal[
+        "plaintext",
+        "bat",
+        "c",
+        "cpp",
+        "csharp",
+        "css",
+        "go",
+        "html",
+        "java",
+        "javascript",
+        "json",
+        "markdown",
+        "powershell",
+        "python",
+        "rust",
+        "shell",
+        "sql",
+        "typescript",
+        "xml",
+        "yaml",
+    ]
+    text: Annotated[str, StringConstraints(max_length=5 * 1024 * 1024, strict=True)]
+    line_ending: Literal["lf", "crlf"] = "lf"
+    execution_policy: Literal["deny"] = "deny"
+
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, value: str) -> str:
+        if value != unicodedata.normalize("NFC", value):
+            raise ValueError("code filename must use NFC normalization")
+        if value != value.strip() or value in {".", ".."} or value.endswith("."):
+            raise ValueError("code filename is not portable")
+        if any(character in '<>:"/\\|?*' for character in value):
+            raise ValueError("code filename contains a forbidden character")
+        if any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+            raise ValueError("code filename contains a control character")
+        basename = value.split(".", 1)[0].upper()
+        reserved = {"CON", "PRN", "AUX", "NUL"}
+        reserved.update({f"COM{index}" for index in range(1, 10)})
+        reserved.update({f"LPT{index}" for index in range(1, 10)})
+        if basename in reserved:
+            raise ValueError("code filename uses a reserved device name")
+        return value
+
+    @model_validator(mode="after")
+    def validate_line_endings(self) -> CodeContentV2:
+        if self.line_ending == "lf":
+            if "\r" in self.text:
+                raise ValueError("code text does not match LF line ending")
+        elif re.search(r"(?<!\r)\n|\r(?!\n)", self.text):
+            raise ValueError("code text does not match CRLF line ending")
+        return self
+
+
 class FlowPosition(ArtifactModel):
     x: float
     y: float
@@ -257,6 +417,100 @@ class FlowContentV1(ArtifactContentModel):
                 raise ValueError(f"flow edge has unknown source: {edge.source}")
             if edge.target not in known:
                 raise ValueError(f"flow edge has unknown target: {edge.target}")
+        return self
+
+
+class FlowPositionV2(ArtifactModel):
+    x: float = Field(ge=-1_000_000, le=1_000_000, allow_inf_nan=False)
+    y: float = Field(ge=-1_000_000, le=1_000_000, allow_inf_nan=False)
+
+
+class FlowNodeDataV2(ArtifactModel):
+    label: Annotated[str, StringConstraints(min_length=1, max_length=200, strict=True)]
+    description: Annotated[str, StringConstraints(max_length=1_000, strict=True)] | None = None
+    artifact_id: BoundedId | None = None
+
+    @field_validator("label", "description")
+    @classmethod
+    def reject_control_text(cls, value: str | None) -> str | None:
+        if value is not None and any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+            raise ValueError("flow text contains a control character")
+        return value
+
+
+class FlowNodeV2(ArtifactModel):
+    id: BoundedId
+    type: Literal["input", "output", "process", "decision", "note", "group", "artifact"]
+    position: FlowPositionV2
+    data: FlowNodeDataV2
+
+    @model_validator(mode="after")
+    def validate_artifact_binding(self) -> FlowNodeV2:
+        if self.type == "artifact" and self.data.artifact_id is None:
+            raise ValueError("artifact flow node requires artifactId")
+        if self.type != "artifact" and self.data.artifact_id is not None:
+            raise ValueError("artifactId is only valid for artifact flow nodes")
+        return self
+
+
+class FlowEdgeV2(ArtifactModel):
+    id: BoundedId
+    source: BoundedId
+    target: BoundedId
+    label: Annotated[str, StringConstraints(max_length=200, strict=True)] | None = None
+
+    @field_validator("label")
+    @classmethod
+    def reject_control_label(cls, value: str | None) -> str | None:
+        if value is not None and any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+            raise ValueError("flow edge label contains a control character")
+        return value
+
+
+class FlowViewportV2(ArtifactModel):
+    x: float = Field(ge=-1_000_000, le=1_000_000, allow_inf_nan=False)
+    y: float = Field(ge=-1_000_000, le=1_000_000, allow_inf_nan=False)
+    zoom: float = Field(ge=0.05, le=8.0, allow_inf_nan=False)
+
+
+class FlowContentV2(ArtifactModel):
+    schema_version: Literal[2] = 2
+    kind: Literal["flow"] = "flow"
+    nodes: list[FlowNodeV2] = Field(max_length=5_000)
+    edges: list[FlowEdgeV2] = Field(max_length=10_000)
+    viewport: FlowViewportV2
+
+    @model_validator(mode="after")
+    def validate_graph(self) -> FlowContentV2:
+        node_ids = [node.id for node in self.nodes]
+        if len(node_ids) != len(set(node_ids)):
+            raise ValueError("flow contains duplicate node ids")
+        edge_ids = [edge.id for edge in self.edges]
+        if len(edge_ids) != len(set(edge_ids)):
+            raise ValueError("flow contains duplicate edge ids")
+        known = set(node_ids)
+        adjacency = {node_id: [] for node_id in node_ids}
+        incoming = {node_id: 0 for node_id in node_ids}
+        for edge in self.edges:
+            if edge.source not in known:
+                raise ValueError(f"flow edge has unknown source: {edge.source}")
+            if edge.target not in known:
+                raise ValueError(f"flow edge has unknown target: {edge.target}")
+            if edge.source == edge.target:
+                raise ValueError("flow contains a self-loop")
+            adjacency[edge.source].append(edge.target)
+            incoming[edge.target] += 1
+        pending = [node_id for node_id, count in incoming.items() if count == 0]
+        visited = 0
+        while pending:
+            node_id = pending.pop()
+            visited += 1
+            for target in adjacency[node_id]:
+                incoming[target] -= 1
+                if incoming[target] == 0:
+                    pending.append(target)
+        if visited != len(node_ids):
+            raise ValueError("flow must be acyclic")
         return self
 
 
@@ -350,7 +604,9 @@ ArtifactContent = (
     DocumentContentV1
     | FormContentV1
     | CodeContentV1
+    | CodeContentV2
     | FlowContentV1
+    | FlowContentV2
     | SpreadsheetContentV1
     | CanvasContentV1
     | SlidesContentV1
@@ -364,6 +620,14 @@ ARTIFACT_CONTENT_MODEL_BY_KIND: dict[ArtifactKind, type[ArtifactContentModel]] =
     ArtifactKind.SPREADSHEET: SpreadsheetContentV1,
     ArtifactKind.CANVAS: CanvasContentV1,
     ArtifactKind.SLIDES: SlidesContentV1,
+}
+
+ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION: dict[
+    tuple[ArtifactKind, int], type[ArtifactModel]
+] = {
+    **{(kind, 1): model for kind, model in ARTIFACT_CONTENT_MODEL_BY_KIND.items()},
+    (ArtifactKind.CODE, 2): CodeContentV2,
+    (ArtifactKind.FLOW, 2): FlowContentV2,
 }
 
 
@@ -398,8 +662,26 @@ class SafeJsonPatch(ArtifactModel):
     operations: list[SafeJsonPatchOperation] = Field(min_length=1, max_length=100)
 
 
-def validate_artifact_content(kind: ArtifactKind, payload: object) -> ArtifactContentModel:
-    model = ARTIFACT_CONTENT_MODEL_BY_KIND[kind]
+def validate_artifact_content(
+    kind: ArtifactKind,
+    payload: object,
+    *,
+    schema_version: int | None = None,
+) -> ArtifactModel:
+    observed_version = schema_version
+    if observed_version is None and isinstance(payload, dict):
+        value = payload.get("schemaVersion")
+        if isinstance(value, int) and not isinstance(value, bool):
+            observed_version = value
+    if observed_version is None:
+        observed_version = 1
+    model = ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION.get((kind, observed_version))
+    if model is None:
+        raise ArtifactDomainError(
+            ArtifactErrorCode.ARTIFACT_SCHEMA_VERSION_UNSUPPORTED,
+            "artifact content schema version is unsupported",
+            details={"kind": kind.value, "schemaVersion": observed_version},
+        )
     content = model.model_validate(payload)
     serialized = json.dumps(
         content.model_dump(mode="json", by_alias=True),

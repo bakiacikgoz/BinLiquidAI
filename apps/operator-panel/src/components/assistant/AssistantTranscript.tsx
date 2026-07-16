@@ -7,10 +7,11 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import { ThreadPrimitive, useAuiState } from '@assistant-ui/react';
 
-import type { AssistantTurn } from '../../assistant/assistantTypes';
+import type { AssistantArtifactRef, AssistantTurn } from '../../assistant/assistantTypes';
 import type { UiLocale } from '../../i18n';
 import { AssistantMessage } from './AssistantMessage';
 
@@ -29,6 +30,7 @@ interface RuntimeTranscriptContextValue {
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
+  renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
 }
 
 const RuntimeTranscriptContext = createContext<RuntimeTranscriptContextValue | null>(null);
@@ -54,6 +56,7 @@ function RuntimeTurnMessage() {
         onExecute={context.onExecute}
         onRegenerate={context.onRegenerate}
         onOpenArtifact={context.onOpenArtifact}
+        renderInlineArtifact={context.renderInlineArtifact}
       />
     </div>
   );
@@ -76,6 +79,7 @@ export function AssistantTranscript({
   onExecute,
   onRegenerate,
   onOpenArtifact,
+  renderInlineArtifact,
 }: {
   turns: AssistantTurn[];
   approvalDisabled: boolean;
@@ -89,6 +93,7 @@ export function AssistantTranscript({
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
+  renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
 }) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const isAtLatestRef = useRef(true);
@@ -108,6 +113,7 @@ export function AssistantTranscript({
     onExecute,
     onRegenerate,
     onOpenArtifact,
+    renderInlineArtifact,
   };
   const lastTurnId = turns.at(-1)?.id ?? '';
   const transcriptContentKey = useMemo(

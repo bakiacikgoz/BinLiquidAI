@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from imperaos.artifacts.content import (
     ARTIFACT_CONTENT_MODEL_BY_KIND,
+    ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION,
     SafeJsonPatch,
     validate_artifact_content,
 )
@@ -106,6 +110,19 @@ def test_artifact_content_registry_is_complete_and_kind_discriminated() -> None:
         validate_artifact_content(ArtifactKind.CODE, mismatched)
 
 
+def test_code_content_registry_dispatches_by_schema_version() -> None:
+    legacy = dict(VALID_CONTENT[ArtifactKind.CODE])
+    legacy["language"] = "tsx"
+    assert validate_artifact_content(ArtifactKind.CODE, legacy).schema_version == 1
+
+    strict = {**legacy, "schemaVersion": 2}
+    with pytest.raises(ValidationError):
+        validate_artifact_content(ArtifactKind.CODE, strict)
+
+    assert (ArtifactKind.CODE, 1) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
+    assert (ArtifactKind.CODE, 2) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
+
+
 def test_safe_json_patch_rejects_prototype_pollution_and_unsafe_operations() -> None:
     patch = SafeJsonPatch.model_validate(
         {"operations": [{"op": "replace", "path": "/blocks/0/content/0/text", "value": "Updated"}]}
@@ -124,7 +141,10 @@ def test_safe_json_patch_rejects_prototype_pollution_and_unsafe_operations() -> 
 
 def test_form_schema_rejects_remote_refs_eval_pressure_and_network_widgets() -> None:
     remote_ref = dict(VALID_CONTENT[ArtifactKind.FORM])
-    remote_ref["schema"] = {"$ref": "https://example.com/schema.json"}
+    remote_ref["schema"] = {
+        "type": "object",
+        "properties": {"name": {"$ref": "https://example.com/schema.json"}},
+    }
     with pytest.raises(ValidationError, match="remote refs"):
         validate_artifact_content(ArtifactKind.FORM, remote_ref)
 
@@ -159,6 +179,20 @@ def test_editor_schemas_keep_execution_calculation_and_remote_assets_disabled() 
         validate_artifact_content(ArtifactKind.CANVAS, remote_canvas)
 
 
+def test_code_content_matches_shared_parity_fixture() -> None:
+    fixture = json.loads(
+        Path("contracts/artifacts/fixtures/code-content-parity.v1.json").read_text(encoding="utf-8")
+    )
+
+    for case in fixture["cases"]:
+        try:
+            validate_artifact_content(ArtifactKind.CODE, case["content"])
+            accepted = True
+        except ValidationError:
+            accepted = False
+        assert accepted is case["expectedValid"], case["id"]
+
+
 def test_flow_edges_and_slide_count_are_bounded() -> None:
     invalid_flow = dict(VALID_CONTENT[ArtifactKind.FLOW])
     invalid_flow["edges"] = [{"id": "edge-bad", "source": "node-1", "target": "missing"}]
@@ -169,3 +203,55 @@ def test_flow_edges_and_slide_count_are_bounded() -> None:
     too_many_slides["slides"] = [{"id": f"slide-{index}", "elements": []} for index in range(201)]
     with pytest.raises(ValidationError):
         validate_artifact_content(ArtifactKind.SLIDES, too_many_slides)
+
+
+def test_flow_v2_is_strict_bounded_and_acyclic() -> None:
+    strict = {**VALID_CONTENT[ArtifactKind.FLOW], "schemaVersion": 2}
+    assert validate_artifact_content(ArtifactKind.FLOW, strict).schema_version == 2
+
+    cyclic = {
+        **strict,
+        "edges": [
+            {"id": "edge-1", "source": "node-1", "target": "node-2"},
+            {"id": "edge-2", "source": "node-2", "target": "node-1"},
+        ],
+    }
+    with pytest.raises(ValidationError, match="acyclic"):
+        validate_artifact_content(ArtifactKind.FLOW, cyclic)
+
+    self_loop = {**strict, "edges": [{"id": "edge-1", "source": "node-1", "target": "node-1"}]}
+    with pytest.raises(ValidationError, match="self-loop"):
+        validate_artifact_content(ArtifactKind.FLOW, self_loop)
+
+    unknown_data = {
+        **strict,
+        "nodes": [
+            {
+                "id": "node-1",
+                "type": "input",
+                "position": {"x": 0, "y": 0},
+                "data": {"label": "Start", "url": "https://example.com"},
+            }
+        ],
+        "edges": [],
+    }
+    with pytest.raises(ValidationError):
+        validate_artifact_content(ArtifactKind.FLOW, unknown_data)
+
+    missing_artifact_binding = {
+        **strict,
+        "nodes": [
+            {
+                "id": "node-1",
+                "type": "artifact",
+                "position": {"x": 0, "y": 0},
+                "data": {"label": "Linked artifact"},
+            }
+        ],
+        "edges": [],
+    }
+    with pytest.raises(ValidationError, match="artifactId"):
+        validate_artifact_content(ArtifactKind.FLOW, missing_artifact_binding)
+
+    assert (ArtifactKind.FLOW, 1) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
+    assert (ArtifactKind.FLOW, 2) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
