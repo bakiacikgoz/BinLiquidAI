@@ -54,6 +54,8 @@ describe('assistant artifact workspace controller hook', () => {
   it('owns shell state and opens a typed artifact tab outside App.tsx', async () => {
     const bridge = {
       get: vi.fn().mockResolvedValue(documentResult()),
+      list: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+      history: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
     } as unknown as ArtifactBridge;
     const onSelectLegacyArtifact = vi.fn();
     const { result } = renderHook(() =>
@@ -86,6 +88,7 @@ describe('assistant artifact workspace controller hook', () => {
   it('normalizes bridge failures and resets shell state for a new chat', async () => {
     const bridge = {
       get: vi.fn().mockRejectedValue(new Error('C:/secret/path must not leak')),
+      history: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
     } as unknown as ArtifactBridge;
     const { result } = renderHook(() =>
       useAssistantArtifactWorkspaceController({

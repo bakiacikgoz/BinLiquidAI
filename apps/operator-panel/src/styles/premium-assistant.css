@@ -543,6 +543,151 @@
   line-height: 1.45;
 }
 
+.artifact-workspace-chrome {
+  gap: 14px;
+}
+
+.artifact-workspace-chrome > .assistant-workbench-panel-head .mc-button {
+  margin-left: auto;
+}
+
+.artifact-workspace-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(2, minmax(90px, 0.55fr));
+  gap: 7px;
+}
+
+.artifact-workspace-filters input,
+.artifact-workspace-filters select {
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--assistant-line);
+  border-radius: 7px;
+  padding: 0 9px;
+  background: var(--assistant-panel-soft);
+  color: var(--assistant-text);
+  font: inherit;
+  font-size: 11px;
+}
+
+.artifact-workspace-navigator {
+  display: grid;
+  max-height: 220px;
+  gap: 6px;
+  overflow: auto;
+}
+
+.artifact-workspace-navigator > button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid var(--assistant-line);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--assistant-panel-soft) 82%, transparent);
+  color: var(--assistant-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.artifact-workspace-navigator > button:hover,
+.artifact-workspace-navigator > button:focus-visible {
+  border-color: var(--assistant-blue);
+  outline: 0;
+}
+
+.artifact-workspace-navigator strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-workspace-navigator span {
+  color: var(--assistant-dim);
+  font-size: 10px;
+}
+
+.artifact-workspace-tabs {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.artifact-workspace-tab-wrap {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--assistant-line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.artifact-workspace-tab-wrap button {
+  min-height: 31px;
+  border: 0;
+  padding: 0 9px;
+  background: var(--assistant-panel-soft);
+  color: var(--assistant-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.artifact-workspace-tab-wrap [role="tab"][aria-selected="true"] {
+  background: color-mix(in srgb, var(--assistant-blue) 12%, var(--assistant-panel));
+  color: var(--assistant-text);
+}
+
+.artifact-workspace-active,
+.artifact-workspace-history {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.artifact-workspace-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.artifact-workspace-banner {
+  margin: 0;
+  border-left: 3px solid var(--assistant-warning);
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--assistant-warning) 8%, transparent);
+  color: var(--assistant-muted);
+  font-size: 11px;
+}
+
+.artifact-workspace-history article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 8px;
+  border-top: 1px solid var(--assistant-line);
+  padding-top: 8px;
+  color: var(--assistant-muted);
+  font-size: 10px;
+}
+
+.artifact-workspace-history article strong {
+  color: var(--assistant-text);
+}
+
+.artifact-workspace-history article time {
+  grid-column: 1 / -1;
+  color: var(--assistant-dim);
+}
+
+@media (max-width: 640px) {
+  .artifact-workspace-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .assistant-right-rail {
   display: flex;
   flex-direction: column;

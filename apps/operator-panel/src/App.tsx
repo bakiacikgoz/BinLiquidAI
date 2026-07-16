@@ -1689,6 +1689,18 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         selectedArtifactName={assistantArtifactWorkspace.selectedLegacyArtifactName}
         locale={locale}
         onSelectArtifact={assistantArtifactWorkspace.actions.selectLegacyArtifact}
+        workspaceState={assistantArtifactWorkspace.state}
+        catalog={assistantArtifactWorkspace.catalog}
+        catalogNextCursor={assistantArtifactWorkspace.catalogNextCursor}
+        catalogLoading={assistantArtifactWorkspace.catalogLoading}
+        history={assistantArtifactWorkspace.history}
+        historyLoading={Boolean(assistantArtifactWorkspace.historyLoadingArtifactId)}
+        onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
+        onActivateArtifact={assistantArtifactWorkspace.actions.activate}
+        onRequestClose={assistantArtifactWorkspace.actions.requestClose}
+        onLoadCatalog={() => void assistantArtifactWorkspace.actions.loadCatalog()}
+        onLoadMoreCatalog={() => void assistantArtifactWorkspace.actions.loadMoreCatalog()}
+        onLoadHistory={(artifactId) => void assistantArtifactWorkspace.actions.loadHistory(artifactId)}
         onViewRuns={() => {
           setRunTab('artifacts');
           setActiveView('runs');

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import type { AssistantSessionState } from '../assistant/assistantTypes';
 import { ArtifactAutosaveQueue } from './artifactAutosave';
 import { ArtifactBridgeError, artifactBridge as defaultBridge, type ArtifactBridge } from './artifactBridge';
-import type { ArtifactContent } from './artifactContracts';
+import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './artifactContracts';
 import { ArtifactWorkspaceController } from './workspaceController';
 
 export type LegacyWorkbenchArtifact = {
@@ -53,6 +53,12 @@ export function useAssistantArtifactWorkspaceController({
   const [open, setOpen] = useState(false);
   const [loadingArtifactId, setLoadingArtifactId] = useState<string | null>(null);
   const [error, setError] = useState<ArtifactWorkspaceUiError | null>(null);
+  const [catalog, setCatalog] = useState<ArtifactDescriptor[]>([]);
+  const [catalogNextCursor, setCatalogNextCursor] = useState<string | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [historyByArtifact, setHistoryByArtifact] = useState<Record<string, ArtifactRevision[]>>({});
+  const [historyNextCursor, setHistoryNextCursor] = useState<Record<string, string | null>>({});
+  const [historyLoadingArtifactId, setHistoryLoadingArtifactId] = useState<string | null>(null);
   const state = useSyncExternalStore(
     useCallback((listener) => controller.subscribe(listener), [controller]),
     useCallback(() => controller.getState(), [controller]),
@@ -61,6 +67,50 @@ export function useAssistantArtifactWorkspaceController({
 
   useEffect(() => () => autosave.dispose(), [autosave]);
 
+  const loadCatalog = useCallback(
+    async (append = false) => {
+      setCatalogLoading(true);
+      setError(null);
+      try {
+        const result = await bridge.list({
+          cursor: append ? catalogNextCursor ?? undefined : undefined,
+          limit: 50,
+        });
+        setCatalog((previous) => (append ? [...previous, ...result.items] : result.items));
+        setCatalogNextCursor(result.nextCursor);
+      } catch (caught) {
+        setError(normalizeWorkspaceError(caught));
+      } finally {
+        setCatalogLoading(false);
+      }
+    },
+    [bridge, catalogNextCursor],
+  );
+
+  const loadHistory = useCallback(
+    async (artifactId: string, append = false) => {
+      setHistoryLoadingArtifactId(artifactId);
+      setError(null);
+      try {
+        const result = await bridge.history({
+          artifactId,
+          cursor: append ? historyNextCursor[artifactId] ?? undefined : undefined,
+          limit: 50,
+        });
+        setHistoryByArtifact((previous) => ({
+          ...previous,
+          [artifactId]: append ? [...(previous[artifactId] ?? []), ...result.items] : result.items,
+        }));
+        setHistoryNextCursor((previous) => ({ ...previous, [artifactId]: result.nextCursor }));
+      } catch (caught) {
+        setError(normalizeWorkspaceError(caught));
+      } finally {
+        setHistoryLoadingArtifactId(null);
+      }
+    },
+    [bridge, historyNextCursor],
+  );
+
   const openArtifact = useCallback(
     async (artifactId: string) => {
       setOpen(true);
@@ -68,13 +118,14 @@ export function useAssistantArtifactWorkspaceController({
       setError(null);
       try {
         await controller.open(artifactId);
+        await loadHistory(artifactId, false);
       } catch (caught) {
         setError(normalizeWorkspaceError(caught));
       } finally {
         setLoadingArtifactId(null);
       }
     },
-    [controller],
+    [controller, loadHistory],
   );
 
   const edit = useCallback(
@@ -88,11 +139,20 @@ export function useAssistantArtifactWorkspaceController({
     setOpen(false);
     setLoadingArtifactId(null);
     setError(null);
+    setCatalog([]);
+    setCatalogNextCursor(null);
+    setHistoryByArtifact({});
+    setHistoryNextCursor({});
   }, [autosave, controller]);
+
+  const toggle = useCallback(() => {
+    if (!open && catalog.length === 0 && !catalogLoading) void loadCatalog(false);
+    setOpen((value) => !value);
+  }, [catalog.length, catalogLoading, loadCatalog, open]);
 
   const actions = useMemo(
     () => ({
-      toggle: () => setOpen((value) => !value),
+      toggle,
       reset,
       selectLegacyArtifact: onSelectLegacyArtifact,
       openArtifact,
@@ -107,8 +167,12 @@ export function useAssistantArtifactWorkspaceController({
         controller.restore(artifactId, revisionId, idempotencyKey),
       archive: (artifactId: string) => controller.archive(artifactId),
       clearError: () => setError(null),
+      loadCatalog: () => loadCatalog(false),
+      loadMoreCatalog: () => loadCatalog(true),
+      loadHistory: (artifactId: string) => loadHistory(artifactId, false),
+      loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [autosave, controller, edit, onSelectLegacyArtifact, openArtifact, reset],
+    [autosave, controller, edit, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, reset, toggle],
   );
 
   const activeTab =
@@ -128,6 +192,12 @@ export function useAssistantArtifactWorkspaceController({
     error,
     legacyArtifacts,
     selectedLegacyArtifactName,
+    catalog,
+    catalogNextCursor,
+    catalogLoading,
+    history: activeTab ? historyByArtifact[activeTab.artifact.artifactId] ?? [] : [],
+    historyNextCursor: activeTab ? historyNextCursor[activeTab.artifact.artifactId] ?? null : null,
+    historyLoadingArtifactId,
     actions,
   };
 }
