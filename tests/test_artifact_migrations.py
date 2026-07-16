@@ -20,8 +20,8 @@ def test_migration_dry_run_reports_capacity_without_creating_database(tmp_path: 
     report = migrate_artifact_metadata(database, dry_run=True)
 
     assert report.current_version == 0
-    assert report.target_version == 3
-    assert report.pending_versions == (1, 2, 3)
+    assert report.target_version == 4
+    assert report.pending_versions == (1, 2, 3, 4)
     assert report.applied_versions == ()
     assert report.database_size_bytes == 0
     assert report.free_space_bytes > 0
@@ -34,7 +34,7 @@ def test_migrations_apply_forward_only_schema_and_runtime_pragmas(tmp_path: Path
 
     report = migrate_artifact_metadata(database, busy_timeout_ms=2_500)
 
-    assert report.applied_versions == (1, 2, 3)
+    assert report.applied_versions == (1, 2, 3, 4)
     with connect_artifact_metadata(database, busy_timeout_ms=2_500) as connection:
         tables = {
             row[0]
@@ -55,7 +55,7 @@ def test_migrations_apply_forward_only_schema_and_runtime_pragmas(tmp_path: Path
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
         assert connection.execute("PRAGMA busy_timeout").fetchone()[0] == 2_500
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
 
     assert {
         "artifacts",
@@ -67,12 +67,13 @@ def test_migrations_apply_forward_only_schema_and_runtime_pragmas(tmp_path: Path
         "artifact_exports",
         "form_submissions",
         "artifact_mutation_proposals",
+        "artifact_evidence_events",
     } <= tables
     assert {
         "idx_artifacts_workspace_updated",
         "idx_artifacts_workspace_kind_status",
     } <= indexes
-    assert [row[0] for row in versions] == [1, 2, 3]
+    assert [row[0] for row in versions] == [1, 2, 3, 4]
     assert all(len(row[1]) == 64 for row in versions)
 
 
@@ -107,7 +108,7 @@ def test_migrations_reject_destructive_downgrade_and_unbounded_timeout(
         connect_artifact_metadata(database, busy_timeout_ms=60_001)
 
     with sqlite3.connect(database) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
 
 
 def test_failed_migration_rolls_back_version_and_history(
@@ -117,7 +118,7 @@ def test_failed_migration_rolls_back_version_and_history(
     database = tmp_path / "artifacts.sqlite3"
     migrate_artifact_metadata(database)
     broken = ArtifactMigration(
-        version=4,
+        version=5,
         name="broken_test_migration",
         statements=("CREATE TABLE must_roll_back (id TEXT)", "NOT VALID SQL"),
     )
@@ -128,10 +129,10 @@ def test_failed_migration_rolls_back_version_and_history(
 
     assert caught.value.code is ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT
     with sqlite3.connect(database) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
         assert (
             connection.execute(
-                "SELECT COUNT(*) FROM artifact_schema_migrations WHERE version = 4"
+                "SELECT COUNT(*) FROM artifact_schema_migrations WHERE version = 5"
             ).fetchone()[0]
             == 0
         )

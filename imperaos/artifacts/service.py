@@ -22,6 +22,10 @@ from imperaos.artifacts.commands import (
 )
 from imperaos.artifacts.content import ArtifactContent, validate_artifact_content
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
+from imperaos.artifacts.evidence import (
+    ArtifactEvidenceRecorder,
+    record_artifact_evidence,
+)
 from imperaos.artifacts.models import (
     ArtifactDescriptor,
     ArtifactKind,
@@ -51,10 +55,13 @@ class ArtifactService:
         root: str | Path,
         *,
         policy: ArtifactPolicyGateway | None = None,
+        evidence: ArtifactEvidenceRecorder | None = None,
     ) -> None:
         self.store = ArtifactStore(root)
         self.policy = policy or ArtifactPolicyGateway()
+        self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
 
+    @record_artifact_evidence("artifact.create")
     def create(
         self,
         command: CreateArtifactCommand,
@@ -132,6 +139,7 @@ class ArtifactService:
         )
         return operation
 
+    @record_artifact_evidence("artifact.get")
     def get(
         self,
         query: GetArtifactQuery,
@@ -151,6 +159,7 @@ class ArtifactService:
         content = self._decode_content(artifact.kind, revision.content)
         return ArtifactReadResult(artifact, revision.descriptor, content)
 
+    @record_artifact_evidence("artifact.list")
     def list(
         self,
         query: ListArtifactsQuery,
@@ -171,6 +180,7 @@ class ArtifactService:
             next_cursor=str(offset + query.limit) if has_more else None,
         )
 
+    @record_artifact_evidence("artifact.mutate")
     def mutate(
         self,
         command: MutateArtifactCommand,
@@ -249,6 +259,7 @@ class ArtifactService:
             stored.disposition,
         )
 
+    @record_artifact_evidence("artifact.propose_mutation")
     def propose_mutation(
         self,
         command: ProposeArtifactMutationCommand,
@@ -319,6 +330,7 @@ class ArtifactService:
             command.summary,
         )
 
+    @record_artifact_evidence("artifact.apply_proposal")
     def apply_proposal(
         self,
         command: ApplyArtifactProposalCommand,
@@ -385,6 +397,7 @@ class ArtifactService:
             connection.commit()
         return result
 
+    @record_artifact_evidence("artifact.history")
     def history(
         self,
         query: ArtifactHistoryQuery,
@@ -405,6 +418,7 @@ class ArtifactService:
             next_cursor=str(offset + query.limit) if has_more else None,
         )
 
+    @record_artifact_evidence("artifact.restore")
     def restore(
         self,
         command: RestoreArtifactCommand,
@@ -473,6 +487,7 @@ class ArtifactService:
             stored.disposition,
         )
 
+    @record_artifact_evidence("artifact.archive")
     def archive(
         self,
         command: ArchiveArtifactCommand,
@@ -503,6 +518,7 @@ class ArtifactService:
         ).descriptor
         return ArtifactOperationResult(stored_artifact, revision, False, "updated")
 
+    @record_artifact_evidence("artifact.duplicate")
     def duplicate(
         self,
         command: DuplicateArtifactCommand,

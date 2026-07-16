@@ -20,6 +20,7 @@ from imperaos.artifacts.content import (
     validate_artifact_content,
 )
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
+from imperaos.artifacts.evidence import ArtifactEvidenceEvent, ArtifactEvidenceRecorder
 from imperaos.artifacts.filesystem import GuardedArtifactFilesystem, StoredArtifactFile
 from imperaos.artifacts.migrations import (
     ArtifactMigration,
@@ -80,6 +81,8 @@ __all__ = [
     "ArtifactDataClass",
     "ArtifactDescriptor",
     "ArtifactDomainError",
+    "ArtifactEvidenceEvent",
+    "ArtifactEvidenceRecorder",
     "ArtifactErrorCode",
     "ArtifactKind",
     "ArtifactMigration",

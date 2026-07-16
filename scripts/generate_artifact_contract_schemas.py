@@ -32,6 +32,7 @@ from imperaos.artifacts.content import (  # noqa: E402
     SlidesContentV1,
     SpreadsheetContentV1,
 )
+from imperaos.artifacts.evidence import ArtifactEvidenceEvent  # noqa: E402
 from imperaos.artifacts.models import (  # noqa: E402
     ArtifactAssetDescriptor,
     ArtifactDescriptor,
@@ -62,6 +63,7 @@ SCHEMAS = {
     "artifact-restore-command.v1": RestoreArtifactCommand,
     "artifact-archive-command.v1": ArchiveArtifactCommand,
     "artifact-duplicate-command.v1": DuplicateArtifactCommand,
+    "artifact-evidence-event.v1": ArtifactEvidenceEvent,
 }
 CONTENT_SCHEMA_NAMES = {
     "document.v1",

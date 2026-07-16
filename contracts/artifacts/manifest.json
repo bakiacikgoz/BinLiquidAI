@@ -133,6 +133,12 @@
       "file": "artifact-duplicate-command.v1.schema.json",
       "name": "artifact-duplicate-command.v1",
       "sha256": "799d6cc66e696a512ab322f36ea2f03c2a96c5d79624723d9127cbcface30f44"
+    },
+    {
+      "category": "contract",
+      "file": "artifact-evidence-event.v1.schema.json",
+      "name": "artifact-evidence-event.v1",
+      "sha256": "4d670ea8309794310549e934b044d694724ad219ffedc9ef6731ca1ba941640c"
     }
   ]
 }

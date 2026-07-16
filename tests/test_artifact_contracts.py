@@ -64,6 +64,7 @@ def test_artifact_contract_manifest_covers_seven_content_kinds_and_hashes() -> N
         "artifact-restore-command.v1",
         "artifact-archive-command.v1",
         "artifact-duplicate-command.v1",
+        "artifact-evidence-event.v1",
     }
 
     assert manifest["schemaVersion"] == "artifact-workspace.contract-manifest/v1"

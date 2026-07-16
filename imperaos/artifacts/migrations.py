@@ -268,6 +268,42 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
             """,
         ),
     ),
+    ArtifactMigration(
+        version=4,
+        name="artifact_evidence_chain",
+        statements=(
+            """
+            CREATE TABLE artifact_evidence_events (
+                event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT NOT NULL UNIQUE,
+                workspace_id TEXT NOT NULL,
+                workspace_ref TEXT NOT NULL CHECK (length(workspace_ref) = 64),
+                operation TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('success', 'denied', 'error')),
+                reason_code TEXT NOT NULL,
+                artifact_ref TEXT CHECK (artifact_ref IS NULL OR length(artifact_ref) = 64),
+                revision_ref TEXT CHECK (revision_ref IS NULL OR length(revision_ref) = 64),
+                content_sha256 TEXT CHECK (
+                    content_sha256 IS NULL OR length(content_sha256) = 64
+                ),
+                principal_ref TEXT NOT NULL CHECK (length(principal_ref) = 64),
+                request_ref TEXT NOT NULL CHECK (length(request_ref) = 64),
+                latency_bucket TEXT NOT NULL CHECK (
+                    latency_bucket IN ('lt10ms', 'lt50ms', 'lt250ms', 'lt1s', 'gte1s')
+                ),
+                previous_event_hash TEXT CHECK (
+                    previous_event_hash IS NULL OR length(previous_event_hash) = 64
+                ),
+                event_hash TEXT NOT NULL CHECK (length(event_hash) = 64),
+                created_at_utc TEXT NOT NULL
+            ) STRICT
+            """,
+            """
+            CREATE INDEX idx_artifact_evidence_workspace_sequence
+            ON artifact_evidence_events (workspace_id, event_sequence)
+            """,
+        ),
+    ),
 )
 
 
@@ -280,6 +316,7 @@ _ROW_COUNT_TABLES = (
     "artifact_exports",
     "form_submissions",
     "artifact_mutation_proposals",
+    "artifact_evidence_events",
 )
 
 
