@@ -28,6 +28,7 @@ interface RuntimeTranscriptContextValue {
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
+  onOpenArtifact?: (artifactId: string) => void;
 }
 
 const RuntimeTranscriptContext = createContext<RuntimeTranscriptContextValue | null>(null);
@@ -52,6 +53,7 @@ function RuntimeTurnMessage() {
         onReject={context.onReject}
         onExecute={context.onExecute}
         onRegenerate={context.onRegenerate}
+        onOpenArtifact={context.onOpenArtifact}
       />
     </div>
   );
@@ -73,6 +75,7 @@ export function AssistantTranscript({
   onReject,
   onExecute,
   onRegenerate,
+  onOpenArtifact,
 }: {
   turns: AssistantTurn[];
   approvalDisabled: boolean;
@@ -85,6 +88,7 @@ export function AssistantTranscript({
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
+  onOpenArtifact?: (artifactId: string) => void;
 }) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const isAtLatestRef = useRef(true);
@@ -103,6 +107,7 @@ export function AssistantTranscript({
     onReject,
     onExecute,
     onRegenerate,
+    onOpenArtifact,
   };
   const lastTurnId = turns.at(-1)?.id ?? '';
   const transcriptContentKey = useMemo(

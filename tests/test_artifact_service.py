@@ -75,7 +75,7 @@ def create_command(*, key: str = "create-1") -> CreateArtifactCommand:
     )
 
 
-def test_service_create_get_list_and_create_idempotency(tmp_path: Path) -> None:
+def test_document_service_create_get_list_and_create_idempotency(tmp_path: Path) -> None:
     service = ArtifactService(tmp_path / "artifact-root")
     context = user_context()
 
@@ -92,7 +92,7 @@ def test_service_create_get_list_and_create_idempotency(tmp_path: Path) -> None:
     assert listed.items == (created.artifact,)
 
 
-def test_service_mutate_history_conflict_and_restore(tmp_path: Path) -> None:
+def test_document_service_mutate_history_conflict_and_restore(tmp_path: Path) -> None:
     service = ArtifactService(tmp_path / "artifact-root")
     context = user_context()
     created = service.create(create_command(), context)
@@ -137,7 +137,7 @@ def test_service_mutate_history_conflict_and_restore(tmp_path: Path) -> None:
     assert [item.revision_number for item in history.items] == [1, 2, 3]
 
 
-def test_service_ai_proposal_is_approval_bound_and_applies_new_revision(
+def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision(
     tmp_path: Path,
 ) -> None:
     service = ArtifactService(tmp_path / "artifact-root")
@@ -179,7 +179,7 @@ def test_service_ai_proposal_is_approval_bound_and_applies_new_revision(
     assert applied.artifact.current_revision_number == 2
 
 
-def test_service_duplicate_and_archive_are_workspace_scoped(tmp_path: Path) -> None:
+def test_document_service_duplicate_and_archive_are_workspace_scoped(tmp_path: Path) -> None:
     service = ArtifactService(tmp_path / "artifact-root")
     admin = user_context("artifact_admin")
     service.create(create_command(), admin)
@@ -199,14 +199,37 @@ def test_service_duplicate_and_archive_are_workspace_scoped(tmp_path: Path) -> N
         ),
         admin,
     )
+    with pytest.raises(ArtifactDomainError) as archived_restore:
+        service.restore(
+            RestoreArtifactCommand(
+                artifact_id="artifact-1",
+                source_revision_id=archived.revision.revision_id,
+                expected_revision_number=1,
+                idempotency_key="restore-archived",
+            ),
+            admin,
+        )
+    with pytest.raises(ArtifactDomainError) as archived_mutation:
+        service.mutate(
+            MutateArtifactCommand(
+                artifact_id="artifact-1",
+                expected_revision_number=1,
+                mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+                content=document("must remain archived"),
+                idempotency_key="mutate-archived",
+            ),
+            admin,
+        )
 
     assert duplicated.artifact.artifact_id == "artifact-2"
     assert duplicated.artifact.current_revision_number == 1
     assert archived.artifact.status is ArtifactStatus.ARCHIVED
+    assert archived_restore.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
+    assert archived_mutation.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
     assert service.get(GetArtifactQuery(artifact_id="artifact-2"), admin).content is not None
 
 
-def test_service_revalidates_schema_without_leaking_raw_content_in_error(
+def test_document_service_revalidates_schema_without_leaking_raw_content_in_error(
     tmp_path: Path,
 ) -> None:
     service = ArtifactService(tmp_path / "artifact-root")

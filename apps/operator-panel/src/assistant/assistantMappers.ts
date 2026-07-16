@@ -326,6 +326,7 @@ export function mapCliAssistantEvent(
         artifactId: artifactId || undefined,
         revisionId: revisionId || undefined,
         kind: kind || undefined,
+        openable: event.event === 'artifact_committed' || event.event === 'artifact_patch_applied',
         summary: readString(data, 'summary', event.event.replaceAll('_', ' ')),
       };
       turn.assistantMessage.referencedArtifacts.push(artifact);

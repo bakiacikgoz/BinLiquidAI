@@ -70,6 +70,41 @@ describe('AssistantView', () => {
     expect(html).toContain('job-ui-preview-cu-1');
   });
 
+  it('exposes committed workspace artifacts as open actions', () => {
+    const state = getAssistantFixture('running');
+    const html = renderToStaticMarkup(
+      <AssistantView
+        copy={copy}
+        state={{
+          ...state,
+          turns: state.turns.map((turn, index) =>
+            index === state.turns.length - 1
+              ? {
+                  ...turn,
+                  assistantMessage: {
+                    ...turn.assistantMessage,
+                    referencedArtifacts: [
+                      {
+                        name: 'Project brief',
+                        artifactId: 'artifact-project-brief',
+                        kind: 'document',
+                        openable: true,
+                        summary: 'Committed document artifact',
+                      },
+                    ],
+                  },
+                }
+              : turn,
+          ),
+        }}
+        onOpenArtifact={() => undefined}
+        {...requiredActionProps}
+      />,
+    );
+
+    expect(html).toContain('aria-label="Open Project brief"');
+  });
+
   it('renders the approval-required state with guarded approval actions', () => {
     const html = renderToStaticMarkup(
       <AssistantView

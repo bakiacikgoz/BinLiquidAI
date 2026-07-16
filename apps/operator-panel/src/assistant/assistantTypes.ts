@@ -132,6 +132,7 @@ export interface AssistantArtifactRef {
   artifactId?: string;
   revisionId?: string;
   kind?: string;
+  openable?: boolean;
   path?: string;
   summary?: string;
 }

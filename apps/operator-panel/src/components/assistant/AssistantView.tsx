@@ -61,6 +61,7 @@ export function AssistantView({
   onReject,
   onExecute,
   onRegenerate,
+  onOpenArtifact,
   onCancel,
   onOpenTerminal,
 }: {
@@ -89,6 +90,7 @@ export function AssistantView({
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
+  onOpenArtifact?: (artifactId: string) => void;
   onCancel: () => void;
   onOpenTerminal?: () => void;
 }) {
@@ -324,6 +326,7 @@ export function AssistantView({
               onReject={onReject}
               onExecute={onExecute}
               onRegenerate={onRegenerate}
+              onOpenArtifact={onOpenArtifact}
             />
           )}
 

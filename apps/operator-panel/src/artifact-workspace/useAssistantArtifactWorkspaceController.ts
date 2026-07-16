@@ -4,6 +4,7 @@ import type { AssistantSessionState } from '../assistant/assistantTypes';
 import { ArtifactAutosaveQueue } from './artifactAutosave';
 import { ArtifactBridgeError, artifactBridge as defaultBridge, type ArtifactBridge } from './artifactBridge';
 import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './artifactContracts';
+import { exportDocumentArtifact, type DocumentArtifactExportFormat } from './artifactDocumentExport';
 import { ArtifactWorkspaceController } from './workspaceController';
 
 export type LegacyWorkbenchArtifact = {
@@ -26,7 +27,14 @@ export interface AssistantArtifactWorkspaceControllerOptions {
   bridge?: ArtifactBridge;
 }
 
-function normalizeWorkspaceError(error: unknown): ArtifactWorkspaceUiError {
+function normalizeWorkspaceError(
+  error: unknown,
+  fallback: ArtifactWorkspaceUiError = {
+    code: 'ARTIFACT_WORKSPACE_OPEN_FAILED',
+    message: 'The artifact could not be opened.',
+    retryable: true,
+  },
+): ArtifactWorkspaceUiError {
   if (error instanceof ArtifactBridgeError) {
     return {
       code: error.code,
@@ -34,11 +42,7 @@ function normalizeWorkspaceError(error: unknown): ArtifactWorkspaceUiError {
       retryable: error.retryable,
     };
   }
-  return {
-    code: 'ARTIFACT_WORKSPACE_OPEN_FAILED',
-    message: 'The artifact could not be opened.',
-    retryable: true,
-  };
+  return fallback;
 }
 
 export function useAssistantArtifactWorkspaceController({
@@ -53,6 +57,7 @@ export function useAssistantArtifactWorkspaceController({
   const [open, setOpen] = useState(false);
   const [loadingArtifactId, setLoadingArtifactId] = useState<string | null>(null);
   const [error, setError] = useState<ArtifactWorkspaceUiError | null>(null);
+  const [operationNotice, setOperationNotice] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<ArtifactDescriptor[]>([]);
   const [catalogNextCursor, setCatalogNextCursor] = useState<string | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -71,6 +76,7 @@ export function useAssistantArtifactWorkspaceController({
     async (append = false) => {
       setCatalogLoading(true);
       setError(null);
+      setOperationNotice(null);
       try {
         const result = await bridge.list({
           cursor: append ? catalogNextCursor ?? undefined : undefined,
@@ -91,16 +97,25 @@ export function useAssistantArtifactWorkspaceController({
     async (artifactId: string, append = false) => {
       setHistoryLoadingArtifactId(artifactId);
       setError(null);
+      setOperationNotice(null);
       try {
         const result = await bridge.history({
           artifactId,
           cursor: append ? historyNextCursor[artifactId] ?? undefined : undefined,
           limit: 50,
         });
-        setHistoryByArtifact((previous) => ({
-          ...previous,
-          [artifactId]: append ? [...(previous[artifactId] ?? []), ...result.items] : result.items,
-        }));
+        setHistoryByArtifact((previous) => {
+          const combined = append ? [...(previous[artifactId] ?? []), ...result.items] : result.items;
+          const seen = new Set<string>();
+          return {
+            ...previous,
+            [artifactId]: combined.filter((revision) => {
+              if (seen.has(revision.revisionId)) return false;
+              seen.add(revision.revisionId);
+              return true;
+            }),
+          };
+        });
         setHistoryNextCursor((previous) => ({ ...previous, [artifactId]: result.nextCursor }));
       } catch (caught) {
         setError(normalizeWorkspaceError(caught));
@@ -114,8 +129,14 @@ export function useAssistantArtifactWorkspaceController({
   const openArtifact = useCallback(
     async (artifactId: string) => {
       setOpen(true);
+      if (controller.getState().tabs.some((tab) => tab.artifact.artifactId === artifactId)) {
+        controller.activate(artifactId);
+        await loadHistory(artifactId, false);
+        return;
+      }
       setLoadingArtifactId(artifactId);
       setError(null);
+      setOperationNotice(null);
       try {
         await controller.open(artifactId);
         await loadHistory(artifactId, false);
@@ -133,12 +154,71 @@ export function useAssistantArtifactWorkspaceController({
     [autosave],
   );
 
+  const restoreArtifact = useCallback(
+    async (artifactId: string, revisionId: string) => {
+      setError(null);
+      setOperationNotice(null);
+      try {
+        await autosave.flush(artifactId);
+        const current = controller.getState().tabs.find((tab) => tab.artifact.artifactId === artifactId);
+        if (!current || current.dirty || current.saveState === 'error' || current.saveState === 'conflict') {
+          throw new Error('Artifact must be saved before restoring history.');
+        }
+        if (current.artifact.status === 'archived') throw new Error('Archived artifacts are read-only.');
+        const idempotencyKey = `restore:${artifactId}:${revisionId}:${globalThis.crypto.randomUUID()}`;
+        await controller.restore(artifactId, revisionId, idempotencyKey);
+        await loadHistory(artifactId, false);
+        setOperationNotice('Revision restored.');
+      } catch (caught) {
+        setError(normalizeWorkspaceError(caught, {
+          code: 'ARTIFACT_RESTORE_FAILED',
+          message: 'The revision could not be restored.',
+          retryable: true,
+        }));
+      }
+    },
+    [autosave, controller, loadHistory],
+  );
+
+  const exportDocument = useCallback(
+    async (artifactId: string, format: DocumentArtifactExportFormat) => {
+      setError(null);
+      setOperationNotice(null);
+      try {
+        await autosave.flush(artifactId);
+        const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+        if (!tab) throw new Error('Artifact tab is not open.');
+        if (tab.dirty || tab.saveState === 'error' || tab.saveState === 'conflict') {
+          throw new Error('Artifact must be saved before export.');
+        }
+        const outcome = await exportDocumentArtifact({
+          artifact: tab.artifact,
+          revision: tab.revision,
+          content: tab.draftContent,
+          format,
+          bridge,
+        });
+        setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+        return outcome;
+      } catch (caught) {
+        setError(normalizeWorkspaceError(caught, {
+          code: 'ARTIFACT_EXPORT_FAILED',
+          message: 'The document could not be exported.',
+          retryable: true,
+        }));
+        return null;
+      }
+    },
+    [autosave, bridge, controller],
+  );
+
   const reset = useCallback(() => {
     autosave.dispose();
     controller.getState().tabs.forEach((tab) => controller.discardAndClose(tab.artifact.artifactId));
     setOpen(false);
     setLoadingArtifactId(null);
     setError(null);
+    setOperationNotice(null);
     setCatalog([]);
     setCatalogNextCursor(null);
     setHistoryByArtifact({});
@@ -163,16 +243,17 @@ export function useAssistantArtifactWorkspaceController({
       requestClose: (artifactId: string) => controller.requestClose(artifactId),
       cancelClose: () => controller.cancelClose(),
       discardAndClose: (artifactId: string) => controller.discardAndClose(artifactId),
-      restore: (artifactId: string, revisionId: string, idempotencyKey: string) =>
-        controller.restore(artifactId, revisionId, idempotencyKey),
+      restore: restoreArtifact,
+      exportDocument,
       archive: (artifactId: string) => controller.archive(artifactId),
       clearError: () => setError(null),
+      clearOperationNotice: () => setOperationNotice(null),
       loadCatalog: () => loadCatalog(false),
       loadMoreCatalog: () => loadCatalog(true),
       loadHistory: (artifactId: string) => loadHistory(artifactId, false),
       loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [autosave, controller, edit, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, reset, toggle],
+    [autosave, controller, edit, exportDocument, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, reset, restoreArtifact, toggle],
   );
 
   const activeTab =
@@ -190,6 +271,7 @@ export function useAssistantArtifactWorkspaceController({
     activeTab,
     loadingArtifactId,
     error,
+    operationNotice,
     legacyArtifacts,
     selectedLegacyArtifactName,
     catalog,

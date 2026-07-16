@@ -62,11 +62,29 @@ export function previewAssistantEvents(
     },
     {
       contractVersion: CONTRACT_VERSION,
+      eventId: 'event-preview-artifact-committed',
+      assistantTurnId,
+      sessionId,
+      event: 'artifact_committed',
+      sequence: 4,
+      timestampUtc: '2026-03-08T09:20:03Z',
+      traceId: 'trace-preview-assistant',
+      dataClass: 'internal',
+      data: {
+        artifactId: 'artifact-preview-document',
+        revisionId: 'revision-1',
+        kind: 'document',
+        title: 'Launch plan',
+        summary: 'Governed document artifact',
+      },
+    },
+    {
+      contractVersion: CONTRACT_VERSION,
       assistantTurnId,
       sessionId,
       event: 'final',
-      sequence: 4,
-      timestampUtc: '2026-03-08T09:20:03Z',
+      sequence: 5,
+      timestampUtc: '2026-03-08T09:20:04Z',
       data: {
         final_text:
           'The selected run is blocked by an approval gate. Review the pending approval before continuing.',

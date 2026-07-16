@@ -200,6 +200,11 @@ class ArtifactService:
             target_data_class=current.data_class,
             approval_granted=command.approval_granted,
         )
+        if current.status is ArtifactStatus.ARCHIVED:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+                "archived artifacts are read-only",
+            )
         if permission is ArtifactPermission.AI_APPLY and command.proposal_id is None:
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
@@ -430,6 +435,11 @@ class ArtifactService:
             context,
             artifact_workspace_id=current.workspace_id,
         )
+        if current.status is ArtifactStatus.ARCHIVED:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+                "archived artifacts are read-only",
+            )
         source = self.store.get_revision(
             context.workspace_id, command.artifact_id, command.source_revision_id
         )

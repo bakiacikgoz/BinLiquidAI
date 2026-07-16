@@ -101,8 +101,8 @@ describe('AssistantWorkbench', () => {
               },
             ],
           },
-          dirty: true,
-          saveState: 'dirty',
+          dirty: false,
+          saveState: 'saved',
           saveError: null,
           conflict: null,
         },
@@ -111,6 +111,16 @@ describe('AssistantWorkbench', () => {
     const onOpenArtifact = vi.fn();
     const onRequestClose = vi.fn();
     const onLoadMore = vi.fn();
+    const onLoadMoreHistory = vi.fn();
+    const onRestoreArtifact = vi.fn();
+    const onExportArtifact = vi.fn();
+    const previousRevision: ArtifactRevision = {
+      ...revision,
+      revisionId: 'revision-1',
+      revisionNumber: 1,
+      parentRevisionId: null,
+      changeSummary: 'Initial draft',
+    };
     const { user } = renderOperatorPanel(
       <AssistantWorkbench
         state={getAssistantFixture('running')}
@@ -121,13 +131,19 @@ describe('AssistantWorkbench', () => {
         workspaceState={workspaceState}
         catalog={[descriptor, codeArtifact]}
         catalogNextCursor="cursor-2"
-        history={[revision]}
+        history={[revision, previousRevision]}
+        historyNextCursor="history-cursor-2"
+        workspaceError={{ code: 'ARTIFACT_EXPORT_FAILED', message: 'Export failed safely.', retryable: true }}
+        operationNotice="Previous export completed."
         onOpenArtifact={onOpenArtifact}
         onActivateArtifact={vi.fn()}
         onRequestClose={onRequestClose}
         onLoadCatalog={vi.fn()}
         onLoadMoreCatalog={onLoadMore}
         onLoadHistory={vi.fn()}
+        onLoadMoreHistory={onLoadMoreHistory}
+        onRestoreArtifact={onRestoreArtifact}
+        onExportArtifact={onExportArtifact}
       />,
     );
 
@@ -136,6 +152,8 @@ describe('AssistantWorkbench', () => {
     expect(screen.getByText('confidential')).toBeInTheDocument();
     expect(screen.getByText('governed')).toBeInTheDocument();
     expect(screen.getByText('Updated title')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Export failed safely.');
+    expect(screen.getByRole('status', { name: 'Artifact operation status' })).toHaveTextContent('Previous export completed.');
 
     await user.type(screen.getByRole('searchbox', { name: 'Search artifacts' }), 'Policy');
     await user.click(screen.getByRole('button', { name: /Policy code/ }));
@@ -145,5 +163,15 @@ describe('AssistantWorkbench', () => {
     expect(onRequestClose).toHaveBeenCalledWith('artifact-document');
     await user.click(screen.getByRole('button', { name: 'Load more artifacts' }));
     expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Restore revision 1' }));
+    expect(onRestoreArtifact).toHaveBeenCalledWith('artifact-document', 'revision-1');
+    await user.click(screen.getByRole('button', { name: 'Load more history' }));
+    expect(onLoadMoreHistory).toHaveBeenCalledWith('artifact-document');
+
+    await user.click(screen.getByRole('button', { name: 'Export Markdown' }));
+    await user.click(screen.getByRole('button', { name: 'Export HTML' }));
+    expect(onExportArtifact).toHaveBeenNthCalledWith(1, 'artifact-document', 'markdown');
+    expect(onExportArtifact).toHaveBeenNthCalledWith(2, 'artifact-document', 'html');
   });
 });

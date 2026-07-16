@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import type { ArtifactDescriptor, ArtifactRevision } from '../../artifact-workspace/artifactContracts';
 import type { ArtifactWorkspaceState } from '../../artifact-workspace/workspaceController';
+import type { ArtifactWorkspaceUiError } from '../../artifact-workspace/useAssistantArtifactWorkspaceController';
 import { ArtifactEditorHost } from '../../artifact-workspace/editors/ArtifactEditorHost';
 import { translateAssistantText, type UiLocale } from '../../i18n';
 import { Badge } from '../primitives/Badge';
@@ -21,6 +22,7 @@ type WorkspaceProps = {
   catalogNextCursor?: string | null;
   catalogLoading?: boolean;
   history?: ArtifactRevision[];
+  historyNextCursor?: string | null;
   historyLoading?: boolean;
   onOpenArtifact?: (artifactId: string) => void;
   onActivateArtifact?: (artifactId: string) => void;
@@ -28,7 +30,12 @@ type WorkspaceProps = {
   onLoadCatalog?: () => void;
   onLoadMoreCatalog?: () => void;
   onLoadHistory?: (artifactId: string) => void;
+  onLoadMoreHistory?: (artifactId: string) => void;
   onEditArtifact?: (artifactId: string, content: ArtifactWorkspaceState['tabs'][number]['draftContent']) => void;
+  onRestoreArtifact?: (artifactId: string, revisionId: string) => void;
+  onExportArtifact?: (artifactId: string, format: 'markdown' | 'html') => void;
+  workspaceError?: ArtifactWorkspaceUiError | null;
+  operationNotice?: string | null;
 };
 
 function stringifyPreview(value: unknown): string {
@@ -70,6 +77,7 @@ export function AssistantWorkbench({
   catalogNextCursor = null,
   catalogLoading = false,
   history = [],
+  historyNextCursor = null,
   historyLoading = false,
   onOpenArtifact,
   onActivateArtifact,
@@ -77,7 +85,12 @@ export function AssistantWorkbench({
   onLoadCatalog,
   onLoadMoreCatalog,
   onLoadHistory,
+  onLoadMoreHistory,
   onEditArtifact,
+  onRestoreArtifact,
+  onExportArtifact,
+  workspaceError = null,
+  operationNotice = null,
 }: {
   state: AssistantSessionState;
   artifacts: AssistantWorkbenchArtifact[];
@@ -133,6 +146,15 @@ export function AssistantWorkbench({
               {catalogLoading ? 'Loading…' : 'Refresh'}
             </Button>
           </div>
+
+          {workspaceError ? (
+            <p className="artifact-workspace-banner" role="alert">{workspaceError.message}</p>
+          ) : null}
+          {operationNotice ? (
+            <p className="artifact-workspace-banner" role="status" aria-label="Artifact operation status">
+              {operationNotice}
+            </p>
+          ) : null}
 
           <div className="artifact-workspace-filters">
             <input
@@ -216,8 +238,30 @@ export function AssistantWorkbench({
                 saveState={activeTab.saveState}
                 onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
                 onSelectionChange={() => undefined}
-                onRequestExport={() => undefined}
+                onRequestExport={(format) => {
+                  if (format === 'markdown' || format === 'html') {
+                    onExportArtifact?.(activeTab.artifact.artifactId, format);
+                  }
+                }}
               />
+              {activeTab.artifact.kind === 'document' ? (
+                <div className="artifact-workspace-export-actions" aria-label="Document export">
+                  <Button
+                    variant="ghost"
+                    disabled={activeTab.dirty || activeTab.saveState === 'saving'}
+                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'markdown')}
+                  >
+                    Export Markdown
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={activeTab.dirty || activeTab.saveState === 'saving'}
+                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'html')}
+                  >
+                    Export HTML
+                  </Button>
+                </div>
+              ) : null}
               <div className="artifact-workspace-history" aria-label="Revision history">
                 <div className="assistant-workbench-panel-head">
                   <span>Revision history</span>
@@ -231,8 +275,27 @@ export function AssistantWorkbench({
                     <strong>Revision {item.revisionNumber}</strong>
                     <span>{item.changeSummary || item.mutationType}</span>
                     <time dateTime={item.createdAtUtc}>{new Date(item.createdAtUtc).toLocaleString()}</time>
+                    {item.revisionId !== activeTab.revision.revisionId ? (
+                      <Button
+                        variant="ghost"
+                        aria-label={`Restore revision ${item.revisionNumber}`}
+                        disabled={activeTab.artifact.status === 'archived' || activeTab.dirty || activeTab.saveState === 'saving'}
+                        onClick={() => onRestoreArtifact?.(activeTab.artifact.artifactId, item.revisionId)}
+                      >
+                        Restore
+                      </Button>
+                    ) : null}
                   </article>
                 )) : <p className="assistant-empty-state">No revision history loaded.</p>}
+                {historyNextCursor ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => onLoadMoreHistory?.(activeTab.artifact.artifactId)}
+                    disabled={historyLoading}
+                  >
+                    Load more history
+                  </Button>
+                ) : null}
               </div>
             </div>
           ) : null}

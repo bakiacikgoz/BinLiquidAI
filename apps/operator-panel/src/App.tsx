@@ -1694,14 +1694,24 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         catalogNextCursor={assistantArtifactWorkspace.catalogNextCursor}
         catalogLoading={assistantArtifactWorkspace.catalogLoading}
         history={assistantArtifactWorkspace.history}
+        historyNextCursor={assistantArtifactWorkspace.historyNextCursor}
         historyLoading={Boolean(assistantArtifactWorkspace.historyLoadingArtifactId)}
+        workspaceError={assistantArtifactWorkspace.error}
+        operationNotice={assistantArtifactWorkspace.operationNotice}
         onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
         onActivateArtifact={assistantArtifactWorkspace.actions.activate}
         onRequestClose={assistantArtifactWorkspace.actions.requestClose}
         onLoadCatalog={() => void assistantArtifactWorkspace.actions.loadCatalog()}
         onLoadMoreCatalog={() => void assistantArtifactWorkspace.actions.loadMoreCatalog()}
         onLoadHistory={(artifactId) => void assistantArtifactWorkspace.actions.loadHistory(artifactId)}
+        onLoadMoreHistory={(artifactId) => void assistantArtifactWorkspace.actions.loadMoreHistory(artifactId)}
         onEditArtifact={assistantArtifactWorkspace.actions.edit}
+        onRestoreArtifact={(artifactId, revisionId) =>
+          void assistantArtifactWorkspace.actions.restore(artifactId, revisionId)
+        }
+        onExportArtifact={(artifactId, format) =>
+          void assistantArtifactWorkspace.actions.exportDocument(artifactId, format)
+        }
         onViewRuns={() => {
           setRunTab('artifacts');
           setActiveView('runs');
@@ -1981,6 +1991,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}
             onExecute={(approvalId) => void onExecuteAssistantApproval(approvalId)}
             onRegenerate={(turnId) => void assistantSession.actions.regenerate(turnId, assistantRuntimeSettings)}
+            onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
             onCancel={() => void onCancelAssistantTurn()}
             onOpenTerminal={openRunTerminalView}
           />

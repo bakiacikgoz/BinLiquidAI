@@ -36,7 +36,13 @@ const baseTurn: AssistantTurn = {
 
 const noop = () => undefined;
 
-function RuntimeTranscript({ turns }: { turns: AssistantTurn[] }) {
+function RuntimeTranscript({
+  turns,
+  onOpenArtifact = noop,
+}: {
+  turns: AssistantTurn[];
+  onOpenArtifact?: (artifactId: string) => void;
+}) {
   const state: AssistantSessionState = {
     sessionId: 'session-1',
     turns,
@@ -66,6 +72,7 @@ function RuntimeTranscript({ turns }: { turns: AssistantTurn[] }) {
         onReject={noop}
         onExecute={noop}
         onRegenerate={noop}
+        onOpenArtifact={onOpenArtifact}
       />
     </AssistantRuntimeProvider>
   );
@@ -180,5 +187,31 @@ describe('AssistantTranscript sticky scrolling', () => {
     await user.click(screen.getByRole('button', { name: 'Jump to latest' }));
 
     expect(scrollToMock).toHaveBeenCalledWith(expect.objectContaining({ top: 1000 }));
+  });
+
+  it('forwards committed artifact card actions through the runtime transcript', async () => {
+    const onOpenArtifact = vi.fn();
+    const artifactTurn: AssistantTurn = {
+      ...baseTurn,
+      assistantMessage: {
+        ...baseTurn.assistantMessage,
+        referencedArtifacts: [
+          {
+            name: 'Project brief',
+            artifactId: 'artifact-project-brief',
+            revisionId: 'revision-1',
+            kind: 'document',
+            openable: true,
+          },
+        ],
+      },
+    };
+    const { user } = renderOperatorPanel(
+      <RuntimeTranscript turns={[artifactTurn]} onOpenArtifact={onOpenArtifact} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open Project brief' }));
+
+    expect(onOpenArtifact).toHaveBeenCalledWith('artifact-project-brief');
   });
 });

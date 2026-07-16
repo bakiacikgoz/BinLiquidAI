@@ -1,5 +1,5 @@
 import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { AssistantTurn } from '../../assistant/assistantTypes';
 import { renderOperatorPanel } from '../../test/render';
@@ -36,7 +36,7 @@ function turnWithText(userText: string, assistantText: string): AssistantTurn {
   };
 }
 
-function renderMessage(turn: AssistantTurn) {
+function renderMessage(turn: AssistantTurn, onOpenArtifact = noop) {
   return renderOperatorPanel(
     <AssistantMessage
       turn={turn}
@@ -49,6 +49,7 @@ function renderMessage(turn: AssistantTurn) {
       onReject={noop}
       onExecute={noop}
       onRegenerate={noop}
+      onOpenArtifact={onOpenArtifact}
     />,
   );
 }
@@ -119,5 +120,40 @@ describe('AssistantMessage', () => {
     expect(screen.queryByText('Approval required')).not.toBeInTheDocument();
     expect(screen.queryByText('Status')).not.toBeInTheDocument();
     expect(screen.queryByText('Streaming response')).not.toBeInTheDocument();
+  });
+
+  it('opens committed workspace artifacts by id and keeps audit references read-only', async () => {
+    const turn = turnWithText('Create a project brief.', 'The draft is ready.');
+    turn.assistantMessage.referencedArtifacts = [
+      {
+        name: 'Project brief',
+        artifactId: 'artifact-project-brief',
+        revisionId: 'revision-1',
+        kind: 'document',
+        summary: 'artifact committed',
+        openable: true,
+      },
+      {
+        name: 'Project brief proposal',
+        artifactId: 'artifact-project-brief-proposal',
+        kind: 'document',
+        summary: 'artifact proposed',
+        openable: false,
+      },
+      {
+        name: 'status.json',
+        path: 'runs/run-1/status.json',
+        summary: 'Immutable audit artifact',
+      },
+    ];
+    const onOpenArtifact = vi.fn();
+    const { user } = renderMessage(turn, onOpenArtifact);
+
+    await user.click(screen.getByRole('button', { name: 'Open Project brief' }));
+
+    expect(onOpenArtifact).toHaveBeenCalledOnce();
+    expect(onOpenArtifact).toHaveBeenCalledWith('artifact-project-brief');
+    expect(screen.queryByRole('button', { name: 'Open Project brief proposal' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open status.json' })).not.toBeInTheDocument();
   });
 });

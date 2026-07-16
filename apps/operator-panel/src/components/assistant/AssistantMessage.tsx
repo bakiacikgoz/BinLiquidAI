@@ -284,6 +284,7 @@ export function AssistantMessage({
   onReject,
   onExecute,
   onRegenerate,
+  onOpenArtifact,
 }: {
   turn: AssistantTurn;
   approvalDisabled: boolean;
@@ -296,6 +297,7 @@ export function AssistantMessage({
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
   onRegenerate: (turnId: string) => void;
+  onOpenArtifact?: (artifactId: string) => void;
 }) {
   const text = assistantUiText[locale];
   const message = turn.assistantMessage;
@@ -396,6 +398,7 @@ export function AssistantMessage({
           artifacts={message.referencedArtifacts}
           emptyRunLabel={emptyRunLabel}
           locale={locale}
+          onOpenArtifact={onOpenArtifact}
         />
         {hasAssistantOutput ? (
           <div className="assistant-message-actions" aria-label="Assistant message actions">

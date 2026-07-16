@@ -116,6 +116,21 @@ describe('assistant mappers', () => {
       },
       withText,
     );
+    const withProposal = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0',
+        eventId: 'event-2b',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'artifact_proposed',
+        sequence: 3,
+        timestampUtc: '2026-07-16T08:00:02Z',
+        traceId: 'trace-1',
+        dataClass: 'internal',
+        data: { artifactId: 'artifact-proposal', kind: 'document' },
+      },
+      withArtifact,
+    );
     const withForm = mapCliAssistantEvent(
       {
         contractVersion: '3.0',
@@ -123,18 +138,19 @@ describe('assistant mappers', () => {
         assistantTurnId: 'turn-test',
         sessionId: 'session-test',
         event: 'form_requested',
-        sequence: 3,
+        sequence: 4,
         timestampUtc: '2026-07-16T08:00:02Z',
         traceId: 'trace-1',
         dataClass: 'confidential',
         data: { artifactId: 'form-1', revisionId: 'revision-form-1', schema: { type: 'object' } },
       },
-      withArtifact,
+      withProposal,
     );
 
     expect(withForm.turns[0].assistantMessage.text).toBe('Draft');
     expect(withForm.referencedArtifacts).toEqual([
-      expect.objectContaining({ artifactId: 'artifact-1', revisionId: 'revision-1', kind: 'document' }),
+      expect.objectContaining({ artifactId: 'artifact-1', revisionId: 'revision-1', kind: 'document', openable: true }),
+      expect.objectContaining({ artifactId: 'artifact-proposal', kind: 'document', openable: false }),
       expect.objectContaining({ artifactId: 'form-1', revisionId: 'revision-form-1', kind: 'form' }),
     ]);
   });
