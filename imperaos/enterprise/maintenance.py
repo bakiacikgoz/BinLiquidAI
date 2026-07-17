@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from imperaos.artifacts.diagnostics import build_artifact_support_snapshot
+from imperaos.artifacts.service import ArtifactService
 from imperaos.enterprise.baseline import security_posture
 from imperaos.enterprise.observability import collect_metrics_snapshot
 from imperaos.enterprise.qualification import (
@@ -157,6 +159,15 @@ def export_support_bundle(
         encoding="utf-8",
     )
     bundle_files.append(str(config_path))
+
+    artifact_root = Path(config.maintenance.support_bundle_dir).parent / "artifacts"
+    artifact_snapshot = build_artifact_support_snapshot(ArtifactService(artifact_root))
+    artifact_snapshot_path = bundle_dir / "artifact_workspace_snapshot.json"
+    artifact_snapshot_path.write_text(
+        json.dumps(artifact_snapshot, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    bundle_files.append(str(artifact_snapshot_path))
 
     for src in [
         Path("artifacts") / "status.json",

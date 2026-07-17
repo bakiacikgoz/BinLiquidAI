@@ -69,6 +69,7 @@ from imperaos.artifacts.models import (
     can_transition_data_class,
     canonical_json,
 )
+from imperaos.artifacts.operations import ArtifactOperationMetrics
 from imperaos.artifacts.policy import ArtifactPermission, ArtifactPolicyGateway
 from imperaos.artifacts.proposal_approval import ArtifactProposalApprovalGateway
 from imperaos.artifacts.results import (
@@ -112,6 +113,7 @@ class ArtifactService:
         self.evidence_resolver = evidence_resolver or DenyArtifactEvidenceResolver()
         self.policy = policy or ArtifactPolicyGateway()
         self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
+        self.operations = ArtifactOperationMetrics()
         self._proposal_approvals = ArtifactProposalApprovalGateway(
             approval_store or ApprovalStore(Path(root) / "metadata" / "artifact-approvals.sqlite3")
         )

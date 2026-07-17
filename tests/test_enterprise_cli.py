@@ -319,6 +319,14 @@ def test_enterprise_metrics_support_bundle_and_ga_report(monkeypatch, tmp_path: 
     assert Path(bundle_payload["archive_path"]).exists()
     bundle_verify = verify_signed_artifact(path=bundle_payload["manifest_path"])
     assert bundle_verify["verified"] is True
+    bundle_dir = Path(bundle_payload["bundle_dir"])
+    artifact_snapshot = json.loads(
+        (bundle_dir / "artifact_workspace_snapshot.json").read_text(encoding="utf-8")
+    )
+    assert artifact_snapshot["schemaVersion"] == "artifact-support/v1"
+    serialized_snapshot = json.dumps(artifact_snapshot).lower()
+    for forbidden in ("rawcontent", "relativepath", "secretref", "authorization"):
+        assert forbidden not in serialized_snapshot
 
     readiness = runner.invoke(
         app,

@@ -225,6 +225,13 @@ def test_server_stdio_is_framed_protocol_only_and_shutdown_stops_admission(
     assert responses[0].result["networkListener"] is False
     assert responses[1].result is not None
     assert responses[1].result["status"] == "ready"
+    assert responses[1].result["integrity"]["status"] == "pass"
+    assert responses[1].result["recovery"] == {
+        "pendingJournals": 0,
+        "quarantinedFiles": 0,
+        "recoveredCommits": 0,
+        "removedTempFiles": 0,
+    }
     assert responses[2].result == {"drained": True}
     assert stderr.getvalue() == b""
 

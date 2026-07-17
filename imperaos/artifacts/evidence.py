@@ -232,6 +232,7 @@ def record_artifact_evidence(
             try:
                 result = method(*args, **kwargs)
             except ArtifactDomainError as exc:
+                latency_ms = (perf_counter() - started) * 1_000
                 status: EvidenceStatus = (
                     "denied"
                     if exc.code
@@ -247,20 +248,33 @@ def record_artifact_evidence(
                     context=context,
                     status=status,
                     reason_code=exc.code.value,
-                    latency_ms=(perf_counter() - started) * 1_000,
+                    latency_ms=latency_ms,
                     artifact_id=_subject_artifact_id(subject),
+                )
+                service.operations.observe_operation(
+                    operation=operation,
+                    reason_code=exc.code.value,
+                    latency_ms=latency_ms,
+                    success=False,
                 )
                 raise
             artifact_id, revision_id, content_sha256 = _result_bindings(result, subject)
+            latency_ms = (perf_counter() - started) * 1_000
             service.evidence.record(
                 operation=operation,
                 context=context,
                 status="success",
                 reason_code="ARTIFACT_OPERATION_SUCCEEDED",
-                latency_ms=(perf_counter() - started) * 1_000,
+                latency_ms=latency_ms,
                 artifact_id=artifact_id,
                 revision_id=revision_id,
                 content_sha256=content_sha256,
+            )
+            service.operations.observe_operation(
+                operation=operation,
+                reason_code="ARTIFACT_OPERATION_SUCCEEDED",
+                latency_ms=latency_ms,
+                success=True,
             )
             return result
 

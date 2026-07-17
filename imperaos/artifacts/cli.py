@@ -13,6 +13,10 @@ from imperaos.artifacts.commands import (
     GetArtifactQuery,
     ListArtifactsQuery,
 )
+from imperaos.artifacts.diagnostics import (
+    build_artifact_doctor_report,
+    verify_artifact_integrity,
+)
 from imperaos.artifacts.evidence_import import FileArtifactEvidenceResolver
 from imperaos.artifacts.licenses import ArtifactLicenseCapability, evaluate_artifact_license
 from imperaos.artifacts.migrations import ArtifactMigrationReport, migrate_artifact_metadata
@@ -87,17 +91,18 @@ def artifact_doctor(
     root: Path = ARTIFACT_ROOT_OPTION,
 ) -> None:
     service = ArtifactService(root)
-    report = migrate_artifact_metadata(service.store.database_path, dry_run=True)
-    _emit(
+    report = build_artifact_doctor_report(service)
+    report.update(
         {
-            "status": "ready",
-            "schemaVersion": report.current_version,
             "protocolVersion": ARTIFACT_RPC_CONTRACT_VERSION,
             "maxFrameBytes": ARTIFACT_RPC_MAX_FRAME_BYTES,
             "networkListener": False,
             "evidenceChainTable": True,
         }
     )
+    _emit(report)
+    if report["status"] != "ready":
+        raise typer.Exit(1)
 
 
 @artifact_app.command("list")
@@ -164,28 +169,10 @@ def artifact_integrity_verify(
     root: Path = ARTIFACT_ROOT_OPTION,
 ) -> None:
     service = ArtifactService(root)
-    artifact_count = 0
-    revision_count = 0
-    offset = 0
-    while True:
-        artifacts = service.store.list_artifacts(workspace, limit=200, offset=offset)
-        for artifact in artifacts:
-            artifact_count += 1
-            revisions = service.store.list_revisions(workspace, artifact.artifact_id)
-            for revision in revisions:
-                service.store.get_revision(workspace, artifact.artifact_id, revision.revision_id)
-                revision_count += 1
-        if len(artifacts) < 200:
-            break
-        offset += len(artifacts)
-    _emit(
-        {
-            "status": "pass",
-            "workspaceRef": workspace,
-            "artifactCount": artifact_count,
-            "revisionCount": revision_count,
-        }
-    )
+    report = verify_artifact_integrity(service, workspace_id=workspace)
+    _emit(report)
+    if report["status"] != "pass":
+        raise typer.Exit(1)
 
 
 @artifact_migration_app.command("plan")

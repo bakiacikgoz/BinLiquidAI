@@ -5,6 +5,7 @@ from collections import OrderedDict
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
+from time import perf_counter
 from typing import Any, BinaryIO
 
 from pydantic import BaseModel, ValidationError
@@ -30,6 +31,7 @@ from imperaos.artifacts.commands import (
     RestoreArtifactCommand,
     SubmitArtifactFormCommand,
 )
+from imperaos.artifacts.diagnostics import verify_artifact_integrity
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import OperationContext, canonical_json
 from imperaos.artifacts.rpc_protocol import (
@@ -81,6 +83,16 @@ class ArtifactRpcServer:
         return self._shutdown_requested
 
     def handle_request(self, request: RpcRequest) -> RpcResponse:
+        started = perf_counter()
+        try:
+            return self._handle_request(request)
+        finally:
+            self.service.operations.add(
+                "imperaos_artifact_rpc_request_latency_ms",
+                (perf_counter() - started) * 1_000,
+            )
+
+    def _handle_request(self, request: RpcRequest) -> RpcResponse:
         request_hash = hashlib.sha256(canonical_json(request).encode("utf-8")).hexdigest()
         try:
             self._ensure_startup_reconciled()
@@ -185,10 +197,31 @@ class ArtifactRpcServer:
                 self.service.license_capabilities()
             ).model_dump(mode="json", by_alias=True)
         if request.method is ArtifactRpcMethod.RPC_HEALTH:
+            recovery = self._ensure_startup_reconciled()
+            integrity = verify_artifact_integrity(self.service)
+            recovered = any(
+                (
+                    recovery.pending_journals,
+                    recovery.recovered_commits,
+                    recovery.quarantined_files,
+                    recovery.removed_temp_files,
+                )
+            )
             return {
-                "status": "ready",
+                "status": (
+                    "ready"
+                    if integrity["status"] == "pass" and not recovered
+                    else "degraded"
+                ),
                 "contractVersion": ARTIFACT_RPC_CONTRACT_VERSION,
                 "accepting": not self._shutdown_requested,
+                "integrity": integrity,
+                "recovery": {
+                    "pendingJournals": recovery.pending_journals,
+                    "recoveredCommits": recovery.recovered_commits,
+                    "quarantinedFiles": recovery.quarantined_files,
+                    "removedTempFiles": recovery.removed_temp_files,
+                },
             }
         if request.method is ArtifactRpcMethod.RPC_SHUTDOWN:
             self.shutdown()
