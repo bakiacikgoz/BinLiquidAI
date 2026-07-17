@@ -20,8 +20,8 @@ def test_migration_dry_run_reports_capacity_without_creating_database(tmp_path: 
     report = migrate_artifact_metadata(database, dry_run=True)
 
     assert report.current_version == 0
-    assert report.target_version == 9
-    assert report.pending_versions == (1, 2, 3, 4, 5, 6, 7, 8, 9)
+    assert report.target_version == 10
+    assert report.pending_versions == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     assert report.applied_versions == ()
     assert report.database_size_bytes == 0
     assert report.free_space_bytes > 0
@@ -34,7 +34,7 @@ def test_migrations_apply_forward_only_schema_and_runtime_pragmas(tmp_path: Path
 
     report = migrate_artifact_metadata(database, busy_timeout_ms=2_500)
 
-    assert report.applied_versions == (1, 2, 3, 4, 5, 6, 7, 8, 9)
+    assert report.applied_versions == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     with connect_artifact_metadata(database, busy_timeout_ms=2_500) as connection:
         tables = {
             row[0]
@@ -55,7 +55,7 @@ def test_migrations_apply_forward_only_schema_and_runtime_pragmas(tmp_path: Path
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
         assert connection.execute("PRAGMA busy_timeout").fetchone()[0] == 2_500
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 10
         revision_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(artifact_revisions)")
         }
@@ -80,7 +80,7 @@ def test_migrations_apply_forward_only_schema_and_runtime_pragmas(tmp_path: Path
         "idx_artifact_revisions_artifact_schema",
     } <= indexes
     assert "schema_version" in revision_columns
-    assert [row[0] for row in versions] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert [row[0] for row in versions] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     assert all(len(row[1]) == 64 for row in versions)
 
 
@@ -115,7 +115,7 @@ def test_migrations_reject_destructive_downgrade_and_unbounded_timeout(
         connect_artifact_metadata(database, busy_timeout_ms=60_001)
 
     with sqlite3.connect(database) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 10
 
 
 def test_failed_migration_rolls_back_version_and_history(
@@ -125,7 +125,7 @@ def test_failed_migration_rolls_back_version_and_history(
     database = tmp_path / "artifacts.sqlite3"
     migrate_artifact_metadata(database)
     broken = ArtifactMigration(
-        version=10,
+        version=11,
         name="broken_test_migration",
         statements=("CREATE TABLE must_roll_back (id TEXT)", "NOT VALID SQL"),
     )
@@ -136,10 +136,10 @@ def test_failed_migration_rolls_back_version_and_history(
 
     assert caught.value.code is ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT
     with sqlite3.connect(database) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 10
         assert (
             connection.execute(
-                    "SELECT COUNT(*) FROM artifact_schema_migrations WHERE version = 10"
+                    "SELECT COUNT(*) FROM artifact_schema_migrations WHERE version = 11"
             ).fetchone()[0]
             == 0
         )
@@ -176,13 +176,13 @@ def test_existing_v8_database_receives_asset_reservation_expiry_forward_migratio
     monkeypatch.setattr(migrations, "MIGRATIONS", current_migrations)
     report = migrate_artifact_metadata(database)
 
-    assert report.current_version == 9
-    assert report.target_version == 9
-    assert report.applied_versions == (9,)
+    assert report.current_version == 10
+    assert report.target_version == 10
+    assert report.applied_versions == (9, 10)
     with sqlite3.connect(database) as connection:
         columns = {
             row[1]
             for row in connection.execute("PRAGMA table_info(artifact_operation_dedup)")
         }
         assert "expires_at_utc" in columns
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 10

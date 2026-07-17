@@ -255,6 +255,10 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
             content=document("AI proposal"),
             idempotency_key="proposal-key-1",
             summary="Update opening paragraph",
+            context_sha256="1" * 64,
+            selection_sha256="2" * 64,
+            source_session_id="session-1",
+            source_turn_id="turn-1",
         ),
         assistant,
     )
@@ -295,6 +299,39 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
     assert len(proposal.action_hash) == 64
     assert applied.artifact.current_revision_number == 2
     assert replay.disposition == "idempotent_replay"
+    with service.store._connect() as connection:
+        stored = connection.execute(
+            "SELECT * FROM artifact_mutation_proposals WHERE proposal_id = 'proposal-1'"
+        ).fetchone()
+    assert stored["request_sha256"]
+    assert stored["context_sha256"] == "1" * 64
+    assert stored["selection_sha256"] == "2" * 64
+    assert stored["source_session_id"] == "session-1"
+    assert stored["source_turn_id"] == "turn-1"
+    assert stored["trace_id"] is None
+    assert stored["approval_id"] == proposal.approval_id
+    assert stored["action_hash"] == proposal.action_hash
+    assert stored["approved_by_id"] == "user-1"
+    assert stored["applied_by_id"] == "assistant-1"
+
+    with pytest.raises(ArtifactDomainError) as replay_mismatch:
+        service.propose_mutation(
+            ProposeArtifactMutationCommand(
+                proposal_id="proposal-1",
+                artifact_id="artifact-1",
+                base_revision_number=1,
+                mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+                content=document("AI proposal"),
+                idempotency_key="proposal-key-1",
+                summary="Changed summary",
+                context_sha256="1" * 64,
+                selection_sha256="2" * 64,
+                source_session_id="session-1",
+                source_turn_id="turn-1",
+            ),
+            assistant,
+        )
+    assert replay_mismatch.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
 
 
 def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: Path) -> None:
@@ -309,6 +346,8 @@ def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: P
             mutation_type=ArtifactMutationType.REPLACE_CONTENT,
             content=document("AI proposal"),
             idempotency_key="proposal-key-1",
+            context_sha256="1" * 64,
+            selection_sha256="2" * 64,
         ),
         assistant_context(),
     )

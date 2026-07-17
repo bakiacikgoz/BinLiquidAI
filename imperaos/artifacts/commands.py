@@ -12,6 +12,7 @@ from imperaos.artifacts.models import (
     ArtifactMutationType,
     ArtifactStatus,
     BoundedId,
+    Sha256,
 )
 
 
@@ -89,6 +90,10 @@ class ProposeArtifactMutationCommand(ArtifactModel):
     content: dict[str, JsonValue]
     idempotency_key: BoundedId
     summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""
+    context_sha256: Sha256
+    selection_sha256: Sha256
+    source_session_id: BoundedId | None = None
+    source_turn_id: BoundedId | None = None
 
 
 class ApplyArtifactProposalCommand(ArtifactModel):

@@ -40,6 +40,12 @@ class ArtifactProposalApprovalGateway:
             "baseRevisionNumber": row["base_revision_number"],
             "mutationType": row["mutation_type"],
             "contentSha256": row["content_sha256"],
+            "requestSha256": row["request_sha256"],
+            "contextSha256": row["context_sha256"],
+            "selectionSha256": row["selection_sha256"],
+            "sourceSessionId": row["source_session_id"],
+            "sourceTurnId": row["source_turn_id"],
+            "traceId": row["trace_id"],
             "executorPrincipalId": row["proposed_by_id"],
             "targetKind": "artifact_mutation_proposal",
             "targetRef": target_ref,
@@ -103,6 +109,12 @@ class ArtifactProposalApprovalGateway:
                 "baseRevisionNumber": row["base_revision_number"],
                 "mutationType": row["mutation_type"],
                 "contentSha256": row["content_sha256"],
+                "requestSha256": row["request_sha256"],
+                "contextSha256": row["context_sha256"],
+                "selectionSha256": row["selection_sha256"],
+                "sourceSessionId": row["source_session_id"],
+                "sourceTurnId": row["source_turn_id"],
+                "traceId": row["trace_id"],
             }
         )
 

@@ -390,6 +390,22 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
             "ALTER TABLE artifact_operation_dedup ADD COLUMN expires_at_utc TEXT",
         ),
     ),
+    ArtifactMigration(
+        version=10,
+        name="artifact_proposal_provenance",
+        statements=(
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN request_sha256 TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN context_sha256 TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN selection_sha256 TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN source_session_id TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN source_turn_id TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN trace_id TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN approval_id TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN action_hash TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN approved_by_id TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN applied_by_id TEXT",
+        ),
+    ),
 )
 
 

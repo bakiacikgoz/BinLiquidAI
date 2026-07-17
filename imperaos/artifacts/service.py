@@ -477,6 +477,7 @@ class ArtifactService:
         )
         content_json = canonical_json(content)
         digest = hashlib.sha256(content_json.encode("utf-8")).hexdigest()
+        request_hash = self._request_hash(command)
         proposal_id = command.proposal_id or self._stable_id(
             "proposal", command.artifact_id, command.idempotency_key
         )
@@ -490,7 +491,7 @@ class ArtifactService:
                 (command.artifact_id, command.idempotency_key),
             ).fetchone()
             if existing is not None:
-                if existing["content_sha256"] != digest:
+                if existing["request_sha256"] != request_hash:
                     self._raise_conflict("proposal idempotency payload mismatch")
                 return self._proposal_result(existing, context)
             if artifact.current_revision_number != command.base_revision_number:
@@ -501,8 +502,10 @@ class ArtifactService:
                     INSERT INTO artifact_mutation_proposals (
                         proposal_id, workspace_id, artifact_id, base_revision_number,
                         mutation_type, content_json, content_sha256, idempotency_key,
-                        summary, proposed_by_id, status, created_at_utc
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+                        summary, proposed_by_id, status, created_at_utc, request_sha256,
+                        context_sha256, selection_sha256, source_session_id, source_turn_id,
+                        trace_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         proposal_id,
@@ -516,6 +519,12 @@ class ArtifactService:
                         command.summary,
                         context.principal_id,
                         now,
+                        request_hash,
+                        command.context_sha256,
+                        command.selection_sha256,
+                        command.source_session_id,
+                        command.source_turn_id,
+                        context.trace_id,
                     ),
                 )
                 connection.commit()
@@ -558,7 +567,7 @@ class ArtifactService:
                 "proposal belongs to a different workspace",
             )
         artifact = self.store.get_artifact(context.workspace_id, row["artifact_id"])
-        self._proposal_approvals.claim(row, context, command.approval_id)
+        approval = self._proposal_approvals.claim(row, context, command.approval_id)
         self.policy.authorize(
             ArtifactPermission.AI_APPLY,
             context,
@@ -594,12 +603,17 @@ class ArtifactService:
             connection.execute(
                 """
                 UPDATE artifact_mutation_proposals
-                SET status = 'applied', applied_revision_id = ?, completed_at_utc = ?
+                SET status = 'applied', applied_revision_id = ?, completed_at_utc = ?,
+                    approval_id = ?, action_hash = ?, approved_by_id = ?, applied_by_id = ?
                 WHERE proposal_id = ? AND status = 'pending'
                 """,
                 (
                     result.revision.revision_id,
                     datetime.now(UTC).isoformat(),
+                    command.approval_id,
+                    row["action_hash"],
+                    approval.actor,
+                    context.principal_id,
                     command.proposal_id,
                 ),
             )
@@ -1676,6 +1690,24 @@ class ArtifactService:
         context: OperationContext,
     ) -> ArtifactMutationProposalResult:
         approval = self._proposal_approvals.request_approval(row, context)
+        with self.store._connect() as connection:
+            connection.execute(
+                """
+                UPDATE artifact_mutation_proposals
+                SET approval_id = ?, action_hash = ?
+                WHERE proposal_id = ?
+                  AND (approval_id IS NULL OR approval_id = ?)
+                  AND (action_hash IS NULL OR action_hash = ?)
+                """,
+                (
+                    approval.approval_id,
+                    approval.action_hash,
+                    row["proposal_id"],
+                    approval.approval_id,
+                    approval.action_hash,
+                ),
+            )
+            connection.commit()
         return ArtifactMutationProposalResult(
             row["proposal_id"],
             row["artifact_id"],

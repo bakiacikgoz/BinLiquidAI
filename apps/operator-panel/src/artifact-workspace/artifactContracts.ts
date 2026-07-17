@@ -714,6 +714,10 @@ export interface ArtifactMutationProposalRequest {
   content: ArtifactContent;
   idempotencyKey: string;
   summary?: string;
+  contextSha256: string;
+  selectionSha256: string;
+  sourceSessionId?: string;
+  sourceTurnId?: string;
 }
 
 export interface ArtifactHistoryRequest {
