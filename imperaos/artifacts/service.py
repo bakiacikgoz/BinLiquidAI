@@ -358,7 +358,7 @@ class ArtifactService:
             MutateArtifactCommand(
                 artifact_id=artifact.artifact_id,
                 expected_revision_number=command.expected_revision_number,
-                mutation_type=ArtifactMutationType.CELL_PATCH,
+                mutation_type=ArtifactMutationType.REPLACE_CONTENT,
                 content=validated.model_dump(mode="json", by_alias=True),
                 idempotency_key=command.idempotency_key,
                 change_summary=command.change_summary,
@@ -366,6 +366,7 @@ class ArtifactService:
             context,
             _operation="spreadsheet_cell_patch",
             _request_hash=request_hash,
+            _revision_mutation_type=ArtifactMutationType.CELL_PATCH,
         )
 
     @record_artifact_evidence("artifact.get")
@@ -421,6 +422,7 @@ class ArtifactService:
         _request_hash: str | None = None,
         _approval_verified: bool = False,
         _proposal_id: str | None = None,
+        _revision_mutation_type: ArtifactMutationType | None = None,
     ) -> ArtifactOperationResult:
         current = self.store.get_artifact(context.workspace_id, command.artifact_id)
         permission = (
@@ -486,7 +488,7 @@ class ArtifactService:
             parent_revision_id=current.current_revision_id,
             revision_number=revision_number,
             schema_version=current.schema_version,
-            mutation_type=command.mutation_type,
+            mutation_type=_revision_mutation_type or command.mutation_type,
             content_relpath=revision_content_relpath(
                 context.workspace_id,
                 current.artifact_id,
