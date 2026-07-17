@@ -801,6 +801,9 @@ pub async fn bridge_artifact_export_commit(
     {
         Ok(result) => result,
         Err(error) => {
+            if error.requires_reconciliation() {
+                return BridgeResult::err(export_bridge_error("artifact export commit", error));
+            }
             if cancel_export_authority(
                 app.clone(),
                 authorized_binding.export_id(),

@@ -117,6 +117,7 @@ def test_form_context_projects_and_merges_only_nested_selected_fields() -> None:
                             "email": {"type": "string", "format": "email"},
                             "fixed": {"type": "string", "default": "exclude"},
                         },
+                        "required": ["name", "email", "fixed"],
                         "additionalProperties": False,
                     },
                     "outside": {"type": "string", "default": "exclude"},
@@ -151,6 +152,7 @@ def test_form_context_projects_and_merges_only_nested_selected_fields() -> None:
                     "name": {"type": "string", "title": "Name"},
                     "email": {"type": "string", "format": "email"},
                 },
+                "required": ["name", "email"],
                 "additionalProperties": False,
             }
         }

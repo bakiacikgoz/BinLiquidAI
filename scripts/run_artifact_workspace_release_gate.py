@@ -41,6 +41,7 @@ REQUIRED_RELEASE_ARTIFACTS = (
 )
 TEST_GATES = frozenset(GATE_REPORTS)
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
+_PERFORMANCE_MARKER = "ARTIFACT_PERFORMANCE_JSON="
 
 
 def _python_tests(*paths: str) -> list[str]:
@@ -77,8 +78,8 @@ def gate_commands(gate: str) -> list[list[str]]:
                 "tests/test_artifact_rpc_protocol.py",
                 "tests/test_artifact_rpc_server.py",
                 "tests/test_artifact_tauri_bridge.py",
-                "tests/test_artifact_rpc_performance.py",
             ),
+            _python_tests("-s", "tests/test_artifact_rpc_performance.py"),
             [_cargo(), "test", "-q", "--manifest-path", "apps/operator-panel/src-tauri/Cargo.toml"],
         ],
         "security": [_python_tests(
@@ -111,6 +112,10 @@ def gate_commands(gate: str) -> list[list[str]]:
                 "artifact-conflict.spec.ts",
                 "artifact-recovery.spec.ts",
                 "artifact-revision-compare.spec.ts",
+                "artifact-security.spec.ts",
+                "artifact-accessibility.spec.ts",
+                "artifact-responsive.spec.ts",
+                "assistant-artifact-integration.spec.ts",
             )],
         )],
         "export": [
@@ -153,6 +158,22 @@ def _test_count(output: str) -> int:
     return count
 
 
+def _extract_performance_evidence(output: str) -> list[dict[str, object]]:
+    evidence: list[dict[str, object]] = []
+    for line in _ANSI.sub("", output).splitlines():
+        marker_index = line.find(_PERFORMANCE_MARKER)
+        if marker_index < 0:
+            continue
+        encoded = line[marker_index + len(_PERFORMANCE_MARKER):].strip()
+        try:
+            payload = json.loads(encoded)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            evidence.append(payload)
+    return evidence
+
+
 def _run_command(command: list[str], repo_root: Path) -> dict[str, object]:
     started = perf_counter()
     executable = command[0]
@@ -176,6 +197,7 @@ def _run_command(command: list[str], repo_root: Path) -> dict[str, object]:
             stderr=f"executable unavailable: {type(exc).__name__}",
         )
     output = completed.stdout + "\n" + completed.stderr
+    performance_evidence = _extract_performance_evidence(output)
     return {
         "name": Path(command[0]).name + " " + " ".join(command[1:3]),
         "exitCode": completed.returncode,
@@ -183,6 +205,7 @@ def _run_command(command: list[str], repo_root: Path) -> dict[str, object]:
         "testCount": _test_count(output),
         "stdoutSha256": hashlib.sha256(completed.stdout.encode("utf-8")).hexdigest(),
         "stderrSha256": hashlib.sha256(completed.stderr.encode("utf-8")).hexdigest(),
+        "performanceEvidence": performance_evidence,
     }
 
 
@@ -224,6 +247,12 @@ def run_leaf_gate(
 ) -> dict[str, object]:
     results = [command_runner(command, repo_root) for command in gate_commands(gate)]
     test_count = sum(int(result["testCount"]) for result in results)
+    performance_evidence = [
+        evidence
+        for result in results
+        for evidence in result.get("performanceEvidence", [])
+        if isinstance(evidence, dict)
+    ]
     blocking = [
         f"COMMAND_FAILED:{result['name']}"
         for result in results
@@ -231,6 +260,8 @@ def run_leaf_gate(
     ]
     if gate in TEST_GATES and test_count == 0:
         blocking.append(f"ZERO_TESTS:{gate}")
+    if gate in {"rpc", "ui"} and not performance_evidence:
+        blocking.append(f"PERFORMANCE_EVIDENCE_MISSING:{gate}")
     extra: dict[str, object] = {}
     if gate == "license" and not blocking:
         try:
@@ -250,6 +281,7 @@ def run_leaf_gate(
         "testCount": test_count,
         "durationMs": round(sum(float(item["durationMs"]) for item in results), 3),
         "commands": results,
+        "performanceEvidence": performance_evidence,
         "blockingReasons": blocking,
         **extra,
     }

@@ -88,12 +88,6 @@ export async function exportCanvasArtifact({
   if (revision.schemaVersion === 1 && format !== 'json') {
     throw new Error('Legacy canvas revisions support JSON export only.');
   }
-  const svg = format === 'json' ? null : serializeCanvasSvg(content);
-  const bytes = format === 'json'
-    ? serializeCanvasJson(content)
-    : format === 'svg'
-      ? new TextEncoder().encode(svg?.text ?? '')
-      : await renderPng(svg as { text: string; width: number; height: number });
   const begin = await bridge.beginExport({
     artifactId: artifact.artifactId,
     revisionId: revision.revisionId,
@@ -102,10 +96,25 @@ export async function exportCanvasArtifact({
   });
   if (begin.cancelled) return { status: 'cancelled' };
   if (!begin.ticket) throw new Error('Native export did not return a ticket.');
-  if (bytes.byteLength > begin.maxBytes) {
-    await bridge.cancelExport(begin.ticket).catch(() => undefined);
-    throw new Error('Canvas export exceeds the native size limit.');
+  let commitStarted = false;
+  try {
+    const svg = format === 'json' ? null : serializeCanvasSvg(content);
+    if (format === 'png' && svg && svg.width * svg.height * 4 > begin.maxBytes) {
+      throw new Error('Canvas export exceeds the native size limit.');
+    }
+    const bytes = format === 'json'
+      ? serializeCanvasJson(content)
+      : format === 'svg'
+        ? new TextEncoder().encode(svg?.text ?? '')
+        : await renderPng(svg as { text: string; width: number; height: number });
+    if (bytes.byteLength > begin.maxBytes) {
+      throw new Error('Canvas export exceeds the native size limit.');
+    }
+    commitStarted = true;
+    const result = await bridge.commitExport(begin.ticket, bytes);
+    return { status: 'exported', ...result };
+  } catch (error) {
+    if (!commitStarted) await bridge.cancelExport(begin.ticket).catch(() => undefined);
+    throw error;
   }
-  const result = await bridge.commitExport(begin.ticket, bytes);
-  return { status: 'exported', ...result };
 }

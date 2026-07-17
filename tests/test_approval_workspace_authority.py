@@ -9,6 +9,8 @@ import pytest
 import imperaos.cli as cli
 import imperaos.computer_use.runtime as computer_use_runtime
 import imperaos.team.supervisor as team_supervisor
+from imperaos.control_plane.models import ControlPlaneRunSummary, RunStatus
+from imperaos.control_plane.run_coordinator import ControlPlaneRunCoordinator
 from imperaos.governance.approval_store import ApprovalStore
 from imperaos.governance.runtime import GovernanceRuntime
 from imperaos.runtime.config import RuntimeConfig
@@ -160,6 +162,52 @@ def _runtime(tmp_path) -> GovernanceRuntime:
     return GovernanceRuntime(config=config)
 
 
+def _coordinator(tmp_path, workspace_id: str = "workspace-a") -> ControlPlaneRunCoordinator:
+    config = RuntimeConfig.from_profile("default")
+    config = config.model_copy(
+        update={
+            "governance": config.governance.model_copy(
+                update={"approval_store_path": str(tmp_path / "coordinator-approvals.sqlite3")}
+            ),
+            "memory": config.memory.model_copy(
+                update={
+                    "workspace_authority": config.memory.workspace_authority.model_copy(
+                        update={"default_workspace_id": workspace_id}
+                    )
+                }
+            ),
+        }
+    )
+    return ControlPlaneRunCoordinator(
+        config=config,
+        registry=SimpleNamespace(),
+        root_dir=tmp_path / "control-plane",
+    )
+
+
+def _write_pending_run(
+    coordinator: ControlPlaneRunCoordinator,
+    *,
+    run_id: str,
+    approval_id: str,
+) -> None:
+    summary = ControlPlaneRunSummary(
+        run_id=run_id,
+        agent_id="agent-1",
+        profile="default",
+        status=RunStatus.APPROVAL_PENDING,
+        submitted_by="operator-a",
+        input_hash="a" * 64,
+        policy_hash="b" * 64,
+        approval_ids=[approval_id],
+        next_actions=["approval.show", "approval.decide", "approval.execute"],
+    )
+    coordinator.store.write_json_atomic(
+        f"runs/{run_id}.json",
+        {"run": summary.model_dump(mode="json")},
+    )
+
+
 def test_runtime_carries_initiating_workspace_and_scopes_normal_lookup(tmp_path) -> None:
     runtime = _runtime(tmp_path)
     _decision, ticket = runtime.evaluate_task(
@@ -231,6 +279,78 @@ def test_resume_collection_hides_foreign_workspace_and_preserves_executor(tmp_pa
         approval_id=ticket.approval_id,
         workspace_id="workspace-a",
     ).executed_by == "executor-a"
+
+
+def test_run_coordinator_completes_after_same_workspace_approval_executes(tmp_path) -> None:
+    coordinator = _coordinator(tmp_path)
+    ticket = _ticket(coordinator.approvals, "workspace-a", "coordinator-local")
+    assert coordinator.approvals.decide(
+        approval_id=ticket.approval_id,
+        workspace_id="workspace-a",
+        approve=True,
+        actor="reviewer-a",
+        reason="approved",
+    ).error_code is None
+    assert coordinator.approvals.mark_executed(
+        approval_id=ticket.approval_id,
+        workspace_id="workspace-a",
+        executed_by="executor-a",
+    ).error_code is None
+    _write_pending_run(
+        coordinator,
+        run_id="run-local",
+        approval_id=ticket.approval_id,
+    )
+
+    result = coordinator.get_status(run_id="run-local")
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.completed_at is not None
+
+
+def test_run_coordinator_treats_foreign_approval_as_missing(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    coordinator = _coordinator(tmp_path)
+    foreign = _ticket(coordinator.approvals, "workspace-b", "coordinator-foreign")
+    assert coordinator.approvals.decide(
+        approval_id=foreign.approval_id,
+        workspace_id="workspace-b",
+        approve=True,
+        actor="reviewer-b",
+        reason="approved",
+    ).error_code is None
+    assert coordinator.approvals.mark_executed(
+        approval_id=foreign.approval_id,
+        workspace_id="workspace-b",
+        executed_by="executor-b",
+    ).error_code is None
+    _write_pending_run(
+        coordinator,
+        run_id="run-foreign",
+        approval_id=foreign.approval_id,
+    )
+    _write_pending_run(
+        coordinator,
+        run_id="run-missing",
+        approval_id="approval-missing",
+    )
+    observed_workspaces: list[str | None] = []
+    get_approval = coordinator.approvals.get
+
+    def recording_get(approval_id: str, *, workspace_id: str | None = None):
+        observed_workspaces.append(workspace_id)
+        return get_approval(approval_id, workspace_id=workspace_id)
+
+    monkeypatch.setattr(coordinator.approvals, "get", recording_get)
+
+    foreign_result = coordinator.get_status(run_id="run-foreign")
+    missing_result = coordinator.get_status(run_id="run-missing")
+
+    assert observed_workspaces == ["workspace-a", "workspace-a"]
+    assert foreign_result.status == missing_result.status == RunStatus.APPROVAL_PENDING
+    assert foreign_result.completed_at is missing_result.completed_at is None
+    assert foreign_result.next_actions == missing_result.next_actions
 
 
 def test_operator_panel_uses_trusted_workspace_and_verified_decision_actor(monkeypatch) -> None:

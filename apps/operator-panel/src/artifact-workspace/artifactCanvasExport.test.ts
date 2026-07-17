@@ -53,6 +53,28 @@ describe('canvas fallback export', () => {
     })).resolves.toEqual({ status: 'cancelled' });
   });
 
+  it.each(['json', 'svg', 'png'] as const)('stops before canvas %s serialization when the native ticket is cancelled', async (format) => {
+    const renderPng = vi.fn().mockRejectedValue(new Error('PNG renderer must not run'));
+    const bridge = {
+      beginExport: vi.fn().mockResolvedValue({ cancelled: true }),
+      cancelExport: vi.fn(),
+      commitExport: vi.fn(),
+    } as unknown as ArtifactBridge;
+
+    await expect(exportCanvasArtifact({
+      artifact,
+      revision,
+      content: { invalid: true } as never,
+      format,
+      bridge,
+      renderPng,
+    })).resolves.toEqual({ status: 'cancelled' });
+    expect(bridge.beginExport).toHaveBeenCalledOnce();
+    expect(renderPng).not.toHaveBeenCalled();
+    expect(bridge.cancelExport).not.toHaveBeenCalled();
+    expect(bridge.commitExport).not.toHaveBeenCalled();
+  });
+
   it('serializes bounded SVG without interpreting canvas text as markup', () => {
     const svg = serializeCanvasSvg(content);
     expect(svg.text).toContain('&lt;script&gt;local text only&lt;/script&gt;');
@@ -91,5 +113,63 @@ describe('canvas fallback export', () => {
       artifactId: artifact.artifactId, revisionId: revision.revisionId, format: 'json',
     }));
     expect(bridge.cancelExport).toHaveBeenCalledWith('ticket-1');
+  });
+
+  it.each(['json', 'svg'] as const)('cancels the native ticket when canvas %s serialization fails', async (format) => {
+    const bridge = {
+      beginExport: vi.fn().mockResolvedValue({ cancelled: false, ticket: 'ticket-1', maxBytes: 1_000_000 }),
+      commitExport: vi.fn(),
+      cancelExport: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ArtifactBridge;
+
+    await expect(exportCanvasArtifact({
+      artifact,
+      revision,
+      content: { invalid: true } as never,
+      format,
+      bridge,
+    })).rejects.toThrow();
+    expect(bridge.cancelExport).toHaveBeenCalledWith('ticket-1');
+    expect(bridge.commitExport).not.toHaveBeenCalled();
+  });
+
+  it('cancels the native ticket when PNG rendering fails', async () => {
+    const bridge = {
+      beginExport: vi.fn().mockResolvedValue({ cancelled: false, ticket: 'ticket-1', maxBytes: 1_000_000 }),
+      commitExport: vi.fn(),
+      cancelExport: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ArtifactBridge;
+
+    await expect(exportCanvasArtifact({
+      artifact,
+      revision,
+      content,
+      format: 'png',
+      bridge,
+      renderPng: vi.fn().mockRejectedValue(new Error('render failed')),
+    })).rejects.toThrow('render failed');
+    expect(bridge.cancelExport).toHaveBeenCalledWith('ticket-1');
+    expect(bridge.commitExport).not.toHaveBeenCalled();
+  });
+
+  it('enforces the ticket bound before allocating the PNG raster', async () => {
+    const renderPng = vi.fn().mockResolvedValue(new Uint8Array([1]));
+    const bridge = {
+      beginExport: vi.fn().mockResolvedValue({ cancelled: false, ticket: 'ticket-1', maxBytes: 2 }),
+      commitExport: vi.fn(),
+      cancelExport: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ArtifactBridge;
+
+    await expect(exportCanvasArtifact({
+      artifact,
+      revision,
+      content,
+      format: 'png',
+      bridge,
+      renderPng,
+    })).rejects.toThrow(/size limit/i);
+    expect(renderPng).not.toHaveBeenCalled();
+    expect(bridge.cancelExport).toHaveBeenCalledWith('ticket-1');
+    expect(bridge.commitExport).not.toHaveBeenCalled();
   });
 });

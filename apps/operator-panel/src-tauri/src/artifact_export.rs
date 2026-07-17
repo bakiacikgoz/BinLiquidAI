@@ -164,6 +164,8 @@ pub struct ExportBoundaryError {
     pub code: String,
     pub message: String,
     pub retryable: bool,
+    #[serde(skip)]
+    reconciliation_required: bool,
 }
 
 impl ExportBoundaryError {
@@ -172,6 +174,7 @@ impl ExportBoundaryError {
             code: code.to_string(),
             message: message.to_string(),
             retryable,
+            reconciliation_required: false,
         }
     }
 
@@ -194,7 +197,29 @@ impl ExportBoundaryError {
     fn failed(message: &str, retryable: bool) -> Self {
         Self::new("ARTIFACT_EXPORT_FAILED", message, retryable)
     }
+
+    fn post_rename_durability_uncertain() -> Self {
+        let mut error = Self::failed(
+            "artifact export was renamed but directory durability is uncertain",
+            true,
+        );
+        error.reconciliation_required = true;
+        error
+    }
+
+    pub(crate) fn requires_reconciliation(&self) -> bool {
+        self.reconciliation_required
+    }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AtomicWriteFailure {
+    BeforeRename,
+    #[cfg_attr(windows, allow(dead_code))]
+    AfterRename,
+}
+
+type AtomicWriter = fn(&Path, &str, &[u8]) -> Result<(), AtomicWriteFailure>;
 
 #[derive(Clone)]
 enum ExportTicketPhase {
@@ -345,6 +370,18 @@ impl ArtifactExportState {
         bytes: Vec<u8>,
         expected_sha256: &str,
     ) -> Result<ArtifactExportResult, ExportBoundaryError> {
+        self.commit_with_writer(ticket, binding, bytes, expected_sha256, atomic_write)
+            .await
+    }
+
+    async fn commit_with_writer(
+        &self,
+        ticket: &str,
+        binding: &ExportBinding,
+        bytes: Vec<u8>,
+        expected_sha256: &str,
+        writer: AtomicWriter,
+    ) -> Result<ArtifactExportResult, ExportBoundaryError> {
         let record = self.record_for_ticket(ticket, binding).await?;
         if bytes.len() > record.max_bytes {
             return Err(ExportBoundaryError::failed(
@@ -412,8 +449,7 @@ impl ArtifactExportState {
             }
         }
         let write_result =
-            match tokio::task::spawn_blocking(move || atomic_write(&target, &ticket_owned, &bytes))
-                .await
+            match tokio::task::spawn_blocking(move || writer(&target, &ticket_owned, &bytes)).await
             {
                 Ok(result) => result,
                 Err(_) => {
@@ -426,11 +462,27 @@ impl ArtifactExportState {
                     ));
                 }
             };
-        if let Err(error) = write_result {
-            if let Some(current) = self.tickets.lock().await.get_mut(ticket) {
-                current.phase = ExportTicketPhase::Issued;
+        if let Err(failure) = write_result {
+            let mut tickets = self.tickets.lock().await;
+            if let Some(current) = tickets.get_mut(ticket) {
+                match failure {
+                    AtomicWriteFailure::BeforeRename => {
+                        current.phase = ExportTicketPhase::Issued;
+                    }
+                    AtomicWriteFailure::AfterRename => {
+                        current.phase = ExportTicketPhase::Written {
+                            basename,
+                            sha256: observed_sha256,
+                            size_bytes,
+                        };
+                        return Err(ExportBoundaryError::post_rename_durability_uncertain());
+                    }
+                }
             }
-            return Err(error);
+            return Err(ExportBoundaryError::failed(
+                "artifact export could not be committed atomically",
+                true,
+            ));
         }
         if let Some(current) = self.tickets.lock().await.get_mut(ticket) {
             current.phase = ExportTicketPhase::Written {
@@ -658,7 +710,12 @@ impl ArtifactExportState {
                     true,
                 )
             })?;
-            atomic_write(&target, &ticket, &bytes)
+            atomic_write(&target, &ticket, &bytes).map_err(|_| {
+                ExportBoundaryError::failed(
+                    "artifact export reconciliation receipt could not be persisted",
+                    true,
+                )
+            })
         })
         .await
         .map_err(|_| {
@@ -797,47 +854,48 @@ fn is_valid_binding(binding: &ExportBinding) -> bool {
         && binding.format.len() <= 32
 }
 
-fn atomic_write(target: &Path, ticket: &str, bytes: &[u8]) -> Result<(), ExportBoundaryError> {
+fn atomic_write(target: &Path, ticket: &str, bytes: &[u8]) -> Result<(), AtomicWriteFailure> {
     let basename = target
         .file_name()
         .and_then(|value| value.to_str())
-        .ok_or_else(|| ExportBoundaryError::failed("export basename is invalid", false))?;
+        .ok_or(AtomicWriteFailure::BeforeRename)?;
     let temp_path = target.with_file_name(format!(".{basename}.{ticket}.tmp"));
     let mut created_by_us = false;
-    let write_result = (|| -> std::io::Result<()> {
+    let write_result = (|| -> Result<(), AtomicWriteFailure> {
         let mut temp = OpenOptions::new()
             .create_new(true)
             .write(true)
-            .open(&temp_path)?;
+            .open(&temp_path)
+            .map_err(|_| AtomicWriteFailure::BeforeRename)?;
         created_by_us = true;
-        temp.write_all(bytes)?;
-        temp.sync_all()?;
+        temp.write_all(bytes)
+            .map_err(|_| AtomicWriteFailure::BeforeRename)?;
+        temp.sync_all()
+            .map_err(|_| AtomicWriteFailure::BeforeRename)?;
         drop(temp);
         atomic_replace(&temp_path, target)
     })();
-    if write_result.is_err() {
+    if matches!(write_result, Err(AtomicWriteFailure::BeforeRename)) {
         if created_by_us {
             let _ = fs::remove_file(&temp_path);
         }
-        return Err(ExportBoundaryError::failed(
-            "artifact export could not be committed atomically",
-            true,
-        ));
     }
-    Ok(())
+    write_result
 }
 
 #[cfg(not(windows))]
-fn atomic_replace(temp_path: &Path, target: &Path) -> std::io::Result<()> {
-    fs::rename(temp_path, target)?;
+fn atomic_replace(temp_path: &Path, target: &Path) -> Result<(), AtomicWriteFailure> {
+    fs::rename(temp_path, target).map_err(|_| AtomicWriteFailure::BeforeRename)?;
     if let Some(parent) = target.parent() {
-        File::open(parent)?.sync_all()?;
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|_| AtomicWriteFailure::AfterRename)?;
     }
     Ok(())
 }
 
 #[cfg(windows)]
-fn atomic_replace(temp_path: &Path, target: &Path) -> std::io::Result<()> {
+fn atomic_replace(temp_path: &Path, target: &Path) -> Result<(), AtomicWriteFailure> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{
         MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
@@ -863,7 +921,7 @@ fn atomic_replace(temp_path: &Path, target: &Path) -> std::io::Result<()> {
         )
     };
     if result == 0 {
-        return Err(std::io::Error::last_os_error());
+        return Err(AtomicWriteFailure::BeforeRename);
     }
     Ok(())
 }
@@ -1308,6 +1366,83 @@ mod tests {
                 actions.as_slice(),
                 [ExportReconciliationAction::CancelNativeWriteFailed(receipt)]
                     if receipt.export_id() == "export-mismatch-1"
+            ));
+        });
+    }
+
+    #[test]
+    fn post_rename_parent_sync_failure_retains_receipt_for_commit_reconciliation() {
+        fn write_then_report_parent_sync_failure(
+            target: &Path,
+            _ticket: &str,
+            bytes: &[u8],
+        ) -> Result<(), AtomicWriteFailure> {
+            fs::write(target, bytes).expect("simulate completed atomic rename");
+            Err(AtomicWriteFailure::AfterRename)
+        }
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let root = tempfile::tempdir().expect("tempdir");
+            let journal_root = root.path().join("journal");
+            let target = root.path().join("report.json");
+            let bytes = br#"{"status":"ok"}"#.to_vec();
+            let digest = format!("{:x}", Sha256::digest(&bytes));
+            let actor = binding("user-1");
+            let exact = ExportBinding::authorized(
+                "workspace-1",
+                "user-1",
+                "user",
+                "export-post-rename-1",
+                "artifact-1",
+                "revision-1",
+                "json",
+            )
+            .expect("binding");
+            let state = ArtifactExportState::new(journal_root);
+            let issued = state
+                .issue_ticket(target.clone(), exact, 1024, Duration::from_secs(60))
+                .await
+                .expect("ticket");
+            let preflight = state
+                .preflight(&issued.ticket, &actor, &bytes, &digest)
+                .await
+                .expect("preflight");
+            state
+                .prepare_reconciliation(&issued.ticket, &actor, &preflight)
+                .await
+                .expect("durable receipt");
+
+            let error = state
+                .commit_with_writer(
+                    &issued.ticket,
+                    &actor,
+                    bytes.clone(),
+                    &digest,
+                    write_then_report_parent_sync_failure,
+                )
+                .await
+                .expect_err("directory sync uncertainty must be reconciled");
+
+            assert!(error.requires_reconciliation());
+            assert_eq!(fs::read(&target).expect("renamed target"), bytes);
+            assert!(state
+                .require_cancellable(&issued.ticket, &actor)
+                .await
+                .is_err());
+            let actions = state
+                .reconciliation_actions(&actor)
+                .await
+                .expect("reconciliation action");
+            assert!(matches!(
+                actions.as_slice(),
+                [ExportReconciliationAction::Commit(receipt)]
+                    if receipt.export_id() == "export-post-rename-1"
+                        && receipt.sha256() == digest
+                        && receipt.size_bytes() == bytes.len()
             ));
         });
     }

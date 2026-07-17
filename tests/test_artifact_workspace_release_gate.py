@@ -8,10 +8,12 @@ import pytest
 from scripts.run_artifact_workspace_release_gate import (
     GATE_REPORTS,
     REQUIRED_RELEASE_ARTIFACTS,
+    _extract_performance_evidence,
     _run_command,
     build_release_readiness,
     evaluate_forced_off_license_gate,
     gate_commands,
+    run_leaf_gate,
 )
 
 
@@ -144,6 +146,80 @@ def test_security_gate_contains_artifact_assistant_and_form_trust_regressions() 
     flattened = " ".join(part for command in gate_commands("security") for part in command)
     assert "tests/test_artifact_assistant_integration.py" in flattened
     assert "tests/test_artifact_form_submission.py" in flattened
+
+
+def test_e2e_gate_contains_phase_23_artifact_quality_matrix() -> None:
+    flattened = " ".join(part for command in gate_commands("e2e") for part in command)
+    for spec in (
+        "e2e/artifact-security.spec.ts",
+        "e2e/artifact-accessibility.spec.ts",
+        "e2e/artifact-responsive.spec.ts",
+        "e2e/assistant-artifact-integration.spec.ts",
+    ):
+        assert spec in flattened
+
+
+def test_performance_markers_are_emitted_and_required_by_rpc_ui_reports(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    performance_test = (
+        root
+        / "apps/operator-panel/src/artifact-workspace/artifactPerformance.test.tsx"
+    )
+    assert performance_test.is_file()
+    assert any(command[-1] == "test" for command in gate_commands("ui"))
+
+    evidence = _extract_performance_evidence(
+        'noise\nARTIFACT_PERFORMANCE_JSON={"workload":"rpc-matrix","p95Ms":12.5}\n'
+    )
+    assert evidence == [{"workload": "rpc-matrix", "p95Ms": 12.5}]
+
+    def command_runner(command: list[str], _root: Path) -> dict[str, object]:
+        result: dict[str, object] = {
+            "name": "focused",
+            "exitCode": 0,
+            "durationMs": 1.0,
+            "testCount": 1,
+            "stdoutSha256": "a" * 64,
+            "stderrSha256": "b" * 64,
+        }
+        if any(part.endswith("test_artifact_rpc_performance.py") for part in command):
+            result["performanceEvidence"] = [
+                {"workload": "rpc-matrix", "p95Ms": 12.5, "errors": 0}
+            ]
+        return result
+
+    report = run_leaf_gate(
+        "rpc",
+        repo_root=tmp_path,
+        output_root=tmp_path,
+        candidate_sha="a" * 40,
+        profile="enterprise",
+        command_runner=command_runner,
+    )
+    assert report["status"] == "pass"
+    assert report["performanceEvidence"] == [
+        {"workload": "rpc-matrix", "p95Ms": 12.5, "errors": 0}
+    ]
+
+    missing = run_leaf_gate(
+        "ui",
+        repo_root=tmp_path,
+        output_root=tmp_path,
+        candidate_sha="a" * 40,
+        profile="enterprise",
+        command_runner=lambda _command, _root: {
+            "name": "focused",
+            "exitCode": 0,
+            "durationMs": 1.0,
+            "testCount": 1,
+            "stdoutSha256": "a" * 64,
+            "stderrSha256": "b" * 64,
+        },
+    )
+    assert missing["status"] == "fail"
+    assert "PERFORMANCE_EVIDENCE_MISSING:ui" in missing["blockingReasons"]
 
 
 def test_command_runner_reports_missing_executable_without_crashing(tmp_path: Path) -> None:

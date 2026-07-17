@@ -123,7 +123,11 @@ class ControlPlaneRunCoordinator:
             raise FileNotFoundError(f"control-plane run not found: {run_id}")
         summary = ControlPlaneRunSummary.model_validate(payload["run"])
         if summary.status == RunStatus.APPROVAL_PENDING:
-            tickets = [self.approvals.get(item) for item in summary.approval_ids]
+            workspace_id = self.config.memory.workspace_authority.default_workspace_id
+            tickets = [
+                self.approvals.get(item, workspace_id=workspace_id)
+                for item in summary.approval_ids
+            ]
             if tickets and all(ticket and ticket.status.value == "executed" for ticket in tickets):
                 summary = summary.model_copy(
                     update={

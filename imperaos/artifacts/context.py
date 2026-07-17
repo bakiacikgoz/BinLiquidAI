@@ -391,6 +391,13 @@ def _merge_form_projection(
         existing = target[key]
         if isinstance(existing, dict) and isinstance(value, dict):
             _merge_form_projection(existing, value)
+        elif (
+            key == "required"
+            and isinstance(existing, list)
+            and isinstance(value, list)
+            and all(isinstance(item, str) for item in (*existing, *value))
+        ):
+            existing.extend(item for item in value if item not in existing)
         elif existing != value:
             _invalid("form selection projection is inconsistent")
 
