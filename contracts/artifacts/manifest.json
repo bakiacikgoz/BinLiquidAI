@@ -126,7 +126,7 @@
       "category": "contract",
       "file": "artifact-mutation-command.v1.schema.json",
       "name": "artifact-mutation-command.v1",
-      "sha256": "37e5fdc6f47ce49a25d113d347a7fac3a3154c278f411925b7099d397b64df9e"
+      "sha256": "5dc4bec508d45a9e6c94c440ccf3be7a5cf8b8a2e5594ba90ce7d7875e44af63"
     },
     {
       "category": "contract",
@@ -144,7 +144,7 @@
       "category": "contract",
       "file": "artifact-apply-proposal-command.v1.schema.json",
       "name": "artifact-apply-proposal-command.v1",
-      "sha256": "1b474c8e1f5ca4405a5acaa5ee5c8f1c1cb309ab8d4065b789aff4f5680d6eed"
+      "sha256": "af0b020bbfa80888d60a215fbe1db548160e8dcd26e5be4815a36a537c48eadf"
     },
     {
       "category": "contract",

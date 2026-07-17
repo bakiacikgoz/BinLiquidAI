@@ -62,6 +62,8 @@ class ArtifactMutationProposalResult:
     status: Literal["pending", "applied", "rejected", "stale"]
     content_sha256: str
     summary: str
+    approval_id: str
+    action_hash: str
 
 
 class ArtifactFormSubmissionResult(ArtifactModel):

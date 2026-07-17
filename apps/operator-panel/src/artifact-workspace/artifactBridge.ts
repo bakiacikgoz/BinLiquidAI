@@ -215,7 +215,7 @@ export const artifactBridge = {
   applyProposal(request: {
     proposalId: string;
     expectedRevisionNumber: number;
-    approvalGranted: boolean;
+    approvalId: string;
   }): Promise<ArtifactOperationResult> {
     return callArtifact(
       'bridge_artifact_apply_proposal',

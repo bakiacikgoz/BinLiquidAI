@@ -46,8 +46,6 @@ class MutateArtifactCommand(ArtifactModel):
     content: dict[str, JsonValue]
     idempotency_key: BoundedId
     change_summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""
-    approval_granted: bool = False
-    proposal_id: BoundedId | None = None
 
 
 class SpreadsheetSetCellOperation(ArtifactModel):
@@ -96,7 +94,7 @@ class ProposeArtifactMutationCommand(ArtifactModel):
 class ApplyArtifactProposalCommand(ArtifactModel):
     proposal_id: BoundedId
     expected_revision_number: int = Field(ge=1)
-    approval_granted: bool = False
+    approval_id: BoundedId
 
 
 class ArtifactHistoryQuery(ArtifactModel):

@@ -20,11 +20,6 @@
   "$id": "https://schemas.imperaos.local/artifacts/artifact-mutation-command.v1.schema.json",
   "additionalProperties": false,
   "properties": {
-    "approvalGranted": {
-      "default": false,
-      "title": "Approvalgranted",
-      "type": "boolean"
-    },
     "artifactId": {
       "maxLength": 128,
       "minLength": 1,
@@ -59,21 +54,6 @@
     },
     "mutationType": {
       "$ref": "#/$defs/ArtifactMutationType"
-    },
-    "proposalId": {
-      "anyOf": [
-        {
-          "maxLength": 128,
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Proposalid"
     }
   },
   "required": [

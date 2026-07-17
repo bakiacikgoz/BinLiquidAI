@@ -235,6 +235,117 @@ class ApprovalStore:
             return None
         return self._row_to_ticket(row)
 
+    def get_by_idempotency_key(self, idempotency_key: str) -> ApprovalTicket | None:
+        with self._conn() as conn:
+            return self._get_by_idempotency_key(conn, idempotency_key)
+
+    def claim_approved_action(
+        self,
+        *,
+        approval_id: str,
+        claim_id: str,
+        target_kind: str,
+        target_ref: str,
+        action_hash: str,
+        executor_principal_id: str,
+    ) -> ApprovalDecisionResult:
+        self.expire_pending()
+        now = datetime.now(UTC)
+        with self._conn() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT * FROM approvals WHERE approval_id = ?",
+                (approval_id,),
+            ).fetchone()
+            if row is None:
+                return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
+            ticket = self._row_to_ticket(row)
+            if (
+                ticket.target_kind != target_kind
+                or ticket.target_ref != target_ref
+                or ticket.action_hash != action_hash
+            ):
+                return ApprovalDecisionResult(ticket=ticket, error_code="STALE_APPROVAL_SNAPSHOT")
+            if ticket.snapshot.get("executorPrincipalId") != executor_principal_id:
+                return ApprovalDecisionResult(
+                    ticket=ticket,
+                    error_code="APPROVAL_PRINCIPAL_MISMATCH",
+                )
+            if ticket.status is ApprovalStatus.CONSUMED:
+                error = None if ticket.consumed_by_job_id == claim_id else "REPLAY_BLOCKED"
+                return ApprovalDecisionResult(ticket=ticket, error_code=error)
+            if ticket.status is ApprovalStatus.EXECUTED:
+                error = None if ticket.resume_claimed_job_id == claim_id else "REPLAY_BLOCKED"
+                return ApprovalDecisionResult(ticket=ticket, error_code=error)
+            if ticket.status is not ApprovalStatus.APPROVED:
+                return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+            updated = conn.execute(
+                """
+                UPDATE approvals
+                SET status = ?, execution_status = ?, executed_at = ?,
+                    resume_claimed_job_id = ?, resume_claimed_at = ?, version = version + 1
+                WHERE approval_id = ? AND version = ? AND status = ?
+                """,
+                (
+                    ApprovalStatus.EXECUTED.value,
+                    ExecutionStatus.EXECUTED.value,
+                    now.isoformat(),
+                    claim_id,
+                    now.isoformat(),
+                    approval_id,
+                    ticket.version,
+                    ApprovalStatus.APPROVED.value,
+                ),
+            ).rowcount
+            if updated != 1:
+                return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+
+    def complete_claimed_action(
+        self,
+        *,
+        approval_id: str,
+        claim_id: str,
+    ) -> ApprovalDecisionResult:
+        now = datetime.now(UTC)
+        with self._conn() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT * FROM approvals WHERE approval_id = ?",
+                (approval_id,),
+            ).fetchone()
+            if row is None:
+                return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
+            ticket = self._row_to_ticket(row)
+            if ticket.status is ApprovalStatus.CONSUMED:
+                error = None if ticket.consumed_by_job_id == claim_id else "REPLAY_BLOCKED"
+                return ApprovalDecisionResult(ticket=ticket, error_code=error)
+            if (
+                ticket.status is not ApprovalStatus.EXECUTED
+                or ticket.resume_claimed_job_id != claim_id
+            ):
+                return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+            updated = conn.execute(
+                """
+                UPDATE approvals
+                SET status = ?, consumed_by_job_id = ?, consumed_at = ?, version = version + 1
+                WHERE approval_id = ? AND version = ? AND status = ?
+                  AND resume_claimed_job_id = ?
+                """,
+                (
+                    ApprovalStatus.CONSUMED.value,
+                    claim_id,
+                    now.isoformat(),
+                    approval_id,
+                    ticket.version,
+                    ApprovalStatus.EXECUTED.value,
+                    claim_id,
+                ),
+            ).rowcount
+            if updated != 1:
+                return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
+        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+
     def schema_version(self) -> str:
         with self._conn() as conn:
             row = conn.execute(

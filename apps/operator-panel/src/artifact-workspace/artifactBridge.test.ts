@@ -179,6 +179,35 @@ describe('artifact bridge', () => {
     });
   });
 
+  it('applies proposals with an opaque approval id and no renderer authority boolean', async () => {
+    const invoke = mockInvoke({
+      artifact: descriptor,
+      revision: {
+        revisionId: 'revision-2', artifactId: 'artifact-1', parentRevisionId: 'revision-1',
+        baseRevisionId: null, revisionNumber: 2, schemaVersion: 1, mutationType: 'replace_content',
+        contentRelpath: 'content/revision-2.json', contentSha256: 'a'.repeat(64), contentSizeBytes: 10,
+        contentEncoding: 'json', changeSummary: 'Apply proposal', authorType: 'assistant',
+        authorId: 'assistant-1', idempotencyKey: 'proposal-key-1', createdAtUtc: '2026-07-16T08:01:00Z',
+      },
+      created: false,
+      disposition: 'updated',
+    });
+    const { artifactBridge } = await import('./artifactBridge');
+
+    await artifactBridge.applyProposal({
+      proposalId: 'proposal-1', expectedRevisionNumber: 1, approvalId: 'approval-1',
+    });
+
+    expect(invoke).toHaveBeenCalledWith('bridge_artifact_apply_proposal', {
+      payload: {
+        params: { proposalId: 'proposal-1', expectedRevisionNumber: 1, approvalId: 'approval-1' },
+        idempotencyKey: null,
+        timeoutMs: 15_000,
+      },
+    });
+    expect(JSON.stringify(invoke.mock.calls)).not.toContain('approvalGranted');
+  });
+
   it('preserves typed governed errors without exposing raw payloads', async () => {
     const invoke = vi.fn().mockResolvedValue({
       ok: false,

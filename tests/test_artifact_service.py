@@ -29,6 +29,7 @@ from imperaos.artifacts.models import (
     PrincipalType,
 )
 from imperaos.artifacts.service import ArtifactService
+from imperaos.governance.approval_store import ApprovalStore
 
 
 def document(text: str) -> dict[str, object]:
@@ -241,7 +242,8 @@ def test_restore_replay_rejects_changed_request_after_response_loss(
 def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision(
     tmp_path: Path,
 ) -> None:
-    service = ArtifactService(tmp_path / "artifact-root")
+    approval_store = ApprovalStore(tmp_path / "approvals.sqlite3")
+    service = ArtifactService(tmp_path / "artifact-root", approval_store=approval_store)
     service.create(create_command(), user_context())
     assistant = assistant_context()
     proposal = service.propose_mutation(
@@ -257,27 +259,107 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
         assistant,
     )
 
-    with pytest.raises(ArtifactDomainError) as approval_required:
-        service.apply_proposal(
-            ApplyArtifactProposalCommand(
-                proposal_id="proposal-1",
-                expected_revision_number=1,
-                approval_granted=False,
-            ),
-            assistant,
+    with pytest.raises(ValidationError):
+        ApplyArtifactProposalCommand.model_validate(
+            {
+                "proposalId": "proposal-1",
+                "expectedRevisionNumber": 1,
+                "approvalGranted": True,
+            }
         )
+    approval_store.decide(
+        approval_id=proposal.approval_id,
+        approve=True,
+        actor="user-1",
+        reason="Reviewed exact proposal",
+    )
     applied = service.apply_proposal(
         ApplyArtifactProposalCommand(
             proposal_id="proposal-1",
             expected_revision_number=1,
-            approval_granted=True,
+            approval_id=proposal.approval_id,
+        ),
+        assistant,
+    )
+    replay = service.apply_proposal(
+        ApplyArtifactProposalCommand(
+            proposal_id="proposal-1",
+            expected_revision_number=1,
+            approval_id=proposal.approval_id,
         ),
         assistant,
     )
 
     assert proposal.status == "pending"
-    assert approval_required.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
+    assert proposal.approval_id
+    assert len(proposal.action_hash) == 64
     assert applied.artifact.current_revision_number == 2
+    assert replay.disposition == "idempotent_replay"
+
+
+def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: Path) -> None:
+    approval_store = ApprovalStore(tmp_path / "approvals.sqlite3")
+    service = ArtifactService(tmp_path / "artifact-root", approval_store=approval_store)
+    service.create(create_command(), user_context())
+    proposal = service.propose_mutation(
+        ProposeArtifactMutationCommand(
+            proposal_id="proposal-1",
+            artifact_id="artifact-1",
+            base_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content=document("AI proposal"),
+            idempotency_key="proposal-key-1",
+        ),
+        assistant_context(),
+    )
+    rogue = approval_store.create_ticket(
+        run_id="rogue-request",
+        target_kind="artifact_mutation_proposal",
+        target_ref="workspace-1:artifact-1:proposal-1",
+        action_hash="f" * 64,
+        policy_hash="e" * 64,
+        request_hash="d" * 64,
+        snapshot_hash="c" * 64,
+        snapshot={"executorPrincipalId": "assistant-1"},
+        ttl_seconds=300,
+        idempotency_key="rogue-approval",
+    )
+    approval_store.decide(
+        approval_id=rogue.approval_id,
+        approve=True,
+        actor="user-1",
+        reason="wrong payload",
+    )
+
+    with pytest.raises(ArtifactDomainError) as wrong_action:
+        service.apply_proposal(
+            ApplyArtifactProposalCommand(
+                proposal_id="proposal-1",
+                expected_revision_number=1,
+                approval_id=rogue.approval_id,
+            ),
+            assistant_context(),
+        )
+
+    approval_store.decide(
+        approval_id=proposal.approval_id,
+        approve=True,
+        actor="user-1",
+        reason="right payload",
+    )
+    other_assistant = assistant_context().model_copy(update={"principal_id": "assistant-2"})
+    with pytest.raises(ArtifactDomainError) as wrong_executor:
+        service.apply_proposal(
+            ApplyArtifactProposalCommand(
+                proposal_id="proposal-1",
+                expected_revision_number=1,
+                approval_id=proposal.approval_id,
+            ),
+            other_assistant,
+        )
+
+    assert wrong_action.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
+    assert wrong_executor.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
 
 
 def test_document_service_duplicate_and_archive_are_workspace_scoped(tmp_path: Path) -> None:

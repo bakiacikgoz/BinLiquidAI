@@ -541,6 +541,8 @@ export const ArtifactMutationProposalResultSchema = z
     status: z.enum(['pending', 'applied', 'rejected', 'stale']),
     content_sha256: sha256,
     summary: z.string().max(500),
+    approval_id: boundedId,
+    action_hash: sha256,
   })
   .strict()
   .transform((value) => ({
@@ -550,6 +552,8 @@ export const ArtifactMutationProposalResultSchema = z
     status: value.status,
     contentSha256: value.content_sha256,
     summary: value.summary,
+    approvalId: value.approval_id,
+    actionHash: value.action_hash,
   }));
 
 export const ArtifactListWireSchema = z
@@ -687,8 +691,6 @@ export interface ArtifactMutationRequest {
   content: ArtifactContent;
   idempotencyKey: string;
   changeSummary?: string;
-  approvalGranted?: boolean;
-  proposalId?: string;
 }
 
 export type SpreadsheetCellOperation =

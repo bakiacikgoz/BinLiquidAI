@@ -2,10 +2,12 @@
   "$id": "https://schemas.imperaos.local/artifacts/artifact-apply-proposal-command.v1.schema.json",
   "additionalProperties": false,
   "properties": {
-    "approvalGranted": {
-      "default": false,
-      "title": "Approvalgranted",
-      "type": "boolean"
+    "approvalId": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "title": "Approvalid",
+      "type": "string"
     },
     "expectedRevisionNumber": {
       "minimum": 1,
@@ -22,7 +24,8 @@
   },
   "required": [
     "proposalId",
-    "expectedRevisionNumber"
+    "expectedRevisionNumber",
+    "approvalId"
   ],
   "title": "ApplyArtifactProposalCommand",
   "type": "object",

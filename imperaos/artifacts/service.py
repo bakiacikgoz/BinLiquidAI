@@ -70,6 +70,7 @@ from imperaos.artifacts.models import (
     canonical_json,
 )
 from imperaos.artifacts.policy import ArtifactPermission, ArtifactPolicyGateway
+from imperaos.artifacts.proposal_approval import ArtifactProposalApprovalGateway
 from imperaos.artifacts.results import (
     ArtifactAssetImportResult,
     ArtifactAssetReadResult,
@@ -104,12 +105,16 @@ class ArtifactService:
         ),
         license_capabilities: Mapping[ArtifactKind, ArtifactLicenseCapability] | None = None,
         evidence_resolver: ArtifactEvidenceResolver | None = None,
+        approval_store: ApprovalStore | None = None,
     ) -> None:
         self.store = ArtifactStore(root)
         self.assets = ArtifactAssetStore(root)
         self.evidence_resolver = evidence_resolver or DenyArtifactEvidenceResolver()
         self.policy = policy or ArtifactPolicyGateway()
         self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
+        self._proposal_approvals = ArtifactProposalApprovalGateway(
+            approval_store or ApprovalStore(Path(root) / "metadata" / "artifact-approvals.sqlite3")
+        )
         self._continuation_gateway = continuation_gateway
         supplied = dict(license_capabilities or {})
         self._license_capabilities = {
@@ -344,6 +349,8 @@ class ArtifactService:
         *,
         _operation: str = "mutate",
         _request_hash: str | None = None,
+        _approval_verified: bool = False,
+        _proposal_id: str | None = None,
     ) -> ArtifactOperationResult:
         current = self.store.get_artifact(context.workspace_id, command.artifact_id)
         permission = (
@@ -357,7 +364,7 @@ class ArtifactService:
             artifact_workspace_id=current.workspace_id,
             current_data_class=current.data_class,
             target_data_class=current.data_class,
-            approval_granted=command.approval_granted,
+            approval_granted=_approval_verified,
         )
         self._require_licensed_editor(current.kind)
         request_hash = _request_hash or self._request_hash(command)
@@ -374,7 +381,9 @@ class ArtifactService:
                 ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
                 "archived artifacts are read-only",
             )
-        if permission is ArtifactPermission.AI_APPLY and command.proposal_id is None:
+        if permission is ArtifactPermission.AI_APPLY and (
+            not _approval_verified or _proposal_id is None
+        ):
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
                 "assistant mutations require an approved proposal",
@@ -392,7 +401,7 @@ class ArtifactService:
             artifact_workspace_id=current.workspace_id,
             current_data_class=current.data_class,
             target_data_class=effective_data_class,
-            approval_granted=command.approval_granted,
+            approval_granted=_approval_verified,
         )
         payload = canonical_json(content).encode("utf-8")
         revision_number = command.expected_revision_number + 1
@@ -483,7 +492,7 @@ class ArtifactService:
             if existing is not None:
                 if existing["content_sha256"] != digest:
                     self._raise_conflict("proposal idempotency payload mismatch")
-                return self._proposal_result(existing)
+                return self._proposal_result(existing, context)
             if artifact.current_revision_number != command.base_revision_number:
                 self._raise_conflict("proposal base revision is stale")
             try:
@@ -515,14 +524,17 @@ class ArtifactService:
                     ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT,
                     "proposal identity conflicts with an existing proposal",
                 ) from exc
-        return ArtifactMutationProposalResult(
-            proposal_id,
-            command.artifact_id,
-            command.base_revision_number,
-            "pending",
-            digest,
-            command.summary,
-        )
+        with self.store._connect() as connection:
+            stored = connection.execute(
+                "SELECT * FROM artifact_mutation_proposals WHERE proposal_id = ?",
+                (proposal_id,),
+            ).fetchone()
+        if stored is None:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                "stored artifact proposal is missing",
+            )
+        return self._proposal_result(stored, context)
 
     @record_artifact_evidence("artifact.apply_proposal")
     def apply_proposal(
@@ -546,19 +558,22 @@ class ArtifactService:
                 "proposal belongs to a different workspace",
             )
         artifact = self.store.get_artifact(context.workspace_id, row["artifact_id"])
+        self._proposal_approvals.claim(row, context, command.approval_id)
         self.policy.authorize(
             ArtifactPermission.AI_APPLY,
             context,
             artifact_workspace_id=artifact.workspace_id,
-            approval_granted=command.approval_granted,
+            approval_granted=True,
         )
         if row["status"] == "applied" and row["applied_revision_id"]:
             stored = self.store.get_revision(
                 context.workspace_id, artifact.artifact_id, row["applied_revision_id"]
             )
-            return ArtifactOperationResult(
+            replay = ArtifactOperationResult(
                 artifact, stored.descriptor, False, "idempotent_replay"
             )
+            self._proposal_approvals.complete(row, command.approval_id)
+            return replay
         if row["status"] != "pending":
             self._raise_conflict("proposal is not pending")
 
@@ -570,10 +585,10 @@ class ArtifactService:
                 content=json.loads(row["content_json"]),
                 idempotency_key=row["idempotency_key"],
                 change_summary=row["summary"],
-                approval_granted=command.approval_granted,
-                proposal_id=command.proposal_id,
             ),
             context,
+            _approval_verified=True,
+            _proposal_id=command.proposal_id,
         )
         with self.store._connect() as connection:
             connection.execute(
@@ -589,6 +604,7 @@ class ArtifactService:
                 ),
             )
             connection.commit()
+        self._proposal_approvals.complete(row, command.approval_id)
         return result
 
     @record_artifact_evidence("artifact.history")
@@ -1654,8 +1670,12 @@ class ArtifactService:
                 effective = attached.data_class
         return effective
 
-    @staticmethod
-    def _proposal_result(row: sqlite3.Row) -> ArtifactMutationProposalResult:
+    def _proposal_result(
+        self,
+        row: sqlite3.Row,
+        context: OperationContext,
+    ) -> ArtifactMutationProposalResult:
+        approval = self._proposal_approvals.request_approval(row, context)
         return ArtifactMutationProposalResult(
             row["proposal_id"],
             row["artifact_id"],
@@ -1663,6 +1683,8 @@ class ArtifactService:
             row["status"],
             row["content_sha256"],
             row["summary"],
+            approval.approval_id,
+            approval.action_hash,
         )
 
     @staticmethod
