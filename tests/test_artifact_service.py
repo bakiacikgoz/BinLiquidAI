@@ -181,7 +181,7 @@ def test_mutation_replays_after_response_loss_and_rejects_changed_request(
             command.model_copy(update={"change_summary": "Changed request"}),
             context,
         )
-    assert mismatch.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert mismatch.value.code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
     replay = restarted.mutate(command, context)
     assert replay.disposition == "idempotent_replay"
     assert [
@@ -234,7 +234,7 @@ def test_restore_replay_rejects_changed_request_after_response_loss(
             command.model_copy(update={"change_summary": "Changed restore"}),
             context,
         )
-    assert mismatch.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert mismatch.value.code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
     replay = restarted.restore(command, context)
     assert replay.disposition == "idempotent_replay"
 
@@ -331,7 +331,69 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
             ),
             assistant,
         )
-    assert replay_mismatch.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert replay_mismatch.value.code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
+
+
+def test_artifact_proposal_stale_base_does_not_claim_approval_or_write_revision(
+    tmp_path: Path,
+) -> None:
+    approval_store = ApprovalStore(tmp_path / "approvals.sqlite3")
+    service = ArtifactService(tmp_path / "artifact-root", approval_store=approval_store)
+    service.create(create_command(), user_context())
+    assistant = assistant_context()
+    proposal = service.propose_mutation(
+        ProposeArtifactMutationCommand(
+            proposal_id="proposal-stale",
+            artifact_id="artifact-1",
+            base_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content=document("stale AI proposal"),
+            idempotency_key="proposal-stale-key",
+            context_sha256="1" * 64,
+            selection_sha256="2" * 64,
+        ),
+        assistant,
+    )
+    approval_store.decide(
+        approval_id=proposal.approval_id,
+        approve=True,
+        actor="user-1",
+        reason="Reviewed exact proposal",
+    )
+    service.mutate(
+        MutateArtifactCommand(
+            artifact_id="artifact-1",
+            expected_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content=document("independent r2"),
+            idempotency_key="independent-r2",
+        ),
+        user_context(),
+    )
+
+    with pytest.raises(ArtifactDomainError) as stale:
+        service.apply_proposal(
+            ApplyArtifactProposalCommand(
+                proposal_id="proposal-stale",
+                expected_revision_number=2,
+                approval_id=proposal.approval_id,
+            ),
+            assistant,
+        )
+
+    assert stale.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert service.get(
+        GetArtifactQuery(artifact_id="artifact-1"), user_context()
+    ).artifact.current_revision_number == 2
+    ticket = approval_store.get(proposal.approval_id)
+    assert ticket is not None
+    assert ticket.status.value == "approved"
+    with service.store._connect() as connection:
+        row = connection.execute(
+            "SELECT status FROM artifact_mutation_proposals WHERE proposal_id = ?",
+            ("proposal-stale",),
+        ).fetchone()
+    assert row["status"] == "stale"
 
 
 def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: Path) -> None:
@@ -601,7 +663,7 @@ def test_duplicate_idempotency_rejects_concurrent_different_payloads(
     rejected = [outcome for outcome in outcomes if isinstance(outcome, ArtifactDomainError)]
     assert len(successful) == 1
     assert len(rejected) == 1
-    assert rejected[0].code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert rejected[0].code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
     with service.store._connect() as connection:
         targets = connection.execute(
             "SELECT artifact_id FROM artifacts WHERE artifact_id LIKE 'artifact-concurrent-%'"
@@ -742,7 +804,7 @@ def test_operation_dedup_rejects_create_and_duplicate_with_the_same_global_key(
     rejected = [outcome for outcome in outcomes if isinstance(outcome, ArtifactDomainError)]
     assert len(successful) == 1
     assert len(rejected) == 1
-    assert rejected[0].code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert rejected[0].code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
     with service.store._connect() as connection:
         targets = connection.execute(
             "SELECT artifact_id FROM artifacts WHERE artifact_id LIKE 'target-%'"

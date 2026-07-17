@@ -406,6 +406,26 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
             "ALTER TABLE artifact_mutation_proposals ADD COLUMN applied_by_id TEXT",
         ),
     ),
+    ArtifactMigration(
+        version=11,
+        name="stale_unverifiable_artifact_proposals",
+        statements=(
+            """
+            UPDATE artifact_mutation_proposals
+            SET status = 'stale',
+                completed_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE status = 'pending'
+              AND (
+                request_sha256 IS NULL
+                OR context_sha256 IS NULL
+                OR selection_sha256 IS NULL
+                OR length(request_sha256) != 64
+                OR length(context_sha256) != 64
+                OR length(selection_sha256) != 64
+              )
+            """,
+        ),
+    ),
 )
 
 

@@ -867,7 +867,7 @@ class ArtifactStore:
             return None
         existing = _revision_from_row(row)
         if existing.content_sha256 != content_sha256:
-            self._raise_conflict("idempotency key payload mismatch", actual_revision=None)
+            self._raise_idempotency_mismatch("idempotency key payload mismatch")
         artifact = self.get_artifact(workspace_id, artifact_id)
         return RevisionWriteResult(artifact, existing, False, "idempotent_replay")
 
@@ -1041,9 +1041,8 @@ class ArtifactStore:
                         replay_row["operation"] != operation
                         or replay_row["request_sha256"] != request_hash
                     ):
-                        self._raise_conflict(
-                            "idempotency key payload mismatch",
-                            actual_revision=None,
+                        self._raise_idempotency_mismatch(
+                            "idempotency key payload mismatch"
                         )
                     result = json.loads(replay_row["result_json"])
                     artifact_row = connection.execute(
@@ -1174,9 +1173,8 @@ class ArtifactStore:
                         replay_row["operation"] != operation
                         or replay_row["request_sha256"] != request_hash
                     ):
-                        self._raise_conflict(
-                            "idempotency key payload mismatch",
-                            actual_revision=None,
+                        self._raise_idempotency_mismatch(
+                            "idempotency key payload mismatch"
                         )
                     result = json.loads(replay_row["result_json"])
                     artifact_row = connection.execute(
@@ -1348,9 +1346,8 @@ class ArtifactStore:
                         replay_row["operation"] != operation
                         or replay_row["request_sha256"] != request_hash
                     ):
-                        self._raise_conflict(
-                            "idempotency key payload mismatch",
-                            actual_revision=None,
+                        self._raise_idempotency_mismatch(
+                            "idempotency key payload mismatch"
                         )
                     result = json.loads(replay_row["result_json"])
                     artifact_row = connection.execute(
@@ -1624,7 +1621,7 @@ class ArtifactStore:
             or revision.author_type is not expected_revision.author_type
             or revision.author_id != expected_revision.author_id
         ):
-            self._raise_conflict("idempotency key payload mismatch", actual_revision=None)
+            self._raise_idempotency_mismatch("idempotency key payload mismatch")
         with self._connect() as connection:
             link = connection.execute(
                 """
@@ -1668,6 +1665,13 @@ class ArtifactStore:
                 "actualRevision": actual_revision,
                 "expectedRevision": expected_revision,
             },
+        )
+
+    @staticmethod
+    def _raise_idempotency_mismatch(message: str) -> None:
+        raise ArtifactDomainError(
+            ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH,
+            message,
         )
 
     @staticmethod

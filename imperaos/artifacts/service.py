@@ -492,7 +492,9 @@ class ArtifactService:
             ).fetchone()
             if existing is not None:
                 if existing["request_sha256"] != request_hash:
-                    self._raise_conflict("proposal idempotency payload mismatch")
+                    self._raise_idempotency_mismatch(
+                        "proposal idempotency payload mismatch"
+                    )
                 return self._proposal_result(existing, context)
             if artifact.current_revision_number != command.base_revision_number:
                 self._raise_conflict("proposal base revision is stale")
@@ -565,14 +567,16 @@ class ArtifactService:
                 "artifact mutation proposal does not exist",
             )
         artifact = self.store.get_artifact(context.workspace_id, row["artifact_id"])
-        approval = self._proposal_approvals.claim(row, context, command.approval_id)
-        self.policy.authorize(
-            ArtifactPermission.AI_APPLY,
-            context,
-            artifact_workspace_id=artifact.workspace_id,
-            approval_granted=True,
-        )
         if row["status"] == "applied" and row["applied_revision_id"]:
+            approval = self._proposal_approvals.claim(
+                row, context, command.approval_id
+            )
+            self.policy.authorize(
+                ArtifactPermission.AI_APPLY,
+                context,
+                artifact_workspace_id=artifact.workspace_id,
+                approval_granted=True,
+            )
             stored = self.store.get_revision(
                 context.workspace_id, artifact.artifact_id, row["applied_revision_id"]
             )
@@ -583,6 +587,29 @@ class ArtifactService:
             return replay
         if row["status"] != "pending":
             self._raise_conflict("proposal is not pending")
+        if (
+            artifact.current_revision_number != row["base_revision_number"]
+            or command.expected_revision_number != row["base_revision_number"]
+        ):
+            with self.store._connect() as connection:
+                connection.execute(
+                    """
+                    UPDATE artifact_mutation_proposals
+                    SET status = 'stale', completed_at_utc = ?
+                    WHERE proposal_id = ? AND status = 'pending'
+                    """,
+                    (datetime.now(UTC).isoformat(), command.proposal_id),
+                )
+                connection.commit()
+            self._raise_conflict("proposal base revision is stale")
+
+        approval = self._proposal_approvals.claim(row, context, command.approval_id)
+        self.policy.authorize(
+            ArtifactPermission.AI_APPLY,
+            context,
+            artifact_workspace_id=artifact.workspace_id,
+            approval_granted=True,
+        )
 
         result = self.mutate(
             MutateArtifactCommand(
@@ -1460,7 +1487,7 @@ class ArtifactService:
         if row is None:
             return None
         if row["operation"] != operation or row["request_sha256"] != request_hash:
-            self._raise_conflict("idempotency key payload mismatch")
+            self._raise_idempotency_mismatch("idempotency key payload mismatch")
         result = json.loads(row["result_json"])
         artifact = self.store.get_artifact(workspace_id, result["artifactId"])
         revision = self.store.get_revision(
@@ -1518,7 +1545,7 @@ class ArtifactService:
         if row is None:
             return None
         if row["operation"] != "asset_import" or row["request_sha256"] != request_hash:
-            self._raise_conflict("idempotency key payload mismatch")
+            self._raise_idempotency_mismatch("idempotency key payload mismatch")
         parsed = json.loads(row["result_json"])
         descriptor = self.assets.get_descriptor(workspace_id, parsed["assetId"])
         return ArtifactAssetImportResult(
@@ -1547,7 +1574,9 @@ class ArtifactService:
                         row["operation"] != "asset_import"
                         or row["request_sha256"] != request_hash
                     ):
-                        self._raise_conflict("idempotency key payload mismatch")
+                        self._raise_idempotency_mismatch(
+                            "idempotency key payload mismatch"
+                        )
                     parsed = json.loads(row["result_json"])
                     if parsed.get("state") == "pending":
                         expires_at = (
@@ -1624,7 +1653,9 @@ class ArtifactService:
                     existing["operation"] != "asset_import"
                     or existing["request_sha256"] != request_hash
                 ):
-                    self._raise_conflict("idempotency key payload mismatch")
+                    self._raise_idempotency_mismatch(
+                        "idempotency key payload mismatch"
+                    )
                 parsed = json.loads(existing["result_json"])
                 if parsed.get("state") != "pending":
                     connection.commit()
@@ -1721,5 +1752,12 @@ class ArtifactService:
     def _raise_conflict(message: str) -> None:
         raise ArtifactDomainError(
             ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT,
+            message,
+        )
+
+    @staticmethod
+    def _raise_idempotency_mismatch(message: str) -> None:
+        raise ArtifactDomainError(
+            ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH,
             message,
         )

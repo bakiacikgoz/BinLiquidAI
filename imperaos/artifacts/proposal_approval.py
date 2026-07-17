@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Any
 
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
@@ -17,6 +18,7 @@ class ArtifactProposalApprovalGateway:
         self._ttl_seconds = ttl_seconds
 
     def request_approval(self, row: Any, context: OperationContext) -> ApprovalTicket:
+        self._validate_provenance(row)
         target_ref = self._target_ref(row)
         action_hash = self.action_hash(row)
         idempotency_key = f"artifact-proposal:{row['workspace_id']}:{row['proposal_id']}"
@@ -117,6 +119,22 @@ class ArtifactProposalApprovalGateway:
                 "traceId": row["trace_id"],
             }
         )
+
+    @staticmethod
+    def _validate_provenance(row: Any) -> None:
+        for field in (
+            "content_sha256",
+            "request_sha256",
+            "context_sha256",
+            "selection_sha256",
+        ):
+            value = row[field]
+            if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise ArtifactDomainError(
+                    ArtifactErrorCode.ARTIFACT_POLICY_UNAVAILABLE,
+                    "artifact proposal provenance is incomplete",
+                    details={"reasonCode": "ARTIFACT_PROPOSAL_PROVENANCE_INVALID"},
+                )
 
     @staticmethod
     def _target_ref(row: Any) -> str:

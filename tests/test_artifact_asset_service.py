@@ -79,7 +79,7 @@ def test_asset_import_rejects_idempotency_payload_reuse_and_cross_workspace_read
             _context("workspace-2"),
         )
 
-    assert reused.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert reused.value.code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
     assert cross_workspace.value.code is ArtifactErrorCode.ARTIFACT_NOT_FOUND
 
 
@@ -104,7 +104,7 @@ def test_asset_replay_reservation_rejects_conflict_before_asset_side_effect(
             _context(),
         )
 
-    assert raced.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert raced.value.code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
     assert called is False
 
 
