@@ -182,7 +182,6 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
                 request_sha256 TEXT NOT NULL CHECK (length(request_sha256) = 64),
                 result_json TEXT NOT NULL,
                 created_at_utc TEXT NOT NULL,
-                expires_at_utc TEXT,
                 PRIMARY KEY (workspace_id, idempotency_key)
             ) STRICT
             """,
@@ -382,6 +381,13 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
             """,
             "DROP TABLE artifact_links",
             "ALTER TABLE artifact_links_v8 RENAME TO artifact_links",
+        ),
+    ),
+    ArtifactMigration(
+        version=9,
+        name="operation_dedup_expiry",
+        statements=(
+            "ALTER TABLE artifact_operation_dedup ADD COLUMN expires_at_utc TEXT",
         ),
     ),
 )
