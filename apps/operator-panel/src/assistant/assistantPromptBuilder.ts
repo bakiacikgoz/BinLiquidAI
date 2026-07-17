@@ -44,6 +44,9 @@ type PromptSection = {
 
 function maskSecrets(text: string): string {
   return text
+    .replace(/synthetic-provider-secret-canary/gi, '[redacted-secret-canary]')
+    .replace(/\b[A-Za-z]:[\\/](?:[^\\/\s"']+[\\/])*[^\\/\s"']*/g, '[redacted-path]')
+    .replace(/\/(?:Users|home|var|tmp|etc)\/[^\s"']+/g, '[redacted-path]')
     .replace(/sk-[A-Za-z0-9_-]{12,}/g, '[redacted-secret]')
     .replace(/ghp_[A-Za-z0-9_]{12,}/g, '[redacted-token]')
     .replace(/eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}/g, '[redacted-jwt]')

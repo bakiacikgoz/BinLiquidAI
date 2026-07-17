@@ -141,12 +141,19 @@ class ProviderGovernanceLLM:
         self.fallback_provider_id = fallback_provider_id
         self._factory = ProviderAdapterFactory(registry=registry)
 
-    def generate(self, prompt: str, system: str | None = None, json_mode: bool = False) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system: str | None = None,
+        json_mode: bool = False,
+        data_classes: list[DataClass] | None = None,
+    ) -> str:
         request = build_chat_request(
             provider_id=self.provider_id,
             model=self.model,
             prompt=prompt,
             system=system,
+            data_classes=data_classes,
             json_mode=json_mode,
         )
         response = call_model_with_governance(

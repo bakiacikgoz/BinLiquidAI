@@ -115,7 +115,8 @@ class ArtifactService:
         self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
         self.operations = ArtifactOperationMetrics()
         self._proposal_approvals = ArtifactProposalApprovalGateway(
-            approval_store or ApprovalStore(Path(root) / "metadata" / "artifact-approvals.sqlite3")
+            approval_store
+            or ApprovalStore(Path(state_path("governance", "approvals.sqlite3")))
         )
         self._continuation_gateway = continuation_gateway
         supplied = dict(license_capabilities or {})

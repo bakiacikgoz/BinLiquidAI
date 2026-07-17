@@ -30,6 +30,7 @@ from imperaos.artifacts.models import (
 )
 from imperaos.artifacts.service import ArtifactService
 from imperaos.governance.approval_store import ApprovalStore
+from imperaos.runtime.paths import state_path
 
 
 def document(text: str) -> dict[str, object]:
@@ -332,6 +333,46 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
             assistant,
         )
     assert replay_mismatch.value.code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
+
+
+def test_default_artifact_proposal_uses_the_operator_governance_approval_store(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    service = ArtifactService(tmp_path / "artifact-root")
+    service.create(create_command(), user_context())
+    proposal = service.propose_mutation(
+        ProposeArtifactMutationCommand(
+            proposal_id="proposal-default-store",
+            artifact_id="artifact-1",
+            base_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content=document("approved through operator store"),
+            idempotency_key="proposal-default-key",
+            context_sha256="1" * 64,
+            selection_sha256="2" * 64,
+        ),
+        assistant_context(),
+    )
+    operator_store = ApprovalStore(Path(state_path("governance", "approvals.sqlite3")))
+    decision = operator_store.decide(
+        approval_id=proposal.approval_id,
+        approve=True,
+        actor="user-1",
+        reason="operator reviewed exact proposal",
+    )
+
+    assert decision.error_code is None
+    applied = service.apply_proposal(
+        ApplyArtifactProposalCommand(
+            proposal_id=proposal.proposal_id,
+            expected_revision_number=1,
+            approval_id=proposal.approval_id,
+        ),
+        assistant_context(),
+    )
+    assert applied.artifact.current_revision_number == 2
 
 
 def test_artifact_proposal_stale_base_does_not_claim_approval_or_write_revision(

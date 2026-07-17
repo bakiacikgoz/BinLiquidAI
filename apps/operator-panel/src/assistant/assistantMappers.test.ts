@@ -211,7 +211,12 @@ describe('assistant mappers', () => {
         event: 'final',
         sequence: 1,
         timestampUtc: '2026-03-08T09:00:02Z',
-        data: { final_text: 'Done', trace_id: 'trace-1', used_path: 'llm_only' },
+        data: {
+          finalText: 'Done',
+          traceId: 'trace-1',
+          usedPath: 'governed_artifact_tools',
+          fallbackEvents: [],
+        },
       },
       started(),
     );
@@ -220,6 +225,7 @@ describe('assistant mappers', () => {
     expect(completed.activeTurnId).toBeNull();
     expect(completed.turns[0].assistantMessage.text).toBe('Done');
     expect(completed.turns[0].assistantMessage.metrics?.traceId).toBe('trace-1');
+    expect(completed.turns[0].assistantMessage.metrics?.usedPath).toBe('governed_artifact_tools');
   });
 
   it('maps approval pending events into guarded approval state', () => {

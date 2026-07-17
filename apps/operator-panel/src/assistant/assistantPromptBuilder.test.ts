@@ -77,6 +77,26 @@ describe('assistant prompt builder', () => {
     expect(result.compiledPrompt).not.toContain('## System health');
   });
 
+  it('redacts adversarial canaries and absolute paths from run and event context', () => {
+    const result = buildAssistantPrompt({
+      userMessage: 'inspect the selected run',
+      session: createAssistantSession('session-security'),
+      selectedRunStatus: {
+        message: 'synthetic-provider-secret-canary',
+        path: 'C:/synthetic/private/path',
+      },
+      selectedRunEvents: [{ message: 'failed at C:\\Users\\private\\trace.json' }],
+      selectedArtifacts: {},
+      pendingApproval: null,
+      systemHealth: null,
+    });
+
+    expect(result.compiledPrompt).not.toContain('synthetic-provider-secret-canary');
+    expect(result.compiledPrompt).not.toContain('C:/synthetic/private/path');
+    expect(result.compiledPrompt).not.toContain('C:\\Users\\private\\trace.json');
+    expect(result.compiledPrompt).toContain('[redacted');
+  });
+
   it('projects artifact metadata and a typed context request without raw content', () => {
     const result = buildAssistantPrompt({
       userMessage: 'Update the selected paragraph.',

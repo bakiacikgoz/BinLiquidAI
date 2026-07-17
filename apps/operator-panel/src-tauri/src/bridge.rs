@@ -12,7 +12,7 @@ use crate::artifact_rpc::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader as StdBufReader, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
@@ -61,6 +61,37 @@ pub struct BridgeResult<T: Serialize> {
 struct AssistantProcessRef {
     process_id: u32,
     session_id: String,
+    prompt_path: PathBuf,
+}
+
+struct AssistantPromptFileGuard(PathBuf);
+
+impl Drop for AssistantPromptFileGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+fn cleanup_stale_assistant_prompt_files(prompt_dir: &Path, max_age: Duration) {
+    let now = SystemTime::now();
+    let Ok(entries) = std::fs::read_dir(prompt_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("md") {
+            continue;
+        }
+        let stale = entry
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .and_then(|modified| now.duration_since(modified).ok())
+            .is_some_and(|age| age >= max_age);
+        if stale {
+            let _ = std::fs::remove_file(path);
+        }
+    }
 }
 
 #[derive(Default)]
@@ -2598,10 +2629,7 @@ pub async fn bridge_assistant_start_turn(
         };
     let runtime_root = default_cli_workdir().unwrap_or_else(|| PathBuf::from("."));
     let artifact_root = runtime_root.join(".imperaos").join("artifacts");
-    let prompt_dir = runtime_root
-        .join(".imperaos")
-        .join("assistant")
-        .join("prompts");
+    let prompt_dir = std::env::temp_dir().join("imperaos-assistant-prompts");
     if let Err(error) = std::fs::create_dir_all(&prompt_dir) {
         return BridgeResult::err(BridgeError::new(
             "CLI_FAILED",
@@ -2611,8 +2639,19 @@ pub async fn bridge_assistant_start_turn(
             true,
         ));
     }
-    let prompt_path = prompt_dir.join(format!("{assistant_turn_id}.md"));
-    if let Err(error) = std::fs::write(&prompt_path, compiled_prompt.as_bytes()) {
+    cleanup_stale_assistant_prompt_files(&prompt_dir, Duration::from_secs(24 * 60 * 60));
+    let prompt_path = prompt_dir.join(format!("{assistant_turn_id}-{}.md", uuid::Uuid::new_v4()));
+    let mut prompt_options = OpenOptions::new();
+    prompt_options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        prompt_options.mode(0o600);
+    }
+    let prompt_write = prompt_options
+        .open(&prompt_path)
+        .and_then(|mut file| std::io::Write::write_all(&mut file, compiled_prompt.as_bytes()));
+    if let Err(error) = prompt_write {
         return BridgeResult::err(BridgeError::new(
             "CLI_FAILED",
             format!("Assistant prompt could not be prepared: {error}"),
@@ -2676,12 +2715,22 @@ pub async fn bridge_assistant_start_turn(
                 AssistantProcessRef {
                     process_id,
                     session_id: session_id.clone(),
+                    prompt_path: prompt_path.clone(),
                 },
             );
     }
     let stdout = match child.stdout.take() {
         Some(value) => value,
         None => {
+            if process_id.is_some() {
+                app.state::<AssistantProcessRegistry>()
+                    .turns
+                    .lock()
+                    .await
+                    .remove(&assistant_turn_id);
+            }
+            let _ = child.kill().await;
+            let _ = std::fs::remove_file(&prompt_path);
             return BridgeResult::err(BridgeError::new(
                 "CLI_FAILED",
                 "Assistant process stdout was not available.",
@@ -2699,6 +2748,7 @@ pub async fn bridge_assistant_start_turn(
     let task_prompt_path = prompt_path.clone();
 
     tokio::spawn(async move {
+        let _prompt_guard = AssistantPromptFileGuard(task_prompt_path);
         let stderr_task = tokio::spawn(read_assistant_stderr_preview(stderr));
         let stream_result = stream_assistant_stdout(
             task_app.clone(),
@@ -2784,7 +2834,6 @@ pub async fn bridge_assistant_start_turn(
             .lock()
             .await
             .remove(&task_turn_id);
-        let _ = std::fs::remove_file(task_prompt_path);
     });
 
     BridgeResult::ok(AssistantStartTurnPayload {
@@ -2831,7 +2880,9 @@ pub async fn bridge_assistant_cancel_turn(
         ));
     };
 
-    if let Err(error) = terminate_process(process_ref.process_id).await {
+    let termination = terminate_process(process_ref.process_id).await;
+    let _ = std::fs::remove_file(&process_ref.prompt_path);
+    if let Err(error) = termination {
         return BridgeResult::err(error);
     }
 
@@ -4495,6 +4546,34 @@ mod tests {
         assert!(preview.contains("[artifact_principal]"));
         assert!(!preview.contains("C:/tmp"));
         assert!(!preview.contains("user-1"));
+    }
+
+    #[test]
+    fn assistant_prompt_guard_removes_prompt_on_every_drop_path() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let prompt = dir.path().join("prompt.md");
+        fs::write(&prompt, "classified prompt").expect("write prompt");
+
+        {
+            let _guard = AssistantPromptFileGuard(prompt.clone());
+            assert!(prompt.exists());
+        }
+
+        assert!(!prompt.exists());
+    }
+
+    #[test]
+    fn assistant_prompt_startup_cleanup_removes_only_stale_prompt_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let stale = dir.path().join("stale.md");
+        let unrelated = dir.path().join("keep.json");
+        fs::write(&stale, "stale prompt").expect("write stale");
+        fs::write(&unrelated, "keep").expect("write unrelated");
+
+        cleanup_stale_assistant_prompt_files(dir.path(), Duration::ZERO);
+
+        assert!(!stale.exists());
+        assert!(unrelated.exists());
     }
 
     #[test]

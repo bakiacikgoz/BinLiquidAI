@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import re
 from typing import Any, Protocol
@@ -8,8 +9,16 @@ from typing import Any, Protocol
 from pydantic import Field, JsonValue, model_validator
 
 from imperaos.artifacts.context import ArtifactContextRequest
-from imperaos.artifacts.models import ArtifactModel, BoundedId, OperationContext, canonical_json
+from imperaos.artifacts.models import (
+    ArtifactDataClass,
+    ArtifactModel,
+    BoundedId,
+    OperationContext,
+    canonical_json,
+)
 from imperaos.artifacts.tools import ArtifactToolRegistry
+from imperaos.model_providers.errors import ProviderGenerationError
+from imperaos.model_providers.models import DataClass
 from imperaos.model_providers.native.types import ProviderRequestedTool
 
 _CONTEXT_SECTION = re.compile(
@@ -53,6 +62,17 @@ class ArtifactAssistantTurnResult(ArtifactModel):
 class CoreLlmArtifactProvider:
     def __init__(self, llm: Any) -> None:
         self._llm = llm
+        self._data_class = ArtifactDataClass.PUBLIC
+
+    def bind_data_class(self, data_class: ArtifactDataClass) -> None:
+        rank = {
+            ArtifactDataClass.PUBLIC: 0,
+            ArtifactDataClass.INTERNAL: 1,
+            ArtifactDataClass.CONFIDENTIAL: 2,
+            ArtifactDataClass.REGULATED: 3,
+        }
+        if rank[data_class] > rank[self._data_class]:
+            self._data_class = data_class
 
     def complete(
         self,
@@ -68,11 +88,23 @@ class CoreLlmArtifactProvider:
             "write an export, execute code, or perform external side effects.\n"
             f"TOOLS={canonical_json(tool_contracts)}"
         )
-        raw = self._llm.generate(
-            prompt=canonical_json({"messages": messages}),
-            system=system,
-            json_mode=True,
+        generate = self._llm.generate
+        parameters = inspect.signature(generate).parameters.values()
+        supports_data_classes = any(
+            parameter.name == "data_classes"
+            or parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters
         )
+        if not supports_data_classes and self._data_class is not ArtifactDataClass.PUBLIC:
+            raise ProviderGenerationError("PROVIDER_DATA_BOUNDARY_DENIED")
+        kwargs: dict[str, object] = {
+            "prompt": canonical_json({"messages": messages}),
+            "system": system,
+            "json_mode": True,
+        }
+        if supports_data_classes:
+            kwargs["data_classes"] = [DataClass(self._data_class.value)]
+        raw = generate(**kwargs)
         return ArtifactAssistantProviderResponse.model_validate(json.loads(raw))
 
 
@@ -100,6 +132,7 @@ class ArtifactAssistantToolLoop:
                 request.model_dump(mode="json", by_alias=True),
                 context,
             )
+            _bind_result_classification(provider, result)
             self._append_result(
                 messages,
                 events,
@@ -122,6 +155,7 @@ class ArtifactAssistantToolLoop:
             if call is None:
                 raise AssertionError("validated response omitted both terminal forms")
             result = self._registry.invoke(call.name, call.arguments, context)
+            _bind_result_classification(provider, result)
             messages.append(
                 {
                     "role": "assistant",
@@ -162,6 +196,12 @@ class ArtifactAssistantToolLoop:
             "revisionNumber",
             "proposalId",
             "approvalId",
+            "actionHash",
+            "baseRevisionNumber",
+            "dataClass",
+            "kind",
+            "title",
+            "summary",
             "reasonCode",
             "projectionSha256",
             "selectionSha256",
@@ -173,6 +213,19 @@ class ArtifactAssistantToolLoop:
         }
         summary.update({key: payload[key] for key in summary_keys if key in payload})
         events.append(summary)
+
+
+def _bind_result_classification(
+    provider: ArtifactAssistantProvider,
+    result: ArtifactModel,
+) -> None:
+    binder = getattr(provider, "bind_data_class", None)
+    if not callable(binder):
+        return
+    payload = result.model_dump(mode="python", by_alias=True)
+    value = payload.get("dataClass")
+    if value is not None:
+        binder(ArtifactDataClass(value))
 
 
 def extract_artifact_context_request(prompt: str) -> ArtifactContextRequest | None:

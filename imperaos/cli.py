@@ -1359,14 +1359,29 @@ def _assistant_turn_events(
     context = {"session_id": session_id}
     context.update(_model_selection_context(config=config, source_map=source_map))
     artifact_request = extract_artifact_context_request(prompt)
-    if artifact_request is not None:
-        if not artifact_root or not artifact_workspace_id or not artifact_principal_id:
+    artifact_runtime_present = bool(
+        artifact_root and artifact_workspace_id and artifact_principal_id
+    )
+    if artifact_request is not None and not artifact_runtime_present:
+        return [
+            {
+                "event": "error",
+                "data": {
+                    "code": "ARTIFACT_TOOL_RUNTIME_UNAVAILABLE",
+                    "message": "Governed artifact assistant context is unavailable.",
+                },
+            }
+        ]
+    if artifact_runtime_present:
+        if artifact_root is None or artifact_workspace_id is None or artifact_principal_id is None:
+            raise AssertionError("artifact runtime presence validation is inconsistent")
+        if not artifact_roles:
             return [
                 {
                     "event": "error",
                     "data": {
                         "code": "ARTIFACT_TOOL_RUNTIME_UNAVAILABLE",
-                        "message": "Governed artifact assistant context is unavailable.",
+                        "message": "Governed artifact assistant roles are unavailable.",
                     },
                 }
             ]
@@ -1399,10 +1414,7 @@ def _assistant_turn_events(
                     },
                 }
             ]
-        events = [
-            {"event": "tool_result", "data": event}
-            for event in governed.events
-        ]
+        events = [_artifact_tool_stream_event(event) for event in governed.events]
         events.append(
             {
                 "event": "final",
@@ -1444,6 +1456,15 @@ def _assistant_turn_events(
         }
     )
     return events
+
+
+def _artifact_tool_stream_event(event: dict[str, object]) -> dict[str, object]:
+    event_name = {
+        "artifact.create_draft": "artifact_committed",
+        "artifact.propose_mutation": "artifact_patch_proposed",
+        "artifact.request_form": "form_requested",
+    }.get(str(event.get("toolName")), "tool_result")
+    return {"event": event_name, "data": event}
 
 
 def _first_run_check(

@@ -52,6 +52,8 @@ class ArtifactCreateDraftResult(ArtifactModel):
     revision_id: BoundedId
     revision_number: int = Field(ge=1)
     data_class: ArtifactDataClass = Field(strict=False)
+    kind: ArtifactKind = Field(strict=False)
+    title: str = Field(min_length=1, max_length=200)
 
 
 class ArtifactProposeMutationInput(ArtifactModel):
@@ -84,6 +86,9 @@ class ArtifactProposalToolResult(ArtifactModel):
     approval_id: BoundedId
     action_hash: Sha256
     summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""
+    data_class: ArtifactDataClass = Field(strict=False)
+    kind: ArtifactKind = Field(strict=False)
+    title: str = Field(min_length=1, max_length=200)
 
 
 class ArtifactRequestFormInput(ArtifactModel):
@@ -108,6 +113,9 @@ class ArtifactFormToolResult(ArtifactModel):
     artifact_id: BoundedId
     revision_id: BoundedId
     revision_number: int = Field(ge=1)
+    data_class: ArtifactDataClass = Field(strict=False)
+    kind: Literal["form"] = "form"
+    title: str = Field(min_length=1, max_length=200)
 
 
 class ArtifactRequestExportInput(ArtifactModel):
@@ -126,6 +134,9 @@ class ArtifactExportRequestToolResult(ArtifactModel):
     format: ArtifactExportFormat
     request_sha256: Sha256
     native_write_started: Literal[False] = False
+    data_class: ArtifactDataClass = Field(strict=False)
+    kind: ArtifactKind = Field(strict=False)
+    title: str = Field(min_length=1, max_length=200)
 
 
 ArtifactToolResult = (
@@ -214,6 +225,8 @@ class ArtifactToolRegistry:
             revision_id=result.revision.revision_id,
             revision_number=result.revision.revision_number,
             data_class=result.artifact.data_class,
+            kind=result.artifact.kind,
+            title=result.artifact.title,
         )
 
     def _propose_mutation(
@@ -224,6 +237,7 @@ class ArtifactToolRegistry:
         request = ArtifactProposeMutationInput.model_validate(value)
         command = ProposeArtifactMutationCommand(**request.model_dump(mode="python"))
         result = self._service.propose_mutation(command, context)
+        artifact = self._service.store.get_artifact(context.workspace_id, request.artifact_id)
         return ArtifactProposalToolResult(
             proposal_id=result.proposal_id,
             artifact_id=result.artifact_id,
@@ -232,6 +246,9 @@ class ArtifactToolRegistry:
             approval_id=result.approval_id,
             action_hash=result.action_hash,
             summary=result.summary,
+            data_class=artifact.data_class,
+            kind=artifact.kind,
+            title=artifact.title,
         )
 
     def _request_form(
@@ -267,6 +284,8 @@ class ArtifactToolRegistry:
             artifact_id=result.artifact.artifact_id,
             revision_id=result.revision.revision_id,
             revision_number=result.revision.revision_number,
+            data_class=result.artifact.data_class,
+            title=result.artifact.title,
         )
 
     def _request_export(
@@ -297,4 +316,7 @@ class ArtifactToolRegistry:
             revision_id=request.revision_id,
             format=request.format,
             request_sha256=digest,
+            data_class=loaded.artifact.data_class,
+            kind=loaded.artifact.kind,
+            title=loaded.artifact.title,
         )

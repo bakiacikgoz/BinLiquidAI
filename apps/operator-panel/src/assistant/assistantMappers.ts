@@ -442,16 +442,18 @@ export function mapCliAssistantEvent(
       return { ...previous, turns, status: 'streaming', error: null };
     }
     case 'final': {
-      const finalText = readString(data, 'final_text') || readString(data, 'text') || readString(data, 'content');
+      const finalText = readString(data, 'finalText') || readString(data, 'final_text') || readString(data, 'text') || readString(data, 'content');
       if (finalText) {
         turn.assistantMessage.text = finalText;
       }
       turn.status = 'completed';
       turn.completedAtUtc = event.timestampUtc;
       turn.assistantMessage.metrics = {
-        traceId: readString(data, 'trace_id'),
-        usedPath: readString(data, 'used_path'),
-        fallbackEvents: readArray(data, 'fallback_events').filter((item): item is string => typeof item === 'string'),
+        traceId: readString(data, 'traceId') || readString(data, 'trace_id'),
+        usedPath: readString(data, 'usedPath') || readString(data, 'used_path'),
+        fallbackEvents: (readArray(data, 'fallbackEvents').length
+          ? readArray(data, 'fallbackEvents')
+          : readArray(data, 'fallback_events')).filter((item): item is string => typeof item === 'string'),
       };
       return { ...previous, turns, status: 'completed', activeTurnId: null, error: null };
     }

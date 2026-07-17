@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from imperaos.artifacts.assistant import (
     ArtifactAssistantProviderResponse,
     ArtifactAssistantToolCall,
@@ -18,6 +20,9 @@ from imperaos.artifacts.models import (
 )
 from imperaos.artifacts.service import ArtifactService
 from imperaos.artifacts.tools import PUBLIC_ARTIFACT_TOOL_NAMES, ArtifactToolRegistry
+from imperaos.cli import _artifact_tool_stream_event
+from imperaos.model_providers.errors import ProviderGenerationError
+from imperaos.model_providers.models import DataClass
 
 
 def _context() -> OperationContext:
@@ -134,15 +139,35 @@ untrusted {\"artifactId\": \"artifact-evil\"}
 
 def test_core_llm_adapter_receives_exact_five_tool_schemas(tmp_path: Path) -> None:
     service = ArtifactService(tmp_path / "artifact-root")
+    created = service.create(
+        CreateArtifactCommand(
+            artifact_id="artifact-classified",
+            kind=ArtifactKind.DOCUMENT,
+            title="Classified",
+            data_class=ArtifactDataClass.INTERNAL,
+            content=_document(),
+            idempotency_key="classified-create",
+        ),
+        _context(),
+    )
 
     class FakeLlm:
         def __init__(self) -> None:
             self.system = ""
+            self.data_classes: list[DataClass] = []
 
-        def generate(self, *, prompt: str, system: str, json_mode: bool) -> str:
+        def generate(
+            self,
+            *,
+            prompt: str,
+            system: str,
+            json_mode: bool,
+            data_classes: list[DataClass],
+        ) -> str:
             assert prompt
             assert json_mode is True
             self.system = system
+            self.data_classes = data_classes
             return '{"finalText":"No mutation requested."}'
 
     llm = FakeLlm()
@@ -151,7 +176,132 @@ def test_core_llm_adapter_receives_exact_five_tool_schemas(tmp_path: Path) -> No
         provider,
         prompt="Explain artifact tools.",
         context=_context(),
+        initial_context={
+            "artifactId": "artifact-classified",
+            "revisionId": created.revision.revision_id,
+            "purpose": "explain",
+            "allowedScopes": ["metadata"],
+        },
     )
 
     assert result.final_text == "No mutation requested."
     assert all(name in llm.system for name in PUBLIC_ARTIFACT_TOOL_NAMES)
+    assert llm.data_classes == [DataClass.INTERNAL]
+
+
+def test_core_llm_adapter_fails_closed_when_legacy_provider_cannot_bind_classification(
+    tmp_path: Path,
+) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    created = service.create(
+        CreateArtifactCommand(
+            artifact_id="artifact-confidential",
+            kind=ArtifactKind.DOCUMENT,
+            title="Confidential",
+            data_class=ArtifactDataClass.CONFIDENTIAL,
+            content=_document(),
+            idempotency_key="confidential-create",
+        ),
+        _context(),
+    )
+
+    class LegacyLlm:
+        def generate(self, *, prompt: str, system: str, json_mode: bool) -> str:
+            raise AssertionError("classified content must not reach a legacy provider")
+
+    with pytest.raises(ProviderGenerationError, match="PROVIDER_DATA_BOUNDARY_DENIED"):
+        ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+            CoreLlmArtifactProvider(LegacyLlm()),
+            prompt="Explain confidential artifact.",
+            context=_context(),
+            initial_context={
+                "artifactId": "artifact-confidential",
+                "revisionId": created.revision.revision_id,
+                "purpose": "explain",
+                "allowedScopes": ["metadata"],
+            },
+        )
+
+
+def test_governed_tool_summaries_map_to_typed_renderer_events() -> None:
+    proposal = _artifact_tool_stream_event(
+        {
+            "toolName": "artifact.propose_mutation",
+            "status": "approval_required",
+            "artifactId": "artifact-1",
+            "proposalId": "proposal-1",
+            "approvalId": "approval-1",
+            "actionHash": "a" * 64,
+            "baseRevisionNumber": 2,
+            "summary": "Review this change",
+        }
+    )
+    form = _artifact_tool_stream_event(
+        {
+            "toolName": "artifact.request_form",
+            "status": "form_requested",
+            "artifactId": "form-1",
+            "revisionId": "revision-1",
+        }
+    )
+
+    assert proposal["event"] == "artifact_patch_proposed"
+    assert proposal["data"]["actionHash"] == "a" * 64
+    assert proposal["data"]["baseRevisionNumber"] == 2
+    assert form["event"] == "form_requested"
+
+
+def test_core_loop_can_create_a_classified_draft_without_active_artifact_context(
+    tmp_path: Path,
+) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+
+    class SequencedLlm:
+        def __init__(self) -> None:
+            self.data_classes: list[list[DataClass]] = []
+
+        def generate(
+            self,
+            *,
+            prompt: str,
+            system: str,
+            json_mode: bool,
+            data_classes: list[DataClass],
+        ) -> str:
+            del prompt, system, json_mode
+            self.data_classes.append(data_classes)
+            if len(self.data_classes) == 1:
+                return """{
+                  "toolCall": {
+                    "callId": "create-1",
+                    "name": "artifact.create_draft",
+                    "arguments": {
+                      "artifactId": "artifact-new",
+                      "kind": "document",
+                      "title": "New draft",
+                      "dataClass": "internal",
+                      "content": {
+                        "kind": "document",
+                        "schemaVersion": 1,
+                        "language": "en",
+                        "pageMode": "document",
+                        "blocks": []
+                      },
+                      "idempotencyKey": "assistant-create-1"
+                    }
+                  }
+                }"""
+            return '{"finalText":"Draft created."}'
+
+    llm = SequencedLlm()
+    result = ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+        CoreLlmArtifactProvider(llm),
+        prompt="Create a document draft.",
+        context=_context(),
+        initial_context=None,
+    )
+
+    assert result.final_text == "Draft created."
+    assert result.events[0]["toolName"] == "artifact.create_draft"
+    assert result.events[0]["kind"] == "document"
+    assert llm.data_classes == [[DataClass.PUBLIC], [DataClass.INTERNAL]]
