@@ -35,6 +35,8 @@ def test_release_readiness_requires_one_immutable_candidate_and_nonzero_tests() 
     ready = build_release_readiness(candidate, reports, dirty_paths=[])
     assert ready["status"] == "pass"
     assert ready["blockingReasons"] == []
+    assert ready["featureFlagDefaults"]["artifact_workspace.enabled"] is False
+    assert ready["featureFlagDefaults"]["artifact_workspace.export.enabled"] is False
 
     reports["e2e"] = _report(candidate, test_count=0)
     blocked = build_release_readiness(candidate, reports, dirty_paths=[])

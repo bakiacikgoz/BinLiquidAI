@@ -10,7 +10,7 @@ import type {
   ArtifactRevision,
 } from '../artifactContracts';
 import type { ArtifactSaveState } from '../workspaceController';
-import { isArtifactCodeEditorEnabled, isArtifactFlowEditorEnabled, isArtifactFormEditorEnabled, isArtifactSlidesEditorEnabled } from '../artifactFeatureFlags';
+import { resolveArtifactFeatureFlags } from '../artifactFeatureFlags';
 import type { ArtifactContextSelection } from '../selectionContext';
 import { FormSessionRuntime } from './form/formSessionRuntime';
 import { ArtifactLicenseBlocked } from '../ui/ArtifactLicenseBlocked';
@@ -33,9 +33,13 @@ export interface ArtifactEditorProps {
 export interface ArtifactEditorHostProps extends ArtifactEditorProps {
   formRuntime?: FormSessionRuntime;
   onSubmitForm?(request: ArtifactFormSubmissionRequest): Promise<ArtifactFormSubmissionResult>;
+  workspaceEnabled?: boolean;
+  documentEnabled?: boolean;
   formEnabled?: boolean;
   codeEnabled?: boolean;
   flowEnabled?: boolean;
+  spreadsheetEnabled?: boolean;
+  canvasEnabled?: boolean;
   slidesEnabled?: boolean;
   licenseCapability?: ArtifactLicenseCapability;
   locale?: 'en' | 'tr';
@@ -73,9 +77,26 @@ const SlidesArtifactEditor = lazy(() =>
 
 export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
   const [ownedFormRuntime] = useState(() => new FormSessionRuntime());
+  const resolvedFlags = resolveArtifactFeatureFlags(import.meta.env, {
+    spreadsheet: props.licenseCapability?.kind === 'spreadsheet' && props.licenseCapability.enabled,
+    canvas: props.licenseCapability?.kind === 'canvas' && props.licenseCapability.enabled,
+  });
+  const explicitlyEnabled = [
+    props.documentEnabled,
+    props.formEnabled,
+    props.codeEnabled,
+    props.flowEnabled,
+    props.spreadsheetEnabled,
+    props.canvasEnabled,
+    props.slidesEnabled,
+  ].some((value) => value === true);
+  const workspaceEnabled = props.workspaceEnabled ?? (explicitlyEnabled || resolvedFlags.workspace);
+  if (!workspaceEnabled) {
+    return <div className="artifact-editor-placeholder" role="status">The artifact workspace is disabled by policy.</div>;
+  }
   if (props.artifact.kind === 'form') {
     const enabled = props.formEnabled
-      ?? isArtifactFormEditorEnabled(import.meta.env.VITE_ARTIFACT_FORM_EDITOR);
+      ?? resolvedFlags.form;
     if (!enabled) {
       return <div className="artifact-editor-placeholder" role="status">The form editor is disabled by policy.</div>;
     }
@@ -101,7 +122,7 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
   }
   if (props.artifact.kind === 'code') {
     const enabled = props.codeEnabled
-      ?? isArtifactCodeEditorEnabled(import.meta.env.VITE_ARTIFACT_CODE_EDITOR);
+      ?? resolvedFlags.code;
     if (!enabled) {
       return <div className="artifact-editor-placeholder" role="status">The code editor is disabled by policy.</div>;
     }
@@ -113,7 +134,7 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
   }
   if (props.artifact.kind === 'flow') {
     const enabled = props.flowEnabled
-      ?? isArtifactFlowEditorEnabled(import.meta.env.VITE_ARTIFACT_FLOW_EDITOR);
+      ?? resolvedFlags.flow;
     if (!enabled) {
       return <div className="artifact-editor-placeholder" role="status">The flow editor is disabled by policy.</div>;
     }
@@ -124,7 +145,15 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
     );
   }
   if (props.artifact.kind === 'spreadsheet' || props.artifact.kind === 'canvas') {
-    const capability = props.licenseCapability ?? {
+    const kindEnabled = props.artifact.kind === 'spreadsheet'
+      ? props.spreadsheetEnabled ?? resolvedFlags.spreadsheet
+      : props.canvasEnabled ?? resolvedFlags.canvas;
+    const capability = !kindEnabled ? {
+      contractVersion: 'artifact-license-capability/v1' as const,
+      kind: props.artifact.kind,
+      enabled: false,
+      reasonCode: 'ARTIFACT_LICENSE_FEATURE_DISABLED',
+    } : props.licenseCapability ?? {
       contractVersion: 'artifact-license-capability/v1' as const,
       kind: props.artifact.kind,
       enabled: false,
@@ -139,7 +168,7 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
   }
   if (props.artifact.kind === 'slides') {
     const enabled = props.slidesEnabled
-      ?? isArtifactSlidesEditorEnabled(import.meta.env.VITE_ARTIFACT_SLIDES_EDITOR);
+      ?? resolvedFlags.slides;
     if (!enabled) {
       return <div className="artifact-editor-placeholder" role="status">The slides editor is disabled by policy.</div>;
     }
@@ -155,6 +184,10 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
         The {props.artifact.kind} editor will load in its governed implementation phase.
       </div>
     );
+  }
+  const documentEnabled = props.documentEnabled ?? resolvedFlags.document;
+  if (!documentEnabled) {
+    return <div className="artifact-editor-placeholder" role="status">The document editor is disabled by policy.</div>;
   }
   return (
     <Suspense fallback={<div className="artifact-editor-loading" role="status">Loading document editor…</div>}>

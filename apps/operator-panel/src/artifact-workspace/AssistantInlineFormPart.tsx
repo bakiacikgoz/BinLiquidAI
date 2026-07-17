@@ -14,6 +14,8 @@ export function AssistantInlineFormPart({
   onLoad,
   onExpand,
   onSubmit,
+  workspaceEnabled = false,
+  formEnabled = false,
 }: {
   artifactId: string;
   tab: ArtifactWorkspaceTab | null;
@@ -23,6 +25,8 @@ export function AssistantInlineFormPart({
   onLoad: (artifactId: string) => void;
   onExpand: (artifactId: string) => void;
   onSubmit: (request: ArtifactFormSubmissionRequest) => Promise<ArtifactFormSubmissionResult>;
+  workspaceEnabled?: boolean;
+  formEnabled?: boolean;
 }) {
   useEffect(() => {
     if (!tab && !loading) onLoad(artifactId);
@@ -51,6 +55,8 @@ export function AssistantInlineFormPart({
         onRequestExport={() => undefined}
         formRuntime={formRuntime}
         onSubmitForm={onSubmit}
+        workspaceEnabled={workspaceEnabled}
+        formEnabled={formEnabled}
         locale={locale}
       />
       <button type="button" onClick={() => onExpand(artifactId)}>

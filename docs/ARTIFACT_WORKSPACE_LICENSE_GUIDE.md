@@ -1,0 +1,9 @@
+# Artifact Workspace License Guide
+
+Spreadsheet and canvas are commercial editor surfaces. They remain forced off unless a trusted backend doctor verifies signed entitlement evidence for the exact product and package versions, production license mode, permitted build targets, offline permission, validity window, activation mechanism, approval, and a production/offline activation smoke. The renderer receives only `{contractVersion, kind, enabled, reasonCode}` and never receives a key, evidence path, entitlement payload, reusable digest, secret reference, or vendor response.
+
+Renderer feature flags can only disable. They cannot manufacture capability. Backend mutation enforcement is mandatory: when capability is not enabled, create/edit/paste/save/AI apply returns `ARTIFACT_LICENSE_UNAVAILABLE` and creates no revision. Stable doctor reasons include feature disabled, evidence missing/invalid/expired, forbidden mode, version mismatch, target mismatch, offline unverified, unsupported activation, and package missing.
+
+The accepted forced-off fallback is bounded read-only content summary, archive/history, and policy-permitted safe export. Spreadsheet may offer verified sheet CSV and workbook XLSX actions; canvas may offer canonical JSON. The application must not import or mount commercial editor chunks while forced off. A plain Vite or renderer boolean may further disable a licensed surface but may never enable it.
+
+Run the compatibility/release license gate before installing or shipping commercial packages. Exact package pins and lockfile hashes must match the approved evidence. Logs, metrics, diagnostics, support bundles, RPC errors, and release reports may include non-secret package/version/reason status only. Missing or stale evidence is a safe forced-off result, not a reason to bypass the doctor. Entitlement ambiguity, activation failure, or secret leakage is a no-ship condition.

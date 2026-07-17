@@ -83,6 +83,7 @@ export function AssistantTranscript({
   onRegenerate,
   onOpenArtifact,
   renderInlineArtifact,
+  assistantUiRuntimeEnabled = true,
 }: {
   turns: AssistantTurn[];
   approvalDisabled: boolean;
@@ -98,6 +99,7 @@ export function AssistantTranscript({
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
   renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
+  assistantUiRuntimeEnabled?: boolean;
 }) {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const isAtLatestRef = useRef(true);
@@ -238,9 +240,30 @@ export function AssistantTranscript({
   return (
     <div className="assistant-transcript-shell">
       <div className="assistant-transcript" role="log" aria-live="polite" ref={transcriptRef}>
-        <RuntimeTranscriptContext.Provider value={runtimeContext}>
-          <ThreadPrimitive.Messages components={{ Message: RuntimeTurnMessage }} />
-        </RuntimeTranscriptContext.Provider>
+        {assistantUiRuntimeEnabled ? (
+          <RuntimeTranscriptContext.Provider value={runtimeContext}>
+            <ThreadPrimitive.Messages components={{ Message: RuntimeTurnMessage }} />
+          </RuntimeTranscriptContext.Provider>
+        ) : turns.map((turn) => (
+          <div key={turn.id} data-assistant-turn="true">
+            <AssistantMessage
+              turn={turn}
+              approvalDisabled={approvalDisabled}
+              approvalDisabledReason={approvalDisabledReason}
+              emptyRunLabel={emptyRunLabel}
+              debugRawEnabled={debugRawEnabled}
+              locale={locale}
+              onReviewApproval={onReviewApproval}
+              onApprove={onApprove}
+              onReject={onReject}
+              onExecute={onExecute}
+              onApplyProposal={onApplyProposal}
+              onRegenerate={onRegenerate}
+              onOpenArtifact={onOpenArtifact}
+              renderInlineArtifact={renderInlineArtifact}
+            />
+          </div>
+        ))}
       </div>
       {!isAtLatest ? (
         <button type="button" className="assistant-jump-latest" onClick={() => scrollToLatest()}>

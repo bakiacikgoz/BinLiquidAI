@@ -90,6 +90,7 @@ import {
 import { useAssistantRuntimeSession } from './assistant/useAssistantRuntimeSession';
 import { useAssistantArtifactWorkspaceController } from './artifact-workspace/useAssistantArtifactWorkspaceController';
 import { AssistantInlineFormPart } from './artifact-workspace/AssistantInlineFormPart';
+import { resolveArtifactFeatureFlags } from './artifact-workspace/artifactFeatureFlags';
 import { useAssistantModels } from './assistant/useAssistantModels';
 import type { AssistantProviderKind } from './assistant/modelDiscovery';
 import { MissionControlView } from './components/mission/MissionControlView';
@@ -365,6 +366,10 @@ function mergeRunStatusWithSessionState(runStatusPayload: unknown, sessionStateP
 
 function AppContent({ settings, updateSettings }: AppContentProps) {
   const previewMode = isBridgePreviewMode();
+  const artifactFeatureFlags = resolveArtifactFeatureFlags(import.meta.env, {
+    spreadsheet: false,
+    canvas: false,
+  });
 
   const [activeView, setActiveView] = useState<ViewKey>('workspace');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -1558,7 +1563,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     artifactContextRequest: governedArtifactContext,
     pendingApproval: approvalDetail || activeApproval,
     systemHealth,
-  }));
+  }), { enabled: artifactFeatureFlags.aiSdkTauriTransport });
   const assistantArtifactWorkspace = useAssistantArtifactWorkspaceController({
     assistantState: assistantSession.state,
     legacyArtifacts: assistantWorkbenchArtifacts,
@@ -1730,7 +1735,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       onViewRuns={() => setActiveView('runs')}
     />
   );
-  const assistantWorkbenchAvailable = assistantArtifactWorkspace.available;
+  const assistantWorkbenchAvailable = artifactFeatureFlags.workspace && assistantArtifactWorkspace.available;
   const assistantWorkbench =
     assistantWorkbenchAvailable && assistantArtifactWorkspace.open ? (
       <AssistantWorkbench
@@ -1739,6 +1744,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         selectedArtifactName={assistantArtifactWorkspace.selectedLegacyArtifactName}
         locale={locale}
         onSelectArtifact={assistantArtifactWorkspace.actions.selectLegacyArtifact}
+        artifactFeatureFlags={artifactFeatureFlags}
         workspaceState={assistantArtifactWorkspace.state}
         catalog={assistantArtifactWorkspace.catalog}
         catalogNextCursor={assistantArtifactWorkspace.catalogNextCursor}
@@ -2049,10 +2055,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             rightRail={assistantRightRail}
             workbench={assistantWorkbench}
             workbenchAvailable={assistantWorkbenchAvailable}
-            workbenchOpen={assistantArtifactWorkspace.open}
+            workbenchOpen={assistantWorkbenchAvailable && assistantArtifactWorkspace.open}
             runtimeSettings={assistantRuntimeSettings}
             modelDiscovery={assistantModels}
             locale={locale}
+            assistantUiRuntimeEnabled={artifactFeatureFlags.assistantUiRuntime}
             onRuntimeSettingsChange={updateSettings}
             onSend={(message, runtimeSettings, controls) =>
               void assistantSession.actions.send(message, runtimeSettings, controls)
@@ -2061,7 +2068,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               assistantArtifactWorkspace.actions.reset();
               assistantSession.actions.newChat();
             }}
-            onToggleWorkbench={assistantArtifactWorkspace.actions.toggle}
+            onToggleWorkbench={assistantWorkbenchAvailable ? assistantArtifactWorkspace.actions.toggle : undefined}
             onReviewApproval={onReviewAssistantApproval}
             onApprove={(approvalId) => void onDecideAssistantApproval(approvalId, true)}
             onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}
@@ -2070,7 +2077,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onRegenerate={(turnId) => void assistantSession.actions.regenerate(turnId, assistantRuntimeSettings)}
             onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
             renderInlineArtifact={(artifact) => {
-              if (artifact.kind !== 'form' || !artifact.artifactId) return null;
+              if (!artifactFeatureFlags.workspace || !artifactFeatureFlags.form || artifact.kind !== 'form' || !artifact.artifactId) return null;
               const inlineTab = assistantArtifactWorkspace.state.tabs.find(
                 (tab) => tab.artifact.artifactId === artifact.artifactId,
               ) ?? null;
@@ -2084,6 +2091,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                   onLoad={assistantArtifactWorkspace.actions.openInlineArtifact}
                   onExpand={assistantArtifactWorkspace.actions.openArtifact}
                   onSubmit={assistantArtifactWorkspace.actions.submitForm}
+                  workspaceEnabled={artifactFeatureFlags.workspace}
+                  formEnabled={artifactFeatureFlags.form}
                 />
               );
             }}

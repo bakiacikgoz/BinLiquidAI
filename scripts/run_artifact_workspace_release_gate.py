@@ -13,6 +13,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from imperaos.artifacts.feature_flags import ARTIFACT_FEATURE_FLAG_NAMES
 from scripts.check_artifact_workspace_compatibility import evaluate_dependency_matrix
 
 GATE_REPORTS = {
@@ -61,6 +62,8 @@ def gate_commands(gate: str) -> list[list[str]]:
             "tests/test_artifact_contracts.py",
             "tests/test_artifact_content_schemas.py",
             "tests/test_operator_contracts.py",
+            "tests/test_artifact_feature_flags.py",
+            "tests/test_artifact_release_docs.py",
         )],
         "storage": [_python_tests(
             "tests/test_artifact_store.py",
@@ -264,6 +267,9 @@ def build_release_readiness(
         "status": "pass" if not blocking else "fail",
         "shipReady": not blocking,
         "forcedOffCapabilities": ["spreadsheet", "canvas"],
+        "featureFlagDefaults": {
+            name: False for name in ARTIFACT_FEATURE_FLAG_NAMES
+        },
         "gateStatuses": {
             gate: reports.get(gate, {}).get("status", "missing") for gate in GATE_REPORTS
         },

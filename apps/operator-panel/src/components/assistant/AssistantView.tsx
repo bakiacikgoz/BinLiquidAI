@@ -64,6 +64,7 @@ export function AssistantView({
   onRegenerate,
   onOpenArtifact,
   renderInlineArtifact,
+  assistantUiRuntimeEnabled = true,
   onCancel,
   onOpenTerminal,
 }: {
@@ -95,6 +96,7 @@ export function AssistantView({
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
   renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
+  assistantUiRuntimeEnabled?: boolean;
   onCancel: () => void;
   onOpenTerminal?: () => void;
 }) {
@@ -165,9 +167,8 @@ export function AssistantView({
     onRegenerate,
   });
 
-  return (
-    <AssistantRuntimeProvider runtime={assistantRuntime}>
-      <section
+  const surface = (
+    <section
         className={`assistant-surface assistant-surface-${surfaceState}`}
         aria-labelledby="assistant-title"
         data-testid="page-primary-region"
@@ -333,6 +334,7 @@ export function AssistantView({
               onRegenerate={onRegenerate}
               onOpenArtifact={onOpenArtifact}
               renderInlineArtifact={renderInlineArtifact}
+              assistantUiRuntimeEnabled={assistantUiRuntimeEnabled}
             />
           )}
 
@@ -397,7 +399,9 @@ export function AssistantView({
           </>
         ) : null}
       </div>
-      </section>
-    </AssistantRuntimeProvider>
+    </section>
   );
+  return assistantUiRuntimeEnabled ? (
+    <AssistantRuntimeProvider runtime={assistantRuntime}>{surface}</AssistantRuntimeProvider>
+  ) : surface;
 }

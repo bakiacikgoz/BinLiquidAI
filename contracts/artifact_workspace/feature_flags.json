@@ -1,0 +1,37 @@
+{
+  "contractVersion": "artifact-feature-flags/v1",
+  "flags": [
+    "artifact_workspace.enabled",
+    "artifact_workspace.document.enabled",
+    "artifact_workspace.form.enabled",
+    "artifact_workspace.code.enabled",
+    "artifact_workspace.flow.enabled",
+    "artifact_workspace.spreadsheet.enabled",
+    "artifact_workspace.canvas.enabled",
+    "artifact_workspace.slides.enabled",
+    "artifact_workspace.export.enabled",
+    "assistant_ui_runtime.enabled",
+    "ai_sdk_tauri_transport.enabled"
+  ],
+  "defaults": {
+    "artifact_workspace.enabled": false,
+    "artifact_workspace.document.enabled": false,
+    "artifact_workspace.form.enabled": false,
+    "artifact_workspace.code.enabled": false,
+    "artifact_workspace.flow.enabled": false,
+    "artifact_workspace.spreadsheet.enabled": false,
+    "artifact_workspace.canvas.enabled": false,
+    "artifact_workspace.slides.enabled": false,
+    "artifact_workspace.export.enabled": false,
+    "assistant_ui_runtime.enabled": false,
+    "ai_sdk_tauri_transport.enabled": false
+  },
+  "authority": {
+    "globalGate": "artifact_workspace.enabled",
+    "commercialCapabilityGates": {
+      "artifact_workspace.spreadsheet.enabled": "spreadsheet",
+      "artifact_workspace.canvas.enabled": "canvas"
+    },
+    "rendererMayDisableOnly": true
+  }
+}

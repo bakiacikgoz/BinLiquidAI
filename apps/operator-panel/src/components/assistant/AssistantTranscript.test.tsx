@@ -143,6 +143,25 @@ describe('AssistantTranscript sticky scrolling', () => {
     HTMLElement.prototype.scrollTo = originalScrollTo;
   });
 
+  it('renders the legacy projection without an assistant-ui provider when cutover is disabled', () => {
+    renderOperatorPanel(
+      <AssistantTranscript
+        turns={[baseTurn]}
+        approvalDisabled={false}
+        approvalDisabledReason=""
+        emptyRunLabel="No run"
+        debugRawEnabled={false}
+        assistantUiRuntimeEnabled={false}
+        onReviewApproval={noop}
+        onApprove={noop}
+        onReject={noop}
+        onExecute={noop}
+        onRegenerate={noop}
+      />,
+    );
+    expect(screen.getByText('Working...')).toBeInTheDocument();
+  });
+
   it('follows the newest turn to the bottom when a new turn appears', () => {
     renderTranscript([baseTurn]);
 

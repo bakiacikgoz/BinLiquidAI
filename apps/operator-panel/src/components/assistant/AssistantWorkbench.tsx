@@ -10,6 +10,7 @@ import type {
   ArtifactWorkspaceUiError,
 } from '../../artifact-workspace/useAssistantArtifactWorkspaceController';
 import { ArtifactEditorHost, type ArtifactSelection } from '../../artifact-workspace/editors/ArtifactEditorHost';
+import type { ArtifactFeatureFlagState } from '../../artifact-workspace/artifactFeatureFlags';
 import { ArtifactSelectionChip } from '../../artifact-workspace/ui/ArtifactSelectionChip';
 import { ArtifactDiffView } from '../../artifact-workspace/ui/ArtifactDiffView';
 import { ArtifactConflictPanel } from '../../artifact-workspace/ui/ArtifactConflictPanel';
@@ -25,6 +26,7 @@ export type AssistantWorkbenchArtifact = {
 };
 
 type WorkspaceProps = {
+  artifactFeatureFlags?: ArtifactFeatureFlagState;
   workspaceState?: ArtifactWorkspaceState;
   catalog?: ArtifactDescriptor[];
   catalogNextCursor?: string | null;
@@ -125,6 +127,7 @@ export function AssistantWorkbench({
   workspaceError = null,
   operationNotice = null,
   onEditorSelectionChange,
+  artifactFeatureFlags,
 }: {
   state: AssistantSessionState;
   artifacts: AssistantWorkbenchArtifact[];
@@ -133,6 +136,19 @@ export function AssistantWorkbench({
   onSelectArtifact: (name: string) => void;
   onViewRuns: () => void;
 } & WorkspaceProps) {
+  const enabledFeatures = artifactFeatureFlags ?? {
+    workspace: true,
+    document: true,
+    form: true,
+    code: true,
+    flow: true,
+    spreadsheet: false,
+    canvas: false,
+    slides: true,
+    export: true,
+    assistantUiRuntime: false,
+    aiSdkTauriTransport: false,
+  };
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -366,10 +382,18 @@ export function AssistantWorkbench({
                   formRuntime={formRuntime}
                   onSubmitForm={onSubmitForm}
                   locale={locale}
+                  workspaceEnabled={enabledFeatures.workspace}
+                  documentEnabled={enabledFeatures.document}
+                  formEnabled={enabledFeatures.form}
+                  codeEnabled={enabledFeatures.code}
+                  flowEnabled={enabledFeatures.flow}
+                  spreadsheetEnabled={enabledFeatures.spreadsheet}
+                  canvasEnabled={enabledFeatures.canvas}
+                  slidesEnabled={enabledFeatures.slides}
                 />
                 <ArtifactSelectionChip selection={editorSelection} />
               </div>
-              {activeTab.artifact.kind === 'document' && activeComparison?.status !== 'ready' ? (
+              {enabledFeatures.export && activeTab.artifact.kind === 'document' && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Document export">
                   <Button
                     variant="ghost"
@@ -387,7 +411,7 @@ export function AssistantWorkbench({
                   </Button>
                 </div>
               ) : null}
-              {activeTab.artifact.kind === 'code' && activeComparison?.status !== 'ready' ? (
+              {enabledFeatures.export && activeTab.artifact.kind === 'code' && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Code export">
                   <Button
                     variant="ghost"
@@ -398,7 +422,7 @@ export function AssistantWorkbench({
                   </Button>
                 </div>
               ) : null}
-              {activeTab.artifact.kind === 'flow' && activeComparison?.status !== 'ready' ? (
+              {enabledFeatures.export && activeTab.artifact.kind === 'flow' && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Flow export">
                   {(['json', 'svg', 'png'] as const).map((format) => (
                     <Button
@@ -412,7 +436,7 @@ export function AssistantWorkbench({
                   ))}
                 </div>
               ) : null}
-              {activeTab.artifact.kind === 'spreadsheet' && activeSpreadsheet?.success && activeComparison?.status !== 'ready' ? (
+              {enabledFeatures.export && activeTab.artifact.kind === 'spreadsheet' && activeSpreadsheet?.success && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Spreadsheet export">
                   {activeSpreadsheet.data.sheets.map((sheet) => (
                     <Button
@@ -433,7 +457,7 @@ export function AssistantWorkbench({
                   </Button>
                 </div>
               ) : null}
-              {activeTab.artifact.kind === 'slides' && activeComparison?.status !== 'ready' ? (
+              {enabledFeatures.export && activeTab.artifact.kind === 'slides' && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Slides export">
                   <Button
                     variant="ghost"
