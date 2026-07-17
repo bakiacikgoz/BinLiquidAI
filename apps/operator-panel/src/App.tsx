@@ -2076,7 +2076,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onExecute={(approvalId) => void onExecuteAssistantApproval(approvalId)}
             onApplyProposal={(proposal) => void onApplyAssistantProposal(proposal)}
             onRegenerate={(turnId) => void assistantSession.actions.regenerate(turnId, assistantRuntimeSettings)}
-            onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
+            onOpenArtifact={artifactFeatureFlags.workspace
+              ? (artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)
+              : undefined}
             renderInlineArtifact={(artifact) => {
               if (!artifactFeatureFlags.workspace || !artifactFeatureFlags.form || artifact.kind !== 'form' || !artifact.artifactId) return null;
               const inlineTab = assistantArtifactWorkspace.state.tabs.find(

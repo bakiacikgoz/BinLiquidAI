@@ -231,6 +231,7 @@ def record_artifact_evidence(
                 raise TypeError("artifact evidence requires an operation context")
             started = perf_counter()
             try:
+                service.require_operation_enabled(operation, subject, context)
                 result = method(*args, **kwargs)
             except ArtifactDomainError as exc:
                 latency_ms = (perf_counter() - started) * 1_000

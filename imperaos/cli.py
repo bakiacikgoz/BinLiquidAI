@@ -23,7 +23,10 @@ from imperaos.artifacts.assistant import (
 )
 from imperaos.artifacts.cli import register_artifact_cli
 from imperaos.artifacts.models import ArtifactDataClass, OperationContext, PrincipalType
-from imperaos.artifacts.runtime import resolve_artifact_approval_store
+from imperaos.artifacts.runtime import (
+    resolve_artifact_approval_store,
+    resolve_runtime_artifact_feature_flags,
+)
 from imperaos.artifacts.service import ArtifactService
 from imperaos.artifacts.tools import ArtifactToolRegistry
 from imperaos.computer_use import ComputerUseMode
@@ -1405,6 +1408,7 @@ def _assistant_turn_events(
                     ArtifactService(
                         artifact_root,
                         approval_store=resolve_artifact_approval_store(profile),
+                        feature_flags=resolve_runtime_artifact_feature_flags(),
                     )
                 ),
                 max_tool_calls=min(8, config.limits.max_tool_calls),

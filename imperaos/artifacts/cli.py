@@ -26,7 +26,10 @@ from imperaos.artifacts.rpc_protocol import (
     ARTIFACT_RPC_MAX_FRAME_BYTES,
 )
 from imperaos.artifacts.rpc_server import ArtifactRpcServer
-from imperaos.artifacts.runtime import resolve_artifact_approval_store
+from imperaos.artifacts.runtime import (
+    resolve_artifact_approval_store,
+    resolve_runtime_artifact_feature_flags,
+)
 from imperaos.artifacts.service import ArtifactService
 from imperaos.runtime.paths import state_path
 
@@ -221,11 +224,18 @@ def workspace_rpc(
         spreadsheet_evidence=spreadsheet_license_evidence,
         canvas_evidence=canvas_license_evidence,
     )
+    feature_flags = resolve_runtime_artifact_feature_flags(
+        license_capabilities={
+            "spreadsheet": capabilities[ArtifactKind.SPREADSHEET].enabled,
+            "canvas": capabilities[ArtifactKind.CANVAS].enabled,
+        }
+    )
     server = ArtifactRpcServer(
         ArtifactService(
             root,
             approval_store=resolve_artifact_approval_store(profile),
             license_capabilities=capabilities,
+            feature_flags=feature_flags,
             evidence_resolver=FileArtifactEvidenceResolver(
                 artifact_evidence_root or root / "evidence"
             ),

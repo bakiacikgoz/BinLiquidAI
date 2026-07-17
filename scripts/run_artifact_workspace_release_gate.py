@@ -247,8 +247,15 @@ def build_release_readiness(
     reports: dict[str, dict[str, object]],
     *,
     dirty_paths: list[str],
+    final_candidate_sha: str | None = None,
+    final_dirty_paths: list[str] | None = None,
 ) -> dict[str, object]:
     blocking = [f"DIRTY_WORKTREE:{path}" for path in dirty_paths]
+    if final_candidate_sha is not None and final_candidate_sha != candidate_sha:
+        blocking.append("CANDIDATE_CHANGED")
+    blocking.extend(
+        f"FINAL_DIRTY_WORKTREE:{path}" for path in (final_dirty_paths or [])
+    )
     for gate in GATE_REPORTS:
         report = reports.get(gate)
         if report is None:
@@ -295,7 +302,19 @@ def run_workspace_release(
         )
         for gate in GATE_REPORTS
     }
-    readiness = build_release_readiness(candidate, reports, dirty_paths=dirty)
+    final_candidate = _git(repo_root, "rev-parse", "HEAD").strip()
+    final_dirty = [
+        line
+        for line in _git(repo_root, "status", "--porcelain=v1").splitlines()
+        if line
+    ]
+    readiness = build_release_readiness(
+        candidate,
+        reports,
+        dirty_paths=dirty,
+        final_candidate_sha=final_candidate,
+        final_dirty_paths=final_dirty,
+    )
     _write_json(output_root / "release-readiness.json", readiness)
     (output_root / "RELEASE_READINESS.md").write_text(
         _render_readiness(readiness), encoding="utf-8"

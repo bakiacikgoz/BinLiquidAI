@@ -32,7 +32,13 @@ def test_release_readiness_requires_one_immutable_candidate_and_nonzero_tests() 
     }
     reports["license"] = _report(candidate, test_count=2)
 
-    ready = build_release_readiness(candidate, reports, dirty_paths=[])
+    ready = build_release_readiness(
+        candidate,
+        reports,
+        dirty_paths=[],
+        final_candidate_sha=candidate,
+        final_dirty_paths=[],
+    )
     assert ready["status"] == "pass"
     assert ready["blockingReasons"] == []
     assert ready["featureFlagDefaults"]["artifact_workspace.enabled"] is False
@@ -46,6 +52,19 @@ def test_release_readiness_requires_one_immutable_candidate_and_nonzero_tests() 
     reports["e2e"] = _report("b" * 40)
     stale = build_release_readiness(candidate, reports, dirty_paths=[])
     assert "CANDIDATE_MISMATCH:e2e" in stale["blockingReasons"]
+
+    moved = build_release_readiness(
+        candidate,
+        reports,
+        dirty_paths=[],
+        final_candidate_sha="c" * 40,
+        final_dirty_paths=[" M imperaos/artifacts/service.py"],
+    )
+    assert "CANDIDATE_CHANGED" in moved["blockingReasons"]
+    assert any(
+        reason.startswith("FINAL_DIRTY_WORKTREE:")
+        for reason in moved["blockingReasons"]
+    )
 
 
 def test_license_gate_accepts_only_backend_forced_off_commercial_editors() -> None:
@@ -106,8 +125,14 @@ def test_release_surface_declares_exact_reports_make_targets_and_ci() -> None:
     workflow = (root / ".github/workflows/artifact-workspace-ci.yml").read_text(
         encoding="utf-8"
     )
+    assert "workflow_call:" in workflow
     assert "windows-latest" in workflow
     assert "macos-latest" in workflow
     assert "--gate workspace-release" in workflow
+    product_closure = (root / ".github/workflows/product-complete-closure.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "uses: ./.github/workflows/artifact-workspace-ci.yml" in product_closure
+    assert "artifact-workspace-release" in product_closure
     package = json.loads((root / "apps/operator-panel/package.json").read_text(encoding="utf-8"))
     assert "pass-with-no-tests" not in package["scripts"]["test:e2e"]

@@ -108,6 +108,7 @@ class ArtifactService:
         license_capabilities: Mapping[ArtifactKind, ArtifactLicenseCapability] | None = None,
         evidence_resolver: ArtifactEvidenceResolver | None = None,
         approval_store: ApprovalStore | None = None,
+        feature_flags: Mapping[str, bool] | None = None,
     ) -> None:
         self.store = ArtifactStore(root)
         self.assets = ArtifactAssetStore(root)
@@ -116,6 +117,7 @@ class ArtifactService:
         self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
         self.operations = ArtifactOperationMetrics()
         self.operation_logs: deque[dict[str, object]] = deque(maxlen=256)
+        self._feature_flags = None if feature_flags is None else dict(feature_flags)
         self._proposal_approvals = ArtifactProposalApprovalGateway(
             approval_store
             or ApprovalStore(Path(state_path("governance", "approvals.sqlite3")))
@@ -138,6 +140,69 @@ class ArtifactService:
 
     def license_capabilities(self) -> tuple[ArtifactLicenseCapability, ...]:
         return tuple(self._license_capabilities.values())
+
+    def require_operation_enabled(
+        self,
+        operation: str,
+        subject: object,
+        context: OperationContext,
+    ) -> None:
+        flags = self._feature_flags
+        if flags is None:
+            return
+        required = "artifact_workspace.enabled"
+        if flags.get(required) is not True:
+            self._raise_feature_disabled(required)
+        if operation.startswith("artifact.export."):
+            required = "artifact_workspace.export.enabled"
+            if flags.get(required) is not True:
+                self._raise_feature_disabled(required)
+        kind = self._operation_artifact_kind(subject, context)
+        if kind is not None:
+            required = f"artifact_workspace.{kind.value}.enabled"
+            if flags.get(required) is not True:
+                self._raise_feature_disabled(required)
+
+    def _operation_artifact_kind(
+        self,
+        subject: object,
+        context: OperationContext,
+    ) -> ArtifactKind | None:
+        kind = getattr(subject, "kind", None)
+        if isinstance(kind, ArtifactKind):
+            return kind
+        artifact_id = getattr(subject, "artifact_id", None) or getattr(
+            subject, "source_artifact_id", None
+        )
+        if not isinstance(artifact_id, str):
+            proposal_id = getattr(subject, "proposal_id", None)
+            if isinstance(proposal_id, str):
+                with self.store._connect() as connection:
+                    row = connection.execute(
+                        "SELECT artifact_id FROM artifact_mutation_proposals "
+                        "WHERE proposal_id = ? AND workspace_id = ?",
+                        (proposal_id, context.workspace_id),
+                    ).fetchone()
+                artifact_id = row["artifact_id"] if row is not None else None
+        if not isinstance(artifact_id, str):
+            return None
+        try:
+            return self.store.get_artifact(context.workspace_id, artifact_id).kind
+        except ArtifactDomainError as exc:
+            if exc.code is ArtifactErrorCode.ARTIFACT_NOT_FOUND:
+                return None
+            raise
+
+    @staticmethod
+    def _raise_feature_disabled(flag_name: str) -> None:
+        raise ArtifactDomainError(
+            ArtifactErrorCode.ARTIFACT_POLICY_UNAVAILABLE,
+            "artifact workspace capability is disabled",
+            details={
+                "reasonCode": "ARTIFACT_FEATURE_DISABLED",
+                "featureFlag": flag_name,
+            },
+        )
 
     def _require_licensed_editor(self, kind: ArtifactKind) -> None:
         if kind in self._license_capabilities and not self._license_capabilities[kind].enabled:
