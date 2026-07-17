@@ -8,6 +8,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from typer.testing import CliRunner
 
+from imperaos.artifacts.store import ArtifactStore
 from imperaos.cli import app
 from imperaos.enterprise.maintenance import create_backup
 from imperaos.enterprise.signing import canonical_payload_hash, verify_signed_artifact
@@ -16,6 +17,7 @@ from imperaos.runtime.config import RuntimeConfig
 from imperaos.schemas.models import OrchestratorResult
 from imperaos.team.models import TeamSpec
 from imperaos.team.supervisor import TeamSupervisor
+from tests.artifact_store_support import make_artifact_pair
 
 runner = CliRunner()
 
@@ -309,6 +311,19 @@ def test_enterprise_metrics_support_bundle_and_ga_report(monkeypatch, tmp_path: 
     assert metrics.exit_code == 0
     assert (tmp_path / "artifacts" / "metrics_snapshot.json").exists()
 
+    artifact_payload = (
+        b'{"kind":"document","schemaVersion":1,"language":"en",'
+        b'"pageMode":"document","blocks":[]}'
+    )
+    descriptor, revision = make_artifact_pair(artifact_payload)
+    ArtifactStore(tmp_path / ".imperaos" / "artifacts").create_artifact(
+        descriptor,
+        revision,
+        artifact_payload,
+        operation="create",
+        request_hash="a" * 64,
+    )
+
     bundle = runner.invoke(
         app,
         ["support", "bundle", "export", "--profile", "enterprise", "--json"],
@@ -324,6 +339,7 @@ def test_enterprise_metrics_support_bundle_and_ga_report(monkeypatch, tmp_path: 
         (bundle_dir / "artifact_workspace_snapshot.json").read_text(encoding="utf-8")
     )
     assert artifact_snapshot["schemaVersion"] == "artifact-support/v1"
+    assert artifact_snapshot["counts"]["artifactCount"] == 1
     serialized_snapshot = json.dumps(artifact_snapshot).lower()
     for forbidden in ("rawcontent", "relativepath", "secretref", "authorization"):
         assert forbidden not in serialized_snapshot

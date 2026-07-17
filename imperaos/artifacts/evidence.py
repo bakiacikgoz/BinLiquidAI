@@ -17,6 +17,7 @@ from imperaos.artifacts.migrations import (
     connect_artifact_metadata,
 )
 from imperaos.artifacts.models import ArtifactModel, OperationContext, canonical_json
+from imperaos.artifacts.operations import safe_artifact_log_event
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -256,6 +257,20 @@ def record_artifact_evidence(
                     reason_code=exc.code.value,
                     latency_ms=latency_ms,
                     success=False,
+                    artifact_kind=_operation_kind(service, context, None, subject),
+                    actor_type=context.principal_type.value,
+                    result=status,
+                    format_name=_operation_format(None, subject),
+                )
+                _append_safe_operation_log(
+                    service=service,
+                    operation=operation,
+                    context=context,
+                    result=None,
+                    subject=subject,
+                    status=status,
+                    reason_code=exc.code.value,
+                    latency_ms=latency_ms,
                 )
                 raise
             artifact_id, revision_id, content_sha256 = _result_bindings(result, subject)
@@ -275,6 +290,21 @@ def record_artifact_evidence(
                 reason_code="ARTIFACT_OPERATION_SUCCEEDED",
                 latency_ms=latency_ms,
                 success=True,
+                artifact_kind=_operation_kind(service, context, result, subject),
+                actor_type=context.principal_type.value,
+                result="success",
+                format_name=_operation_format(result, subject),
+                content_size_bytes=_result_content_size(result),
+            )
+            _append_safe_operation_log(
+                service=service,
+                operation=operation,
+                context=context,
+                result=result,
+                subject=subject,
+                status="success",
+                reason_code="ARTIFACT_OPERATION_SUCCEEDED",
+                latency_ms=latency_ms,
             )
             return result
 
@@ -303,6 +333,75 @@ def _result_bindings(result: object, subject: object) -> tuple[str | None, str |
         or getattr(result, "sha256", None)
     )
     return artifact_id or _subject_artifact_id(subject), revision_id, content_sha256
+
+
+def _operation_kind(
+    service: Any,
+    context: OperationContext,
+    result: object | None,
+    subject: object,
+) -> str:
+    artifact = getattr(result, "artifact", None)
+    value = getattr(artifact, "kind", None) or getattr(subject, "kind", None)
+    if value is None:
+        artifact_id = getattr(result, "artifact_id", None) or _subject_artifact_id(subject)
+        if isinstance(artifact_id, str):
+            try:
+                value = service.store.get_artifact(context.workspace_id, artifact_id).kind
+            except ArtifactDomainError:
+                value = None
+    return str(getattr(value, "value", value) or "unknown")
+
+
+def _operation_format(result: object | None, subject: object) -> str:
+    value = getattr(result, "format", None) or getattr(subject, "format", None)
+    return str(getattr(value, "value", value) or "unknown")
+
+
+def _result_content_size(result: object | None) -> int | None:
+    value = getattr(result, "size_bytes", None)
+    if isinstance(value, int):
+        return value
+    revision = getattr(result, "revision", None)
+    revision_size = getattr(revision, "content_size_bytes", None)
+    return revision_size if isinstance(revision_size, int) else None
+
+
+def _append_safe_operation_log(
+    *,
+    service: Any,
+    operation: str,
+    context: OperationContext,
+    result: object | None,
+    subject: object,
+    status: EvidenceStatus,
+    reason_code: str,
+    latency_ms: float,
+) -> None:
+    artifact_id, _, _ = _result_bindings(result, subject)
+    revision = getattr(result, "revision", None)
+    revision_number = getattr(revision, "revision_number", None)
+    service.operation_logs.append(
+        safe_artifact_log_event(
+            component="artifact.service",
+            operation=operation,
+            workspace_id=context.workspace_id,
+            artifact_id=artifact_id,
+            artifact_kind=_operation_kind(service, context, result, subject),
+            revision_number=(
+                revision_number if isinstance(revision_number, int) else None
+            ),
+            actor_type=context.principal_type.value,
+            result=status,
+            reason_code=reason_code,
+            latency_ms=latency_ms,
+            content_size_bytes=_result_content_size(result),
+            trace_id=context.request_id,
+            request_id=context.request_id,
+            sidecar_restart_count=0,
+            level="INFO" if status == "success" else "WARNING",
+        )
+    )
 
 
 def _event_from_row(row: sqlite3.Row) -> ArtifactEvidenceEvent:

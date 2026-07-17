@@ -61,6 +61,16 @@ def test_integrity_verifies_sqlite_hashes_evidence_and_orphans_without_raw_conte
     assert report["orphanContentFileCount"] == 0
     assert report["orphanAssetFileCount"] == 0
     assert service.operations.snapshot()["imperaos_artifact_create_total"] == 1
+    create_series = next(
+        item
+        for item in service.operations.series_snapshot()
+        if item["name"] == "imperaos_artifact_create_total"
+    )
+    assert create_series["labels"] == {"kind": "document", "result": "success"}
+    assert create_series["value"] == 1
+    assert service.operation_logs[-1]["operation"] == "artifact.create"
+    assert service.operation_logs[-1]["artifact_kind"] == "document"
+    assert "Diagnostic document" not in json.dumps(list(service.operation_logs))
     assert "Diagnostic document" not in json.dumps(report)
 
 

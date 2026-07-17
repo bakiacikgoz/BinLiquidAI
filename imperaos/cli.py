@@ -22,7 +22,8 @@ from imperaos.artifacts.assistant import (
     extract_artifact_context_request,
 )
 from imperaos.artifacts.cli import register_artifact_cli
-from imperaos.artifacts.models import OperationContext, PrincipalType
+from imperaos.artifacts.models import ArtifactDataClass, OperationContext, PrincipalType
+from imperaos.artifacts.runtime import resolve_artifact_approval_store
 from imperaos.artifacts.service import ArtifactService
 from imperaos.artifacts.tools import ArtifactToolRegistry
 from imperaos.computer_use import ComputerUseMode
@@ -1326,6 +1327,7 @@ def _assistant_turn_events(
     artifact_workspace_id: str | None = None,
     artifact_principal_id: str | None = None,
     artifact_roles: tuple[str, ...] = (),
+    artifact_prompt_data_class: ArtifactDataClass = ArtifactDataClass.CONFIDENTIAL,
 ) -> list[dict[str, object]]:
     config, source_map = resolve_runtime_config(
         profile=profile,
@@ -1362,6 +1364,11 @@ def _assistant_turn_events(
     artifact_runtime_present = bool(
         artifact_root and artifact_workspace_id and artifact_principal_id
     )
+    if artifact_prompt_data_class in {
+        ArtifactDataClass.PUBLIC,
+        ArtifactDataClass.INTERNAL,
+    }:
+        artifact_prompt_data_class = ArtifactDataClass.CONFIDENTIAL
     if artifact_request is not None and not artifact_runtime_present:
         return [
             {
@@ -1394,7 +1401,12 @@ def _assistant_turn_events(
                 request_id=turn_id,
             )
             loop = ArtifactAssistantToolLoop(
-                ArtifactToolRegistry(ArtifactService(artifact_root)),
+                ArtifactToolRegistry(
+                    ArtifactService(
+                        artifact_root,
+                        approval_store=resolve_artifact_approval_store(profile),
+                    )
+                ),
                 max_tool_calls=min(8, config.limits.max_tool_calls),
             )
             governed = loop.run(
@@ -1402,6 +1414,7 @@ def _assistant_turn_events(
                 prompt=prompt,
                 context=artifact_context,
                 initial_context=artifact_request,
+                prompt_data_class=artifact_prompt_data_class,
             )
         except Exception as exc:  # noqa: BLE001
             code = getattr(getattr(exc, "code", None), "value", None)
@@ -1735,6 +1748,13 @@ def assistant_turn(
         str | None, typer.Option("--artifact-principal-id")
     ] = None,
     artifact_role: Annotated[list[str] | None, typer.Option("--artifact-role")] = None,
+    artifact_prompt_data_class: Annotated[
+        ArtifactDataClass,
+        typer.Option(
+            "--artifact-prompt-data-class",
+            help="Trusted upper-bound classification for the compiled prompt",
+        ),
+    ] = ArtifactDataClass.CONFIDENTIAL,
 ) -> None:
     """Run one assistant turn and emit the product stream event contract."""
     if not prompt_file.exists() or not prompt_file.is_file():
@@ -1755,6 +1775,7 @@ def assistant_turn(
         artifact_workspace_id=artifact_workspace_id,
         artifact_principal_id=artifact_principal_id,
         artifact_roles=tuple(artifact_role or ()),
+        artifact_prompt_data_class=artifact_prompt_data_class,
     )
     saw_final = False
     for sequence, event in enumerate(events, start=1):

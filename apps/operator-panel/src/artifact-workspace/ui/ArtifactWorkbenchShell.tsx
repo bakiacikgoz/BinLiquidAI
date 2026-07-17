@@ -8,8 +8,10 @@ import {
   type ReactNode,
 } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
+import type { ArtifactKind } from '../artifactContracts';
+import { recordArtifactEditorLoadFailure } from '../artifactUiMetrics';
 
-type ErrorBoundaryProps = PropsWithChildren;
+type ErrorBoundaryProps = PropsWithChildren<{ artifactKind?: ArtifactKind }>;
 
 class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed: boolean }> {
   state = { failed: false };
@@ -20,6 +22,7 @@ class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed
 
   componentDidCatch(_error: Error, _info: ErrorInfo): void {
     // React reports the component stack. Raw artifact content is intentionally not logged here.
+    recordArtifactEditorLoadFailure(this.props.artifactKind ?? 'unknown');
   }
 
   render(): ReactNode {
@@ -62,9 +65,11 @@ export function ArtifactWorkbenchShell({
   children,
   workbench,
   onCloseWorkbench,
+  activeArtifactKind,
 }: PropsWithChildren<{
   workbench: ReactNode;
   onCloseWorkbench: () => void;
+  activeArtifactKind?: ArtifactKind;
 }>) {
   const compact = useCompactWorkbench();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -92,7 +97,11 @@ export function ArtifactWorkbenchShell({
 
   if (!workbench) return children;
 
-  const guardedWorkbench = <ArtifactEditorErrorBoundary>{workbench}</ArtifactEditorErrorBoundary>;
+  const guardedWorkbench = (
+    <ArtifactEditorErrorBoundary artifactKind={activeArtifactKind}>
+      {workbench}
+    </ArtifactEditorErrorBoundary>
+  );
   if (compact) {
     return (
       <>

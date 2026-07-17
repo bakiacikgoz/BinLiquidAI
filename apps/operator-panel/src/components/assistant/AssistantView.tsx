@@ -6,6 +6,7 @@ import type { AssistantComposerControls } from '../../assistant/assistantTypes';
 import { useImperaAssistantUiRuntime } from '../../assistant/assistantUiRuntime';
 import type { AssistantModelDiscoveryState } from '../../assistant/useAssistantModels';
 import type { AssistantRuntimeSettings } from '../../settings';
+import type { ArtifactKind } from '../../artifact-workspace/artifactContracts';
 import { assistantUiText, type UiLocale } from '../../i18n';
 import { ArtifactWorkbenchShell } from '../../artifact-workspace/ui/ArtifactWorkbenchShell';
 import { Card } from '../primitives/Card';
@@ -65,6 +66,7 @@ export function AssistantView({
   onOpenArtifact,
   renderInlineArtifact,
   assistantUiRuntimeEnabled = true,
+  activeArtifactKind,
   onCancel,
   onOpenTerminal,
 }: {
@@ -97,6 +99,7 @@ export function AssistantView({
   onOpenArtifact?: (artifactId: string) => void;
   renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
   assistantUiRuntimeEnabled?: boolean;
+  activeArtifactKind?: ArtifactKind;
   onCancel: () => void;
   onOpenTerminal?: () => void;
 }) {
@@ -283,7 +286,11 @@ export function AssistantView({
       </header>
 
       <div className="assistant-surface-grid">
-        <ArtifactWorkbenchShell workbench={workbench} onCloseWorkbench={() => onToggleWorkbench?.()}>
+        <ArtifactWorkbenchShell
+          workbench={workbench}
+          activeArtifactKind={activeArtifactKind}
+          onCloseWorkbench={() => onToggleWorkbench?.()}
+        >
         <div className="assistant-main-stage">
           {state.turns.length > 0 ? (
             <header className="assistant-session-header">

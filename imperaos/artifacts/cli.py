@@ -26,6 +26,7 @@ from imperaos.artifacts.rpc_protocol import (
     ARTIFACT_RPC_MAX_FRAME_BYTES,
 )
 from imperaos.artifacts.rpc_server import ArtifactRpcServer
+from imperaos.artifacts.runtime import resolve_artifact_approval_store
 from imperaos.artifacts.service import ArtifactService
 from imperaos.runtime.paths import state_path
 
@@ -210,6 +211,7 @@ def workspace_rpc(
     spreadsheet_license_evidence: Path | None = SPREADSHEET_LICENSE_EVIDENCE_OPTION,
     canvas_license_evidence: Path | None = CANVAS_LICENSE_EVIDENCE_OPTION,
     artifact_evidence_root: Path | None = ARTIFACT_EVIDENCE_ROOT_OPTION,
+    profile: str = typer.Option("enterprise", "--profile"),
 ) -> None:
     if not stdio_json:
         raise typer.BadParameter("--stdio-json is required")
@@ -222,6 +224,7 @@ def workspace_rpc(
     server = ArtifactRpcServer(
         ArtifactService(
             root,
+            approval_store=resolve_artifact_approval_store(profile),
             license_capabilities=capabilities,
             evidence_resolver=FileArtifactEvidenceResolver(
                 artifact_evidence_root or root / "evidence"

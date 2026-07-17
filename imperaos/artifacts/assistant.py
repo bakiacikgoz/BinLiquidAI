@@ -122,7 +122,11 @@ class ArtifactAssistantToolLoop:
         prompt: str,
         context: OperationContext,
         initial_context: ArtifactContextRequest | dict[str, Any] | None = None,
+        prompt_data_class: ArtifactDataClass = ArtifactDataClass.PUBLIC,
     ) -> ArtifactAssistantTurnResult:
+        binder = getattr(provider, "bind_data_class", None)
+        if callable(binder):
+            binder(prompt_data_class)
         messages: list[dict[str, object]] = [{"role": "user", "content": prompt}]
         events: list[dict[str, JsonValue]] = []
         if initial_context is not None:

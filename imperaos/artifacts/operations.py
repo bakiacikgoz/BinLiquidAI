@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from threading import RLock
 from typing import Literal
@@ -38,15 +39,26 @@ class ArtifactOperationMetrics:
 
     def __init__(self) -> None:
         self._values = {name: 0.0 for name in ARTIFACT_METRIC_NAMES}
+        self._series: dict[str, dict[tuple[tuple[str, str], ...], float]] = {
+            name: {} for name in ARTIFACT_METRIC_NAMES
+        }
         self._lock = RLock()
 
-    def add(self, name: str, value: float = 1.0) -> None:
+    def add(
+        self,
+        name: str,
+        value: float = 1.0,
+        *,
+        labels: Mapping[str, str] | None = None,
+    ) -> None:
         if name not in self._values:
             raise ValueError("unknown artifact metric")
         if value < 0:
             raise ValueError("artifact metric increments must be non-negative")
         with self._lock:
             self._values[name] += float(value)
+            key = tuple(sorted((str(label), str(item)) for label, item in (labels or {}).items()))
+            self._series[name][key] = self._series[name].get(key, 0.0) + float(value)
 
     def observe_operation(
         self,
@@ -55,16 +67,42 @@ class ArtifactOperationMetrics:
         reason_code: str,
         latency_ms: float,
         success: bool,
+        artifact_kind: str = "unknown",
+        actor_type: str = "system",
+        result: str | None = None,
+        format_name: str = "unknown",
+        content_size_bytes: int | None = None,
     ) -> None:
-        if operation == "artifact.create" and success:
-            self.add("imperaos_artifact_create_total")
-        if operation in _MUTATION_OPERATIONS and success:
-            self.add("imperaos_artifact_mutation_total")
-            self.add("imperaos_artifact_autosave_latency_ms", max(0.0, latency_ms))
+        result = result or ("success" if success else "error")
+        if operation == "artifact.create":
+            self.add(
+                "imperaos_artifact_create_total",
+                labels={"kind": artifact_kind, "result": result},
+            )
+        if operation in _MUTATION_OPERATIONS:
+            self.add(
+                "imperaos_artifact_mutation_total",
+                labels={"kind": artifact_kind, "actor": actor_type, "result": result},
+            )
+            if success:
+                self.add("imperaos_artifact_autosave_latency_ms", max(0.0, latency_ms))
         if operation == "artifact.get":
-            self.add("imperaos_artifact_open_latency_ms", max(0.0, latency_ms))
+            self.add(
+                "imperaos_artifact_open_latency_ms",
+                max(0.0, latency_ms),
+                labels={"kind": artifact_kind},
+            )
         if operation.startswith("artifact.export."):
-            self.add("imperaos_artifact_export_total")
+            self.add(
+                "imperaos_artifact_export_total",
+                labels={
+                    "kind": artifact_kind,
+                    "format": format_name,
+                    "result": result,
+                },
+            )
+        if operation == "artifact.export.completed" and success and content_size_bytes is not None:
+            self.add("imperaos_artifact_export_bytes", content_size_bytes)
         reason_metric = {
             "ARTIFACT_REVISION_CONFLICT": "imperaos_artifact_revision_conflict_total",
             "FORM_VALIDATION_FAILED": "imperaos_artifact_form_validation_failure_total",
@@ -74,7 +112,15 @@ class ArtifactOperationMetrics:
             "ARTIFACT_LICENSE_UNAVAILABLE": "imperaos_artifact_license_block_total",
         }.get(reason_code)
         if reason_metric is not None:
-            self.add(reason_metric)
+            labels: dict[str, str] = {}
+            if reason_metric in {
+                "imperaos_artifact_revision_conflict_total",
+                "imperaos_artifact_license_block_total",
+            }:
+                labels["kind"] = artifact_kind
+            if reason_metric == "imperaos_artifact_policy_denied_total":
+                labels["operation"] = operation
+            self.add(reason_metric, labels=labels)
 
     def snapshot(self) -> dict[str, int | float]:
         with self._lock:
@@ -82,6 +128,19 @@ class ArtifactOperationMetrics:
                 name: int(value) if value.is_integer() else round(value, 3)
                 for name, value in self._values.items()
             }
+
+    def series_snapshot(self) -> list[dict[str, object]]:
+        with self._lock:
+            return [
+                {
+                    "name": name,
+                    "labels": dict(labels),
+                    "value": int(value) if value.is_integer() else round(value, 3),
+                }
+                for name in ARTIFACT_METRIC_NAMES
+                for labels, value in sorted(self._series[name].items())
+                if value > 0
+            ]
 
 
 def safe_artifact_log_event(

@@ -90,6 +90,7 @@ class ArtifactRpcServer:
             self.service.operations.add(
                 "imperaos_artifact_rpc_request_latency_ms",
                 (perf_counter() - started) * 1_000,
+                labels={"method": request.method.value},
             )
 
     def _handle_request(self, request: RpcRequest) -> RpcResponse:

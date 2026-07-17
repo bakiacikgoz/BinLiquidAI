@@ -5,6 +5,7 @@ import binascii
 import hashlib
 import json
 import sqlite3
+from collections import deque
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -114,6 +115,7 @@ class ArtifactService:
         self.policy = policy or ArtifactPolicyGateway()
         self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
         self.operations = ArtifactOperationMetrics()
+        self.operation_logs: deque[dict[str, object]] = deque(maxlen=256)
         self._proposal_approvals = ArtifactProposalApprovalGateway(
             approval_store
             or ApprovalStore(Path(state_path("governance", "approvals.sqlite3")))

@@ -114,6 +114,8 @@ def build_artifact_doctor_report(service: ArtifactService) -> dict[str, Any]:
         "integrity": integrity,
         "licenses": licenses,
         "metrics": service.operations.snapshot(),
+        "metricSeries": service.operations.series_snapshot(),
+        "recentOperationLogs": list(service.operation_logs),
     }
 
 

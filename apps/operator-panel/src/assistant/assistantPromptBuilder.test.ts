@@ -94,6 +94,9 @@ describe('assistant prompt builder', () => {
     expect(result.compiledPrompt).not.toContain('synthetic-provider-secret-canary');
     expect(result.compiledPrompt).not.toContain('C:/synthetic/private/path');
     expect(result.compiledPrompt).not.toContain('C:\\Users\\private\\trace.json');
+    expect(result.compiledPrompt).not.toContain('Users');
+    expect(result.compiledPrompt).not.toContain('private');
+    expect(result.compiledPrompt).not.toContain('trace.json');
     expect(result.compiledPrompt).toContain('[redacted');
   });
 

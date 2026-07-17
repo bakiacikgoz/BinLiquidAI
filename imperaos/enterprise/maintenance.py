@@ -20,6 +20,7 @@ from imperaos.enterprise.signing import load_signed_artifact, write_signed_json
 from imperaos.governance.approval_store import ApprovalStore
 from imperaos.memory.persistent_store import PersistentMemoryStore
 from imperaos.runtime.config import RuntimeConfig, redact_config_payload
+from imperaos.runtime.paths import state_path
 from imperaos.team.checkpoint_store import TeamCheckpointStore
 
 
@@ -160,7 +161,7 @@ def export_support_bundle(
     )
     bundle_files.append(str(config_path))
 
-    artifact_root = Path(config.maintenance.support_bundle_dir).parent / "artifacts"
+    artifact_root = Path(state_path("artifacts"))
     artifact_snapshot = build_artifact_support_snapshot(ArtifactService(artifact_root))
     artifact_snapshot_path = bundle_dir / "artifact_workspace_snapshot.json"
     artifact_snapshot_path.write_text(

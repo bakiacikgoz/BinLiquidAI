@@ -2060,6 +2060,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             modelDiscovery={assistantModels}
             locale={locale}
             assistantUiRuntimeEnabled={artifactFeatureFlags.assistantUiRuntime}
+            activeArtifactKind={assistantArtifactWorkspace.activeTab?.artifact.kind}
             onRuntimeSettingsChange={updateSettings}
             onSend={(message, runtimeSettings, controls) =>
               void assistantSession.actions.send(message, runtimeSettings, controls)

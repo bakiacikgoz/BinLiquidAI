@@ -62,7 +62,21 @@ function truncate(value: string, limit: number): { text: string; truncated: bool
 }
 
 function safeJson(value: unknown): string {
-  return maskSecrets(JSON.stringify(redactJson(value), null, 2));
+  return maskSecrets(JSON.stringify(sanitizeStructuredStrings(redactJson(value)), null, 2));
+}
+
+function sanitizeStructuredStrings(value: unknown): unknown {
+  if (typeof value === 'string') return maskSecrets(value);
+  if (Array.isArray(value)) return value.map((item) => sanitizeStructuredStrings(item));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        sanitizeStructuredStrings(entry),
+      ]),
+    );
+  }
+  return value;
 }
 
 function section(title: string, body: string, limit: number): PromptSection {

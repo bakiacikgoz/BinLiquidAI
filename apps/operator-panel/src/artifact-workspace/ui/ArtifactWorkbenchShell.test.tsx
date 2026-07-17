@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderOperatorPanel } from '../../test/render';
 import { ArtifactWorkbenchShell } from './ArtifactWorkbenchShell';
+import { artifactUiMetricSnapshot, resetArtifactUiMetricsForTest } from '../artifactUiMetrics';
 
 function setCompact(matches: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
@@ -45,6 +46,7 @@ function CompactHarness({ onClose }: { onClose: () => void }) {
 
 describe('ArtifactWorkbenchShell', () => {
   beforeEach(() => {
+    resetArtifactUiMetricsForTest();
     setCompact(false);
     class ResizeObserverStub {
       observe(): void {}
@@ -90,7 +92,7 @@ describe('ArtifactWorkbenchShell', () => {
   it('isolates editor crashes behind an actionable error boundary', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     renderOperatorPanel(
-      <ArtifactWorkbenchShell workbench={<BrokenEditor />} onCloseWorkbench={vi.fn()}>
+      <ArtifactWorkbenchShell workbench={<BrokenEditor />} activeArtifactKind="document" onCloseWorkbench={vi.fn()}>
         <main>Assistant chat remains available</main>
       </ArtifactWorkbenchShell>,
     );
@@ -98,6 +100,11 @@ describe('ArtifactWorkbenchShell', () => {
     expect(screen.getByText('Assistant chat remains available')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('The artifact editor could not be displayed.');
     expect(screen.getByRole('button', { name: 'Retry editor' })).toBeInTheDocument();
+    expect(artifactUiMetricSnapshot()).toContainEqual({
+      name: 'imperaos_artifact_editor_load_failure_total',
+      labels: { kind: 'document' },
+      value: 1,
+    });
     consoleError.mockRestore();
   });
 });

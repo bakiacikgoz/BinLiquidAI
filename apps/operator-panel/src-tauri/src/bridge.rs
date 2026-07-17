@@ -72,6 +72,26 @@ impl Drop for AssistantPromptFileGuard {
     }
 }
 
+fn create_assistant_prompt_file_with_writer<F>(
+    prompt_path: &Path,
+    writer: F,
+) -> std::io::Result<AssistantPromptFileGuard>
+where
+    F: FnOnce(&mut File) -> std::io::Result<()>,
+{
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(prompt_path)?;
+    let guard = AssistantPromptFileGuard(prompt_path.to_path_buf());
+    writer(&mut file)?;
+    Ok(guard)
+}
+
 fn cleanup_stale_assistant_prompt_files(prompt_dir: &Path, max_age: Duration) {
     let now = SystemTime::now();
     let Ok(entries) = std::fs::read_dir(prompt_dir) else {
@@ -2641,25 +2661,20 @@ pub async fn bridge_assistant_start_turn(
     }
     cleanup_stale_assistant_prompt_files(&prompt_dir, Duration::from_secs(24 * 60 * 60));
     let prompt_path = prompt_dir.join(format!("{assistant_turn_id}-{}.md", uuid::Uuid::new_v4()));
-    let mut prompt_options = OpenOptions::new();
-    prompt_options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        prompt_options.mode(0o600);
-    }
-    let prompt_write = prompt_options
-        .open(&prompt_path)
-        .and_then(|mut file| std::io::Write::write_all(&mut file, compiled_prompt.as_bytes()));
-    if let Err(error) = prompt_write {
-        return BridgeResult::err(BridgeError::new(
-            "CLI_FAILED",
-            format!("Assistant prompt could not be prepared: {error}"),
-            "",
-            "assistant prompt preparation",
-            true,
-        ));
-    }
+    let prompt_guard = match create_assistant_prompt_file_with_writer(&prompt_path, |file| {
+        std::io::Write::write_all(file, compiled_prompt.as_bytes())
+    }) {
+        Ok(guard) => guard,
+        Err(error) => {
+            return BridgeResult::err(BridgeError::new(
+                "CLI_FAILED",
+                format!("Assistant prompt could not be prepared: {error}"),
+                "",
+                "assistant prompt preparation",
+                true,
+            ))
+        }
+    };
     let args = build_assistant_turn_args(
         &config,
         &prompt_path,
@@ -2745,10 +2760,10 @@ pub async fn bridge_assistant_start_turn(
     let task_turn_id = assistant_turn_id.clone();
     let task_session_id = session_id.clone();
     let task_command_preview = command_preview.clone();
-    let task_prompt_path = prompt_path.clone();
+    let task_prompt_guard = prompt_guard;
 
     tokio::spawn(async move {
-        let _prompt_guard = AssistantPromptFileGuard(task_prompt_path);
+        let _prompt_guard = task_prompt_guard;
         let stderr_task = tokio::spawn(read_assistant_stderr_preview(stderr));
         let stream_result = stream_assistant_stdout(
             task_app.clone(),
@@ -3035,6 +3050,8 @@ fn build_assistant_turn_args(
         identity.workspace_id().to_string(),
         "--artifact-principal-id".to_string(),
         identity.principal_id().to_string(),
+        "--artifact-prompt-data-class".to_string(),
+        "confidential".to_string(),
     ];
     for role in identity.roles() {
         args.push("--artifact-role".to_string());
@@ -3601,6 +3618,7 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
         "IMPERAOS_BREAK_GLASS_ASSERTION_PATH",
         "IMPERAOS_ACTOR_ID",
         "IMPERAOS_ARTIFACT_ROLES",
+        "IMPERAOS_GOVERNANCE_APPROVAL_STORE_PATH",
     ] {
         if let Ok(value) = std::env::var(key) {
             command.env(key, value);
@@ -4539,6 +4557,9 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|pair| pair[0] == "--artifact-role" && pair[1] == "artifact_admin"));
+        assert!(args.windows(2).any(|pair| {
+            pair[0] == "--artifact-prompt-data-class" && pair[1] == "confidential"
+        }));
 
         let preview = format_assistant_command_preview("imperaos", &[], &args);
         assert!(preview.contains("[compiled_prompt_file]"));
@@ -4559,6 +4580,19 @@ mod tests {
             assert!(prompt.exists());
         }
 
+        assert!(!prompt.exists());
+    }
+
+    #[test]
+    fn assistant_prompt_partial_write_failure_removes_created_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let prompt = dir.path().join("partial.md");
+        let result = create_assistant_prompt_file_with_writer(&prompt, |file| {
+            std::io::Write::write_all(file, b"classified prefix")?;
+            Err(std::io::Error::other("simulated disk failure"))
+        });
+
+        assert!(result.is_err());
         assert!(!prompt.exists());
     }
 

@@ -315,6 +315,7 @@ pub struct RpcHealth {
     pub restart_count: u32,
     pub circuit_open: bool,
     pub process_id: Option<u32>,
+    pub metrics: HashMap<String, u64>,
 }
 
 struct WorkspaceRpcProcess {
@@ -547,6 +548,8 @@ impl WorkspaceRpcSupervisor {
             .args(&self.launch.args)
             .arg("workspace-rpc")
             .arg("--stdio-json")
+            .arg("--profile")
+            .arg(std::env::var("IMPERAOS_PROFILE").unwrap_or_else(|_| "enterprise".to_string()))
             .arg("--root")
             .arg(&self.launch.artifact_root)
             .envs(&self.launch.env)
@@ -591,6 +594,10 @@ impl WorkspaceRpcSupervisor {
     }
 
     fn health_snapshot(state: &SupervisorState) -> RpcHealth {
+        let metrics = HashMap::from([(
+            "imperaos_artifact_rpc_restart_total".to_string(),
+            u64::from(state.restart_count),
+        )]);
         RpcHealth {
             status: if state.circuit.is_open() {
                 "circuit_open".to_string()
@@ -609,6 +616,7 @@ impl WorkspaceRpcSupervisor {
                 .process
                 .as_ref()
                 .and_then(|process| process.child.id()),
+            metrics,
         }
     }
 }
@@ -822,6 +830,19 @@ mod tests {
         assert!(!circuit.record_failure());
         assert!(circuit.record_failure());
         assert!(circuit.is_open());
+    }
+
+    #[test]
+    fn health_snapshot_publishes_the_named_restart_metric() {
+        let state = SupervisorState {
+            restart_count: 2,
+            ..SupervisorState::default()
+        };
+        let health = WorkspaceRpcSupervisor::health_snapshot(&state);
+        assert_eq!(
+            health.metrics.get("imperaos_artifact_rpc_restart_total"),
+            Some(&2)
+        );
     }
 
     #[test]

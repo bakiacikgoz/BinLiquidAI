@@ -305,3 +305,36 @@ def test_core_loop_can_create_a_classified_draft_without_active_artifact_context
     assert result.events[0]["toolName"] == "artifact.create_draft"
     assert result.events[0]["kind"] == "document"
     assert llm.data_classes == [[DataClass.PUBLIC], [DataClass.INTERNAL]]
+
+
+def test_core_loop_binds_trusted_prompt_classification_before_first_provider_call(
+    tmp_path: Path,
+) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+
+    class ClassifiedLlm:
+        def __init__(self) -> None:
+            self.data_classes: list[list[DataClass]] = []
+
+        def generate(
+            self,
+            *,
+            prompt: str,
+            system: str,
+            json_mode: bool,
+            data_classes: list[DataClass],
+        ) -> str:
+            del prompt, system, json_mode
+            self.data_classes.append(data_classes)
+            return '{"finalText":"Safe."}'
+
+    llm = ClassifiedLlm()
+    ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+        CoreLlmArtifactProvider(llm),
+        prompt="Summarize trusted operational context.",
+        context=_context(),
+        initial_context=None,
+        prompt_data_class=ArtifactDataClass.CONFIDENTIAL,
+    )
+
+    assert llm.data_classes == [[DataClass.CONFIDENTIAL]]

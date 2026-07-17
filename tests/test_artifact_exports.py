@@ -126,6 +126,15 @@ def test_export_authority_binds_exact_revision_format_actor_and_terminal_state(
     assert authorized.status == "pending"
     assert committed.status == "completed"
     assert committed.artifact_id == artifact_id
+    assert service.operations.snapshot()["imperaos_artifact_export_bytes"] == len(payload)
+    completed_series = next(
+        item
+        for item in service.operations.series_snapshot()
+        if item["name"] == "imperaos_artifact_export_total"
+        and item["labels"].get("result") == "success"
+    )
+    assert completed_series["labels"]["kind"] == "code"
+    assert completed_series["labels"]["format"] == "source"
     with pytest.raises(ArtifactDomainError) as terminal:
         service.cancel_export(
             CancelArtifactExportCommand(
