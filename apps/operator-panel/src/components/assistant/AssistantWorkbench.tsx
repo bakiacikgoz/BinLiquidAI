@@ -10,6 +10,7 @@ import type {
   ArtifactWorkspaceUiError,
 } from '../../artifact-workspace/useAssistantArtifactWorkspaceController';
 import { ArtifactEditorHost, type ArtifactSelection } from '../../artifact-workspace/editors/ArtifactEditorHost';
+import { contextSelectionLabel } from '../../artifact-workspace/selectionContext';
 import { ArtifactDiffView } from '../../artifact-workspace/ui/ArtifactDiffView';
 import { ArtifactConflictPanel } from '../../artifact-workspace/ui/ArtifactConflictPanel';
 import { translateAssistantText, type UiLocale } from '../../i18n';
@@ -82,22 +83,6 @@ function licenseLabel(artifact: ArtifactDescriptor): string {
     return metadataLabel(artifact, 'licenseStatus', 'license required');
   }
   return metadataLabel(artifact, 'licenseStatus', 'built-in');
-}
-
-function artifactSelectionLabel(selection: ArtifactSelection | null): string {
-  if (!selection) return 'No editor selection';
-  if (selection.kind === 'flow') {
-    return `${selection.nodeIds.length} flow nodes, ${selection.edgeIds.length} flow edges selected`;
-  }
-  if (selection.kind === 'code') {
-    return `Code selection line ${selection.startLineNumber}, column ${selection.startColumn}`;
-  }
-  if (selection.kind === 'slides') {
-    return selection.elementId
-      ? `Slide ${selection.slideId}, element ${selection.elementId} selected`
-      : `Slide ${selection.slideId} selected`;
-  }
-  return `${selection.blockIds.length} document blocks selected`;
 }
 
 export function AssistantWorkbench({
@@ -377,7 +362,7 @@ export function AssistantWorkbench({
                   locale={locale}
                 />
                 <p className="artifact-workspace-selection-status" role="status" aria-live="polite">
-                  {artifactSelectionLabel(editorSelection)}
+                  {contextSelectionLabel(editorSelection)}
                 </p>
               </div>
               {activeTab.artifact.kind === 'document' && activeComparison?.status !== 'ready' ? (

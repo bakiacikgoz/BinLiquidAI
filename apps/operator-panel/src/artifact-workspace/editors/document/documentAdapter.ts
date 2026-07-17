@@ -39,10 +39,8 @@ export type DocumentArtifactContent = ArtifactContent & {
 };
 
 export type DocumentArtifactSelection = {
-  kind: 'block';
+  kind: 'document';
   blockIds: string[];
-  anchorBlockId: string;
-  focusBlockId: string;
 };
 
 function record(value: unknown, label: string): Record<string, unknown> {
@@ -159,13 +157,11 @@ export function serializeDocumentBlocks(
 }
 
 export function selectionFromBlockIds(blockIds: string[]): DocumentArtifactSelection | null {
-  const unique = Array.from(new Set(blockIds.filter((id) => BOUNDED_ID.test(id)))).slice(0, 500);
+  const unique = Array.from(new Set(blockIds.filter((id) => BOUNDED_ID.test(id)))).slice(0, 100);
   if (unique.length === 0) return null;
   return {
-    kind: 'block',
+    kind: 'document',
     blockIds: unique,
-    anchorBlockId: unique[0],
-    focusBlockId: unique.at(-1) ?? unique[0],
   };
 }
 

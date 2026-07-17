@@ -11,14 +11,11 @@ import type {
 } from '../artifactContracts';
 import type { ArtifactSaveState } from '../workspaceController';
 import { isArtifactCodeEditorEnabled, isArtifactFlowEditorEnabled, isArtifactFormEditorEnabled, isArtifactSlidesEditorEnabled } from '../artifactFeatureFlags';
-import type { CodeArtifactSelection } from './code/codeAdapter';
-import type { DocumentArtifactSelection } from './document/documentAdapter';
-import type { FlowArtifactSelection } from './flow/flowAdapter';
-import type { SlidesArtifactSelection } from './slides/slidesAdapter';
+import type { ArtifactContextSelection } from '../selectionContext';
 import { FormSessionRuntime } from './form/formSessionRuntime';
 import { ArtifactLicenseBlocked } from '../ui/ArtifactLicenseBlocked';
 
-export type ArtifactSelection = DocumentArtifactSelection | CodeArtifactSelection | FlowArtifactSelection | SlidesArtifactSelection;
+export type ArtifactSelection = ArtifactContextSelection;
 export type ArtifactExportFormat = 'json' | 'markdown' | 'html' | 'txt' | 'source' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx';
 
 export interface ArtifactEditorProps {

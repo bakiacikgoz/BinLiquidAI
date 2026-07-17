@@ -51,10 +51,8 @@ describe('document artifact adapter', () => {
 
   it('projects bounded block selections without raw text', () => {
     expect(selectionFromBlockIds(['block-1', 'block-2', 'block-2'])).toEqual({
-      kind: 'block',
+      kind: 'document',
       blockIds: ['block-1', 'block-2'],
-      anchorBlockId: 'block-1',
-      focusBlockId: 'block-2',
     });
     expect(selectionFromBlockIds([])).toBeNull();
   });
