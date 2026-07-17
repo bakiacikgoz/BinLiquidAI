@@ -8,6 +8,7 @@ import pytest
 from scripts.run_artifact_workspace_release_gate import (
     GATE_REPORTS,
     REQUIRED_RELEASE_ARTIFACTS,
+    _run_command,
     build_release_readiness,
     evaluate_forced_off_license_gate,
 )
@@ -136,3 +137,9 @@ def test_release_surface_declares_exact_reports_make_targets_and_ci() -> None:
     assert "artifact-workspace-release" in product_closure
     package = json.loads((root / "apps/operator-panel/package.json").read_text(encoding="utf-8"))
     assert "pass-with-no-tests" not in package["scripts"]["test:e2e"]
+
+
+def test_command_runner_reports_missing_executable_without_crashing(tmp_path: Path) -> None:
+    result = _run_command(["imperaos-command-that-does-not-exist"], tmp_path)
+    assert result["exitCode"] == 127
+    assert result["testCount"] == 0

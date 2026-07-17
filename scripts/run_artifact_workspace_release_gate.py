@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -149,15 +150,26 @@ def _test_count(output: str) -> int:
 
 def _run_command(command: list[str], repo_root: Path) -> dict[str, object]:
     started = perf_counter()
-    completed = subprocess.run(  # noqa: S603
-        command,
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
+    executable = command[0]
+    if not Path(executable).is_absolute():
+        executable = shutil.which(executable) or executable
+    try:
+        completed = subprocess.run(  # noqa: S603
+            [executable, *command[1:]],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError as exc:
+        completed = subprocess.CompletedProcess(
+            command,
+            127,
+            stdout="",
+            stderr=f"executable unavailable: {type(exc).__name__}",
+        )
     output = completed.stdout + "\n" + completed.stderr
     return {
         "name": Path(command[0]).name + " " + " ".join(command[1:3]),
