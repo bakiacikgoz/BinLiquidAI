@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:interaction": "vitest run interaction --passWithNoTests",
-    "test:e2e": "playwright test --pass-with-no-tests",
+    "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:a11y": "playwright test e2e/accessibility.spec.ts --pass-with-no-tests",
     "test:responsive": "playwright test e2e/responsive.spec.ts --pass-with-no-tests",

@@ -1,5 +1,32 @@
 .PHONY: bootstrap bootstrap-macos bootstrap-windows install lint test check doctor chat benchmark benchmark-team benchmark-ablation benchmark-energy brand-consistency-gate pilot-gate enterprise-gate qualification-run vision-gate provider-native-gate provider-runtime-gate provider-workflow-proof-gate provider-governance-gate provider-v1-1-closure-gate provider-native-adapter-gate provider-governance-pr-readiness target-evidence-rehearsal-gate operator-attestation-gate design-partner-pilot-candidate-gate design-partner-rc-audit-gate design-partner-field-evidence-gate design-partner-handoff-gate mainline-rc-freeze-gate rc-evidence-orchestrator-gate rc-release-decision-gate enterprise-workspace-onboarding-gate enterprise-workspace-release-closure-gate product-complete-scope-gate assistant-real-runtime-gate first-run-readiness-gate governed-agent-workflow-product-gate product-complete-closure-gate product-desktop-smoke-gate memory-governance-gate memory-index-gate memory-authority-gate memory-operator-panel-gate memory-runtime-gate memory-runtime-policy-gate memory-context-pack-gate memory-sync-gate governed-memory-v1-gate workspace-memory-authority-gate memory-rbac-gate memory-workspace-sync-gate memory-migration-dry-run-gate memory-authority-operator-gate semantic-memory-index-gate memory-retrieval-quality-gate memory-privacy-leakage-gate memory-backend-benchmark-gate governed-pilot-workflow-gate control-plane-schemas control-plane-snapshot-gate control-plane-gate evidence-pack-gate enterprise-hat-a-evidence-gate evidence-corpus-gate install-rehearsal-gate external-agent-pilot-gate external-agent-v1-1-gate pilot-operations-gate governance-admin-gate security-review-pack-gate operator-panel-fallow-report operator-panel-boundary-gate operator-panel-fallow-gate ci-node24-inventory design-partner-beta-pack design-partner-beta-gate design-partner-pilot-gate agent-control-plane-v1-gate operator-panel-i18n-gate operator-panel-productization-gate operator-panel-tauri-smoke pilot-readiness-gate design-partner-rc-gate ui-gate ui-e2e-gate rust-gate mainline-gate ui-install ui-dev ui-build ui-tauri-build
-.PHONY: macos-local-trial-gate operator-panel-bridge-parity-gate macos-bundled-runtime-gate
+.PHONY: macos-local-trial-gate operator-panel-bridge-parity-gate macos-bundled-runtime-gate artifact-contract-gate artifact-storage-gate artifact-rpc-gate artifact-security-gate artifact-ui-gate artifact-e2e-gate artifact-export-gate artifact-license-gate artifact-workspace-release-gate
+
+artifact-contract-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate contract --profile enterprise --json
+
+artifact-storage-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate storage --profile enterprise --json
+
+artifact-rpc-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate rpc --profile enterprise --json
+
+artifact-security-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate security --profile enterprise --json
+
+artifact-ui-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate ui --profile enterprise --json
+
+artifact-e2e-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate e2e --profile enterprise --json
+
+artifact-export-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate export --profile enterprise --json
+
+artifact-license-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate license --profile enterprise --json
+
+artifact-workspace-release-gate:
+	uv run python scripts/run_artifact_workspace_release_gate.py --gate workspace-release --profile enterprise --json
 
 bootstrap: bootstrap-macos
 
