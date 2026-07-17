@@ -76,6 +76,7 @@ from imperaos.artifacts.store import (
     StoredRevision,
     revision_content_relpath,
 )
+from imperaos.artifacts.tools import PUBLIC_ARTIFACT_TOOL_NAMES, ArtifactToolRegistry
 
 __all__ = [
     "ARTIFACT_CONTENT_LIMITS_BYTES",
@@ -112,6 +113,7 @@ __all__ = [
     "ArtifactRevisionDescriptor",
     "ArtifactStatus",
     "ArtifactStore",
+    "ArtifactToolRegistry",
     "CreateArtifactCommand",
     "DuplicateArtifactCommand",
     "GetArtifactQuery",
@@ -120,6 +122,7 @@ __all__ = [
     "MutateArtifactCommand",
     "OperationContext",
     "PrincipalType",
+    "PUBLIC_ARTIFACT_TOOL_NAMES",
     "ProposeArtifactMutationCommand",
     "RestoreArtifactCommand",
     "RpcError",

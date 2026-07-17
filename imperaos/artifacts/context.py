@@ -42,7 +42,7 @@ class ArtifactContextPurpose(StrEnum):
 
 class DocumentArtifactSelection(ArtifactModel):
     kind: Literal["document"] = "document"
-    block_ids: tuple[BoundedId, ...] = Field(min_length=1, max_length=100)
+    block_ids: tuple[BoundedId, ...] = Field(min_length=1, max_length=100, strict=False)
 
 
 class FormArtifactSelection(ArtifactModel):
@@ -50,7 +50,7 @@ class FormArtifactSelection(ArtifactModel):
     field_paths: tuple[
         Annotated[str, StringConstraints(pattern=r"^/(?:[^/~]|~[01])+(?:/(?:[^/~]|~[01])+)*$")],
         ...,
-    ] = Field(min_length=1, max_length=100)
+    ] = Field(min_length=1, max_length=100, strict=False)
 
 
 class CodeArtifactSelection(ArtifactModel):
@@ -72,8 +72,8 @@ class CodeArtifactSelection(ArtifactModel):
 
 class FlowArtifactSelection(ArtifactModel):
     kind: Literal["flow"] = "flow"
-    node_ids: tuple[BoundedId, ...] = Field(default_factory=tuple, max_length=500)
-    edge_ids: tuple[BoundedId, ...] = Field(default_factory=tuple, max_length=1_000)
+    node_ids: tuple[BoundedId, ...] = Field(default_factory=tuple, max_length=500, strict=False)
+    edge_ids: tuple[BoundedId, ...] = Field(default_factory=tuple, max_length=1_000, strict=False)
 
     @model_validator(mode="after")
     def validate_non_empty(self) -> FlowArtifactSelection:
@@ -88,6 +88,7 @@ class SpreadsheetArtifactSelection(ArtifactModel):
     ranges: tuple[Annotated[str, StringConstraints(pattern=_CELL_RANGE.pattern)], ...] = Field(
         min_length=1,
         max_length=100,
+        strict=False,
     )
 
     @model_validator(mode="after")
@@ -99,7 +100,7 @@ class SpreadsheetArtifactSelection(ArtifactModel):
 
 class CanvasArtifactSelection(ArtifactModel):
     kind: Literal["canvas"] = "canvas"
-    object_ids: tuple[BoundedId, ...] = Field(min_length=1, max_length=500)
+    object_ids: tuple[BoundedId, ...] = Field(min_length=1, max_length=500, strict=False)
 
 
 class SlidesArtifactSelection(ArtifactModel):
@@ -139,6 +140,7 @@ class ArtifactContextPack(ArtifactModel):
     projection: dict[str, JsonValue]
     canonical_projection: str
     projection_sha256: Sha256
+    selection_sha256: Sha256
     content_sha256: Sha256
     projection_size_bytes: int = Field(ge=2, le=MAX_CONTEXT_BYTES)
     estimated_tokens: int = Field(ge=1, le=MAX_CONTEXT_TOKENS)
@@ -178,6 +180,11 @@ def build_artifact_context_pack(
     projection, redaction_count = _redact(projection)
     fitted, truncated = _fit_projection(projection)
     canonical = _canonical(fitted)
+    selection_json = _canonical(
+        request.selection.model_dump(mode="json", by_alias=True)
+        if request.selection is not None
+        else None
+    )
     size_bytes = len(canonical.encode("utf-8"))
     return ArtifactContextPack(
         artifact_id=artifact.artifact_id,
@@ -190,6 +197,7 @@ def build_artifact_context_pack(
         projection=fitted,
         canonical_projection=canonical,
         projection_sha256=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+        selection_sha256=hashlib.sha256(selection_json.encode("utf-8")).hexdigest(),
         content_sha256=revision.content_sha256,
         projection_size_bytes=size_bytes,
         estimated_tokens=max(1, math.ceil(size_bytes / 4)),

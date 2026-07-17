@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from imperaos.artifacts.tool_names import PUBLIC_ARTIFACT_TOOL_NAMES
 from imperaos.model_providers.models import DataClass, ProviderPolicy
 from imperaos.model_providers.native.types import (
     ProviderRequestedTool,
@@ -70,6 +71,20 @@ def evaluate_provider_tool_policy(
                 requested_tool.tool_type,
                 "UNKNOWN_TOOL_DEFAULT_DENY",
             ),
+            execution_allowed=False,
+            proposal_allowed=False,
+            approval_required=False,
+            tool_name=requested_tool.name,
+        )
+
+    if (
+        requested_tool.name.startswith("artifact.")
+        and requested_tool.name not in PUBLIC_ARTIFACT_TOOL_NAMES
+    ):
+        return ProviderToolPolicyDecision(
+            status=ProviderToolPolicyStatus.DENY,
+            requested_tool_type=requested_tool.tool_type,
+            reason_code="ARTIFACT_TOOL_NOT_PUBLIC",
             execution_allowed=False,
             proposal_allowed=False,
             approval_required=False,
