@@ -3452,36 +3452,16 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                       spellCheck={false}
                     />
                   </label>
-                  <label className="operator-setting-row">
+                  <div className="operator-setting-row" role="note">
                     <div>
-                      <span>OpenAI API key</span>
-                      <small>{locale === 'tr' ? 'Sadece local bridge env içine aktarılır.' : 'Passed only into the local bridge environment.'}</small>
+                      <span>{locale === 'tr' ? 'Provider kimlik bilgileri' : 'Provider credentials'}</span>
+                      <small>
+                        {locale === 'tr'
+                          ? 'Kimlik bilgileri güvenilir backend ortamında yönetilir; renderer tarafında saklanmaz.'
+                          : 'Credentials are managed by the trusted backend environment and are never stored in the renderer.'}
+                      </small>
                     </div>
-                    <input
-                      aria-label="OpenAI API key"
-                      type="password"
-                      value={settings.assistantOpenAiApiKey}
-                      onChange={(event) => updateSettings({ assistantOpenAiApiKey: event.target.value })}
-                      placeholder="sk-..."
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </label>
-                  <label className="operator-setting-row">
-                    <div>
-                      <span>DeepSeek API key</span>
-                      <small>{locale === 'tr' ? 'DeepSeek provider girilen key ile etkinleşir.' : 'The DeepSeek provider is enabled when this key is set.'}</small>
-                    </div>
-                    <input
-                      aria-label="DeepSeek API key"
-                      type="password"
-                      value={settings.assistantDeepSeekApiKey}
-                      onChange={(event) => updateSettings({ assistantDeepSeekApiKey: event.target.value })}
-                      placeholder="sk-..."
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </label>
+                  </div>
                 </div>
               </article>
             </div>

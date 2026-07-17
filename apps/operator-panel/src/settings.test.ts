@@ -108,13 +108,11 @@ describe('assistant runtime settings', () => {
         assistantFallbackProvider: '',
         assistantModel: '',
         assistantHfModelId: '',
-        assistantOpenAiApiKey: '',
-        assistantDeepSeekApiKey: '',
       }),
     );
   });
 
-  it('preserves assistant API keys from stored settings', () => {
+  it('scrubs legacy assistant API keys from renderer storage', () => {
     localStorage.setItem(
       SETTINGS_KEY,
       JSON.stringify({
@@ -124,12 +122,11 @@ describe('assistant runtime settings', () => {
       }),
     );
 
-    expect(loadSettings()).toEqual(
-      expect.objectContaining({
-        assistantOpenAiApiKey: 'sk-openai',
-        assistantDeepSeekApiKey: 'sk-deepseek',
-      }),
-    );
+    const loaded = loadSettings();
+    expect(loaded).not.toHaveProperty('assistantOpenAiApiKey');
+    expect(loaded).not.toHaveProperty('assistantDeepSeekApiKey');
+    expect(localStorage.getItem(SETTINGS_KEY)).not.toContain('sk-openai');
+    expect(localStorage.getItem(SETTINGS_KEY)).not.toContain('sk-deepseek');
   });
 
   it('leaves empty assistant runtime overrides undefined for CLI defaults', () => {

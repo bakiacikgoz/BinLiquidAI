@@ -66,7 +66,7 @@ describe('bridge tauri contract', () => {
     );
   });
 
-  it('passes assistant API keys and remote provider flag through bridge config env', async () => {
+  it('never passes renderer provider secrets through bridge config env', async () => {
     const { invoke, bridge } = await importBridgeWithInvoke({
       contractVersion: 'operator-panel.assistant-provider-models/v4',
       profile: 'balanced',
@@ -75,29 +75,28 @@ describe('bridge tauri contract', () => {
       providers: [],
     });
 
+    const pollutedLegacySettings = {
+      ...DEFAULT_SETTINGS,
+      assistantOpenAiApiKey: 'sk-openai',
+      assistantDeepSeekApiKey: 'sk-deepseek',
+    } as typeof DEFAULT_SETTINGS & {
+      assistantOpenAiApiKey: string;
+      assistantDeepSeekApiKey: string;
+    };
     await bridge.listAssistantModels(
-      {
-        ...DEFAULT_SETTINGS,
-        assistantOpenAiApiKey: 'sk-openai',
-        assistantDeepSeekApiKey: 'sk-deepseek',
-      },
+      pollutedLegacySettings,
       { profile: 'balanced', provider: 'all' },
     );
 
-    expect(invoke).toHaveBeenCalledWith(
-      'bridge_assistant_provider_models',
-      expect.objectContaining({
-        config: expect.objectContaining({
-          env: expect.objectContaining({
-            IMPERAOS_PROFILE_NAME: 'balanced',
-            IMPERAOS_TEAM_ARTIFACT_DIR: DEFAULT_SETTINGS.rootDir,
-            IMPERAOS_REMOTE_PROVIDERS_ENABLED: 'true',
-            OPENAI_API_KEY: 'sk-openai',
-            DEEPSEEK_API_KEY: 'sk-deepseek',
-          }),
-        }),
-      }),
-    );
+    const call = invoke.mock.calls.find(([command]) => command === 'bridge_assistant_provider_models');
+    const config = (call?.[1] as { config?: { env?: Record<string, string> } }).config;
+    expect(config?.env).toMatchObject({
+      IMPERAOS_PROFILE_NAME: 'balanced',
+      IMPERAOS_TEAM_ARTIFACT_DIR: DEFAULT_SETTINGS.rootDir,
+    });
+    expect(config?.env).not.toHaveProperty('IMPERAOS_REMOTE_PROVIDERS_ENABLED');
+    expect(config?.env).not.toHaveProperty('OPENAI_API_KEY');
+    expect(config?.env).not.toHaveProperty('DEEPSEEK_API_KEY');
   });
 
   it('passes assistant provider and model options to the Tauri command', async () => {

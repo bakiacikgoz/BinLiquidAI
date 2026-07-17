@@ -28,8 +28,6 @@ export interface PanelSettings {
   assistantFallbackProvider: string;
   assistantModel: string;
   assistantHfModelId: string;
-  assistantOpenAiApiKey: string;
-  assistantDeepSeekApiKey: string;
 }
 
 export const SETTINGS_KEY = `${PRODUCT_IDENTITY.slug}.operator.settings.v1`;
@@ -56,8 +54,6 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   debugRaw: false,
   theme: 'system',
   ...DEFAULT_ASSISTANT_RUNTIME_SETTINGS,
-  assistantOpenAiApiKey: '',
-  assistantDeepSeekApiKey: '',
 };
 
 const MODEL_TOKEN_PATTERN = /^[A-Za-z0-9._:/@+-]+$/;
@@ -130,8 +126,11 @@ export function loadSettings(): PanelSettings {
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<PanelSettings>;
-    return {
+    const parsed = JSON.parse(raw) as Partial<PanelSettings> & {
+      assistantOpenAiApiKey?: unknown;
+      assistantDeepSeekApiKey?: unknown;
+    };
+    const loaded: PanelSettings = {
       ...DEFAULT_SETTINGS,
       ...parsed,
       operatorId: normalizeStoredOperatorId(parsed.operatorId),
@@ -140,10 +139,13 @@ export function loadSettings(): PanelSettings {
         typeof parsed.assistantFallbackProvider === 'string' ? parsed.assistantFallbackProvider : '',
       assistantModel: typeof parsed.assistantModel === 'string' ? parsed.assistantModel : '',
       assistantHfModelId: typeof parsed.assistantHfModelId === 'string' ? parsed.assistantHfModelId : '',
-      assistantOpenAiApiKey: typeof parsed.assistantOpenAiApiKey === 'string' ? parsed.assistantOpenAiApiKey : '',
-      assistantDeepSeekApiKey:
-        typeof parsed.assistantDeepSeekApiKey === 'string' ? parsed.assistantDeepSeekApiKey : '',
     };
+    delete (loaded as PanelSettings & { assistantOpenAiApiKey?: unknown }).assistantOpenAiApiKey;
+    delete (loaded as PanelSettings & { assistantDeepSeekApiKey?: unknown }).assistantDeepSeekApiKey;
+    if ('assistantOpenAiApiKey' in parsed || 'assistantDeepSeekApiKey' in parsed) {
+      globalThis.localStorage?.setItem(SETTINGS_KEY, JSON.stringify(loaded));
+    }
+    return loaded;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
