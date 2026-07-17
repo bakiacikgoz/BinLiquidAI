@@ -688,7 +688,7 @@ export interface ArtifactCreateRequest {
 export interface ArtifactMutationRequest {
   artifactId: string;
   expectedRevisionNumber: number;
-  mutationType: ArtifactMutationType;
+  mutationType: 'replace_content';
   content: ArtifactContent;
   idempotencyKey: string;
   changeSummary?: string;
@@ -725,7 +725,7 @@ export interface ArtifactMutationProposalRequest {
   proposalId?: string;
   artifactId: string;
   baseRevisionNumber: number;
-  mutationType: ArtifactMutationType;
+  mutationType: 'replace_content';
   content: ArtifactContent;
   idempotencyKey: string;
   summary?: string;

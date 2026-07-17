@@ -100,6 +100,7 @@ def propose_admin_change(
     status = "denied" if blocking else "approval_required"
     if not blocking:
         approval_id = ApprovalStore(store_root / "approvals.sqlite3").create_ticket(
+            workspace_id="default",
             run_id=proposal_id,
             target_kind=f"admin:{kind}",
             target_ref=operation,
@@ -155,7 +156,9 @@ def apply_admin_change(
     proposal = AdminChangeProposal.model_validate(proposal_payload)
     if approval_id != proposal.approval_id:
         return _blocked(proposal_id, "missing", ["APPROVAL_ID_MISMATCH"])
-    ticket = ApprovalStore(store_root / "approvals.sqlite3").get(approval_id)
+    ticket = ApprovalStore(store_root / "approvals.sqlite3").get(
+        approval_id, workspace_id="default"
+    )
     if ticket is None or ticket.status != ApprovalStatus.APPROVED:
         return _blocked(proposal_id, "missing", ["APPROVAL_NOT_APPROVED"])
 
@@ -180,7 +183,11 @@ def apply_admin_change(
         config=config,
         purpose="admin-change-audit",
     )
-    ApprovalStore(store_root / "approvals.sqlite3").mark_executed(approval_id=approval_id)
+    ApprovalStore(store_root / "approvals.sqlite3").mark_executed(
+        approval_id=approval_id,
+        workspace_id="default",
+        executed_by=actor.actor_id,
+    )
     proposal = proposal.model_copy(
         update={"status": "signed_audited", "audit_envelope_path": audit_path}
     )

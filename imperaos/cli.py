@@ -5393,8 +5393,7 @@ def approval_pending(
         raise typer.Exit(code=1)
     tickets = [
         item.model_dump(mode="json")
-        for item in runtime.approval_store.list_pending()
-        if _approval_visible_in_workspace(item, workspace_id)
+        for item in runtime.approval_store.list_pending(workspace_id=workspace_id)
     ]
     if json_output:
         typer.echo(
@@ -5433,8 +5432,8 @@ def approval_show(
         raise typer.Exit(code=1)
 
     runtime.approval_store.expire_pending()
-    ticket = runtime.approval_store.get(approval_id)
-    if ticket is None or not _approval_visible_in_workspace(ticket, workspace_id):
+    ticket = runtime.approval_store.get(approval_id, workspace_id=workspace_id)
+    if ticket is None:
         payload = {"approval_id": approval_id, "error_code": "APPROVAL_NOT_FOUND"}
         if json_output:
             typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -5470,25 +5469,14 @@ def _require_approval_workspace(
 ) -> None:
     if ticket is None:
         return
-    target_kind = str(getattr(ticket, "target_kind", ""))
-    if not target_kind.startswith("artifact"):
-        return
-    if workspace_id is None:
+    if workspace_id is None or not workspace_id.strip():
         typer.echo(
             json.dumps(
                 {"error_code": "APPROVAL_WORKSPACE_REQUIRED", "approval_id": approval_id}
             )
         )
         raise typer.Exit(code=1)
-    snapshot = getattr(ticket, "snapshot", {})
-    snapshot_workspace = (
-        snapshot.get("workspaceId") or snapshot.get("workspace_id")
-        if isinstance(snapshot, dict)
-        else None
-    )
-    target_ref = str(getattr(ticket, "target_ref", ""))
-    bound_workspace = str(snapshot_workspace or target_ref.split(":", 1)[0])
-    if bound_workspace != workspace_id:
+    if _approval_bound_workspace(ticket) != workspace_id.strip():
         typer.echo(
             json.dumps(
                 {"error_code": "APPROVAL_WORKSPACE_MISMATCH", "approval_id": approval_id}
@@ -5498,29 +5486,36 @@ def _require_approval_workspace(
 
 
 def _approval_visible_in_workspace(ticket: object, workspace_id: str) -> bool:
-    target_kind = str(getattr(ticket, "target_kind", ""))
-    if not target_kind.startswith("artifact"):
-        return True
+    return _approval_bound_workspace(ticket) == workspace_id.strip()
+
+
+def _approval_bound_workspace(ticket: object) -> str | None:
+    candidates: set[str] = set()
+    stored_workspace = getattr(ticket, "workspace_id", None)
+    if isinstance(stored_workspace, str) and stored_workspace.strip():
+        candidates.add(stored_workspace.strip())
     snapshot = getattr(ticket, "snapshot", {})
-    snapshot_workspace = (
-        snapshot.get("workspaceId") or snapshot.get("workspace_id")
-        if isinstance(snapshot, dict)
-        else None
-    )
-    target_ref = str(getattr(ticket, "target_ref", ""))
-    return str(snapshot_workspace or target_ref.split(":", 1)[0]) == workspace_id
+    if isinstance(snapshot, dict):
+        for key in ("workspaceId", "workspace_id"):
+            value = snapshot.get(key)
+            if isinstance(value, str) and value.strip():
+                candidates.add(value.strip())
+    target_kind = str(getattr(ticket, "target_kind", ""))
+    if target_kind.startswith("artifact"):
+        prefix, separator, remainder = str(getattr(ticket, "target_ref", "")).partition(":")
+        if not separator or not prefix.strip() or not remainder.strip():
+            return None
+        candidates.add(prefix.strip())
+    return next(iter(candidates)) if len(candidates) == 1 else None
 
 
 def _approval_actor(ticket: object | None, verified_actor: object | None, supplied: str) -> str:
-    target_kind = str(getattr(ticket, "target_kind", ""))
-    if target_kind.startswith("artifact"):
-        actor_id = getattr(verified_actor, "actor_id", None)
-        if not isinstance(actor_id, str) or not actor_id:
-            typer.echo(json.dumps({"error_code": "IDENTITY_REQUIRED"}))
-            raise typer.Exit(code=1)
-        return actor_id
+    del ticket, supplied
     actor_id = getattr(verified_actor, "actor_id", None)
-    return actor_id if isinstance(actor_id, str) and actor_id else supplied
+    if not isinstance(actor_id, str) or not actor_id:
+        typer.echo(json.dumps({"error_code": "IDENTITY_REQUIRED"}))
+        raise typer.Exit(code=1)
+    return actor_id
 
 
 @approval_app.command("decide")
@@ -5544,12 +5539,15 @@ def approval_decide(
         typer.echo("Governance disabled.")
         raise typer.Exit(code=1)
 
-    ticket = runtime.approval_store.get(approval_id)
-    _require_approval_workspace(ticket, workspace_id, approval_id)
+    if workspace_id is None or not workspace_id.strip():
+        typer.echo(json.dumps({"error_code": "APPROVAL_WORKSPACE_REQUIRED"}))
+        raise typer.Exit(code=1)
+    ticket = runtime.approval_store.get(approval_id, workspace_id=workspace_id)
     actor = _approval_actor(ticket, verified_actor, actor)
 
     result = runtime.decide_approval(
         approval_id=approval_id,
+        workspace_id=workspace_id,
         approve=approve,
         actor=actor,
         reason=reason,
@@ -5586,11 +5584,13 @@ def approval_execute(
         typer.echo(f"POLICY_UNAVAILABLE: {startup_error}")
         raise typer.Exit(code=2)
 
-    ticket = runtime.approval_store.get(approval_id)
+    if workspace_id is None or not workspace_id.strip():
+        typer.echo(json.dumps({"error_code": "APPROVAL_WORKSPACE_REQUIRED"}))
+        raise typer.Exit(code=1)
+    ticket = runtime.approval_store.get(approval_id, workspace_id=workspace_id)
     if ticket is None:
         typer.echo(json.dumps({"error_code": "APPROVAL_NOT_FOUND", "approval_id": approval_id}))
         raise typer.Exit(code=1)
-    _require_approval_workspace(ticket, workspace_id, approval_id)
     actor = _approval_actor(ticket, verified_actor, actor)
     if ticket.status.value == "expired":
         typer.echo(json.dumps({"error_code": "APPROVAL_EXPIRED", "approval_id": approval_id}))
@@ -5621,6 +5621,7 @@ def approval_execute(
     if kind != "task":
         fail = runtime.approval_store.mark_execution_failed(
             approval_id=approval_id,
+            workspace_id=workspace_id,
             error_code="UNSUPPORTED_SNAPSHOT_KIND",
         )
         typer.echo(
@@ -5646,6 +5647,7 @@ def approval_execute(
         "requested_hf_model_id": str(config.hf_model_id),
         "config_source_model_name": "profile",
         "config_source_hf_model_id": "profile",
+        "governance_workspace_id": workspace_id,
     }
     result = orchestrator.process(
         str(ticket.snapshot.get("user_input", "")),
@@ -5665,13 +5667,18 @@ def approval_execute(
     if result.used_path in {"governance_pending", "governance_blocked"}:
         runtime.approval_store.mark_execution_failed(
             approval_id=approval_id,
+            workspace_id=workspace_id,
             error_code="EXECUTION_FAILED",
         )
         output["error_code"] = "EXECUTION_FAILED"
         typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
         raise typer.Exit(code=1)
 
-    decision = runtime.execute_approval(approval_id=approval_id)
+    decision = runtime.execute_approval(
+        approval_id=approval_id,
+        workspace_id=workspace_id,
+        executed_by=actor,
+    )
     if decision.error_code:
         output["error_code"] = decision.error_code
         output["ticket"] = decision.ticket.model_dump(mode="json") if decision.ticket else None

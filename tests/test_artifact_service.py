@@ -446,6 +446,143 @@ def test_artifact_proposal_rejects_changes_outside_trusted_selection(tmp_path: P
     assert count == 0
 
 
+def test_artifact_proposal_revalidates_content_hash_and_scope_before_claim(
+    tmp_path: Path,
+) -> None:
+    approval_store = ApprovalStore(tmp_path / "approvals.sqlite3")
+    service = ArtifactService(tmp_path / "artifact-root", approval_store=approval_store)
+    service.create(create_command(), user_context())
+    proposal = service.propose_mutation(
+        proposal_command(
+            service,
+            proposal_id="proposal-tamper",
+            artifact_id="artifact-1",
+            base_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content=document("approved content"),
+            idempotency_key="proposal-tamper-key",
+        ),
+        assistant_context(),
+    )
+    approval_store.decide(
+        approval_id=proposal.approval_id,
+        approve=True,
+        actor="user-1",
+        reason="Reviewed exact proposal",
+    )
+    with service.store._connect() as connection:
+        connection.execute(
+            "UPDATE artifact_mutation_proposals SET content_json = ? WHERE proposal_id = ?",
+            (
+                '{"blocks":[],"kind":"document","language":"tr",'
+                '"pageMode":"document","schemaVersion":1}',
+                "proposal-tamper",
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(ArtifactDomainError) as denied:
+        service.apply_proposal(
+            ApplyArtifactProposalCommand(
+                proposal_id="proposal-tamper",
+                expected_revision_number=1,
+                approval_id=proposal.approval_id,
+            ),
+            assistant_context(),
+        )
+
+    assert denied.value.code is ArtifactErrorCode.ARTIFACT_POLICY_UNAVAILABLE
+    assert service.get(
+        GetArtifactQuery(artifact_id="artifact-1"), user_context()
+    ).artifact.current_revision_number == 1
+    assert approval_store.get(proposal.approval_id).status.value == "approved"
+
+
+def test_artifact_proposal_revalidates_complete_request_hash_before_claim(
+    tmp_path: Path,
+) -> None:
+    approval_store = ApprovalStore(tmp_path / "approvals.sqlite3")
+    service = ArtifactService(tmp_path / "artifact-root", approval_store=approval_store)
+    service.create(create_command(), user_context())
+    proposal = service.propose_mutation(
+        proposal_command(
+            service,
+            proposal_id="proposal-request-tamper",
+            artifact_id="artifact-1",
+            base_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content=document("approved content"),
+            idempotency_key="proposal-request-tamper-key",
+        ),
+        assistant_context(),
+    )
+    approval_store.decide(
+        approval_id=proposal.approval_id,
+        approve=True,
+        actor="user-1",
+        reason="Reviewed exact proposal",
+    )
+    with service.store._connect() as connection:
+        connection.execute(
+            "UPDATE artifact_mutation_proposals SET summary = ? WHERE proposal_id = ?",
+            ("tampered summary", "proposal-request-tamper"),
+        )
+        connection.commit()
+
+    with pytest.raises(ArtifactDomainError) as denied:
+        service.apply_proposal(
+            ApplyArtifactProposalCommand(
+                proposal_id="proposal-request-tamper",
+                expected_revision_number=1,
+                approval_id=proposal.approval_id,
+            ),
+            assistant_context(),
+        )
+    assert denied.value.details["reasonCode"] == "ARTIFACT_PROPOSAL_INTEGRITY_INVALID"
+    assert service.get(
+        GetArtifactQuery(artifact_id="artifact-1"), user_context()
+    ).artifact.current_revision_number == 1
+
+
+def test_applied_proposal_replay_does_not_depend_on_mutable_payload(tmp_path: Path) -> None:
+    approval_store = ApprovalStore(tmp_path / "approvals.sqlite3")
+    service = ArtifactService(tmp_path / "artifact-root", approval_store=approval_store)
+    service.create(create_command(), user_context())
+    proposal = service.propose_mutation(
+        proposal_command(
+            service,
+            proposal_id="proposal-replay",
+            artifact_id="artifact-1",
+            base_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content=document("approved content"),
+            idempotency_key="proposal-replay-key",
+        ),
+        assistant_context(),
+    )
+    approval_store.decide(
+        approval_id=proposal.approval_id,
+        approve=True,
+        actor="user-1",
+        reason="Reviewed exact proposal",
+    )
+    command = ApplyArtifactProposalCommand(
+        proposal_id="proposal-replay",
+        expected_revision_number=1,
+        approval_id=proposal.approval_id,
+    )
+    applied = service.apply_proposal(command, assistant_context())
+    with service.store._connect() as connection:
+        connection.execute(
+            "UPDATE artifact_mutation_proposals SET content_json = ? WHERE proposal_id = ?",
+            ("{}", "proposal-replay"),
+        )
+        connection.commit()
+    replay = service.apply_proposal(command, assistant_context())
+    assert replay.disposition == "idempotent_replay"
+    assert replay.revision.revision_id == applied.revision.revision_id
+
+
 def test_artifact_proposal_stale_base_does_not_claim_approval_or_write_revision(
     tmp_path: Path,
 ) -> None:

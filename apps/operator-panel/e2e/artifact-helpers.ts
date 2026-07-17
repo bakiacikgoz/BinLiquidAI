@@ -426,21 +426,33 @@ export async function installStructuredArtifactBridgeStub(
 ): Promise<void> {
   await page.evaluate((artifactKind) => {
     const now = '2026-07-17T09:00:00Z';
+    const spreadsheetCells = Object.fromEntries(
+      Array.from({ length: 10_000 }, (_, index) => [
+        `A${index + 1}`,
+        { value: index === 0 ? '=1+1' : index + 1 },
+      ]),
+    );
     const contents = {
       spreadsheet: {
         kind: 'spreadsheet', schemaVersion: 2, calculationMode: 'disabled',
         sheets: [{
           id: 'sheet-1', name: 'Budget', columns: [],
-          cells: { A1: { value: '=1+1' }, B1: { value: 42 } },
+          cells: spreadsheetCells,
         }],
       },
       canvas: {
         kind: 'canvas', schemaVersion: 2,
-        snapshot: { objects: [{
-          id: 'note-1', type: 'note', x: 1, y: 2, width: 200, height: 100,
-          text: '<script>local text only</script>',
-        }] },
-        assetIds: [], embeds: 'deny', remoteAssets: 'deny',
+        snapshot: { objects: [
+          {
+            id: 'note-1', type: 'note', x: 1, y: 2, width: 200, height: 100,
+            text: '<script>local text only</script>',
+          },
+          {
+            id: 'image-1', type: 'image', x: 240, y: 2, width: 160, height: 100,
+            assetId: 'asset-local-1',
+          },
+        ] },
+        assetIds: ['asset-local-1'], embeds: 'deny', remoteAssets: 'deny',
       },
       slides: {
         kind: 'slides', schemaVersion: 2,

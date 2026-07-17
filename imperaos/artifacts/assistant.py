@@ -179,24 +179,22 @@ class ArtifactAssistantToolLoop:
                 arguments["dataClass"] = _maximum_data_class(
                     effective_data_class, requested_class
                 ).value
-            prospective_messages = [
-                *messages,
-                {
-                    "role": "assistant",
-                    "toolCall": {
-                        **call.model_dump(mode="json", by_alias=True),
-                        "arguments": arguments,
-                    },
+            assistant_message = {
+                "role": "assistant",
+                "toolCall": {
+                    **call.model_dump(mode="json", by_alias=True),
+                    "arguments": arguments,
                 },
-            ]
-            requested_tool = next(tool for tool in tools if tool.name == call.name)
-            if requested_tool.mutating:
+            }
+            prospective_messages = [*messages, assistant_message]
+            execution_metadata = self._registry.execution_metadata(call.name)
+            if execution_metadata.persists_state:
                 prospective_messages.append(
                     {
                         "role": "tool",
                         "callId": call.call_id,
                         "name": call.name,
-                        "content": "x" * 4_096,
+                        "content": "x" * execution_metadata.provider_result_reserve_bytes,
                     }
                 )
             _enforce_provider_request_budget(prospective_messages, tools)
@@ -212,12 +210,7 @@ class ArtifactAssistantToolLoop:
                 effective_data_class = _maximum_data_class(
                     effective_data_class, observed_class
                 )
-            messages.append(
-                {
-                    "role": "assistant",
-                    "toolCall": call.model_dump(mode="json", by_alias=True),
-                }
-            )
+            messages.append(assistant_message)
             self._append_result(
                 messages,
                 events,
@@ -363,9 +356,19 @@ def _enforce_provider_request_budget(
     messages: list[dict[str, object]],
     tools: tuple[ProviderRequestedTool, ...],
 ) -> None:
-    payload = canonical_json({"system": _provider_system(tools), "messages": messages})
+    system = _provider_system(tools)
+    serialized_messages = canonical_json(messages)
+    payload = canonical_json({"system": system, "messages": messages})
     size_bytes = len(payload.encode("utf-8"))
-    estimated_tokens = math.ceil(size_bytes / 4)
+    # Tool schemas are a versioned, server-owned ASCII contract. Budget that
+    # immutable prefix at the established provider ratio, but count every byte
+    # of dynamic/provider-controlled transcript as a token. This makes the
+    # fallback fail closed for high-entropy and multi-byte user/tool content.
+    estimated_tokens = (
+        math.ceil(len(system.encode("utf-8")) / 4)
+        + len(serialized_messages.encode("utf-8"))
+        + 32
+    )
     if size_bytes > MAX_CONTEXT_BYTES or estimated_tokens > MAX_CONTEXT_TOKENS:
         raise ArtifactDomainError(
             ArtifactErrorCode.ARTIFACT_CONTENT_TOO_LARGE,

@@ -83,6 +83,9 @@ class GovernanceRuntime:
             return "disabled"
         return self._policy_bundle.policy_hash
 
+    def _approval_workspace_id(self) -> str:
+        return self._config.memory.workspace_authority.default_workspace_id
+
     def _load_policy(self) -> None:
         if not self._gov.enabled:
             return
@@ -217,6 +220,7 @@ class GovernanceRuntime:
             }
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
+                workspace_id=self._approval_workspace_id(),
                 run_id=run_id,
                 target_kind="task",
                 target_ref=target_ref,
@@ -298,6 +302,7 @@ class GovernanceRuntime:
             request_hash = self._hash_payload(snapshot["normalized"])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
+                workspace_id=self._approval_workspace_id(),
                 run_id=run_id,
                 target_kind="tool",
                 target_ref=command_root,
@@ -465,6 +470,7 @@ class GovernanceRuntime:
             request_hash = self._hash_payload([from_role, to_role, payload_hash])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
+                workspace_id=self._approval_workspace_id(),
                 run_id=run_id,
                 target_kind="handoff",
                 target_ref=target_ref,
@@ -638,6 +644,7 @@ class GovernanceRuntime:
             request_hash = self._hash_payload([scope, producer_role, visibility])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
+                workspace_id=self._approval_workspace_id(),
                 run_id=run_id,
                 target_kind="memory_write",
                 target_ref=target_ref,
@@ -767,19 +774,31 @@ class GovernanceRuntime:
         self,
         *,
         approval_id: str,
+        workspace_id: str | None = None,
         approve: bool,
         actor: str,
         reason: str | None,
     ) -> ApprovalDecisionResult:
         return self._approval_store.decide(
             approval_id=approval_id,
+            workspace_id=workspace_id or self._approval_workspace_id(),
             approve=approve,
             actor=actor,
             reason=reason,
         )
 
-    def execute_approval(self, *, approval_id: str) -> ApprovalDecisionResult:
-        return self._approval_store.mark_executed(approval_id=approval_id)
+    def execute_approval(
+        self,
+        *,
+        approval_id: str,
+        workspace_id: str | None = None,
+        executed_by: str = "system",
+    ) -> ApprovalDecisionResult:
+        return self._approval_store.mark_executed(
+            approval_id=approval_id,
+            workspace_id=workspace_id or self._approval_workspace_id(),
+            executed_by=executed_by,
+        )
 
     def request_manual_task_approval(
         self,
@@ -824,6 +843,7 @@ class GovernanceRuntime:
         request_hash = self._hash_payload({"task_type": task_type, "user_input": user_input})
         snapshot_hash = self._hash_payload(snapshot)
         ticket = self._approval_store.create_ticket(
+            workspace_id=self._approval_workspace_id(),
             run_id=run_id,
             target_kind="task",
             target_ref=target_ref,
@@ -910,6 +930,7 @@ class GovernanceRuntime:
         )
         snapshot_hash = self._hash_payload(snapshot)
         ticket = self._approval_store.create_ticket(
+            workspace_id=self._approval_workspace_id(),
             run_id=run_id,
             target_kind="device_action",
             target_ref=target_ref,
@@ -963,6 +984,7 @@ class GovernanceRuntime:
     ) -> ApprovalDecisionResult:
         return self._approval_store.mark_consumed(
             approval_id=approval_id,
+            workspace_id=self._approval_workspace_id(),
             consumed_by_job_id=consumed_by_job_id,
             execution_contract_hash=execution_contract_hash,
             resume_token_ref=resume_token_ref,
@@ -975,18 +997,17 @@ class GovernanceRuntime:
         execution_contract: dict[str, Any],
         execution_contract_hash: str,
     ) -> ApprovalDecisionResult:
+        workspace_id = self._approval_workspace_id()
+        ticket = self._approval_store.get(approval_id, workspace_id=workspace_id)
         snapshot_hash = self._hash_payload(
             {
-                **(
-                    self._approval_store.get(approval_id).snapshot
-                    if self._approval_store.get(approval_id)
-                    else {}
-                ),
+                **(ticket.snapshot if ticket else {}),
                 "execution_contract": execution_contract,
             }
         )
         return self._approval_store.attach_execution_contract(
             approval_id=approval_id,
+            workspace_id=workspace_id,
             execution_contract=execution_contract,
             execution_contract_hash=execution_contract_hash,
             snapshot_hash=snapshot_hash,
@@ -1002,7 +1023,8 @@ class GovernanceRuntime:
         execution_contract_hash: str,
     ) -> ApprovalDecisionResult:
         self._approval_store.expire_pending()
-        ticket = self._approval_store.get(approval_id)
+        workspace_id = self._approval_workspace_id()
+        ticket = self._approval_store.get(approval_id, workspace_id=workspace_id)
         if ticket is None:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         contract_task_run_id = str(
@@ -1019,6 +1041,7 @@ class GovernanceRuntime:
         )
         return self._approval_store.claim_resume(
             approval_id=approval_id,
+            workspace_id=workspace_id,
             resume_job_id=run_id,
             resume_token_ref=resume_token_ref,
             execution_contract_hash=execution_contract_hash,

@@ -75,6 +75,9 @@ class ControlPlaneRunCoordinator:
                         "runtime_version": __version__,
                     }
                     ticket = self.approvals.create_ticket(
+                        workspace_id=(
+                            self.config.memory.workspace_authority.default_workspace_id
+                        ),
                         run_id=run_id,
                         target_kind="control_plane_action",
                         target_ref=f"{agent_id}:{decision.action_id}",

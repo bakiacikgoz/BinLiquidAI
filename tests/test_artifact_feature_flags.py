@@ -11,6 +11,7 @@ from imperaos.artifacts.commands import (
     BeginArtifactExportCommand,
     CreateArtifactCommand,
     GetArtifactQuery,
+    ListArtifactsQuery,
 )
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.feature_flags import (
@@ -130,14 +131,45 @@ def test_forced_off_editor_flag_preserves_read_archive_and_safe_export_fallback(
         ),
         context,
     )
+    ArtifactService(root).create(
+        CreateArtifactCommand(
+            artifact_id="canvas-fallback",
+            kind=ArtifactKind.CANVAS,
+            title="Fallback canvas",
+            data_class=ArtifactDataClass.INTERNAL,
+            content={
+                "kind": "canvas",
+                "schemaVersion": 1,
+                "snapshot": {"store": {}},
+                "assetIds": [],
+                "embeds": "deny",
+                "remoteAssets": "deny",
+            },
+            idempotency_key="create-canvas-fallback",
+        ),
+        context,
+    )
     flags = {name: True for name in ARTIFACT_FEATURE_FLAG_NAMES}
     flags["artifact_workspace.spreadsheet.enabled"] = False
+    flags["artifact_workspace.canvas.enabled"] = False
     fallback = ArtifactService(root, feature_flags=flags)
 
     assert fallback.get(GetArtifactQuery(artifact_id="spreadsheet-fallback"), context).artifact
     assert fallback.history(
         ArtifactHistoryQuery(artifact_id="spreadsheet-fallback"), context
     ).items
+    assert [
+        item.artifact_id
+        for item in fallback.list(
+            ListArtifactsQuery(kind=ArtifactKind.SPREADSHEET), context
+        ).items
+    ] == ["spreadsheet-fallback"]
+    assert [
+        item.artifact_id
+        for item in fallback.list(
+            ListArtifactsQuery(kind=ArtifactKind.CANVAS), context
+        ).items
+    ] == ["canvas-fallback"]
     export = fallback.begin_export(
         BeginArtifactExportCommand(
             artifact_id="spreadsheet-fallback",

@@ -17,7 +17,7 @@ def require_scoped_replacement(
         _deny()
     validators = {
         ArtifactKind.DOCUMENT: _document,
-        ArtifactKind.FORM: _json_pointer,
+        ArtifactKind.FORM: _form,
         ArtifactKind.CODE: _code,
         ArtifactKind.FLOW: _flow,
         ArtifactKind.SPREADSHEET: _spreadsheet,
@@ -52,20 +52,22 @@ def _document(base: dict[str, Any], proposed: dict[str, Any], selection: dict[st
     )
 
 
-def _json_pointer(
+def _form(
     base: dict[str, Any], proposed: dict[str, Any], selection: dict[str, Any]
 ) -> bool:
-    left, right = deepcopy(base), deepcopy(proposed)
-    for pointer in selection["fieldPaths"]:
-        parts = [part.replace("~1", "/").replace("~0", "~") for part in pointer[1:].split("/")]
-        for root in (left, right):
-            parent: Any = root
-            for part in parts[:-1]:
-                parent = parent[int(part)] if isinstance(parent, list) else parent[part]
-            if isinstance(parent, list):
-                parent[int(parts[-1])] = "__ARTIFACT_SELECTED__"
-            else:
-                parent[parts[-1]] = "__ARTIFACT_SELECTED__"
+    paths = selection["fieldPaths"]
+    if not paths or not _same_except(base, proposed, "schema"):
+        return False
+    left_schema, right_schema = deepcopy(base["schema"]), deepcopy(proposed["schema"])
+    if not _same_except(left_schema, right_schema, "properties"):
+        return False
+    left, right = left_schema["properties"], right_schema["properties"]
+    for pointer in paths:
+        parts = _pointer_parts(pointer)
+        if not parts or parts[0] not in left or parts[0] not in right:
+            return False
+        _mask_form_field(left, parts)
+        _mask_form_field(right, parts)
     return left == right
 
 
@@ -109,10 +111,57 @@ def _spreadsheet(base: dict[str, Any], proposed: dict[str, Any], selection: dict
 
 def _canvas(base: dict[str, Any], proposed: dict[str, Any], selection: dict[str, Any]) -> bool:
     ids = set(selection["objectIds"])
-    key = "objects" if "objects" in base else "shapes"
-    return _same_except(base, proposed, key) and [
-        item for item in base[key] if item.get("id") not in ids
-    ] == [item for item in proposed[key] if item.get("id") not in ids]
+    if (
+        not ids
+        or base.get("schemaVersion") != 2
+        or proposed.get("schemaVersion") != 2
+        or not _same_except(base, proposed, "snapshot")
+    ):
+        return False
+    left_snapshot, right_snapshot = base["snapshot"], proposed["snapshot"]
+    if not _same_except(left_snapshot, right_snapshot, "objects"):
+        return False
+    left, right = left_snapshot["objects"], right_snapshot["objects"]
+    if not ids.issubset({item.get("id") for item in left}) or not ids.issubset(
+        {item.get("id") for item in right}
+    ):
+        return False
+    return [item for item in left if item.get("id") not in ids] == [
+        item for item in right if item.get("id") not in ids
+    ]
+
+
+def _pointer_parts(pointer: str) -> list[str]:
+    if not pointer.startswith("/"):
+        raise ValueError
+    return [
+        part.replace("~1", "/").replace("~0", "~")
+        for part in pointer[1:].split("/")
+    ]
+
+
+def _mask_pointer(root: dict[str, Any], parts: list[str]) -> None:
+    parent: Any = root
+    for part in parts[:-1]:
+        parent = parent[int(part)] if isinstance(parent, list) else parent[part]
+    if isinstance(parent, list):
+        parent[int(parts[-1])] = "__ARTIFACT_SELECTED__"
+    else:
+        parent[parts[-1]] = "__ARTIFACT_SELECTED__"
+
+
+def _mask_form_field(properties: dict[str, Any], parts: list[str]) -> None:
+    current = properties
+    for index, part in enumerate(parts):
+        if part not in current:
+            raise ValueError
+        if index == len(parts) - 1:
+            current[part] = "__ARTIFACT_SELECTED__"
+            return
+        field = current[part]
+        if not isinstance(field, dict) or not isinstance(field.get("properties"), dict):
+            raise ValueError
+        current = field["properties"]
 
 
 def _slides(base: dict[str, Any], proposed: dict[str, Any], selection: dict[str, Any]) -> bool:

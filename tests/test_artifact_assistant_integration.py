@@ -118,6 +118,22 @@ def test_artifact_assistant_loop_exposes_exact_tools_and_invokes_results(tmp_pat
     assert "canonicalProjection" not in str(provider.calls[-1][0])
 
 
+def test_artifact_tool_execution_metadata_is_internal_and_fail_closed(tmp_path: Path) -> None:
+    registry = ArtifactToolRegistry(ArtifactService(tmp_path / "artifact-root"))
+    assert all(not tool.mutating for tool in registry.provider_tools())
+    assert {
+        name
+        for name in registry.names
+        if registry.execution_metadata(name).persists_state
+    } == {
+        "artifact.create_draft",
+        "artifact.propose_mutation",
+        "artifact.request_form",
+    }
+    with pytest.raises(ArtifactDomainError):
+        registry.execution_metadata("artifact.not_public")
+
+
 def test_model_cannot_expand_the_trusted_context_grant(tmp_path: Path) -> None:
     service = ArtifactService(tmp_path / "artifact-root")
     first = service.create(
@@ -330,6 +346,91 @@ def test_oversized_mutating_tool_call_is_rejected_before_side_effects(tmp_path: 
     assert caught.value.details["reasonCode"] == "ARTIFACT_CONTEXT_BUDGET_EXCEEDED"
     with pytest.raises(ArtifactDomainError) as missing:
         service.store.get_artifact("workspace-1", "artifact-oversized")
+    assert missing.value.code is ArtifactErrorCode.ARTIFACT_NOT_FOUND
+
+
+def test_multibyte_dynamic_content_uses_conservative_token_bound(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    content = _document()
+    content["blocks"][0]["content"] = [{"type": "text", "text": "🙂" * 5_000}]
+
+    class MultibyteProvider:
+        def complete(self, messages, tools):
+            del messages, tools
+            return ArtifactAssistantProviderResponse(
+                tool_call=ArtifactAssistantToolCall(
+                    call_id="multibyte-draft",
+                    name="artifact.create_draft",
+                    arguments={
+                        "artifactId": "artifact-multibyte",
+                        "kind": "document",
+                        "title": "Multibyte",
+                        "dataClass": "internal",
+                        "content": content,
+                        "idempotencyKey": "multibyte-draft",
+                    },
+                )
+            )
+
+    with pytest.raises(ArtifactDomainError) as caught:
+        ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+            MultibyteProvider(), prompt="Create a draft.", context=_context()
+        )
+    assert caught.value.details["reasonCode"] == "ARTIFACT_CONTEXT_BUDGET_EXCEEDED"
+    with pytest.raises(ArtifactDomainError):
+        service.store.get_artifact("workspace-1", "artifact-multibyte")
+
+
+def test_mutating_tool_result_reserve_is_checked_before_registry_invoke(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+
+    class DraftProvider:
+        def complete(self, messages, tools):
+            del messages, tools
+            return ArtifactAssistantProviderResponse(
+                tool_call=ArtifactAssistantToolCall(
+                    call_id="reserved-draft",
+                    name="artifact.create_draft",
+                    arguments={
+                        "artifactId": "artifact-reserved",
+                        "kind": "document",
+                        "title": "Reserved",
+                        "dataClass": "internal",
+                        "content": _document(),
+                        "idempotencyKey": "reserved-draft",
+                    },
+                )
+            )
+
+    def reject_reserved_result(messages, tools):
+        del tools
+        if any(
+            item.get("role") == "tool"
+            and isinstance(item.get("content"), str)
+            and len(item["content"]) == 2_048
+            for item in messages
+        ):
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_CONTENT_TOO_LARGE,
+                "reserved result exceeds the provider budget",
+                details={"reasonCode": "ARTIFACT_CONTEXT_BUDGET_EXCEEDED"},
+            )
+
+    monkeypatch.setattr(
+        "imperaos.artifacts.assistant._enforce_provider_request_budget",
+        reject_reserved_result,
+    )
+    with pytest.raises(ArtifactDomainError):
+        ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+            DraftProvider(),
+            prompt="Create a draft.",
+            context=_context(),
+        )
+    with pytest.raises(ArtifactDomainError) as missing:
+        service.store.get_artifact("workspace-1", "artifact-reserved")
     assert missing.value.code is ArtifactErrorCode.ARTIFACT_NOT_FOUND
 
 

@@ -55,6 +55,7 @@ _MUTATION_METHODS_WITH_KEYS = {
     ArtifactRpcMethod.ARTIFACT_CREATE,
     ArtifactRpcMethod.ARTIFACT_MUTATE,
     ArtifactRpcMethod.ARTIFACT_SPREADSHEET_PATCH,
+    ArtifactRpcMethod.ARTIFACT_SLIDES_PATCH,
     ArtifactRpcMethod.ARTIFACT_PROPOSE_MUTATION,
     ArtifactRpcMethod.ARTIFACT_RESTORE,
     ArtifactRpcMethod.ARTIFACT_DUPLICATE,

@@ -219,6 +219,7 @@ class ExternalAgentGateway:
                 next_actions = ["gateway.submit --dry-run false", "approval.required"]
             else:
                 ticket = self.approvals.create_ticket(
+                    workspace_id=self.config.memory.workspace_authority.default_workspace_id,
                     run_id=run_id,
                     target_kind="external_agent_action",
                     target_ref=f"{request.agent_id}:{request.action_kind}",

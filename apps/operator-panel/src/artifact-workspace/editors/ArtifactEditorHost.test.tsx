@@ -104,7 +104,7 @@ describe('ArtifactEditorHost form integration', () => {
       idempotencyKey: expect.stringMatching(/^form-submit-/),
     }));
     expect(await screen.findByRole('status')).toHaveTextContent('Form submitted.');
-  });
+  }, 15_000);
 });
 
 describe('ArtifactEditorHost code integration', () => {

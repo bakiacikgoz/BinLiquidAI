@@ -21,6 +21,7 @@ const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
     "artifact.get",
     "artifact.create",
     "artifact.mutate",
+    "artifact.slides.patch",
     "artifact.propose_mutation",
     "artifact.apply_proposal",
     "artifact.history",
@@ -39,6 +40,7 @@ const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
 const MUTATION_METHODS_WITH_KEYS: &[&str] = &[
     "artifact.create",
     "artifact.mutate",
+    "artifact.slides.patch",
     "artifact.propose_mutation",
     "artifact.restore",
     "artifact.duplicate",
@@ -932,6 +934,22 @@ mod tests {
             json!({"artifactId": "artifact-1", "workspaceId": "other"}),
             &identity,
             None,
+            5000,
+        )
+        .is_err());
+        assert!(build_trusted_request(
+            "artifact.slides.patch",
+            json!({"artifactId": "slides-1", "idempotencyKey": "slide-patch-1"}),
+            &identity,
+            Some("slide-patch-1".to_string()),
+            5000,
+        )
+        .is_ok());
+        assert!(build_trusted_request(
+            "artifact.slides.patch",
+            json!({"artifactId": "slides-1", "idempotencyKey": "params-key"}),
+            &identity,
+            Some("envelope-key".to_string()),
             5000,
         )
         .is_err());

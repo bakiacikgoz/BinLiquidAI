@@ -23,7 +23,9 @@ class ArtifactProposalApprovalGateway:
         target_ref = self._target_ref(row)
         action_hash = self.action_hash(row)
         idempotency_key = f"artifact-proposal:{row['workspace_id']}:{row['proposal_id']}"
-        existing = self._approval_store.get_by_idempotency_key(idempotency_key)
+        existing = self._approval_store.get_by_idempotency_key(
+            idempotency_key, workspace_id=row["workspace_id"]
+        )
         if existing is not None:
             if (
                 existing.target_kind != "artifact_mutation_proposal"
@@ -58,6 +60,7 @@ class ArtifactProposalApprovalGateway:
             "actionHash": action_hash,
         }
         return self._approval_store.create_ticket(
+            workspace_id=row["workspace_id"],
             run_id=context.request_id,
             target_kind="artifact_mutation_proposal",
             target_ref=target_ref,
@@ -79,6 +82,7 @@ class ArtifactProposalApprovalGateway:
         claim_id = self._claim_id(row)
         result = self._approval_store.claim_approved_action(
             approval_id=approval_id,
+            workspace_id=row["workspace_id"],
             claim_id=claim_id,
             target_kind="artifact_mutation_proposal",
             target_ref=self._target_ref(row),
@@ -96,6 +100,7 @@ class ArtifactProposalApprovalGateway:
     def complete(self, row: Any, approval_id: str) -> None:
         result = self._approval_store.complete_claimed_action(
             approval_id=approval_id,
+            workspace_id=row["workspace_id"],
             claim_id=self._claim_id(row),
         )
         if result.error_code is not None:

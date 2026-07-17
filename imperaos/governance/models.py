@@ -103,6 +103,7 @@ class ApprovalTicket(BaseModel):
 
     version: int = Field(ge=0)
     approval_id: str
+    workspace_id: str = "default"
     run_id: str
     status: ApprovalStatus
     target_kind: str
@@ -118,6 +119,7 @@ class ApprovalTicket(BaseModel):
     execution_status: ExecutionStatus = ExecutionStatus.NOT_EXECUTED
     executed_at: datetime | None = None
     execution_error_code: str | None = None
+    executed_by: str | None = None
     execution_contract_hash: str | None = None
     resume_token_ref: str | None = None
     resume_claimed_job_id: str | None = None

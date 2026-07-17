@@ -33,7 +33,11 @@ def test_context_pack_redacts_secret_shaped_keys_and_values() -> None:
             schema_version=1,
             data_class=ArtifactDataClass.REGULATED,
         ),
-        revision=SimpleNamespace(revision_id="revision-1", content_sha256="b" * 64),
+        revision=SimpleNamespace(
+            revision_id="revision-1",
+            revision_number=1,
+            content_sha256="b" * 64,
+        ),
         content=content,
     )
 

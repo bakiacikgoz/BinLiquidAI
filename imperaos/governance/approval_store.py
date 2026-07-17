@@ -19,7 +19,8 @@ class ApprovalDecisionResult:
 
 
 class ApprovalStore:
-    SCHEMA_VERSION = "2.0"
+    SCHEMA_VERSION = "3.0"
+    LEGACY_UNBOUND_WORKSPACE = "__legacy_unbound__"
 
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -40,6 +41,7 @@ class ApprovalStore:
                 """
                 CREATE TABLE IF NOT EXISTS approvals (
                     approval_id TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL DEFAULT '__legacy_unbound__',
                     version INTEGER NOT NULL,
                     run_id TEXT NOT NULL,
                     status TEXT NOT NULL,
@@ -56,6 +58,7 @@ class ApprovalStore:
                     execution_status TEXT NOT NULL,
                     executed_at TEXT,
                     execution_error_code TEXT,
+                    executed_by TEXT,
                     execution_contract_hash TEXT,
                     resume_token_ref TEXT,
                     resume_claimed_job_id TEXT,
@@ -102,10 +105,22 @@ class ApprovalStore:
                 "resume_claimed_at": "ALTER TABLE approvals ADD COLUMN resume_claimed_at TEXT",
                 "consumed_by_job_id": "ALTER TABLE approvals ADD COLUMN consumed_by_job_id TEXT",
                 "consumed_at": "ALTER TABLE approvals ADD COLUMN consumed_at TEXT",
+                "workspace_id": (
+                    "ALTER TABLE approvals ADD COLUMN workspace_id "
+                    "TEXT NOT NULL DEFAULT '__legacy_unbound__'"
+                ),
+                "executed_by": "ALTER TABLE approvals ADD COLUMN executed_by TEXT",
             }
             for column, statement in migrations.items():
                 if column not in existing_cols:
                     conn.execute(statement)
+            self._backfill_workspace_bindings(conn)
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_approvals_workspace_status_created
+                ON approvals(workspace_id, status, created_at)
+                """
+            )
             conn.execute(
                 """
                 INSERT INTO approval_metadata(key, value)
@@ -115,9 +130,71 @@ class ApprovalStore:
                 (self.SCHEMA_VERSION,),
             )
 
+    def _backfill_workspace_bindings(self, conn: sqlite3.Connection) -> None:
+        rows = conn.execute(
+            """
+            SELECT approval_id, target_kind, target_ref, snapshot_json
+            FROM approvals WHERE workspace_id = ?
+            """,
+            (self.LEGACY_UNBOUND_WORKSPACE,),
+        ).fetchall()
+        for row in rows:
+            try:
+                snapshot = json.loads(str(row["snapshot_json"]))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            candidates = {
+                str(snapshot[key]).strip()
+                for key in ("workspaceId", "workspace_id")
+                if isinstance(snapshot, dict)
+                and isinstance(snapshot.get(key), str)
+                and str(snapshot[key]).strip()
+            }
+            target_kind = str(row["target_kind"])
+            if target_kind.startswith("artifact"):
+                target_ref = str(row["target_ref"])
+                prefix, separator, remainder = target_ref.partition(":")
+                if separator and prefix.strip() and remainder.strip():
+                    candidates.add(prefix.strip())
+            if len(candidates) != 1:
+                continue
+            conn.execute(
+                "UPDATE approvals SET workspace_id = ? WHERE approval_id = ?",
+                (next(iter(candidates)), str(row["approval_id"])),
+            )
+
+    @classmethod
+    def _canonical_workspace_binding(
+        cls,
+        *,
+        workspace_id: str | None,
+        target_kind: str,
+        target_ref: str,
+        snapshot: dict[str, Any],
+    ) -> str:
+        candidates = {
+            value.strip()
+            for value in (workspace_id, snapshot.get("workspaceId"), snapshot.get("workspace_id"))
+            if isinstance(value, str) and value.strip()
+        }
+        if target_kind.startswith("artifact"):
+            prefix, separator, remainder = target_ref.partition(":")
+            if not separator or not prefix.strip() or not remainder.strip():
+                raise ValueError("artifact approval workspace binding is malformed")
+            candidates.add(prefix.strip())
+        if not candidates:
+            return "default"
+        if len(candidates) != 1:
+            raise ValueError("approval workspace binding is inconsistent")
+        bound = next(iter(candidates))
+        if bound == cls.LEGACY_UNBOUND_WORKSPACE:
+            raise ValueError("approval workspace binding is reserved")
+        return bound
+
     def create_ticket(
         self,
         *,
+        workspace_id: str | None = None,
         run_id: str,
         target_kind: str,
         target_ref: str,
@@ -130,9 +207,16 @@ class ApprovalStore:
         idempotency_key: str,
     ) -> ApprovalTicket:
         now = datetime.now(UTC)
+        bound_workspace = self._canonical_workspace_binding(
+            workspace_id=workspace_id,
+            target_kind=target_kind,
+            target_ref=target_ref,
+            snapshot=snapshot,
+        )
         ticket = ApprovalTicket(
             version=0,
             approval_id=str(uuid4()),
+            workspace_id=bound_workspace,
             run_id=run_id,
             status=ApprovalStatus.PENDING,
             target_kind=target_kind,
@@ -152,21 +236,23 @@ class ApprovalStore:
                 conn.execute(
                     """
                     INSERT INTO approvals (
-                        approval_id, version, run_id, status, target_kind, target_ref, action_hash,
+                        approval_id, workspace_id, version, run_id, status,
+                        target_kind, target_ref, action_hash,
                         policy_hash, request_hash, snapshot_hash,
                         snapshot_json, expires_at, actor, decision_reason, execution_status,
-                        executed_at, execution_error_code, execution_contract_hash,
+                        executed_at, execution_error_code, executed_by, execution_contract_hash,
                         resume_token_ref, resume_claimed_job_id, resume_claimed_at,
                         consumed_by_job_id, consumed_at,
                         idempotency_key, created_at, decided_at
                     )
                     VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     (
                         ticket.approval_id,
+                        ticket.workspace_id,
                         ticket.version,
                         ticket.run_id,
                         ticket.status.value,
@@ -183,6 +269,7 @@ class ApprovalStore:
                         ticket.execution_status.value,
                         ticket.executed_at.isoformat() if ticket.executed_at else None,
                         ticket.execution_error_code,
+                        ticket.executed_by,
                         ticket.execution_contract_hash,
                         ticket.resume_token_ref,
                         ticket.resume_claimed_job_id,
@@ -197,7 +284,9 @@ class ApprovalStore:
                     ),
                 )
             except sqlite3.IntegrityError:
-                existing = self._get_by_idempotency_key(conn, idempotency_key)
+                existing = self._get_by_idempotency_key(
+                    conn, idempotency_key, bound_workspace
+                )
                 if existing is not None:
                     return existing
                 raise
@@ -207,42 +296,70 @@ class ApprovalStore:
         self,
         conn: sqlite3.Connection,
         idempotency_key: str,
+        workspace_id: str | None = None,
     ) -> ApprovalTicket | None:
-        row = conn.execute(
-            "SELECT * FROM approvals WHERE idempotency_key = ?",
-            (idempotency_key,),
-        ).fetchone()
-        if row is None:
-            return None
-        return self._row_to_ticket(row)
-
-    def list_pending(self) -> list[ApprovalTicket]:
-        self.expire_pending()
-        with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM approvals WHERE status = ? ORDER BY created_at ASC",
-                (ApprovalStatus.PENDING.value,),
-            ).fetchall()
-        return [self._row_to_ticket(row) for row in rows]
-
-    def get(self, approval_id: str) -> ApprovalTicket | None:
-        with self._conn() as conn:
+        if workspace_id is None:
             row = conn.execute(
-                "SELECT * FROM approvals WHERE approval_id = ?",
-                (approval_id,),
+                "SELECT * FROM approvals WHERE idempotency_key = ?",
+                (idempotency_key,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT * FROM approvals WHERE idempotency_key = ? AND workspace_id = ?",
+                (idempotency_key, workspace_id),
             ).fetchone()
         if row is None:
             return None
         return self._row_to_ticket(row)
 
-    def get_by_idempotency_key(self, idempotency_key: str) -> ApprovalTicket | None:
+    def list_pending(self, *, workspace_id: str | None = None) -> list[ApprovalTicket]:
+        self.expire_pending()
         with self._conn() as conn:
-            return self._get_by_idempotency_key(conn, idempotency_key)
+            if workspace_id is None:
+                rows = conn.execute(
+                    "SELECT * FROM approvals WHERE status = ? ORDER BY created_at ASC",
+                    (ApprovalStatus.PENDING.value,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM approvals
+                    WHERE status = ? AND workspace_id = ?
+                    ORDER BY created_at ASC
+                    """,
+                    (ApprovalStatus.PENDING.value, workspace_id),
+                ).fetchall()
+        return [self._row_to_ticket(row) for row in rows]
+
+    def get(
+        self, approval_id: str, *, workspace_id: str | None = None
+    ) -> ApprovalTicket | None:
+        with self._conn() as conn:
+            if workspace_id is None:
+                row = conn.execute(
+                    "SELECT * FROM approvals WHERE approval_id = ?",
+                    (approval_id,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM approvals WHERE approval_id = ? AND workspace_id = ?",
+                    (approval_id, workspace_id),
+                ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_ticket(row)
+
+    def get_by_idempotency_key(
+        self, idempotency_key: str, *, workspace_id: str | None = None
+    ) -> ApprovalTicket | None:
+        with self._conn() as conn:
+            return self._get_by_idempotency_key(conn, idempotency_key, workspace_id)
 
     def claim_approved_action(
         self,
         *,
         approval_id: str,
+        workspace_id: str,
         claim_id: str,
         target_kind: str,
         target_ref: str,
@@ -254,8 +371,8 @@ class ApprovalStore:
         with self._conn() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
-                "SELECT * FROM approvals WHERE approval_id = ?",
-                (approval_id,),
+                "SELECT * FROM approvals WHERE approval_id = ? AND workspace_id = ?",
+                (approval_id, workspace_id),
             ).fetchone()
             if row is None:
                 return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
@@ -283,36 +400,42 @@ class ApprovalStore:
                 """
                 UPDATE approvals
                 SET status = ?, execution_status = ?, executed_at = ?,
-                    resume_claimed_job_id = ?, resume_claimed_at = ?, version = version + 1
-                WHERE approval_id = ? AND version = ? AND status = ?
+                    executed_by = ?, resume_claimed_job_id = ?, resume_claimed_at = ?,
+                    version = version + 1
+                WHERE approval_id = ? AND workspace_id = ? AND version = ? AND status = ?
                 """,
                 (
                     ApprovalStatus.EXECUTED.value,
                     ExecutionStatus.EXECUTED.value,
                     now.isoformat(),
+                    executor_principal_id,
                     claim_id,
                     now.isoformat(),
                     approval_id,
+                    workspace_id,
                     ticket.version,
                     ApprovalStatus.APPROVED.value,
                 ),
             ).rowcount
             if updated != 1:
                 return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
-        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+        return ApprovalDecisionResult(
+            ticket=self.get(approval_id, workspace_id=workspace_id), error_code=None
+        )
 
     def complete_claimed_action(
         self,
         *,
         approval_id: str,
+        workspace_id: str,
         claim_id: str,
     ) -> ApprovalDecisionResult:
         now = datetime.now(UTC)
         with self._conn() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
-                "SELECT * FROM approvals WHERE approval_id = ?",
-                (approval_id,),
+                "SELECT * FROM approvals WHERE approval_id = ? AND workspace_id = ?",
+                (approval_id, workspace_id),
             ).fetchone()
             if row is None:
                 return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
@@ -329,7 +452,7 @@ class ApprovalStore:
                 """
                 UPDATE approvals
                 SET status = ?, consumed_by_job_id = ?, consumed_at = ?, version = version + 1
-                WHERE approval_id = ? AND version = ? AND status = ?
+                WHERE approval_id = ? AND workspace_id = ? AND version = ? AND status = ?
                   AND resume_claimed_job_id = ?
                 """,
                 (
@@ -337,6 +460,7 @@ class ApprovalStore:
                     claim_id,
                     now.isoformat(),
                     approval_id,
+                    workspace_id,
                     ticket.version,
                     ApprovalStatus.EXECUTED.value,
                     claim_id,
@@ -344,7 +468,9 @@ class ApprovalStore:
             ).rowcount
             if updated != 1:
                 return ApprovalDecisionResult(ticket=ticket, error_code="APPROVAL_CONFLICT")
-        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+        return ApprovalDecisionResult(
+            ticket=self.get(approval_id, workspace_id=workspace_id), error_code=None
+        )
 
     def schema_version(self) -> str:
         with self._conn() as conn:
@@ -376,12 +502,13 @@ class ApprovalStore:
         self,
         *,
         approval_id: str,
+        workspace_id: str | None = None,
         approve: bool,
         actor: str,
         reason: str | None,
     ) -> ApprovalDecisionResult:
         self.expire_pending()
-        ticket = self.get(approval_id)
+        ticket = self.get(approval_id, workspace_id=workspace_id)
         if ticket is None:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         if ticket.status != ApprovalStatus.PENDING:
@@ -395,7 +522,7 @@ class ApprovalStore:
                 UPDATE approvals
                 SET status = ?, actor = ?, decision_reason = ?, decided_at = ?,
                     version = version + 1
-                WHERE approval_id = ? AND version = ? AND status = ?
+                WHERE approval_id = ? AND workspace_id = ? AND version = ? AND status = ?
                 """,
                 (
                     new_status.value,
@@ -403,20 +530,29 @@ class ApprovalStore:
                     reason,
                     now.isoformat(),
                     approval_id,
+                    ticket.workspace_id,
                     ticket.version,
                     ApprovalStatus.PENDING.value,
                 ),
             ).rowcount
         if updated == 0:
             return ApprovalDecisionResult(
-                ticket=self.get(approval_id),
+                ticket=self.get(approval_id, workspace_id=workspace_id),
                 error_code="APPROVAL_CONFLICT",
             )
-        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+        return ApprovalDecisionResult(
+            ticket=self.get(approval_id, workspace_id=workspace_id), error_code=None
+        )
 
-    def mark_executed(self, *, approval_id: str) -> ApprovalDecisionResult:
+    def mark_executed(
+        self,
+        *,
+        approval_id: str,
+        workspace_id: str | None = None,
+        executed_by: str,
+    ) -> ApprovalDecisionResult:
         self.expire_pending()
-        ticket = self.get(approval_id)
+        ticket = self.get(approval_id, workspace_id=workspace_id)
         if ticket is None:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         if ticket.status != ApprovalStatus.APPROVED:
@@ -429,27 +565,38 @@ class ApprovalStore:
             updated = conn.execute(
                 """
                 UPDATE approvals
-                SET status = ?, execution_status = ?, executed_at = ?, version = version + 1
-                WHERE approval_id = ? AND version = ? AND status = ?
+                SET status = ?, execution_status = ?, executed_at = ?, executed_by = ?,
+                    version = version + 1
+                WHERE approval_id = ? AND workspace_id = ? AND version = ? AND status = ?
                 """,
                 (
                     ApprovalStatus.EXECUTED.value,
                     ExecutionStatus.EXECUTED.value,
                     now.isoformat(),
+                    executed_by,
                     approval_id,
+                    ticket.workspace_id,
                     ticket.version,
                     ApprovalStatus.APPROVED.value,
                 ),
             ).rowcount
         if updated == 0:
             return ApprovalDecisionResult(
-                ticket=self.get(approval_id),
+                ticket=self.get(approval_id, workspace_id=workspace_id),
                 error_code="APPROVAL_CONFLICT",
             )
-        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+        return ApprovalDecisionResult(
+            ticket=self.get(approval_id, workspace_id=workspace_id), error_code=None
+        )
 
-    def mark_execution_failed(self, *, approval_id: str, error_code: str) -> ApprovalDecisionResult:
-        ticket = self.get(approval_id)
+    def mark_execution_failed(
+        self,
+        *,
+        approval_id: str,
+        error_code: str,
+        workspace_id: str | None = None,
+    ) -> ApprovalDecisionResult:
+        ticket = self.get(approval_id, workspace_id=workspace_id)
         if ticket is None:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         now = datetime.now(UTC)
@@ -459,7 +606,7 @@ class ApprovalStore:
                 UPDATE approvals
                 SET status = ?, execution_status = ?, executed_at = ?,
                     execution_error_code = ?, version = version + 1
-                WHERE approval_id = ?
+                WHERE approval_id = ? AND workspace_id = ?
                 """,
                 (
                     ApprovalStatus.EXECUTION_FAILED.value,
@@ -467,19 +614,23 @@ class ApprovalStore:
                     now.isoformat(),
                     error_code,
                     approval_id,
+                    ticket.workspace_id,
                 ),
             )
-        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+        return ApprovalDecisionResult(
+            ticket=self.get(approval_id, workspace_id=workspace_id), error_code=None
+        )
 
     def mark_consumed(
         self,
         *,
         approval_id: str,
+        workspace_id: str,
         consumed_by_job_id: str,
         execution_contract_hash: str | None = None,
         resume_token_ref: str | None = None,
     ) -> ApprovalDecisionResult:
-        ticket = self.get(approval_id)
+        ticket = self.get(approval_id, workspace_id=workspace_id)
         if ticket is None:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         if ticket.status != ApprovalStatus.EXECUTED:
@@ -506,33 +657,37 @@ class ApprovalStore:
                 """
                 UPDATE approvals
                 SET status = ?, consumed_by_job_id = ?, consumed_at = ?, version = version + 1
-                WHERE approval_id = ? AND version = ? AND status = ?
+                WHERE approval_id = ? AND workspace_id = ? AND version = ? AND status = ?
                 """,
                 (
                     ApprovalStatus.CONSUMED.value,
                     consumed_by_job_id,
                     now.isoformat(),
                     approval_id,
+                    workspace_id,
                     ticket.version,
                     ApprovalStatus.EXECUTED.value,
                 ),
             ).rowcount
         if updated == 0:
             return ApprovalDecisionResult(
-                ticket=self.get(approval_id),
+                ticket=self.get(approval_id, workspace_id=workspace_id),
                 error_code="APPROVAL_CONFLICT",
             )
-        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+        return ApprovalDecisionResult(
+            ticket=self.get(approval_id, workspace_id=workspace_id), error_code=None
+        )
 
     def attach_execution_contract(
         self,
         *,
         approval_id: str,
+        workspace_id: str,
         execution_contract: dict[str, Any],
         execution_contract_hash: str,
         snapshot_hash: str,
     ) -> ApprovalDecisionResult:
-        ticket = self.get(approval_id)
+        ticket = self.get(approval_id, workspace_id=workspace_id)
         if ticket is None:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         snapshot = dict(ticket.snapshot)
@@ -554,31 +709,36 @@ class ApprovalStore:
                 SET snapshot_hash = ?, snapshot_json = ?, execution_contract_hash = ?,
                     resume_token_ref = NULL, resume_claimed_job_id = NULL, resume_claimed_at = NULL,
                     version = version + 1
-                WHERE approval_id = ? AND version = ?
+                WHERE approval_id = ? AND workspace_id = ? AND version = ?
                 """,
                 (
                     effective_snapshot_hash,
                     json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
                     effective_contract_hash or execution_contract_hash,
                     approval_id,
+                    workspace_id,
                     ticket.version,
                 ),
             ).rowcount
         if updated == 0:
             return ApprovalDecisionResult(
-                ticket=self.get(approval_id), error_code="APPROVAL_CONFLICT"
+                ticket=self.get(approval_id, workspace_id=workspace_id),
+                error_code="APPROVAL_CONFLICT",
             )
-        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+        return ApprovalDecisionResult(
+            ticket=self.get(approval_id, workspace_id=workspace_id), error_code=None
+        )
 
     def claim_resume(
         self,
         *,
         approval_id: str,
+        workspace_id: str,
         resume_job_id: str,
         resume_token_ref: str,
         execution_contract_hash: str,
     ) -> ApprovalDecisionResult:
-        ticket = self.get(approval_id)
+        ticket = self.get(approval_id, workspace_id=workspace_id)
         if ticket is None:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         if ticket.status != ApprovalStatus.EXECUTED:
@@ -609,7 +769,7 @@ class ApprovalStore:
                 UPDATE approvals
                 SET resume_token_ref = ?, resume_claimed_job_id = ?, resume_claimed_at = ?,
                     version = version + 1
-                WHERE approval_id = ? AND version = ? AND status = ?
+                WHERE approval_id = ? AND workspace_id = ? AND version = ? AND status = ?
                   AND consumed_at IS NULL
                   AND (
                       resume_claimed_job_id IS NULL
@@ -624,6 +784,7 @@ class ApprovalStore:
                     resume_job_id,
                     now.isoformat(),
                     approval_id,
+                    workspace_id,
                     ticket.version,
                     ApprovalStatus.EXECUTED.value,
                     resume_job_id,
@@ -631,7 +792,7 @@ class ApprovalStore:
                 ),
             ).rowcount
         if updated == 0:
-            current = self.get(approval_id)
+            current = self.get(approval_id, workspace_id=workspace_id)
             if (
                 current is not None
                 and current.resume_claimed_job_id == resume_job_id
@@ -639,7 +800,9 @@ class ApprovalStore:
             ):
                 return ApprovalDecisionResult(ticket=current, error_code=None)
             return ApprovalDecisionResult(ticket=current, error_code="RESUME_DUPLICATE_SUPPRESSED")
-        return ApprovalDecisionResult(ticket=self.get(approval_id), error_code=None)
+        return ApprovalDecisionResult(
+            ticket=self.get(approval_id, workspace_id=workspace_id), error_code=None
+        )
 
     @staticmethod
     def _row_to_ticket(row: sqlite3.Row) -> ApprovalTicket:
@@ -647,6 +810,7 @@ class ApprovalStore:
         ticket = ApprovalTicket(
             version=int(row["version"]),
             approval_id=str(row["approval_id"]),
+            workspace_id=str(row["workspace_id"]),
             run_id=str(row["run_id"]),
             status=ApprovalStatus(str(row["status"])),
             target_kind=str(row["target_kind"]),
@@ -666,6 +830,7 @@ class ApprovalStore:
             execution_error_code=(
                 str(row["execution_error_code"]) if row["execution_error_code"] else None
             ),
+            executed_by=(str(row["executed_by"]) if row["executed_by"] else None),
             execution_contract_hash=(
                 str(row["execution_contract_hash"]) if row["execution_contract_hash"] else None
             ),

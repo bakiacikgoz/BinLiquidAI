@@ -144,7 +144,11 @@ def test_vision_approval_resume_requires_executed_unconsumed_ticket(tmp_path) ->
     assert approved_only.allowed is False
     assert approved_only.reason_code == "APPROVAL_NOT_EXECUTED"
 
-    executed = store.mark_executed(approval_id=ticket.approval_id)
+    executed = store.mark_executed(
+        approval_id=ticket.approval_id,
+        workspace_id=ticket.workspace_id,
+        executed_by="operator",
+    )
     assert executed.ticket is not None
     ready = validate_vision_approval_resume(
         ticket=executed.ticket,
@@ -157,6 +161,7 @@ def test_vision_approval_resume_requires_executed_unconsumed_ticket(tmp_path) ->
 
     consumed = store.mark_consumed(
         approval_id=ticket.approval_id,
+        workspace_id=ticket.workspace_id,
         consumed_by_job_id="job-resume",
     )
     assert consumed.ticket is not None

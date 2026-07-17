@@ -44,6 +44,7 @@ class ArtifactFormContinuationGateway:
             "action_hash": action_hash,
         }
         return self._approval_store.create_ticket(
+            workspace_id=context.workspace_id,
             run_id=context.request_id,
             target_kind="artifact_form_continuation",
             target_ref=target_ref,

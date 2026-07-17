@@ -95,6 +95,7 @@ from imperaos.runtime.paths import state_path
 _DEFAULT_CONTINUATION_GATEWAY = object()
 _ASSET_IMPORT_RESERVATION_TTL = timedelta(minutes=5)
 _EDITOR_FLAG_SAFE_OPERATIONS = {
+    "artifact.list",
     "artifact.get",
     "artifact.history",
     "artifact.archive",
@@ -681,7 +682,15 @@ class ArtifactService:
         )
         content_json = canonical_json(content)
         digest = hashlib.sha256(content_json.encode("utf-8")).hexdigest()
-        request_hash = self._request_hash(command)
+        normalized_command = command.model_copy(
+            update={
+                "content": content.model_dump(mode="json", by_alias=True),
+                "target_selection": context_pack.selection.model_dump(
+                    mode="json", by_alias=True
+                ),
+            }
+        )
+        request_hash = self._request_hash(normalized_command)
         proposal_id = command.proposal_id or self._stable_id(
             "proposal", command.artifact_id, command.idempotency_key
         )
@@ -810,6 +819,7 @@ class ArtifactService:
                 connection.commit()
             self._raise_conflict("proposal base revision is stale")
 
+        content = self._revalidate_stored_proposal(row, artifact, context)
         approval = self._proposal_approvals.claim(row, context, command.approval_id)
         self.policy.authorize(
             ArtifactPermission.AI_APPLY,
@@ -823,7 +833,7 @@ class ArtifactService:
                 artifact_id=artifact.artifact_id,
                 expected_revision_number=command.expected_revision_number,
                 mutation_type=row["mutation_type"],
-                content=json.loads(row["content_json"]),
+                content=content.model_dump(mode="json", by_alias=True),
                 idempotency_key=row["idempotency_key"],
                 change_summary=row["summary"],
             ),
@@ -852,6 +862,83 @@ class ArtifactService:
             connection.commit()
         self._proposal_approvals.complete(row, command.approval_id)
         return result
+
+    def _revalidate_stored_proposal(
+        self,
+        row: sqlite3.Row,
+        artifact: ArtifactDescriptor,
+        context: OperationContext,
+    ) -> ArtifactContent:
+        from imperaos.artifacts.context import (
+            ArtifactContextRequest,
+            build_artifact_context_pack,
+        )
+
+        try:
+            raw_content = json.loads(row["content_json"])
+            target_selection = json.loads(row["target_scope_json"])
+            content = self._validate_content(
+                artifact.kind,
+                raw_content,
+                schema_version=artifact.schema_version,
+            )
+            content_json = canonical_json(content)
+            if hashlib.sha256(content_json.encode("utf-8")).hexdigest() != row["content_sha256"]:
+                raise ValueError("proposal content hash mismatch")
+            base_read = self.get(
+                GetArtifactQuery(
+                    artifact_id=artifact.artifact_id,
+                    revision_id=row["context_revision_id"],
+                ),
+                context,
+            )
+            request = ArtifactContextRequest.model_validate(
+                {
+                    "artifactId": artifact.artifact_id,
+                    "revisionId": row["context_revision_id"],
+                    "purpose": row["context_purpose"],
+                    "allowedScopes": ["metadata", "selection"],
+                    "selection": target_selection,
+                }
+            )
+            pack = build_artifact_context_pack(base_read, request)
+            if (
+                pack.revision_number != row["base_revision_number"]
+                or pack.projection_sha256 != row["context_sha256"]
+                or pack.selection_sha256 != row["selection_sha256"]
+            ):
+                raise ValueError("proposal context binding mismatch")
+            require_scoped_replacement(
+                artifact.kind,
+                base_read.content.model_dump(mode="json", by_alias=True),
+                content.model_dump(mode="json", by_alias=True),
+                target_selection,
+            )
+            reconstructed = ProposeArtifactMutationCommand(
+                proposal_id=row["proposal_id"],
+                artifact_id=row["artifact_id"],
+                base_revision_number=row["base_revision_number"],
+                mutation_type=row["mutation_type"],
+                content=content.model_dump(mode="json", by_alias=True),
+                idempotency_key=row["idempotency_key"],
+                summary=row["summary"],
+                context_sha256=row["context_sha256"],
+                selection_sha256=row["selection_sha256"],
+                context_revision_id=row["context_revision_id"],
+                context_purpose=row["context_purpose"],
+                target_selection=pack.selection.model_dump(mode="json", by_alias=True),
+                source_session_id=row["source_session_id"],
+                source_turn_id=row["source_turn_id"],
+            )
+            if self._request_hash(reconstructed) != row["request_sha256"]:
+                raise ValueError("proposal request hash mismatch")
+        except (ArtifactDomainError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_POLICY_UNAVAILABLE,
+                "stored artifact proposal integrity validation failed",
+                details={"reasonCode": "ARTIFACT_PROPOSAL_INTEGRITY_INVALID"},
+            ) from exc
+        return content
 
     @record_artifact_evidence("artifact.history")
     def history(

@@ -9,7 +9,9 @@ pub fn run() {
         .manage(bridge::AssistantProcessRegistry::default())
         .manage(artifact_rpc::WorkspaceRpcRegistry::default())
         .manage(artifact_asset::ArtifactAssetState::default())
-        .manage(artifact_export::ArtifactExportState::default())
+        .manage(artifact_export::ArtifactExportState::new(
+            bridge::artifact_export_journal_root(),
+        ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_log::Builder::default().build())
         .invoke_handler(tauri::generate_handler![

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, JsonValue, StringConstraints
@@ -142,6 +143,21 @@ ArtifactToolResult = (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class ArtifactToolExecutionMetadata:
+    persists_state: bool
+    provider_result_reserve_bytes: int
+
+
+_TOOL_EXECUTION_METADATA = {
+    "artifact.create_draft": ArtifactToolExecutionMetadata(True, 2_048),
+    "artifact.get_context": ArtifactToolExecutionMetadata(False, 0),
+    "artifact.propose_mutation": ArtifactToolExecutionMetadata(True, 2_048),
+    "artifact.request_form": ArtifactToolExecutionMetadata(True, 2_048),
+    "artifact.request_export": ArtifactToolExecutionMetadata(False, 0),
+}
+
+
 class ArtifactToolRegistry:
     def __init__(self, service: ArtifactService) -> None:
         self._service = service
@@ -177,6 +193,16 @@ class ArtifactToolRegistry:
             )
             for name in self.names
         )
+
+    def execution_metadata(self, name: str) -> ArtifactToolExecutionMetadata:
+        metadata = _TOOL_EXECUTION_METADATA.get(name)
+        if metadata is None:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+                "artifact tool execution metadata is unavailable",
+                details={"reasonCode": "ARTIFACT_TOOL_NOT_PUBLIC"},
+            )
+        return metadata
 
     def invoke(
         self,

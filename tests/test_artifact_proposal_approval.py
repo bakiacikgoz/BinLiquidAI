@@ -36,6 +36,7 @@ def test_artifact_approval_decision_is_bound_to_the_trusted_workspace() -> None:
 def _ticket(approval_id: str, workspace_id: str) -> SimpleNamespace:
     payload = {
         "approval_id": approval_id,
+        "workspace_id": workspace_id,
         "target_kind": "artifact_mutation_proposal",
         "target_ref": f"{workspace_id}:artifact-1:proposal-1",
         "snapshot": {"workspaceId": workspace_id},
@@ -54,7 +55,11 @@ def test_artifact_approval_uses_verified_actor_and_requires_workspace(
     ticket = _ticket("approval-1", "workspace-1")
     captured: dict[str, object] = {}
     runtime = SimpleNamespace(
-        approval_store=SimpleNamespace(get=lambda _approval_id: ticket),
+        approval_store=SimpleNamespace(
+            get=lambda _approval_id, *, workspace_id: (
+                ticket if workspace_id == "workspace-1" else None
+            )
+        ),
         decide_approval=lambda **kwargs: (
             captured.update(kwargs)
             or SimpleNamespace(error_code=None, ticket=None)
@@ -87,9 +92,15 @@ def test_pending_and_show_hide_foreign_artifact_approvals(
     local = _ticket("approval-local", "workspace-1")
     foreign = _ticket("approval-foreign", "workspace-2")
     store = SimpleNamespace(
-        list_pending=lambda: [local, foreign],
+        list_pending=lambda *, workspace_id: [
+            item for item in (local, foreign) if item.workspace_id == workspace_id
+        ],
         expire_pending=lambda: None,
-        get=lambda approval_id: foreign if approval_id == "approval-foreign" else local,
+        get=lambda approval_id, *, workspace_id: (
+            local
+            if approval_id == "approval-local" and workspace_id == "workspace-1"
+            else None
+        ),
     )
     runtime = SimpleNamespace(approval_store=store)
     monkeypatch.setattr("imperaos.cli.RuntimeConfig.from_profile", lambda _profile: object())

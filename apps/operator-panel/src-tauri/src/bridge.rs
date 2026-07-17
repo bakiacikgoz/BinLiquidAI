@@ -3,7 +3,7 @@ use crate::artifact_asset::{
 };
 use crate::artifact_export::{
     ArtifactExportCancelResult, ArtifactExportResult, ArtifactExportState, ExportBinding,
-    ExportBoundaryError, DEFAULT_MAX_EXPORT_BYTES, DEFAULT_TICKET_TTL,
+    ExportBoundaryError, ExportReconciliationAction, DEFAULT_MAX_EXPORT_BYTES, DEFAULT_TICKET_TTL,
 };
 use crate::artifact_rpc::{
     build_trusted_request, SupervisorError, TrustedArtifactIdentity, WorkspaceRpcLaunch,
@@ -533,6 +533,9 @@ pub async fn bridge_artifact_export_begin(
             Ok(identity) => identity,
             Err(error) => return BridgeResult::err(error),
         };
+    if let Err(error) = reconcile_artifact_exports(app.clone(), &identity).await {
+        return BridgeResult::err(error);
+    }
     let authority = bridge_artifact_rpc_call(
         app.clone(),
         "artifact.export.begin".to_string(),
@@ -776,49 +779,51 @@ pub async fn bridge_artifact_export_commit(
             )
         }));
     }
+    if let Err(error) = state
+        .prepare_reconciliation(&request.ticket, &binding, &preflight)
+        .await
+    {
+        if cancel_export_authority(
+            app.clone(),
+            authorized_binding.export_id(),
+            "native_write_failed",
+        )
+        .await
+        .is_ok()
+        {
+            let _ = state.cancel(&request.ticket, &binding).await;
+        }
+        return BridgeResult::err(export_bridge_error("artifact export commit", error));
+    }
     let result = match state
         .commit(&request.ticket, &binding, request.bytes, &request.sha256)
         .await
     {
         Ok(result) => result,
         Err(error) => {
-            let _ = state.cancel(&request.ticket, &binding).await;
-            let _ = cancel_export_authority(
+            if cancel_export_authority(
                 app.clone(),
                 authorized_binding.export_id(),
                 "native_write_failed",
             )
-            .await;
+            .await
+            .is_ok()
+            {
+                let _ = state.cancel(&request.ticket, &binding).await;
+            }
             return BridgeResult::err(export_bridge_error("artifact export commit", error));
         }
     };
-    let export_id = result.binding.export_id().to_string();
-    let authority = bridge_artifact_rpc_call(
+    if let Err(error) = commit_export_authority(
         app.clone(),
-        "artifact.export.commit".to_string(),
-        ArtifactBridgePayload {
-            params: json!({
-                "exportId": export_id,
-                "basename": result.basename.clone(),
-                "sha256": result.sha256.clone(),
-                "sizeBytes": result.size_bytes,
-                "idempotencyKey": format!("commit-{}", result.binding.export_id()),
-            }),
-            idempotency_key: Some(format!("commit-{}", result.binding.export_id())),
-            timeout_ms: Some(DEFAULT_TIMEOUT_MS),
-        },
+        result.binding.export_id(),
+        &result.basename,
+        &result.sha256,
+        result.size_bytes,
     )
-    .await;
-    if authority.data.is_none() {
-        return BridgeResult::err(authority.error.unwrap_or_else(|| {
-            BridgeError::new(
-                "ARTIFACT_RPC_UNAVAILABLE",
-                "Artifact export completion could not be acknowledged.",
-                "",
-                "artifact export commit",
-                true,
-            )
-        }));
+    .await
+    {
+        return BridgeResult::err(error);
     }
     if let Err(error) = state.finalize(&request.ticket, &binding).await {
         return BridgeResult::err(export_bridge_error("artifact export commit", error));
@@ -927,6 +932,13 @@ fn configured_max_export_bytes() -> usize {
         .unwrap_or(DEFAULT_MAX_EXPORT_BYTES)
 }
 
+pub(crate) fn artifact_export_journal_root() -> PathBuf {
+    default_cli_workdir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".imperaos")
+        .join("artifact-export-reconciliation")
+}
+
 fn export_bridge_error(command: &str, error: ExportBoundaryError) -> BridgeError {
     BridgeError::new(&error.code, error.message, "", command, error.retryable)
 }
@@ -964,6 +976,130 @@ async fn cancel_export_authority(
             )
         }))
     }
+}
+
+fn export_commit_terminal_request(
+    export_id: &str,
+    basename: &str,
+    sha256: &str,
+    size_bytes: usize,
+) -> (String, ArtifactBridgePayload) {
+    let idempotency_key = format!("commit-{export_id}");
+    (
+        "artifact.export.commit".to_string(),
+        ArtifactBridgePayload {
+            params: json!({
+                "exportId": export_id,
+                "basename": basename,
+                "sha256": sha256,
+                "sizeBytes": size_bytes,
+                "idempotencyKey": idempotency_key,
+            }),
+            idempotency_key: Some(idempotency_key),
+            timeout_ms: Some(DEFAULT_TIMEOUT_MS),
+        },
+    )
+}
+
+fn export_reconciliation_terminal_request(
+    action: &ExportReconciliationAction,
+) -> (String, ArtifactBridgePayload) {
+    match action {
+        ExportReconciliationAction::Commit(receipt) => export_commit_terminal_request(
+            receipt.export_id(),
+            receipt.basename(),
+            receipt.sha256(),
+            receipt.size_bytes(),
+        ),
+        ExportReconciliationAction::CancelNativeWriteFailed(receipt) => {
+            let idempotency_key = format!("cancel-{}-native_write_failed", receipt.export_id());
+            (
+                "artifact.export.cancel".to_string(),
+                ArtifactBridgePayload {
+                    params: json!({
+                        "exportId": receipt.export_id(),
+                        "reason": "native_write_failed",
+                        "idempotencyKey": idempotency_key.clone(),
+                    }),
+                    idempotency_key: Some(idempotency_key),
+                    timeout_ms: Some(DEFAULT_TIMEOUT_MS),
+                },
+            )
+        }
+    }
+}
+
+async fn call_export_terminal_authority(
+    app: tauri::AppHandle,
+    method: String,
+    payload: ArtifactBridgePayload,
+) -> Result<(), BridgeError> {
+    let response = bridge_artifact_rpc_call(app, method.clone(), payload).await;
+    if response.data.is_some() {
+        Ok(())
+    } else {
+        Err(response.error.unwrap_or_else(|| {
+            BridgeError::new(
+                "ARTIFACT_RPC_UNAVAILABLE",
+                "Artifact export terminal state could not be acknowledged.",
+                "",
+                method,
+                true,
+            )
+        }))
+    }
+}
+
+async fn commit_export_authority(
+    app: tauri::AppHandle,
+    export_id: &str,
+    basename: &str,
+    sha256: &str,
+    size_bytes: usize,
+) -> Result<(), BridgeError> {
+    let (method, payload) = export_commit_terminal_request(export_id, basename, sha256, size_bytes);
+    call_export_terminal_authority(app, method, payload).await
+}
+
+async fn reconcile_export_actions_with<F, Fut>(
+    state: &ArtifactExportState,
+    actions: Vec<ExportReconciliationAction>,
+    mut terminal: F,
+) -> Result<(), BridgeError>
+where
+    F: FnMut(ExportReconciliationAction) -> Fut,
+    Fut: std::future::Future<Output = Result<(), BridgeError>>,
+{
+    for action in actions {
+        let export_id = action.receipt().export_id().to_string();
+        terminal(action).await?;
+        state
+            .acknowledge_reconciliation(&export_id)
+            .await
+            .map_err(|error| export_bridge_error("artifact export reconciliation", error))?;
+    }
+    Ok(())
+}
+
+async fn reconcile_artifact_exports(
+    app: tauri::AppHandle,
+    identity: &TrustedArtifactIdentity,
+) -> Result<(), BridgeError> {
+    let binding = ExportBinding::new(identity.workspace_id(), identity.principal_id())
+        .map_err(|error| export_bridge_error("artifact export reconciliation", error))?;
+    let state = app.state::<ArtifactExportState>();
+    let actions = state
+        .reconciliation_actions(&binding)
+        .await
+        .map_err(|error| export_bridge_error("artifact export reconciliation", error))?;
+    reconcile_export_actions_with(&state, actions, |action| {
+        let app = app.clone();
+        async move {
+            let (method, payload) = export_reconciliation_terminal_request(&action);
+            call_export_terminal_authority(app, method, payload).await
+        }
+    })
+    .await
 }
 
 async fn bridge_artifact_rpc_call(
@@ -4404,10 +4540,12 @@ fn tail_events_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Digest, Sha256};
     use std::collections::HashMap;
     use std::io::Write;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+    use std::sync::{Arc, Mutex as StdMutex};
 
     #[test]
     fn normalize_actor_requires_expected_format() {
@@ -5099,5 +5237,159 @@ mod tests {
             .expect("spawn");
 
         assert!(pid.is_some());
+    }
+
+    #[test]
+    fn export_reconciliation_retains_receipt_until_idempotent_authority_ack() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let root = tempfile::tempdir().expect("tempdir");
+            let state = ArtifactExportState::new(root.path().join("journal"));
+            let actor = ExportBinding::new("workspace-1", "user-1").expect("actor");
+            let exact = ExportBinding::authorized(
+                "workspace-1",
+                "user-1",
+                "user",
+                "export-reconcile-1",
+                "artifact-1",
+                "revision-1",
+                "json",
+            )
+            .expect("binding");
+            let target = root.path().join("report.json");
+            let bytes = br#"{"status":"ok"}"#.to_vec();
+            let digest = format!("{:x}", Sha256::digest(&bytes));
+            let issued = state
+                .issue_ticket(target, exact, 1024, Duration::from_secs(60))
+                .await
+                .expect("ticket");
+            let preflight = state
+                .preflight(&issued.ticket, &actor, &bytes, &digest)
+                .await
+                .expect("preflight");
+            state
+                .prepare_reconciliation(&issued.ticket, &actor, &preflight)
+                .await
+                .expect("receipt");
+            state
+                .commit(&issued.ticket, &actor, bytes, &digest)
+                .await
+                .expect("write");
+
+            let unavailable = reconcile_export_actions_with(
+                &state,
+                state.reconciliation_actions(&actor).await.expect("actions"),
+                |_action| async {
+                    Err(BridgeError::new(
+                        "ARTIFACT_RPC_UNAVAILABLE",
+                        "unavailable",
+                        "",
+                        "artifact export reconciliation",
+                        true,
+                    ))
+                },
+            )
+            .await
+            .expect_err("authority failure");
+            assert!(unavailable.retryable);
+            assert_eq!(
+                state
+                    .reconciliation_actions(&actor)
+                    .await
+                    .expect("retained")
+                    .len(),
+                1
+            );
+
+            let requests = Arc::new(StdMutex::new(Vec::new()));
+            let observed = requests.clone();
+            reconcile_export_actions_with(
+                &state,
+                state
+                    .reconciliation_actions(&actor)
+                    .await
+                    .expect("retry actions"),
+                move |action| {
+                    let observed = observed.clone();
+                    async move {
+                        let (method, payload) = export_reconciliation_terminal_request(&action);
+                        observed
+                            .lock()
+                            .expect("requests")
+                            .push((method, payload.params));
+                        Ok(())
+                    }
+                },
+            )
+            .await
+            .expect("authority ack");
+
+            let requests = requests.lock().expect("requests");
+            assert_eq!(requests.len(), 1);
+            assert_eq!(requests[0].0, "artifact.export.commit");
+            assert_eq!(requests[0].1["idempotencyKey"], "commit-export-reconcile-1");
+            assert!(state
+                .reconciliation_actions(&actor)
+                .await
+                .expect("cleared")
+                .is_empty());
+        });
+    }
+
+    #[test]
+    fn missing_export_reconciliation_uses_idempotent_native_write_failed_cancel() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let root = tempfile::tempdir().expect("tempdir");
+            let state = ArtifactExportState::new(root.path().join("journal"));
+            let actor = ExportBinding::new("workspace-1", "user-1").expect("actor");
+            let bytes = b"safe export".to_vec();
+            let digest = format!("{:x}", Sha256::digest(&bytes));
+            let issued = state
+                .issue_ticket(
+                    root.path().join("missing.json"),
+                    ExportBinding::authorized(
+                        "workspace-1",
+                        "user-1",
+                        "user",
+                        "export-cancel-1",
+                        "artifact-1",
+                        "revision-1",
+                        "json",
+                    )
+                    .expect("binding"),
+                    1024,
+                    Duration::from_secs(60),
+                )
+                .await
+                .expect("ticket");
+            let preflight = state
+                .preflight(&issued.ticket, &actor, &bytes, &digest)
+                .await
+                .expect("preflight");
+            state
+                .prepare_reconciliation(&issued.ticket, &actor, &preflight)
+                .await
+                .expect("receipt");
+
+            let actions = state.reconciliation_actions(&actor).await.expect("actions");
+            let (method, payload) = export_reconciliation_terminal_request(&actions[0]);
+            assert_eq!(method, "artifact.export.cancel");
+            assert_eq!(payload.params["reason"], "native_write_failed");
+            assert_eq!(
+                payload.params["idempotencyKey"],
+                "cancel-export-cancel-1-native_write_failed"
+            );
+            assert_eq!(
+                payload.idempotency_key.as_deref(),
+                Some("cancel-export-cancel-1-native_write_failed")
+            );
+        });
     }
 }

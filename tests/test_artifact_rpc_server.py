@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from artifact_store_support import make_artifact_pair
 
+from imperaos.artifacts.errors import ArtifactDomainError
 from imperaos.artifacts.models import PrincipalType
 from imperaos.artifacts.rpc_protocol import (
     ArtifactRpcMethod,
@@ -61,6 +62,26 @@ def _request(
 def _decode_responses(payload: bytes) -> list[RpcResponse]:
     decoder = RpcFrameDecoder()
     return [RpcResponse.model_validate_json(frame) for frame in decoder.feed(payload)]
+
+
+def test_slides_patch_requires_envelope_bound_idempotency_key() -> None:
+    valid = _request(
+        "slides-patch-valid",
+        ArtifactRpcMethod.ARTIFACT_SLIDES_PATCH,
+        {"idempotencyKey": "slides-patch-1"},
+        idempotency_key="slides-patch-1",
+    )
+    ArtifactRpcServer._validate_idempotency_binding(valid)
+
+    with pytest.raises(ArtifactDomainError):
+        ArtifactRpcServer._validate_idempotency_binding(
+            _request(
+                "slides-patch-mismatch",
+                ArtifactRpcMethod.ARTIFACT_SLIDES_PATCH,
+                {"idempotencyKey": "params-key"},
+                idempotency_key="envelope-key",
+            )
+        )
 
 
 def test_handshake_exposes_only_redacted_backend_license_capabilities(tmp_path: Path) -> None:

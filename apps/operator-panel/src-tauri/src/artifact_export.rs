@@ -1,10 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-#[cfg(not(windows))]
-use std::fs::File;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -13,8 +11,12 @@ use uuid::Uuid;
 pub const DEFAULT_MAX_EXPORT_BYTES: usize = 100 * 1024 * 1024;
 pub const DEFAULT_TICKET_TTL: Duration = Duration::from_secs(5 * 60);
 const MAX_TICKET_TTL: Duration = Duration::from_secs(15 * 60);
+const RECONCILIATION_RECEIPT_VERSION: u8 = 1;
+const MAX_RECONCILIATION_RECEIPT_BYTES: u64 = 64 * 1024;
+const MAX_RECONCILIATION_RECEIPTS: usize = 1_024;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExportBinding {
     workspace_id: String,
     principal_id: String,
@@ -83,6 +85,50 @@ impl ExportBinding {
 
     fn same_actor(&self, other: &Self) -> bool {
         self.workspace_id == other.workspace_id && self.principal_id == other.principal_id
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ExportReconciliationReceipt {
+    version: u8,
+    ticket: String,
+    target: PathBuf,
+    binding: ExportBinding,
+    basename: String,
+    sha256: String,
+    size_bytes: usize,
+}
+
+impl ExportReconciliationReceipt {
+    pub(crate) fn export_id(&self) -> &str {
+        self.binding.export_id()
+    }
+
+    pub(crate) fn basename(&self) -> &str {
+        &self.basename
+    }
+
+    pub(crate) fn sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    pub(crate) fn size_bytes(&self) -> usize {
+        self.size_bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ExportReconciliationAction {
+    Commit(ExportReconciliationReceipt),
+    CancelNativeWriteFailed(ExportReconciliationReceipt),
+}
+
+impl ExportReconciliationAction {
+    pub(crate) fn receipt(&self) -> &ExportReconciliationReceipt {
+        match self {
+            Self::Commit(receipt) | Self::CancelNativeWriteFailed(receipt) => receipt,
+        }
     }
 }
 
@@ -170,12 +216,27 @@ struct ExportTicketRecord {
     phase: ExportTicketPhase,
 }
 
-#[derive(Default)]
 pub struct ArtifactExportState {
     tickets: Mutex<HashMap<String, ExportTicketRecord>>,
+    journal_root: PathBuf,
+    reconciliation_lock: Mutex<()>,
+}
+
+impl Default for ArtifactExportState {
+    fn default() -> Self {
+        Self::new(PathBuf::new())
+    }
 }
 
 impl ArtifactExportState {
+    pub fn new(journal_root: PathBuf) -> Self {
+        Self {
+            tickets: Mutex::new(HashMap::new()),
+            journal_root,
+            reconciliation_lock: Mutex::new(()),
+        }
+    }
+
     pub async fn preflight(
         &self,
         ticket: &str,
@@ -350,22 +411,21 @@ impl ArtifactExportState {
                 }
             }
         }
-        let write_result = match tokio::task::spawn_blocking(move || {
-            atomic_write(&target, &ticket_owned, &bytes)
-        })
-        .await
-        {
-            Ok(result) => result,
-            Err(_) => {
-                if let Some(current) = self.tickets.lock().await.get_mut(ticket) {
-                    current.phase = ExportTicketPhase::Issued;
+        let write_result =
+            match tokio::task::spawn_blocking(move || atomic_write(&target, &ticket_owned, &bytes))
+                .await
+            {
+                Ok(result) => result,
+                Err(_) => {
+                    if let Some(current) = self.tickets.lock().await.get_mut(ticket) {
+                        current.phase = ExportTicketPhase::Issued;
+                    }
+                    return Err(ExportBoundaryError::failed(
+                        "artifact export write task failed",
+                        true,
+                    ));
                 }
-                return Err(ExportBoundaryError::failed(
-                    "artifact export write task failed",
-                    true,
-                ));
-            }
-        };
+            };
         if let Err(error) = write_result {
             if let Some(current) = self.tickets.lock().await.get_mut(ticket) {
                 current.phase = ExportTicketPhase::Issued;
@@ -389,12 +449,109 @@ impl ArtifactExportState {
         })
     }
 
+    pub(crate) async fn prepare_reconciliation(
+        &self,
+        ticket: &str,
+        binding: &ExportBinding,
+        result: &ArtifactExportResult,
+    ) -> Result<(), ExportBoundaryError> {
+        let record = self.record_for_ticket(ticket, binding).await?;
+        if record.binding != result.binding {
+            return Err(ExportBoundaryError::permission_denied());
+        }
+        let target = record.target;
+        let basename = target
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| ExportBoundaryError::failed("export basename is invalid", false))?
+            .to_string();
+        if basename != result.basename
+            || result.sha256.len() != 64
+            || !result
+                .sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            || result.size_bytes > record.max_bytes
+        {
+            return Err(ExportBoundaryError::failed(
+                "artifact export reconciliation receipt is invalid",
+                false,
+            ));
+        }
+        let receipt = ExportReconciliationReceipt {
+            version: RECONCILIATION_RECEIPT_VERSION,
+            ticket: ticket.to_string(),
+            target,
+            binding: record.binding,
+            basename,
+            sha256: result.sha256.clone(),
+            size_bytes: result.size_bytes,
+        };
+        self.persist_reconciliation(receipt).await
+    }
+
+    pub(crate) async fn reconciliation_actions(
+        &self,
+        binding: &ExportBinding,
+    ) -> Result<Vec<ExportReconciliationAction>, ExportBoundaryError> {
+        let _guard = self.reconciliation_lock.lock().await;
+        let receipts = self.load_reconciliations()?;
+        let mut actions = Vec::new();
+        for receipt in receipts {
+            if !receipt.binding.same_actor(binding) {
+                continue;
+            }
+            let observed = receipt.clone();
+            let matches = tokio::task::spawn_blocking(move || target_matches_receipt(&observed))
+                .await
+                .map_err(|_| {
+                    ExportBoundaryError::failed("artifact export reconciliation task failed", true)
+                })??;
+            actions.push(if matches {
+                ExportReconciliationAction::Commit(receipt)
+            } else {
+                ExportReconciliationAction::CancelNativeWriteFailed(receipt)
+            });
+        }
+        Ok(actions)
+    }
+
+    pub(crate) async fn acknowledge_reconciliation(
+        &self,
+        export_id: &str,
+    ) -> Result<(), ExportBoundaryError> {
+        if self.journal_root.as_os_str().is_empty() {
+            return Ok(());
+        }
+        if !is_bounded_id(export_id) {
+            return Err(ExportBoundaryError::failed(
+                "artifact export reconciliation ID is invalid",
+                false,
+            ));
+        }
+        let path = self.journal_root.join(format!("{export_id}.json"));
+        tokio::task::spawn_blocking(move || match fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(_) => Err(ExportBoundaryError::failed(
+                "artifact export reconciliation receipt could not be removed",
+                true,
+            )),
+        })
+        .await
+        .map_err(|_| {
+            ExportBoundaryError::failed("artifact export reconciliation task failed", true)
+        })?
+    }
+
     pub async fn finalize(
         &self,
         ticket: &str,
         binding: &ExportBinding,
     ) -> Result<(), ExportBoundaryError> {
-        self.take_ticket(ticket, binding).await.map(|_| ())
+        let record = self.take_ticket(ticket, binding).await?;
+        self.acknowledge_reconciliation(record.binding.export_id())
+            .await
     }
 
     pub async fn cancel(
@@ -404,6 +561,8 @@ impl ArtifactExportState {
     ) -> Result<ArtifactExportCancelResult, ExportBoundaryError> {
         self.require_cancellable(ticket, binding).await?;
         let record = self.take_ticket(ticket, binding).await?;
+        self.acknowledge_reconciliation(record.binding.export_id())
+            .await?;
         Ok(ArtifactExportCancelResult {
             cancelled: true,
             binding: record.binding,
@@ -418,12 +577,12 @@ impl ArtifactExportState {
         let record = self.record_for_ticket(ticket, binding).await?;
         match record.phase {
             ExportTicketPhase::Issued => Ok(()),
-            ExportTicketPhase::Writing | ExportTicketPhase::Written { .. } => Err(
-                ExportBoundaryError::failed(
+            ExportTicketPhase::Writing | ExportTicketPhase::Written { .. } => {
+                Err(ExportBoundaryError::failed(
                     "written artifact export requires terminal completion",
                     true,
-                ),
-            ),
+                ))
+            }
         }
     }
 
@@ -466,6 +625,176 @@ impl ArtifactExportState {
         }
         Ok(record.clone())
     }
+
+    async fn persist_reconciliation(
+        &self,
+        receipt: ExportReconciliationReceipt,
+    ) -> Result<(), ExportBoundaryError> {
+        if self.journal_root.as_os_str().is_empty() {
+            return Err(ExportBoundaryError::failed(
+                "artifact export reconciliation root is unavailable",
+                true,
+            ));
+        }
+        let bytes = serde_json::to_vec(&receipt).map_err(|_| {
+            ExportBoundaryError::failed(
+                "artifact export reconciliation receipt could not be encoded",
+                false,
+            )
+        })?;
+        if bytes.len() as u64 > MAX_RECONCILIATION_RECEIPT_BYTES {
+            return Err(ExportBoundaryError::failed(
+                "artifact export reconciliation receipt exceeds its size boundary",
+                false,
+            ));
+        }
+        let root = self.journal_root.clone();
+        let target = root.join(format!("{}.json", receipt.export_id()));
+        let ticket = receipt.ticket.clone();
+        tokio::task::spawn_blocking(move || {
+            fs::create_dir_all(&root).map_err(|_| {
+                ExportBoundaryError::failed(
+                    "artifact export reconciliation root could not be created",
+                    true,
+                )
+            })?;
+            atomic_write(&target, &ticket, &bytes)
+        })
+        .await
+        .map_err(|_| {
+            ExportBoundaryError::failed("artifact export reconciliation task failed", true)
+        })?
+    }
+
+    fn load_reconciliations(
+        &self,
+    ) -> Result<Vec<ExportReconciliationReceipt>, ExportBoundaryError> {
+        if self.journal_root.as_os_str().is_empty() || !self.journal_root.exists() {
+            return Ok(Vec::new());
+        }
+        let mut paths = fs::read_dir(&self.journal_root)
+            .map_err(|_| {
+                ExportBoundaryError::failed(
+                    "artifact export reconciliation root could not be read",
+                    true,
+                )
+            })?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("json"))
+            .collect::<Vec<_>>();
+        paths.sort();
+        if paths.len() > MAX_RECONCILIATION_RECEIPTS {
+            return Err(ExportBoundaryError::failed(
+                "artifact export reconciliation receipt count exceeds its boundary",
+                false,
+            ));
+        }
+        paths
+            .into_iter()
+            .map(|path| load_reconciliation_receipt(&path))
+            .collect()
+    }
+}
+
+fn load_reconciliation_receipt(
+    path: &Path,
+) -> Result<ExportReconciliationReceipt, ExportBoundaryError> {
+    let metadata = fs::symlink_metadata(path).map_err(|_| {
+        ExportBoundaryError::failed(
+            "artifact export reconciliation receipt is unavailable",
+            true,
+        )
+    })?;
+    if !metadata.file_type().is_file() || metadata.len() > MAX_RECONCILIATION_RECEIPT_BYTES {
+        return Err(ExportBoundaryError::failed(
+            "artifact export reconciliation receipt is invalid",
+            false,
+        ));
+    }
+    let bytes = fs::read(path).map_err(|_| {
+        ExportBoundaryError::failed(
+            "artifact export reconciliation receipt could not be read",
+            true,
+        )
+    })?;
+    let receipt: ExportReconciliationReceipt = serde_json::from_slice(&bytes).map_err(|_| {
+        ExportBoundaryError::failed("artifact export reconciliation receipt is invalid", false)
+    })?;
+    let expected_name = format!("{}.json", receipt.export_id());
+    if receipt.version != RECONCILIATION_RECEIPT_VERSION
+        || receipt.ticket.is_empty()
+        || receipt.ticket.len() > 128
+        || !receipt.ticket.starts_with("export-")
+        || !is_valid_binding(&receipt.binding)
+        || receipt.basename.is_empty()
+        || receipt.basename.len() > 255
+        || receipt.target.file_name().and_then(|value| value.to_str())
+            != Some(receipt.basename.as_str())
+        || receipt.sha256.len() != 64
+        || !receipt
+            .sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || receipt.size_bytes > DEFAULT_MAX_EXPORT_BYTES
+        || path.file_name().and_then(|value| value.to_str()) != Some(expected_name.as_str())
+    {
+        return Err(ExportBoundaryError::failed(
+            "artifact export reconciliation receipt is invalid",
+            false,
+        ));
+    }
+    Ok(receipt)
+}
+
+fn target_matches_receipt(
+    receipt: &ExportReconciliationReceipt,
+) -> Result<bool, ExportBoundaryError> {
+    let metadata = match fs::symlink_metadata(&receipt.target) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(_) => {
+            return Err(ExportBoundaryError::failed(
+                "artifact export reconciliation target could not be inspected",
+                true,
+            ))
+        }
+    };
+    if !metadata.file_type().is_file() || metadata.len() != receipt.size_bytes as u64 {
+        return Ok(false);
+    }
+    let mut file = File::open(&receipt.target).map_err(|_| {
+        ExportBoundaryError::failed(
+            "artifact export reconciliation target could not be read",
+            true,
+        )
+    })?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer).map_err(|_| {
+            ExportBoundaryError::failed(
+                "artifact export reconciliation target could not be read",
+                true,
+            )
+        })?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hasher.finalize()) == receipt.sha256)
+}
+
+fn is_valid_binding(binding: &ExportBinding) -> bool {
+    is_bounded_id(&binding.workspace_id)
+        && is_bounded_id(&binding.principal_id)
+        && binding.principal_type == "user"
+        && is_bounded_id(&binding.export_id)
+        && is_bounded_id(&binding.artifact_id)
+        && is_bounded_id(&binding.revision_id)
+        && !binding.format.is_empty()
+        && binding.format.len() <= 32
 }
 
 fn atomic_write(target: &Path, ticket: &str, bytes: &[u8]) -> Result<(), ExportBoundaryError> {
@@ -788,6 +1117,198 @@ mod tests {
                 .expect_err("size boundary");
             assert_eq!(size_error.code, "ARTIFACT_EXPORT_FAILED");
             assert!(!oversized_target.exists());
+        });
+    }
+
+    #[test]
+    fn reconciliation_receipt_survives_restart_and_matches_written_bytes() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let root = tempfile::tempdir().expect("tempdir");
+            let journal_root = root.path().join("journal");
+            let target = root.path().join("report.json");
+            let bytes = br#"{"status":"ok"}"#.to_vec();
+            let digest = format!("{:x}", Sha256::digest(&bytes));
+            let exact = ExportBinding::authorized(
+                "workspace-1",
+                "user-1",
+                "user",
+                "export-restart-1",
+                "artifact-1",
+                "revision-1",
+                "json",
+            )
+            .expect("binding");
+            let state = ArtifactExportState::new(journal_root.clone());
+            let issued = state
+                .issue_ticket(target.clone(), exact.clone(), 1024, Duration::from_secs(60))
+                .await
+                .expect("ticket");
+            let preflight = state
+                .preflight(&issued.ticket, &binding("user-1"), &bytes, &digest)
+                .await
+                .expect("preflight");
+            state
+                .prepare_reconciliation(&issued.ticket, &binding("user-1"), &preflight)
+                .await
+                .expect("durable receipt");
+            state
+                .commit(&issued.ticket, &binding("user-1"), bytes, &digest)
+                .await
+                .expect("native write");
+            drop(state);
+
+            let restarted = ArtifactExportState::new(journal_root);
+            let actions = restarted
+                .reconciliation_actions(&binding("user-1"))
+                .await
+                .expect("recovery actions");
+
+            assert_eq!(actions.len(), 1);
+            match &actions[0] {
+                ExportReconciliationAction::Commit(receipt) => {
+                    assert_eq!(receipt.export_id(), "export-restart-1");
+                    assert_eq!(receipt.basename(), "report.json");
+                    assert_eq!(receipt.sha256(), digest);
+                    assert_eq!(receipt.size_bytes(), 15);
+                }
+                ExportReconciliationAction::CancelNativeWriteFailed(_) => {
+                    panic!("matching written bytes must replay commit")
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn missing_target_reconciles_as_native_write_failure_until_acknowledged() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let root = tempfile::tempdir().expect("tempdir");
+            let journal_root = root.path().join("journal");
+            let bytes = b"safe export".to_vec();
+            let digest = format!("{:x}", Sha256::digest(&bytes));
+            let state = ArtifactExportState::new(journal_root.clone());
+            let issued = state
+                .issue_ticket(
+                    root.path().join("missing.json"),
+                    ExportBinding::authorized(
+                        "workspace-1",
+                        "user-1",
+                        "user",
+                        "export-missing-1",
+                        "artifact-1",
+                        "revision-1",
+                        "json",
+                    )
+                    .expect("binding"),
+                    1024,
+                    Duration::from_secs(60),
+                )
+                .await
+                .expect("ticket");
+            let preflight = state
+                .preflight(&issued.ticket, &binding("user-1"), &bytes, &digest)
+                .await
+                .expect("preflight");
+            state
+                .prepare_reconciliation(&issued.ticket, &binding("user-1"), &preflight)
+                .await
+                .expect("durable receipt");
+            drop(state);
+
+            let restarted = ArtifactExportState::new(journal_root.clone());
+            let actions = restarted
+                .reconciliation_actions(&binding("user-1"))
+                .await
+                .expect("recovery actions");
+            assert!(matches!(
+                actions.as_slice(),
+                [ExportReconciliationAction::CancelNativeWriteFailed(receipt)]
+                    if receipt.export_id() == "export-missing-1"
+            ));
+
+            drop(restarted);
+            let still_pending = ArtifactExportState::new(journal_root.clone())
+                .reconciliation_actions(&binding("user-1"))
+                .await
+                .expect("unacknowledged receipt");
+            assert_eq!(
+                still_pending.len(),
+                1,
+                "authority failure must retain receipt"
+            );
+
+            let acknowledged = ArtifactExportState::new(journal_root.clone());
+            acknowledged
+                .acknowledge_reconciliation("export-missing-1")
+                .await
+                .expect("terminal acknowledgement");
+            assert!(ArtifactExportState::new(journal_root)
+                .reconciliation_actions(&binding("user-1"))
+                .await
+                .expect("cleared journal")
+                .is_empty());
+        });
+    }
+
+    #[test]
+    fn mismatched_target_reconciles_as_native_write_failure() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let root = tempfile::tempdir().expect("tempdir");
+            let journal_root = root.path().join("journal");
+            let target = root.path().join("report.json");
+            let expected = b"safe export".to_vec();
+            let digest = format!("{:x}", Sha256::digest(&expected));
+            let actor = binding("user-1");
+            let state = ArtifactExportState::new(journal_root.clone());
+            let issued = state
+                .issue_ticket(
+                    target.clone(),
+                    ExportBinding::authorized(
+                        "workspace-1",
+                        "user-1",
+                        "user",
+                        "export-mismatch-1",
+                        "artifact-1",
+                        "revision-1",
+                        "json",
+                    )
+                    .expect("binding"),
+                    1024,
+                    Duration::from_secs(60),
+                )
+                .await
+                .expect("ticket");
+            let preflight = state
+                .preflight(&issued.ticket, &actor, &expected, &digest)
+                .await
+                .expect("preflight");
+            state
+                .prepare_reconciliation(&issued.ticket, &actor, &preflight)
+                .await
+                .expect("durable receipt");
+            fs::write(&target, b"tampered!!!").expect("same-size mismatched target");
+            drop(state);
+
+            let actions = ArtifactExportState::new(journal_root)
+                .reconciliation_actions(&actor)
+                .await
+                .expect("recovery actions");
+            assert!(matches!(
+                actions.as_slice(),
+                [ExportReconciliationAction::CancelNativeWriteFailed(receipt)]
+                    if receipt.export_id() == "export-mismatch-1"
+            ));
         });
     }
 }

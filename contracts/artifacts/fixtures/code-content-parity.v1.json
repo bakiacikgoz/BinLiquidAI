@@ -80,6 +80,19 @@
       }
     },
     {
+      "id": "unicode-17-format-control",
+      "expectedValid": false,
+      "content": {
+        "kind": "code",
+        "schemaVersion": 2,
+        "filename": "safe\ud80d\udc39.py",
+        "language": "python",
+        "text": "pass\n",
+        "lineEnding": "lf",
+        "executionPolicy": "deny"
+      }
+    },
+    {
       "id": "mixed-line-endings",
       "expectedValid": false,
       "content": {

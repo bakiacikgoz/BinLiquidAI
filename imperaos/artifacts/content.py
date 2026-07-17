@@ -353,7 +353,11 @@ class CodeContentV2(ArtifactModel):
             raise ValueError("code filename is not portable")
         if any(character in '<>:"/\\|?*' for character in value):
             raise ValueError("code filename contains a forbidden character")
-        if any(unicodedata.category(character) in {"Cc", "Cf"} for character in value):
+        if any(
+            unicodedata.category(character) in {"Cc", "Cf"}
+            or 0x13439 <= ord(character) <= 0x1343F
+            for character in value
+        ):
             raise ValueError("code filename contains a control character")
         basename = value.split(".", 1)[0].upper()
         reserved = {"CON", "PRN", "AUX", "NUL"}

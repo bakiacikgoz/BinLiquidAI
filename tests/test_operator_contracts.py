@@ -531,14 +531,28 @@ def test_approval_payloads_match_frozen_contracts(monkeypatch, tmp_path: Path) -
     )
     assert first_run.exit_code == 0
 
-    pending = runner.invoke(app, ["approval", "pending", "--json"])
+    pending = runner.invoke(
+        app,
+        ["approval", "pending", "--workspace-id", "default", "--json"],
+    )
     assert pending.exit_code == 0
     pending_payload = ApprovalPendingPayloadContract.model_validate_json(pending.stdout)
     assert pending_payload.contract_version == "3.0"
     assert len(pending_payload.pending) == 1
 
     approval_id = pending_payload.pending[0].approval_id
-    detail = runner.invoke(app, ["approval", "show", "--id", approval_id, "--json"])
+    detail = runner.invoke(
+        app,
+        [
+            "approval",
+            "show",
+            "--id",
+            approval_id,
+            "--workspace-id",
+            "default",
+            "--json",
+        ],
+    )
     assert detail.exit_code == 0
     detail_payload = ApprovalDetailPayloadContract.model_validate_json(detail.stdout)
     assert detail_payload.contract_version == "3.0"
