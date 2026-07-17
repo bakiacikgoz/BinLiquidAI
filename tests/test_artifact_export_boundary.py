@@ -35,7 +35,8 @@ def test_export_boundary_is_registered_with_minimum_native_capability() -> None:
     lib = LIB.read_text(encoding="utf-8")
     capability = CAPABILITY.read_text(encoding="utf-8")
 
-    assert ".manage(artifact_export::ArtifactExportState::default())" in lib
+    assert ".manage(artifact_export::ArtifactExportState::new(" in lib
+    assert "bridge::artifact_export_journal_root()" in lib
     assert ".plugin(tauri_plugin_dialog::init())" in lib
     assert '"dialog:allow-save"' in capability
 
