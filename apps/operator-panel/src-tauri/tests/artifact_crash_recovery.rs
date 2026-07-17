@@ -76,6 +76,7 @@ fn supervisor_recovers_a_real_python_crash_after_content_publish() {
             python,
             vec![fixture.to_string_lossy().into_owned()],
             &artifact_root,
+            "enterprise",
         )
         .expect("fixture launch must be valid")
         .with_env(env)

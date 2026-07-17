@@ -20,7 +20,7 @@ from imperaos.artifacts.models import (
 )
 from imperaos.artifacts.service import ArtifactService
 from imperaos.artifacts.tools import PUBLIC_ARTIFACT_TOOL_NAMES, ArtifactToolRegistry
-from imperaos.cli import _artifact_tool_stream_event
+from imperaos.cli import _artifact_tool_stream_event, _effective_artifact_prompt_data_class
 from imperaos.model_providers.errors import ProviderGenerationError
 from imperaos.model_providers.models import DataClass
 
@@ -338,3 +338,16 @@ def test_core_loop_binds_trusted_prompt_classification_before_first_provider_cal
     )
 
     assert llm.data_classes == [[DataClass.CONFIDENTIAL]]
+
+
+@pytest.mark.parametrize("requested", list(ArtifactDataClass))
+def test_governed_artifact_runtime_uses_regulated_provider_ceiling(
+    requested: ArtifactDataClass,
+) -> None:
+    assert (
+        _effective_artifact_prompt_data_class(
+            artifact_runtime_present=True,
+            requested=requested,
+        )
+        is ArtifactDataClass.REGULATED
+    )

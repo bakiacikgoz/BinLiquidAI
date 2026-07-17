@@ -52,11 +52,12 @@ const MUTATION_METHODS_WITH_KEYS: &[&str] = &[
 ];
 static REQUEST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceRpcLaunch {
     program: String,
     args: Vec<String>,
     artifact_root: PathBuf,
+    profile: String,
     env: HashMap<String, String>,
 }
 
@@ -65,11 +66,13 @@ impl WorkspaceRpcLaunch {
         program: impl Into<String>,
         args: Vec<String>,
         artifact_root: impl Into<PathBuf>,
+        profile: impl Into<String>,
     ) -> Result<Self, SupervisorError> {
         let launch = Self {
             program: program.into(),
             args,
             artifact_root: artifact_root.into(),
+            profile: profile.into(),
             env: HashMap::new(),
         };
         launch.validate()?;
@@ -91,6 +94,9 @@ impl WorkspaceRpcLaunch {
         }
         let root = self.artifact_root.to_string_lossy();
         if root.trim().is_empty() || root.contains('\0') {
+            return Err(SupervisorError::invalid_launch());
+        }
+        if self.profile.trim().is_empty() || self.profile.contains('\0') {
             return Err(SupervisorError::invalid_launch());
         }
         if self
@@ -348,6 +354,16 @@ impl WorkspaceRpcRegistry {
         &self,
         launch: WorkspaceRpcLaunch,
     ) -> Result<Arc<WorkspaceRpcSupervisor>, SupervisorError> {
+        let stale = {
+            let mut guard = self.supervisor.lock().await;
+            match guard.as_ref() {
+                Some(supervisor) if supervisor.launch != launch => guard.take(),
+                _ => None,
+            }
+        };
+        if let Some(supervisor) = stale {
+            supervisor.shutdown().await?;
+        }
         let supervisor = {
             let mut guard = self.supervisor.lock().await;
             guard
@@ -549,7 +565,7 @@ impl WorkspaceRpcSupervisor {
             .arg("workspace-rpc")
             .arg("--stdio-json")
             .arg("--profile")
-            .arg(std::env::var("IMPERAOS_PROFILE").unwrap_or_else(|_| "enterprise".to_string()))
+            .arg(&self.launch.profile)
             .arg("--root")
             .arg(&self.launch.artifact_root)
             .envs(&self.launch.env)
@@ -808,19 +824,43 @@ mod tests {
 
     #[test]
     fn launch_contract_rejects_shell_like_or_empty_inputs() {
-        assert!(WorkspaceRpcLaunch::new("", Vec::new(), ".imperaos/artifacts").is_err());
+        assert!(
+            WorkspaceRpcLaunch::new("", Vec::new(), ".imperaos/artifacts", "enterprise").is_err()
+        );
         assert!(WorkspaceRpcLaunch::new(
             "python",
             vec!["bad\0arg".to_string()],
-            ".imperaos/artifacts"
+            ".imperaos/artifacts",
+            "enterprise"
         )
         .is_err());
         assert!(WorkspaceRpcLaunch::new(
             "python",
             vec!["-m".to_string(), "imperaos".to_string()],
-            ".imperaos/artifacts"
+            ".imperaos/artifacts",
+            "enterprise"
         )
         .is_ok());
+    }
+
+    #[test]
+    fn launch_identity_includes_the_trusted_profile() {
+        let enterprise = WorkspaceRpcLaunch::new(
+            "python",
+            vec!["-m".to_string(), "imperaos".to_string()],
+            ".imperaos/artifacts",
+            "enterprise",
+        )
+        .expect("enterprise launch");
+        let balanced = WorkspaceRpcLaunch::new(
+            "python",
+            vec!["-m".to_string(), "imperaos".to_string()],
+            ".imperaos/artifacts",
+            "balanced",
+        )
+        .expect("balanced launch");
+
+        assert_ne!(enterprise, balanced);
     }
 
     #[test]

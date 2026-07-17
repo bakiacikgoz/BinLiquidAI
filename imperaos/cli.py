@@ -1367,11 +1367,10 @@ def _assistant_turn_events(
     artifact_runtime_present = bool(
         artifact_root and artifact_workspace_id and artifact_principal_id
     )
-    if artifact_prompt_data_class in {
-        ArtifactDataClass.PUBLIC,
-        ArtifactDataClass.INTERNAL,
-    }:
-        artifact_prompt_data_class = ArtifactDataClass.CONFIDENTIAL
+    artifact_prompt_data_class = _effective_artifact_prompt_data_class(
+        artifact_runtime_present=artifact_runtime_present,
+        requested=artifact_prompt_data_class,
+    )
     if artifact_request is not None and not artifact_runtime_present:
         return [
             {
@@ -1473,6 +1472,18 @@ def _assistant_turn_events(
         }
     )
     return events
+
+
+def _effective_artifact_prompt_data_class(
+    *,
+    artifact_runtime_present: bool,
+    requested: ArtifactDataClass,
+) -> ArtifactDataClass:
+    """Keep renderer-controlled input from lowering governed artifact context."""
+
+    if artifact_runtime_present:
+        return ArtifactDataClass.REGULATED
+    return requested
 
 
 def _artifact_tool_stream_event(event: dict[str, object]) -> dict[str, object]:

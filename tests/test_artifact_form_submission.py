@@ -190,6 +190,19 @@ def test_assistant_cannot_submit_and_continuation_never_executes(tmp_path: Path)
     assert replay.disposition == "idempotent_replay"
 
 
+def test_default_form_continuation_reuses_injected_approval_store(tmp_path: Path) -> None:
+    approvals = ApprovalStore(tmp_path / "custom-approvals.sqlite3")
+    service = ArtifactService(tmp_path / "artifacts", approval_store=approvals)
+    artifact_id, revision_id = _create_form(service, continuation="approval_required")
+
+    result = service.submit_form(_submit(artifact_id, revision_id), _context())
+
+    assert result.approval_id is not None
+    ticket = approvals.get(result.approval_id)
+    assert ticket is not None
+    assert ticket.target_kind == "artifact_form_continuation"
+
+
 def test_form_continuation_never_creates_ticket_before_submission_commit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

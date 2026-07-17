@@ -970,11 +970,15 @@ async fn bridge_artifact_rpc_call(
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".imperaos")
         .join("artifacts");
-    let launch =
-        match WorkspaceRpcLaunch::new(resolved.program, resolved.prefix_args, artifact_root) {
-            Ok(launch) => launch,
-            Err(error) => return BridgeResult::err(supervisor_bridge_error(&method, error)),
-        };
+    let launch = match WorkspaceRpcLaunch::new(
+        resolved.program,
+        resolved.prefix_args,
+        artifact_root,
+        trusted_artifact_profile(),
+    ) {
+        Ok(launch) => launch,
+        Err(error) => return BridgeResult::err(supervisor_bridge_error(&method, error)),
+    };
     let timeout_ms = payload
         .timeout_ms
         .unwrap_or(DEFAULT_TIMEOUT_MS)
@@ -1007,13 +1011,31 @@ fn trusted_artifact_bridge_config() -> BridgeConfig {
         mode: Some("auto".to_string()),
         cli_path: None,
         bundled_python_path: None,
-        profile: Some(
-            std::env::var("IMPERAOS_PROFILE").unwrap_or_else(|_| "enterprise".to_string()),
-        ),
+        profile: Some(trusted_artifact_profile()),
         root_dir: None,
         env: HashMap::new(),
         timeout_ms: Some(DEFAULT_TIMEOUT_MS),
     }
+}
+
+fn trusted_artifact_profile() -> String {
+    std::env::var("IMPERAOS_PROFILE")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty() && !value.contains('\0'))
+        .unwrap_or_else(|| "enterprise".to_string())
+}
+
+fn trusted_artifact_command_config(config: &BridgeConfig) -> BridgeConfig {
+    let mut trusted = config.clone();
+    trusted.profile = Some(trusted_artifact_profile());
+    trusted.env.retain(|key, _| {
+        matches!(
+            key.as_str(),
+            "OPENAI_API_KEY" | "DEEPSEEK_API_KEY" | "ANTHROPIC_API_KEY" | "COMPANY_LLM_API_KEY"
+        )
+    });
+    trusted
 }
 
 async fn resolve_trusted_artifact_identity(
@@ -1282,6 +1304,7 @@ pub async fn bridge_handshake(
 
 #[tauri::command]
 pub async fn bridge_approval_pending(config: BridgeConfig) -> BridgeResult<Value> {
+    let config = trusted_artifact_command_config(&config);
     match run_cli_json_owned(
         &config,
         vec![
@@ -1304,6 +1327,7 @@ pub async fn bridge_approval_show(
     config: BridgeConfig,
     approval_id: String,
 ) -> BridgeResult<Value> {
+    let config = trusted_artifact_command_config(&config);
     if approval_id.trim().is_empty() {
         return BridgeResult::err(BridgeError::new(
             "INVALID_INPUT",
@@ -1340,6 +1364,7 @@ pub async fn bridge_approval_decide(
     reason: Option<String>,
     operator_id: String,
 ) -> BridgeResult<Value> {
+    let config = trusted_artifact_command_config(&config);
     let actor = match normalize_actor(&operator_id) {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
@@ -1380,6 +1405,7 @@ pub async fn bridge_approval_execute(
     approval_id: String,
     operator_id: String,
 ) -> BridgeResult<Value> {
+    let config = trusted_artifact_command_config(&config);
     let actor = match normalize_actor(&operator_id) {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
@@ -2571,6 +2597,7 @@ pub async fn bridge_assistant_start_turn(
     model: Option<String>,
     hf_model_id: Option<String>,
 ) -> BridgeResult<AssistantStartTurnPayload> {
+    let config = trusted_artifact_command_config(&config);
     let assistant_turn_id = match normalize_assistant_turn_id(&assistant_turn_id) {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
@@ -3051,7 +3078,7 @@ fn build_assistant_turn_args(
         "--artifact-principal-id".to_string(),
         identity.principal_id().to_string(),
         "--artifact-prompt-data-class".to_string(),
-        "confidential".to_string(),
+        "regulated".to_string(),
     ];
     for role in identity.roles() {
         args.push("--artifact-role".to_string());
@@ -4540,8 +4567,9 @@ mod tests {
             vec!["artifact_admin".to_string()],
         )
         .expect("identity");
+        let trusted_config = trusted_artifact_command_config(&config);
         let args = build_assistant_turn_args(
-            &config,
+            &trusted_config,
             Path::new("C:/tmp/compiled-prompt.md"),
             "turn-1",
             "session-1",
@@ -4568,9 +4596,12 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|pair| pair[0] == "--artifact-role" && pair[1] == "artifact_admin"));
-        assert!(args.windows(2).any(|pair| {
-            pair[0] == "--artifact-prompt-data-class" && pair[1] == "confidential"
-        }));
+        assert!(args
+            .windows(2)
+            .any(|pair| { pair[0] == "--artifact-prompt-data-class" && pair[1] == "regulated" }));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--profile" && pair[1] == "enterprise"));
 
         let preview = format_assistant_command_preview("imperaos", &[], &args);
         assert!(preview.contains("[compiled_prompt_file]"));
@@ -4578,6 +4609,38 @@ mod tests {
         assert!(preview.contains("[artifact_principal]"));
         assert!(!preview.contains("C:/tmp"));
         assert!(!preview.contains("user-1"));
+    }
+
+    #[test]
+    fn governed_artifact_config_drops_renderer_authority_overrides() {
+        let config = BridgeConfig {
+            mode: Some("auto".to_string()),
+            cli_path: None,
+            bundled_python_path: None,
+            profile: Some("balanced".to_string()),
+            root_dir: None,
+            env: HashMap::from([
+                (
+                    "IMPERAOS_GOVERNANCE_APPROVAL_STORE_PATH".to_string(),
+                    "renderer-controlled.sqlite3".to_string(),
+                ),
+                (
+                    "IMPERAOS_CONFIG_ROOT".to_string(),
+                    "renderer-controlled-config".to_string(),
+                ),
+                ("OPENAI_API_KEY".to_string(), "provider-key".to_string()),
+            ]),
+            timeout_ms: None,
+        };
+
+        let trusted = trusted_artifact_command_config(&config);
+
+        assert_eq!(trusted.profile(), trusted_artifact_profile());
+        assert_eq!(trusted.env.len(), 1);
+        assert_eq!(
+            trusted.env.get("OPENAI_API_KEY").map(String::as_str),
+            Some("provider-key")
+        );
     }
 
     #[test]

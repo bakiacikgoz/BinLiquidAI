@@ -118,10 +118,10 @@ class ArtifactService:
         self.operations = ArtifactOperationMetrics()
         self.operation_logs: deque[dict[str, object]] = deque(maxlen=256)
         self._feature_flags = None if feature_flags is None else dict(feature_flags)
-        self._proposal_approvals = ArtifactProposalApprovalGateway(
-            approval_store
-            or ApprovalStore(Path(state_path("governance", "approvals.sqlite3")))
+        self._approval_store = approval_store or ApprovalStore(
+            Path(state_path("governance", "approvals.sqlite3"))
         )
+        self._proposal_approvals = ArtifactProposalApprovalGateway(self._approval_store)
         self._continuation_gateway = continuation_gateway
         supplied = dict(license_capabilities or {})
         self._license_capabilities = {
@@ -1412,9 +1412,7 @@ class ArtifactService:
         if pending:
             gateway = self._continuation_gateway
             if gateway is _DEFAULT_CONTINUATION_GATEWAY:
-                gateway = ArtifactFormContinuationGateway(
-                    ApprovalStore(state_path("governance", "approvals.sqlite3"))
-                )
+                gateway = ArtifactFormContinuationGateway(self._approval_store)
                 self._continuation_gateway = gateway
             if not isinstance(gateway, ArtifactFormContinuationGateway):
                 raise ArtifactDomainError(

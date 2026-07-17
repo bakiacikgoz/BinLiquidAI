@@ -100,6 +100,28 @@ describe('assistant prompt builder', () => {
     expect(result.compiledPrompt).toContain('[redacted');
   });
 
+  it('redacts arbitrary POSIX, UNC, and extended Windows absolute paths', () => {
+    const result = buildAssistantPrompt({
+      userMessage: 'inspect the selected run',
+      session: createAssistantSession('session-path-redaction'),
+      selectedRunStatus: null,
+      selectedRunEvents: [
+        { message: 'failed at /opt/impera/private/trace.json' },
+        { message: 'credential at /root/.ssh/id_rsa' },
+        { message: 'network at \\\\server\\share\\private\\trace.json' },
+        { message: 'extended at \\\\?\\C:\\private\\trace.json' },
+      ],
+      selectedArtifacts: {},
+      pendingApproval: null,
+      systemHealth: null,
+    });
+
+    for (const fragment of ['opt', 'impera', 'root', '.ssh', 'server', 'share', 'trace.json']) {
+      expect(result.compiledPrompt).not.toContain(fragment);
+    }
+    expect(result.compiledPrompt).toContain('[redacted-path]');
+  });
+
   it('projects artifact metadata and a typed context request without raw content', () => {
     const result = buildAssistantPrompt({
       userMessage: 'Update the selected paragraph.',
