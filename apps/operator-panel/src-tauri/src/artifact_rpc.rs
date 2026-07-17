@@ -28,8 +28,10 @@ const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
     "artifact.archive",
     "artifact.duplicate",
     "artifact.asset.import",
+    "artifact.asset.get",
     "artifact.form.submit",
     "artifact.export.begin",
+    "artifact.export.preflight",
     "artifact.export.commit",
     "artifact.export.cancel",
     "artifact.import_evidence",
@@ -40,8 +42,11 @@ const MUTATION_METHODS_WITH_KEYS: &[&str] = &[
     "artifact.propose_mutation",
     "artifact.restore",
     "artifact.duplicate",
+    "artifact.asset.import",
+    "artifact.import_evidence",
     "artifact.form.submit",
     "artifact.export.begin",
+    "artifact.export.preflight",
     "artifact.export.commit",
     "artifact.export.cancel",
 ];
@@ -689,14 +694,19 @@ fn validate_handshake(
     let handshake: RpcHandshakeResult = serde_json::from_value(result.clone())
         .map_err(|_| SupervisorError::protocol("artifact RPC handshake shape is invalid"))?;
     let safe_license_capabilities = handshake.license_capabilities.len() == 2
-        && handshake.license_capabilities.iter().any(|item| item.kind == "spreadsheet")
-        && handshake.license_capabilities.iter().any(|item| item.kind == "canvas")
+        && handshake
+            .license_capabilities
+            .iter()
+            .any(|item| item.kind == "spreadsheet")
+        && handshake
+            .license_capabilities
+            .iter()
+            .any(|item| item.kind == "canvas")
         && handshake.license_capabilities.iter().all(|capability| {
             capability.contract_version == "artifact-license-capability/v1"
                 && matches!(capability.kind.as_str(), "spreadsheet" | "canvas")
                 && capability.reason_code.starts_with("ARTIFACT_LICENSE_")
-                && (capability.enabled
-                    == (capability.reason_code == "ARTIFACT_LICENSE_ENABLED"))
+                && (capability.enabled == (capability.reason_code == "ARTIFACT_LICENSE_ENABLED"))
         });
     if handshake.contract_version != RPC_CONTRACT_VERSION
         || handshake.transport != "stdio-length-prefixed-json"

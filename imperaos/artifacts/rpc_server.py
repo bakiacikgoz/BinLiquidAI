@@ -18,10 +18,14 @@ from imperaos.artifacts.commands import (
     CommitArtifactExportCommand,
     CreateArtifactCommand,
     DuplicateArtifactCommand,
+    GetArtifactAssetQuery,
     GetArtifactQuery,
+    ImportArtifactAssetCommand,
+    ImportEvidenceArtifactCommand,
     ListArtifactsQuery,
     MutateArtifactCommand,
     PatchSpreadsheetCellsCommand,
+    PreflightArtifactExportCommand,
     ProposeArtifactMutationCommand,
     RestoreArtifactCommand,
     SubmitArtifactFormCommand,
@@ -51,8 +55,11 @@ _MUTATION_METHODS_WITH_KEYS = {
     ArtifactRpcMethod.ARTIFACT_PROPOSE_MUTATION,
     ArtifactRpcMethod.ARTIFACT_RESTORE,
     ArtifactRpcMethod.ARTIFACT_DUPLICATE,
+    ArtifactRpcMethod.ARTIFACT_ASSET_IMPORT,
+    ArtifactRpcMethod.ARTIFACT_IMPORT_EVIDENCE,
     ArtifactRpcMethod.ARTIFACT_FORM_SUBMIT,
     ArtifactRpcMethod.ARTIFACT_EXPORT_BEGIN,
+    ArtifactRpcMethod.ARTIFACT_EXPORT_PREFLIGHT,
     ArtifactRpcMethod.ARTIFACT_EXPORT_COMMIT,
     ArtifactRpcMethod.ARTIFACT_EXPORT_CANCEL,
 }
@@ -228,6 +235,18 @@ class ArtifactRpcServer:
                 DuplicateArtifactCommand,
                 self.service.duplicate,
             ),
+            ArtifactRpcMethod.ARTIFACT_ASSET_IMPORT: (
+                ImportArtifactAssetCommand,
+                self.service.import_asset,
+            ),
+            ArtifactRpcMethod.ARTIFACT_ASSET_GET: (
+                GetArtifactAssetQuery,
+                self.service.get_asset,
+            ),
+            ArtifactRpcMethod.ARTIFACT_IMPORT_EVIDENCE: (
+                ImportEvidenceArtifactCommand,
+                self.service.import_evidence,
+            ),
             ArtifactRpcMethod.ARTIFACT_FORM_SUBMIT: (
                 SubmitArtifactFormCommand,
                 self.service.submit_form,
@@ -235,6 +254,10 @@ class ArtifactRpcServer:
             ArtifactRpcMethod.ARTIFACT_EXPORT_BEGIN: (
                 BeginArtifactExportCommand,
                 self.service.begin_export,
+            ),
+            ArtifactRpcMethod.ARTIFACT_EXPORT_PREFLIGHT: (
+                PreflightArtifactExportCommand,
+                self.service.preflight_export,
             ),
             ArtifactRpcMethod.ARTIFACT_EXPORT_COMMIT: (
                 CommitArtifactExportCommand,

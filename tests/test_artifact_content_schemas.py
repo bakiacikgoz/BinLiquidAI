@@ -293,6 +293,50 @@ def test_canvas_v2_is_strict_bounded_and_asset_referential() -> None:
         with pytest.raises(ValidationError):
             validate_artifact_content(ArtifactKind.CANVAS, invalid)
 
+
+def test_slides_v2_is_structured_strict_and_asset_referential() -> None:
+    deck = {
+        "kind": "slides", "schemaVersion": 2,
+        "theme": {
+            "name": "ImperaOS", "backgroundColor": "FFFFFF",
+            "foregroundColor": "172033", "accentColor": "6E57FF",
+        },
+        "slides": [{
+            "id": "slide-1", "title": "Overview",
+            "elements": [
+                {
+                    "id": "title-1", "type": "text", "x": 0.5, "y": 0.5,
+                    "width": 8, "height": 1, "text": "Governed deck", "fontSize": 30,
+                },
+                {
+                    "id": "image-1", "type": "image", "x": 8.8, "y": 0.5,
+                    "width": 3.5, "height": 2.5, "assetId": "asset-1",
+                    "altText": "Local evidence image",
+                },
+            ],
+        }],
+        "assetIds": ["asset-1"],
+    }
+    assert validate_artifact_content(ArtifactKind.SLIDES, deck).schema_version == 2
+    assert (ArtifactKind.SLIDES, 2) in ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION
+
+    invalid_cases = [
+        {**deck, "slides": [deck["slides"][0], deck["slides"][0]]},
+        {**deck, "slides": [{**deck["slides"][0], "elements": [
+            deck["slides"][0]["elements"][0], deck["slides"][0]["elements"][0],
+        ]}]},
+        {**deck, "slides": [{**deck["slides"][0], "elements": [{
+            **deck["slides"][0]["elements"][1], "assetId": "missing",
+        }]}]},
+        {**deck, "slides": [{**deck["slides"][0], "elements": [{
+            **deck["slides"][0]["elements"][0], "type": "video",
+        }]}]},
+        {**deck, "slides": [{**deck["slides"][0], "externalUrl": "https://example.com"}]},
+    ]
+    for invalid in invalid_cases:
+        with pytest.raises(ValidationError):
+            validate_artifact_content(ArtifactKind.SLIDES, invalid)
+
 def test_spreadsheet_v2_is_strict_scalar_and_xlsx_bounded() -> None:
     strict = {
         "kind": "spreadsheet", "schemaVersion": 2, "calculationMode": "disabled",

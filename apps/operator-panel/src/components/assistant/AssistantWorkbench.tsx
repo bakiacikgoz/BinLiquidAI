@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
-import { SpreadsheetArtifactContentSchema, type ArtifactDescriptor, type ArtifactRevision } from '../../artifact-workspace/artifactContracts';
+import { SpreadsheetArtifactContentSchema, type ArtifactAssetDescriptor, type ArtifactDescriptor, type ArtifactRevision } from '../../artifact-workspace/artifactContracts';
 import type { ArtifactFormSubmissionRequest, ArtifactFormSubmissionResult } from '../../artifact-workspace/artifactContracts';
 import type { FormSessionRuntime } from '../../artifact-workspace/editors/form/formSessionRuntime';
 import type { ArtifactWorkspaceState } from '../../artifact-workspace/workspaceController';
@@ -49,7 +49,8 @@ type WorkspaceProps = {
   onEditArtifact?: (artifactId: string, content: ArtifactWorkspaceState['tabs'][number]['draftContent']) => void;
   onRetrySave?: (artifactId: string) => void;
   onRestoreArtifact?: (artifactId: string, revisionId: string) => void;
-  onExportArtifact?: (artifactId: string, format: 'markdown' | 'html' | 'source' | 'json' | 'svg' | 'png' | 'csv' | 'xlsx', sheetId?: string) => void;
+  onExportArtifact?: (artifactId: string, format: 'markdown' | 'html' | 'source' | 'json' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx', sheetId?: string) => void;
+  onImportAsset?: (artifactId: string) => Promise<ArtifactAssetDescriptor | null>;
   formRuntime?: FormSessionRuntime;
   onSubmitForm?: (request: ArtifactFormSubmissionRequest) => Promise<ArtifactFormSubmissionResult>;
   workspaceError?: ArtifactWorkspaceUiError | null;
@@ -91,6 +92,11 @@ function artifactSelectionLabel(selection: ArtifactSelection | null): string {
   if (selection.kind === 'code') {
     return `Code selection line ${selection.startLineNumber}, column ${selection.startColumn}`;
   }
+  if (selection.kind === 'slides') {
+    return selection.elementId
+      ? `Slide ${selection.slideId}, element ${selection.elementId} selected`
+      : `Slide ${selection.slideId} selected`;
+  }
   return `${selection.blockIds.length} document blocks selected`;
 }
 
@@ -127,6 +133,7 @@ export function AssistantWorkbench({
   onRetrySave,
   onRestoreArtifact,
   onExportArtifact,
+  onImportAsset,
   formRuntime,
   onSubmitForm,
   workspaceError = null,
@@ -360,10 +367,11 @@ export function AssistantWorkbench({
                   onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
                   onSelectionChange={setEditorSelection}
                   onRequestExport={(format) => {
-                    if (format === 'markdown' || format === 'html' || format === 'source' || format === 'json' || format === 'svg' || format === 'png') {
+                    if (format === 'markdown' || format === 'html' || format === 'source' || format === 'json' || format === 'svg' || format === 'png' || format === 'pptx') {
                       onExportArtifact?.(activeTab.artifact.artifactId, format);
                     }
                   }}
+                  onImportAsset={() => onImportAsset?.(activeTab.artifact.artifactId) ?? Promise.resolve(null)}
                   formRuntime={formRuntime}
                   onSubmitForm={onSubmitForm}
                   locale={locale}
@@ -433,6 +441,17 @@ export function AssistantWorkbench({
                     onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'xlsx')}
                   >
                     Export XLSX
+                  </Button>
+                </div>
+              ) : null}
+              {activeTab.artifact.kind === 'slides' && activeComparison?.status !== 'ready' ? (
+                <div className="artifact-workspace-export-actions" aria-label="Slides export">
+                  <Button
+                    variant="ghost"
+                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
+                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'pptx')}
+                  >
+                    Export PPTX
                   </Button>
                 </div>
               ) : null}

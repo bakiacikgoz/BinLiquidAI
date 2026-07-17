@@ -2,6 +2,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
 
 import {
+  ArtifactAssetImportResultSchema,
+  ArtifactAssetReadResultSchema,
+  ArtifactAssetSelectResultSchema,
   ArtifactExportBeginResultSchema,
   ArtifactExportCancelResultSchema,
   ArtifactExportResultSchema,
@@ -12,11 +15,16 @@ import {
   ArtifactOperationResultSchema,
   ArtifactReadResultSchema,
   type ArtifactArchiveRequest,
+  type ArtifactAssetImportRequest,
+  type ArtifactAssetImportResult,
+  type ArtifactAssetReadResult,
+  type ArtifactAssetSelectResult,
   type ArtifactCreateRequest,
   type ArtifactDuplicateRequest,
   type ArtifactExportBeginRequest,
   type ArtifactExportBeginResult,
   type ArtifactExportResult,
+  type ArtifactEvidenceImportRequest,
   type ArtifactFormSubmissionRequest,
   type ArtifactFormSubmissionResult,
   type ArtifactGetRequest,
@@ -133,6 +141,26 @@ async function callNativeExport<T>(
   return parsed.data;
 }
 
+async function callNativeAsset<T>(
+  command: string,
+  request: ArtifactParams,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const response = NativeResultSchema.safeParse(await invoke(command, request));
+  if (!response.success) throw new ArtifactContractError(command);
+  if (!response.data.ok) {
+    throw new ArtifactBridgeError(
+      response.data.error.code,
+      response.data.error.message,
+      response.data.error.retryable,
+      response.data.error.command,
+    );
+  }
+  const parsed = schema.safeParse(response.data.data);
+  if (!parsed.success) throw new ArtifactContractError(command);
+  return parsed.data;
+}
+
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const source = Uint8Array.from(bytes);
   const digest = await globalThis.crypto.subtle.digest('SHA-256', source.buffer);
@@ -216,6 +244,35 @@ export const artifactBridge = {
   duplicate(request: ArtifactDuplicateRequest): Promise<ArtifactOperationResult> {
     return callArtifact(
       'bridge_artifact_duplicate',
+      { ...request },
+      ArtifactOperationResultSchema,
+      request.idempotencyKey,
+    );
+  },
+
+  selectAsset(): Promise<ArtifactAssetSelectResult> {
+    return callNativeAsset('bridge_artifact_asset_select', {}, ArtifactAssetSelectResultSchema);
+  },
+
+  importAsset(request: ArtifactAssetImportRequest): Promise<ArtifactAssetImportResult> {
+    return callNativeAsset(
+      'bridge_artifact_asset_import',
+      { request: { ...request } },
+      ArtifactAssetImportResultSchema,
+    );
+  },
+
+  getAsset(assetId: string): Promise<ArtifactAssetReadResult> {
+    return callArtifact(
+      'bridge_artifact_asset_get',
+      { assetId },
+      ArtifactAssetReadResultSchema,
+    );
+  },
+
+  importEvidence(request: ArtifactEvidenceImportRequest): Promise<ArtifactOperationResult> {
+    return callArtifact(
+      'bridge_artifact_import_evidence',
       { ...request },
       ArtifactOperationResultSchema,
       request.idempotencyKey,

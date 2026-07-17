@@ -7,13 +7,13 @@ from typing import Literal
 from pydantic import Field, JsonValue, model_validator
 
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
+from imperaos.artifacts.licenses import ArtifactLicenseCapability
 from imperaos.artifacts.models import (
     ArtifactModel,
     BoundedId,
     PrincipalType,
     canonical_json,
 )
-from imperaos.artifacts.licenses import ArtifactLicenseCapability
 
 ARTIFACT_RPC_CONTRACT_VERSION = "1.0"
 ARTIFACT_RPC_MAX_FRAME_BYTES = 32 * 1024 * 1024
@@ -36,8 +36,10 @@ class ArtifactRpcMethod(StrEnum):
     ARTIFACT_ARCHIVE = "artifact.archive"
     ARTIFACT_DUPLICATE = "artifact.duplicate"
     ARTIFACT_ASSET_IMPORT = "artifact.asset.import"
+    ARTIFACT_ASSET_GET = "artifact.asset.get"
     ARTIFACT_FORM_SUBMIT = "artifact.form.submit"
     ARTIFACT_EXPORT_BEGIN = "artifact.export.begin"
+    ARTIFACT_EXPORT_PREFLIGHT = "artifact.export.preflight"
     ARTIFACT_EXPORT_COMMIT = "artifact.export.commit"
     ARTIFACT_EXPORT_CANCEL = "artifact.export.cancel"
     ARTIFACT_IMPORT_EVIDENCE = "artifact.import_evidence"

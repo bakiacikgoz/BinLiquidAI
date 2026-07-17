@@ -8,12 +8,23 @@ from pydantic import model_validator
 from imperaos.artifacts.content import ArtifactContent
 from imperaos.artifacts.exports import ArtifactExportFormat, ArtifactExportStatus
 from imperaos.artifacts.models import (
+    ArtifactAssetDescriptor,
     ArtifactDescriptor,
     ArtifactModel,
     ArtifactRevisionDescriptor,
     BoundedId,
     Sha256,
 )
+
+
+class ArtifactAssetImportResult(ArtifactModel):
+    asset: ArtifactAssetDescriptor
+    disposition: Literal["created", "deduplicated", "idempotent_replay"]
+
+
+class ArtifactAssetReadResult(ArtifactModel):
+    asset: ArtifactAssetDescriptor
+    content_base64: str
 
 
 @dataclass(frozen=True, slots=True)

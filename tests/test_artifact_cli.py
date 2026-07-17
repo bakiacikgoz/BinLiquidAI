@@ -109,7 +109,7 @@ def test_artifact_cli_doctor_list_get_history_and_integrity(tmp_path: Path) -> N
 
     assert doctor.exit_code == 0, doctor.output
     assert json.loads(doctor.output)["status"] == "ready"
-    assert json.loads(doctor.output)["schemaVersion"] == 7
+    assert json.loads(doctor.output)["schemaVersion"] == 8
     assert json.loads(listed.output)["count"] == 1
     assert json.loads(loaded.output)["artifact"]["artifactId"] == "artifact-1"
     assert len(json.loads(history.output)["items"]) == 1
@@ -134,8 +134,8 @@ def test_artifact_cli_migration_plan_is_dry_and_workspace_rpc_is_registered(
 
     payload = json.loads(plan.output)
     assert plan.exit_code == 0, plan.output
-    assert payload["targetVersion"] == 7
-    assert payload["pendingVersions"] == [1, 2, 3, 4, 5, 6, 7]
+    assert payload["targetVersion"] == 8
+    assert payload["pendingVersions"] == [1, 2, 3, 4, 5, 6, 7, 8]
     assert not root.exists()
     assert rpc_help.exit_code == 0
     assert "--stdio-json" in rpc_help.output

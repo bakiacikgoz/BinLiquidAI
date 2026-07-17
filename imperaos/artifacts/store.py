@@ -245,6 +245,72 @@ class ArtifactStore:
                 connection.rollback()
                 self._raise_storage_failure(exc, "artifact_export_transition_failed")
 
+    def preflight_export(
+        self,
+        *,
+        workspace_id: str,
+        export_id: str,
+        actor_type: str,
+        actor_id: str,
+        basename: str,
+        sha256: str,
+        size_bytes: int,
+    ) -> tuple[ArtifactExportRecord, bool]:
+        with self._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    "SELECT * FROM artifact_exports WHERE workspace_id = ? AND export_id = ?",
+                    (workspace_id, export_id),
+                ).fetchone()
+                if row is None:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_NOT_FOUND,
+                        "artifact export does not exist",
+                    )
+                if row["actor_type"] != actor_type or row["actor_id"] != actor_id:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+                        "artifact export actor binding does not match",
+                    )
+                if row["status"] != "pending" or row["basename"] != basename:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_EXPORT_FAILED,
+                        "artifact export is not pending for the authorized basename",
+                    )
+                if row["sha256"] is not None or row["size_bytes"] is not None:
+                    if row["sha256"] == sha256 and row["size_bytes"] == size_bytes:
+                        connection.commit()
+                        return _export_from_row(row), False
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH,
+                        "artifact export preflight bytes do not match",
+                    )
+                connection.execute(
+                    """
+                    UPDATE artifact_exports SET sha256 = ?, size_bytes = ?
+                    WHERE workspace_id = ? AND export_id = ? AND status = 'pending'
+                    """,
+                    (sha256, size_bytes, workspace_id, export_id),
+                )
+                updated = connection.execute(
+                    "SELECT * FROM artifact_exports WHERE workspace_id = ? AND export_id = ?",
+                    (workspace_id, export_id),
+                ).fetchone()
+                if updated is None:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                        "artifact export preflight record is missing",
+                    )
+                connection.commit()
+                return _export_from_row(updated), True
+            except ArtifactDomainError:
+                connection.rollback()
+                raise
+            except sqlite3.Error as exc:
+                connection.rollback()
+                self._raise_storage_failure(exc, "artifact_export_preflight_failed")
+
     def create_form_submission(
         self,
         *,
@@ -479,6 +545,39 @@ class ArtifactStore:
             source_artifact_id,
             operation=operation,
             request_hash=request_hash,
+        )
+
+    def create_evidence_artifact(
+        self,
+        artifact: ArtifactDescriptor,
+        revision: ArtifactRevisionDescriptor,
+        content: bytes,
+        *,
+        source_evidence_id: str,
+        operation: str,
+        request_hash: str,
+    ) -> RevisionWriteResult:
+        self._validate_payload(artifact, revision, content)
+        if (
+            revision.revision_number != 1
+            or revision.parent_revision_id is not None
+            or revision.base_revision_id is not None
+            or revision.mutation_type is not ArtifactMutationType.IMPORT_EVIDENCE
+            or artifact.current_revision_id != revision.revision_id
+            or artifact.current_revision_number != 1
+            or operation != "import_evidence"
+            or not source_evidence_id
+            or len(request_hash) != 64
+        ):
+            self._raise_schema_invalid("invalid evidence import revision contract")
+        return self._commit_create_operation(
+            artifact,
+            revision,
+            content,
+            operation=operation,
+            request_hash=request_hash,
+            source_link_type="source_evidence",
+            source_target_id=source_evidence_id,
         )
 
     def append_revision(
@@ -925,7 +1024,13 @@ class ArtifactStore:
         *,
         operation: str,
         request_hash: str,
+        source_link_type: str | None = None,
+        source_target_id: str | None = None,
     ) -> RevisionWriteResult:
+        if (source_link_type is None) != (source_target_id is None):
+            self._raise_schema_invalid("create source link binding is invalid")
+        if source_link_type not in {None, "source_evidence"}:
+            self._raise_schema_invalid("create source link type is invalid")
         with self._connect() as connection:
             try:
                 connection.execute("BEGIN IMMEDIATE")
@@ -962,6 +1067,19 @@ class ArtifactStore:
                             ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
                             "create replay metadata is missing or inconsistent",
                         )
+                    if source_link_type is not None:
+                        link_row = connection.execute(
+                            """
+                            SELECT target_id FROM artifact_links
+                            WHERE artifact_id = ? AND link_type = ?
+                            """,
+                            (result["artifactId"], source_link_type),
+                        ).fetchone()
+                        if link_row is None or link_row["target_id"] != source_target_id:
+                            raise ArtifactDomainError(
+                                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                                "create source link is missing or inconsistent",
+                            )
                     connection.commit()
                     return RevisionWriteResult(
                         _artifact_from_row(artifact_row),
@@ -989,6 +1107,22 @@ class ArtifactStore:
                 self._publish_content(revision, content)
                 connection.execute(_ARTIFACT_INSERT_SQL, _artifact_record(artifact))
                 connection.execute(_REVISION_INSERT_SQL, _revision_record(revision))
+                if source_link_type is not None and source_target_id is not None:
+                    connection.execute(
+                        _GENERIC_LINK_INSERT_SQL,
+                        {
+                            "link_id": self._link_id(
+                                artifact.artifact_id,
+                                source_link_type,
+                                source_target_id,
+                            ),
+                            "artifact_id": artifact.artifact_id,
+                            "link_type": source_link_type,
+                            "target_id": source_target_id,
+                            "created_by_id": artifact.created_by_id,
+                            "created_at_utc": artifact.created_at_utc.isoformat(),
+                        },
+                    )
                 self._commit_journal(connection, revision.revision_id)
                 connection.execute(
                     """
@@ -1512,8 +1646,12 @@ class ArtifactStore:
 
     @staticmethod
     def _source_link_id(artifact_id: str, source_artifact_id: str) -> str:
+        return ArtifactStore._link_id(artifact_id, "source", source_artifact_id)
+
+    @staticmethod
+    def _link_id(artifact_id: str, link_type: str, target_id: str) -> str:
         digest = hashlib.sha256(
-            f"{artifact_id}\x1fsource\x1f{source_artifact_id}".encode()
+            f"{artifact_id}\x1f{link_type}\x1f{target_id}".encode()
         ).hexdigest()[:32]
         return f"link-{digest}"
 
@@ -1615,6 +1753,14 @@ INSERT INTO artifact_links (
 ) VALUES (
     :link_id, :artifact_id, 'source', :source_artifact_id,
     :created_by_id, :created_at_utc
+)
+"""
+
+_GENERIC_LINK_INSERT_SQL = """
+INSERT INTO artifact_links (
+    link_id, artifact_id, link_type, target_id, created_by_id, created_at_utc
+) VALUES (
+    :link_id, :artifact_id, :link_type, :target_id, :created_by_id, :created_at_utc
 )
 """
 

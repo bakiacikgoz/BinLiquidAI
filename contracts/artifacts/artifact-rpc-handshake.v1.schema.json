@@ -64,8 +64,10 @@
         "artifact.archive",
         "artifact.duplicate",
         "artifact.asset.import",
+        "artifact.asset.get",
         "artifact.form.submit",
         "artifact.export.begin",
+        "artifact.export.preflight",
         "artifact.export.commit",
         "artifact.export.cancel",
         "artifact.import_evidence"

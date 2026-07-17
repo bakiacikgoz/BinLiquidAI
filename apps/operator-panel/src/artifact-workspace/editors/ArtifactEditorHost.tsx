@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react';
 
 import type {
   ArtifactContent,
+  ArtifactAssetDescriptor,
   ArtifactDescriptor,
   ArtifactFormSubmissionRequest,
   ArtifactFormSubmissionResult,
@@ -9,15 +10,16 @@ import type {
   ArtifactRevision,
 } from '../artifactContracts';
 import type { ArtifactSaveState } from '../workspaceController';
-import { isArtifactCodeEditorEnabled, isArtifactFlowEditorEnabled, isArtifactFormEditorEnabled } from '../artifactFeatureFlags';
+import { isArtifactCodeEditorEnabled, isArtifactFlowEditorEnabled, isArtifactFormEditorEnabled, isArtifactSlidesEditorEnabled } from '../artifactFeatureFlags';
 import type { CodeArtifactSelection } from './code/codeAdapter';
 import type { DocumentArtifactSelection } from './document/documentAdapter';
 import type { FlowArtifactSelection } from './flow/flowAdapter';
+import type { SlidesArtifactSelection } from './slides/slidesAdapter';
 import { FormSessionRuntime } from './form/formSessionRuntime';
 import { ArtifactLicenseBlocked } from '../ui/ArtifactLicenseBlocked';
 
-export type ArtifactSelection = DocumentArtifactSelection | CodeArtifactSelection | FlowArtifactSelection;
-export type ArtifactExportFormat = 'json' | 'markdown' | 'html' | 'txt' | 'source' | 'svg' | 'png' | 'csv' | 'xlsx';
+export type ArtifactSelection = DocumentArtifactSelection | CodeArtifactSelection | FlowArtifactSelection | SlidesArtifactSelection;
+export type ArtifactExportFormat = 'json' | 'markdown' | 'html' | 'txt' | 'source' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx';
 
 export interface ArtifactEditorProps {
   artifact: ArtifactDescriptor;
@@ -28,6 +30,7 @@ export interface ArtifactEditorProps {
   onChange(next: ArtifactContent, selection?: ArtifactSelection): void;
   onSelectionChange(selection: ArtifactSelection | null): void;
   onRequestExport(format: ArtifactExportFormat): void;
+  onImportAsset?(): Promise<ArtifactAssetDescriptor | null>;
 }
 
 export interface ArtifactEditorHostProps extends ArtifactEditorProps {
@@ -36,6 +39,7 @@ export interface ArtifactEditorHostProps extends ArtifactEditorProps {
   formEnabled?: boolean;
   codeEnabled?: boolean;
   flowEnabled?: boolean;
+  slidesEnabled?: boolean;
   licenseCapability?: ArtifactLicenseCapability;
   locale?: 'en' | 'tr';
 }
@@ -61,6 +65,12 @@ const CodeArtifactEditor = lazy(() =>
 const FlowArtifactEditor = lazy(() =>
   import('./flow/FlowArtifactEditor').then((module) => ({
     default: module.FlowArtifactEditor,
+  })),
+);
+
+const SlidesArtifactEditor = lazy(() =>
+  import('./slides/SlidesArtifactEditor').then((module) => ({
+    default: module.SlidesArtifactEditor,
   })),
 );
 
@@ -129,6 +139,18 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
       capability={capability}
       onExportJson={props.artifact.kind === 'canvas' ? () => props.onRequestExport('json') : undefined}
     />;
+  }
+  if (props.artifact.kind === 'slides') {
+    const enabled = props.slidesEnabled
+      ?? isArtifactSlidesEditorEnabled(import.meta.env.VITE_ARTIFACT_SLIDES_EDITOR);
+    if (!enabled) {
+      return <div className="artifact-editor-placeholder" role="status">The slides editor is disabled by policy.</div>;
+    }
+    return (
+      <Suspense fallback={<div className="artifact-editor-loading" role="status">Loading slides editor…</div>}>
+        <SlidesArtifactEditor key={props.artifact.artifactId} {...props} />
+      </Suspense>
+    );
   }
   if (props.artifact.kind !== 'document') {
     return (

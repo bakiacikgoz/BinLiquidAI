@@ -340,16 +340,48 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
             "ALTER TABLE artifact_exports ADD COLUMN reason_code TEXT",
             "ALTER TABLE artifact_exports ADD COLUMN terminal_idempotency_key TEXT",
             "ALTER TABLE artifact_exports ADD COLUMN terminal_request_sha256 TEXT",
-            "CREATE UNIQUE INDEX idx_artifact_exports_workspace_idempotency ON artifact_exports (workspace_id, idempotency_key)",
-            "CREATE INDEX idx_artifact_exports_workspace_status ON artifact_exports (workspace_id, status, created_at_utc)",
+            "CREATE UNIQUE INDEX idx_artifact_exports_workspace_idempotency ON artifact_exports (workspace_id, idempotency_key)",  # noqa: E501
+            "CREATE INDEX idx_artifact_exports_workspace_status ON artifact_exports (workspace_id, status, created_at_utc)",  # noqa: E501
         ),
     ),
     ArtifactMigration(
         version=7,
         name="revision_schema_version",
         statements=(
-            "ALTER TABLE artifact_revisions ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version >= 1)",
-            "CREATE INDEX idx_artifact_revisions_artifact_schema ON artifact_revisions (artifact_id, schema_version, revision_number)",
+            "ALTER TABLE artifact_revisions ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version >= 1)",  # noqa: E501
+            "CREATE INDEX idx_artifact_revisions_artifact_schema ON artifact_revisions (artifact_id, schema_version, revision_number)",  # noqa: E501
+        ),
+    ),
+    ArtifactMigration(
+        version=8,
+        name="evidence_source_links",
+        statements=(
+            """
+            CREATE TABLE artifact_links_v8 (
+                link_id TEXT PRIMARY KEY,
+                artifact_id TEXT NOT NULL,
+                link_type TEXT NOT NULL CHECK (
+                    link_type IN (
+                        'session', 'turn', 'run', 'evidence', 'approval', 'source',
+                        'source_evidence', 'export'
+                    )
+                ),
+                target_id TEXT NOT NULL,
+                created_by_id TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL,
+                FOREIGN KEY (artifact_id) REFERENCES artifacts(artifact_id) ON DELETE RESTRICT,
+                UNIQUE (artifact_id, link_type, target_id)
+            ) STRICT
+            """,
+            """
+            INSERT INTO artifact_links_v8 (
+                link_id, artifact_id, link_type, target_id, created_by_id, created_at_utc
+            )
+            SELECT link_id, artifact_id, link_type, target_id, created_by_id, created_at_utc
+            FROM artifact_links
+            """,
+            "DROP TABLE artifact_links",
+            "ALTER TABLE artifact_links_v8 RENAME TO artifact_links",
         ),
     ),
 )

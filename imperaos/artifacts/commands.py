@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, JsonValue, StringConstraints, model_validator
 
+from imperaos.artifacts.exports import ArtifactExportFormat
 from imperaos.artifacts.models import (
     ArtifactDataClass,
     ArtifactKind,
@@ -12,7 +13,6 @@ from imperaos.artifacts.models import (
     ArtifactStatus,
     BoundedId,
 )
-from imperaos.artifacts.exports import ArtifactExportFormat
 
 
 class CreateArtifactCommand(ArtifactModel):
@@ -127,6 +127,44 @@ class DuplicateArtifactCommand(ArtifactModel):
     idempotency_key: BoundedId
 
 
+class ImportArtifactAssetCommand(ArtifactModel):
+    file_name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=255, strict=True),
+    ]
+    declared_media_type: Literal[
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+    ]
+    content_base64: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=28_000_000, strict=True),
+    ]
+    data_class: ArtifactDataClass = Field(strict=False)
+    idempotency_key: BoundedId
+
+
+class GetArtifactAssetQuery(ArtifactModel):
+    asset_id: BoundedId
+
+
+class ImportEvidenceArtifactCommand(ArtifactModel):
+    evidence_id: BoundedId
+    expected_sha256: Annotated[
+        str,
+        StringConstraints(pattern=r"^[0-9a-f]{64}$", strict=True),
+    ]
+    artifact_id: BoundedId | None = None
+    title: Annotated[
+        str | None,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=200, strict=True),
+    ] = None
+    idempotency_key: BoundedId
+
+
 class SubmitArtifactFormCommand(ArtifactModel):
     artifact_id: BoundedId
     schema_revision_id: BoundedId
@@ -149,6 +187,10 @@ class CommitArtifactExportCommand(ArtifactModel):
     sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$", strict=True)]
     size_bytes: int = Field(ge=0, le=100 * 1024 * 1024)
     idempotency_key: BoundedId
+
+
+class PreflightArtifactExportCommand(CommitArtifactExportCommand):
+    pass
 
 
 class CancelArtifactExportCommand(ArtifactModel):

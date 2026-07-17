@@ -9,6 +9,7 @@ import {
   ArtifactReadResultSchema,
   CanvasArtifactContentSchema,
   SpreadsheetArtifactContentSchema,
+  SlidesArtifactContentSchema,
 } from './artifactContracts';
 
 const valid = {
@@ -125,5 +126,26 @@ describe('canvas v2 content contract', () => {
     expect(CanvasArtifactContentSchema.safeParse({
       ...canvas, snapshot: { objects: [{ ...canvas.snapshot.objects[0], src: 'https://example.com/x' }] },
     }).success).toBe(false);
+  });
+});
+
+describe('slides v2 content contract', () => {
+  const deck = {
+    kind: 'slides' as const, schemaVersion: 2 as const,
+    theme: { name: 'ImperaOS', backgroundColor: 'FFFFFF', foregroundColor: '172033', accentColor: '6E57FF' },
+    slides: [{ id: 'slide-1', title: 'Overview', elements: [
+      { id: 'title-1', type: 'text' as const, x: 0.5, y: 0.5, width: 8, height: 1, text: 'Governed', fontSize: 30 },
+      { id: 'image-1', type: 'image' as const, x: 9, y: 0.5, width: 3, height: 2, assetId: 'asset-1', altText: 'Local image' },
+    ] }],
+    assetIds: ['asset-1'],
+  };
+
+  it('accepts supported elements and rejects duplicates, dangling assets, and unknown fields', () => {
+    expect(SlidesArtifactContentSchema.safeParse(deck).success).toBe(true);
+    expect(SlidesArtifactContentSchema.safeParse({ ...deck, slides: [deck.slides[0], deck.slides[0]] }).success).toBe(false);
+    expect(SlidesArtifactContentSchema.safeParse({
+      ...deck, slides: [{ ...deck.slides[0], elements: [{ ...deck.slides[0].elements[1], assetId: 'missing' }] }],
+    }).success).toBe(false);
+    expect(SlidesArtifactContentSchema.safeParse({ ...deck, externalUrl: 'https://example.com' }).success).toBe(false);
   });
 });

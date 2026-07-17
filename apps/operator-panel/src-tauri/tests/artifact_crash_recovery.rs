@@ -29,13 +29,7 @@ fn count_files(root: &Path) -> usize {
     fs::read_dir(root)
         .expect("storage directory must be readable")
         .map(|entry| entry.expect("storage entry must be readable").path())
-        .map(|path| {
-            if path.is_dir() {
-                count_files(&path)
-            } else {
-                1
-            }
-        })
+        .map(|path| if path.is_dir() { count_files(&path) } else { 1 })
         .sum()
 }
 
@@ -99,7 +93,9 @@ fn supervisor_recovers_a_real_python_crash_after_content_publish() {
             .start()
             .await
             .expect("sidecar handshake must succeed");
-        let initial_pid = initial.process_id.expect("sidecar must expose a process id");
+        let initial_pid = initial
+            .process_id
+            .expect("sidecar must expose a process id");
         let create = build_trusted_request(
             "artifact.create",
             json!({
@@ -149,7 +145,9 @@ fn supervisor_recovers_a_real_python_crash_after_content_publish() {
             .expect("same idempotent mutation must succeed after restart reconciliation");
         assert!(restart_started.elapsed() <= Duration::from_secs(3));
         assert_eq!(
-            replay.pointer("/revision/revisionNumber").and_then(Value::as_u64),
+            replay
+                .pointer("/revision/revisionNumber")
+                .and_then(Value::as_u64),
             Some(2)
         );
 

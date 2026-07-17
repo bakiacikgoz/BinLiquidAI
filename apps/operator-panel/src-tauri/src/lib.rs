@@ -1,3 +1,4 @@
+pub mod artifact_asset;
 pub mod artifact_export;
 pub mod artifact_rpc;
 mod bridge;
@@ -7,6 +8,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(bridge::AssistantProcessRegistry::default())
         .manage(artifact_rpc::WorkspaceRpcRegistry::default())
+        .manage(artifact_asset::ArtifactAssetState::default())
         .manage(artifact_export::ArtifactExportState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_log::Builder::default().build())
@@ -69,7 +71,9 @@ pub fn run() {
             bridge::bridge_artifact_restore,
             bridge::bridge_artifact_archive,
             bridge::bridge_artifact_duplicate,
+            bridge::bridge_artifact_asset_select,
             bridge::bridge_artifact_asset_import,
+            bridge::bridge_artifact_asset_get,
             bridge::bridge_artifact_form_submit,
             bridge::bridge_artifact_export_begin,
             bridge::bridge_artifact_export_commit,

@@ -163,6 +163,51 @@ pub struct ArtifactExportState {
 }
 
 impl ArtifactExportState {
+    pub async fn preflight(
+        &self,
+        ticket: &str,
+        binding: &ExportBinding,
+        bytes: &[u8],
+        expected_sha256: &str,
+    ) -> Result<ArtifactExportResult, ExportBoundaryError> {
+        let mut tickets = self.tickets.lock().await;
+        let record = tickets
+            .get(ticket)
+            .ok_or_else(ExportBoundaryError::cancelled)?;
+        if !record.binding.same_actor(binding) {
+            return Err(ExportBoundaryError::permission_denied());
+        }
+        if record.expires_at <= Instant::now() {
+            tickets.remove(ticket);
+            return Err(ExportBoundaryError::cancelled());
+        }
+        if bytes.len() > record.max_bytes {
+            return Err(ExportBoundaryError::failed(
+                "artifact export exceeds its ticket size boundary",
+                false,
+            ));
+        }
+        let observed_sha256 = format!("{:x}", Sha256::digest(bytes));
+        if observed_sha256 != expected_sha256 {
+            return Err(ExportBoundaryError::failed(
+                "artifact export hash does not match",
+                false,
+            ));
+        }
+        let basename = record
+            .target
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| ExportBoundaryError::failed("export basename is invalid", false))?
+            .to_string();
+        Ok(ArtifactExportResult {
+            basename,
+            sha256: observed_sha256,
+            size_bytes: bytes.len(),
+            binding: record.binding.clone(),
+        })
+    }
+
     pub async fn binding_for_ticket(
         &self,
         ticket: &str,
@@ -277,7 +322,10 @@ impl ArtifactExportState {
         binding: &ExportBinding,
     ) -> Result<ArtifactExportCancelResult, ExportBoundaryError> {
         let record = self.take_ticket(ticket, binding).await?;
-        Ok(ArtifactExportCancelResult { cancelled: true, binding: record.binding })
+        Ok(ArtifactExportCancelResult {
+            cancelled: true,
+            binding: record.binding,
+        })
     }
 
     async fn take_ticket(
@@ -443,18 +491,34 @@ mod tests {
             let state = ArtifactExportState::default();
             let root = tempfile::tempdir().expect("tempdir");
             let exact = ExportBinding::authorized(
-                "workspace-1", "user-1", "user", "export-1", "artifact-1",
-                "revision-7", "source",
-            ).expect("authorized binding");
-            let issued = state.issue_ticket(
-                root.path().join("main.py"), exact.clone(), 1024, Duration::from_secs(60),
-            ).await.expect("ticket");
+                "workspace-1",
+                "user-1",
+                "user",
+                "export-1",
+                "artifact-1",
+                "revision-7",
+                "source",
+            )
+            .expect("authorized binding");
+            let issued = state
+                .issue_ticket(
+                    root.path().join("main.py"),
+                    exact.clone(),
+                    1024,
+                    Duration::from_secs(60),
+                )
+                .await
+                .expect("ticket");
 
-            let observed = state.binding_for_ticket(&issued.ticket, &binding("user-1"))
-                .await.expect("binding lookup");
+            let observed = state
+                .binding_for_ticket(&issued.ticket, &binding("user-1"))
+                .await
+                .expect("binding lookup");
             assert_eq!(observed, exact);
-            let cancelled = state.cancel(&issued.ticket, &binding("user-1"))
-                .await.expect("cancel");
+            let cancelled = state
+                .cancel(&issued.ticket, &binding("user-1"))
+                .await
+                .expect("cancel");
             let serialized = serde_json::to_string(&cancelled).expect("serialize");
             assert!(!serialized.contains("revision-7"));
             assert!(!serialized.contains("export-1"));

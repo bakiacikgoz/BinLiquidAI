@@ -10,6 +10,7 @@ from imperaos.artifacts.commands import (
     CancelArtifactExportCommand,
     CommitArtifactExportCommand,
     CreateArtifactCommand,
+    PreflightArtifactExportCommand,
 )
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import (
@@ -74,7 +75,9 @@ def test_source_export_accepts_the_exact_persisted_code_v2_revision(tmp_path: Pa
     assert begun.basename == "main.py"
 
 
-def test_export_authority_binds_exact_revision_format_actor_and_terminal_state(tmp_path: Path) -> None:
+def test_export_authority_binds_exact_revision_format_actor_and_terminal_state(
+    tmp_path: Path,
+) -> None:
     service = ArtifactService(tmp_path / "artifacts")
     artifact_id, revision_id = _create_code(service)
     begin_command = BeginArtifactExportCommand(
@@ -87,6 +90,24 @@ def test_export_authority_binds_exact_revision_format_actor_and_terminal_state(t
     begun = service.begin_export(begin_command, _context())
     replay = service.begin_export(begin_command, _context())
     payload = b"print('display only')\n"
+    preflight = PreflightArtifactExportCommand(
+        export_id=begun.export_id,
+        basename=begun.basename,
+        sha256=hashlib.sha256(payload).hexdigest(),
+        size_bytes=len(payload),
+        idempotency_key="export-preflight-1",
+    )
+    with pytest.raises(ArtifactDomainError) as not_preflighted:
+        service.commit_export(
+            CommitArtifactExportCommand.model_validate(
+                preflight.model_copy(
+                    update={"idempotency_key": "export-commit-early"}
+                ).model_dump(mode="python")
+            ),
+            _context(),
+        )
+    assert not_preflighted.value.code is ArtifactErrorCode.ARTIFACT_EXPORT_FAILED
+    authorized = service.preflight_export(preflight, _context())
     committed = service.commit_export(
         CommitArtifactExportCommand(
             export_id=begun.export_id,
@@ -102,6 +123,7 @@ def test_export_authority_binds_exact_revision_format_actor_and_terminal_state(t
     assert begun.format == "source"
     assert replay.model_dump(exclude={"disposition"}) == begun.model_dump(exclude={"disposition"})
     assert replay.disposition == "idempotent_replay"
+    assert authorized.status == "pending"
     assert committed.status == "completed"
     assert committed.artifact_id == artifact_id
     with pytest.raises(ArtifactDomainError) as terminal:

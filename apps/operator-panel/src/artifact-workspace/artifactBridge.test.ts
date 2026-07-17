@@ -123,6 +123,24 @@ describe('artifact bridge', () => {
     await expect(artifactBridge.list({ limit: 25 })).rejects.toBeInstanceOf(ArtifactContractError);
   });
 
+  it('keeps asset paths and bytes behind native opaque tickets', async () => {
+    const invoke = mockInvoke({
+      cancelled: false,
+      ticket: 'asset-ticket-1',
+      fileName: 'görsel.png',
+      expiresInMs: 120_000,
+      maxBytes: 20 * 1024 * 1024,
+    });
+    const { artifactBridge } = await import('./artifactBridge');
+
+    const result = await artifactBridge.selectAsset();
+
+    expect(result.ticket).toBe('asset-ticket-1');
+    expect(invoke).toHaveBeenCalledWith('bridge_artifact_asset_select', {});
+    expect(JSON.stringify(invoke.mock.calls)).not.toContain('path');
+    expect(JSON.stringify(invoke.mock.calls)).not.toContain('contentBase64');
+  });
+
   it('binds form submission idempotency and never adds continuation authority', async () => {
     const invoke = mockInvoke({
       submissionId: 'submission-1',

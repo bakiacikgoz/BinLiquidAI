@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import sqlite3
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from pydantic import ValidationError
 
+from imperaos.artifacts.assets import ArtifactAssetStore
 from imperaos.artifacts.commands import (
     ApplyArtifactProposalCommand,
     ArchiveArtifactCommand,
@@ -18,10 +21,14 @@ from imperaos.artifacts.commands import (
     CommitArtifactExportCommand,
     CreateArtifactCommand,
     DuplicateArtifactCommand,
+    GetArtifactAssetQuery,
     GetArtifactQuery,
+    ImportArtifactAssetCommand,
+    ImportEvidenceArtifactCommand,
     ListArtifactsQuery,
     MutateArtifactCommand,
     PatchSpreadsheetCellsCommand,
+    PreflightArtifactExportCommand,
     ProposeArtifactMutationCommand,
     RestoreArtifactCommand,
     SubmitArtifactFormCommand,
@@ -37,6 +44,10 @@ from imperaos.artifacts.evidence import (
     ArtifactEvidenceRecorder,
     record_artifact_evidence,
 )
+from imperaos.artifacts.evidence_import import (
+    ArtifactEvidenceResolver,
+    DenyArtifactEvidenceResolver,
+)
 from imperaos.artifacts.exports import (
     DEFAULT_ARTIFACT_EXPORT_MAX_BYTES,
     canonical_export_basename,
@@ -46,6 +57,7 @@ from imperaos.artifacts.form_continuation import ArtifactFormContinuationGateway
 from imperaos.artifacts.forms import validate_form_response
 from imperaos.artifacts.licenses import ArtifactLicenseCapability
 from imperaos.artifacts.models import (
+    ArtifactDataClass,
     ArtifactDescriptor,
     ArtifactKind,
     ArtifactModel,
@@ -53,10 +65,14 @@ from imperaos.artifacts.models import (
     ArtifactRevisionDescriptor,
     ArtifactStatus,
     OperationContext,
+    PrincipalType,
+    can_transition_data_class,
     canonical_json,
 )
 from imperaos.artifacts.policy import ArtifactPermission, ArtifactPolicyGateway
 from imperaos.artifacts.results import (
+    ArtifactAssetImportResult,
+    ArtifactAssetReadResult,
     ArtifactExportBeginResult,
     ArtifactExportResult,
     ArtifactFormSubmissionResult,
@@ -71,6 +87,7 @@ from imperaos.governance.approval_store import ApprovalStore
 from imperaos.runtime.paths import state_path
 
 _DEFAULT_CONTINUATION_GATEWAY = object()
+_ASSET_IMPORT_RESERVATION_TTL = timedelta(minutes=5)
 
 
 class ArtifactService:
@@ -86,8 +103,11 @@ class ArtifactService:
             _DEFAULT_CONTINUATION_GATEWAY
         ),
         license_capabilities: Mapping[ArtifactKind, ArtifactLicenseCapability] | None = None,
+        evidence_resolver: ArtifactEvidenceResolver | None = None,
     ) -> None:
         self.store = ArtifactStore(root)
+        self.assets = ArtifactAssetStore(root)
+        self.evidence_resolver = evidence_resolver or DenyArtifactEvidenceResolver()
         self.policy = policy or ArtifactPolicyGateway()
         self.evidence = evidence or ArtifactEvidenceRecorder(self.store.database_path)
         self._continuation_gateway = continuation_gateway
@@ -138,6 +158,15 @@ class ArtifactService:
             return replay
 
         content = self._validate_content(command.kind, command.content)
+        effective_data_class = self._effective_content_data_class(
+            context.workspace_id, content, command.data_class
+        )
+        self.policy.authorize(
+            ArtifactPermission.CREATE,
+            context,
+            artifact_workspace_id=context.workspace_id,
+            target_data_class=effective_data_class,
+        )
         payload = canonical_json(content).encode("utf-8")
         digest = hashlib.sha256(payload).hexdigest()
         artifact_id = command.artifact_id or self._stable_id(
@@ -170,7 +199,7 @@ class ArtifactService:
             title=command.title,
             status=ArtifactStatus.DRAFT,
             schema_version=content.schema_version,
-            data_class=command.data_class,
+            data_class=effective_data_class,
             current_revision_id=revision_id,
             current_revision_number=1,
             source_session_id=command.source_session_id,
@@ -354,6 +383,17 @@ class ArtifactService:
         content = self._validate_content(
             current.kind, command.content, schema_version=current.schema_version
         )
+        effective_data_class = self._effective_content_data_class(
+            context.workspace_id, content, current.data_class
+        )
+        self.policy.authorize(
+            permission,
+            context,
+            artifact_workspace_id=current.workspace_id,
+            current_data_class=current.data_class,
+            target_data_class=effective_data_class,
+            approval_granted=command.approval_granted,
+        )
         payload = canonical_json(content).encode("utf-8")
         revision_number = command.expected_revision_number + 1
         revision_id = self._stable_id(
@@ -392,6 +432,7 @@ class ArtifactService:
                 "updated_by_id": context.principal_id,
                 "updated_at_utc": now,
                 "etag": digest,
+                "data_class": effective_data_class,
             }
         )
         stored = self.store.append_revision(
@@ -734,6 +775,16 @@ class ArtifactService:
             content_input,
             schema_version=loaded.revision.schema_version,
         )
+        effective_data_class = self._effective_content_data_class(
+            context.workspace_id, content, source.data_class
+        )
+        self.policy.authorize(
+            ArtifactPermission.DUPLICATE,
+            context,
+            artifact_workspace_id=source.workspace_id,
+            current_data_class=source.data_class,
+            target_data_class=effective_data_class,
+        )
         payload = canonical_json(content).encode("utf-8")
         digest = hashlib.sha256(payload).hexdigest()
         artifact_id = command.artifact_id or self._stable_id(
@@ -767,7 +818,7 @@ class ArtifactService:
             title=command.title,
             status=ArtifactStatus.DRAFT,
             schema_version=loaded.revision.schema_version,
-            data_class=source.data_class,
+            data_class=effective_data_class,
             current_revision_id=revision_id,
             current_revision_number=1,
             source_session_id=source.source_session_id,
@@ -800,6 +851,195 @@ class ArtifactService:
         )
         return operation
 
+    @record_artifact_evidence("artifact.asset.imported")
+    def import_asset(
+        self,
+        command: ImportArtifactAssetCommand,
+        context: OperationContext,
+    ) -> ArtifactAssetImportResult:
+        self.policy.authorize(
+            ArtifactPermission.ASSET_IMPORT,
+            context,
+            artifact_workspace_id=context.workspace_id,
+            target_data_class=command.data_class,
+        )
+        request_hash = self._request_hash(command)
+        try:
+            payload = base64.b64decode(command.content_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID,
+                "asset payload is not valid base64",
+            ) from exc
+        replay = self._reserve_asset_replay(
+            context.workspace_id,
+            command.idempotency_key,
+            request_hash,
+        )
+        if replay is not None:
+            return replay
+        try:
+            imported = self.assets.import_bytes(
+                context.workspace_id,
+                payload,
+                declared_media_type=command.declared_media_type,
+                data_class=command.data_class,
+                created_by_id=context.principal_id,
+                original_name=command.file_name,
+            )
+            result = ArtifactAssetImportResult(
+                asset=imported.descriptor,
+                disposition="deduplicated" if imported.deduplicated else "created",
+            )
+            self._save_asset_replay(
+                context.workspace_id,
+                command.idempotency_key,
+                request_hash,
+                result,
+            )
+            return result
+        except Exception:
+            self._release_asset_replay(
+                context.workspace_id, command.idempotency_key, request_hash
+            )
+            raise
+
+    @record_artifact_evidence("artifact.asset.read")
+    def get_asset(
+        self,
+        query: GetArtifactAssetQuery,
+        context: OperationContext,
+    ) -> ArtifactAssetReadResult:
+        descriptor = self.assets.get_descriptor(context.workspace_id, query.asset_id)
+        self.policy.authorize(
+            ArtifactPermission.READ,
+            context,
+            artifact_workspace_id=descriptor.workspace_id,
+            current_data_class=descriptor.data_class,
+        )
+        payload = self.assets.get_bytes(context.workspace_id, query.asset_id)
+        return ArtifactAssetReadResult(
+            asset=descriptor,
+            content_base64=base64.b64encode(payload).decode("ascii"),
+        )
+
+    @record_artifact_evidence("artifact.evidence.imported")
+    def import_evidence(
+        self,
+        command: ImportEvidenceArtifactCommand,
+        context: OperationContext,
+    ) -> ArtifactOperationResult:
+        self.policy.authorize(
+            ArtifactPermission.IMPORT_EVIDENCE,
+            context,
+            artifact_workspace_id=context.workspace_id,
+        )
+        request_hash = self._request_hash(command)
+        replay = self._load_operation_replay(
+            context.workspace_id,
+            command.idempotency_key,
+            "import_evidence",
+            request_hash,
+        )
+        if replay is not None:
+            return replay
+        source = self.evidence_resolver.resolve(context, command.evidence_id)
+        if source.workspace_id != context.workspace_id:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_WORKSPACE_MISMATCH,
+                "evidence source belongs to a different workspace",
+            )
+        if source.content_sha256 != command.expected_sha256:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                "evidence source hash does not match the requested immutable source",
+                details={"classification": "evidence_hash_mismatch"},
+            )
+        observed_source_hash = hashlib.sha256(
+            canonical_json(source.content).encode("utf-8")
+        ).hexdigest()
+        if observed_source_hash != source.content_sha256:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                "evidence source failed integrity verification",
+                details={"classification": "evidence_hash_mismatch"},
+            )
+        self.policy.authorize(
+            ArtifactPermission.IMPORT_EVIDENCE,
+            context,
+            artifact_workspace_id=source.workspace_id,
+            target_data_class=source.data_class,
+        )
+        self._require_licensed_editor(source.kind)
+        self._validate_content(
+            source.kind,
+            source.content,
+            schema_version=source.schema_version,
+        )
+        payload = canonical_json(source.content).encode("utf-8")
+        digest = source.content_sha256
+        artifact_id = command.artifact_id or self._stable_id(
+            "artifact", context.workspace_id, command.idempotency_key
+        )
+        revision_id = self._stable_id("revision", artifact_id, command.idempotency_key)
+        now = datetime.now(UTC)
+        revision = ArtifactRevisionDescriptor(
+            revision_id=revision_id,
+            artifact_id=artifact_id,
+            revision_number=1,
+            schema_version=source.schema_version,
+            mutation_type=ArtifactMutationType.IMPORT_EVIDENCE,
+            content_relpath=revision_content_relpath(
+                context.workspace_id, artifact_id, 1, revision_id, "json"
+            ),
+            content_sha256=digest,
+            content_size_bytes=len(payload),
+            content_encoding="json",
+            change_summary="Verified evidence copied into editable artifact",
+            author_type=PrincipalType.IMPORT,
+            author_id=context.principal_id,
+            idempotency_key=command.idempotency_key,
+            created_at_utc=now,
+        )
+        artifact = ArtifactDescriptor(
+            artifact_id=artifact_id,
+            workspace_id=context.workspace_id,
+            kind=source.kind,
+            title=command.title or source.title,
+            status=ArtifactStatus.DRAFT,
+            schema_version=source.schema_version,
+            data_class=source.data_class,
+            current_revision_id=revision_id,
+            current_revision_number=1,
+            source_session_id=None,
+            source_turn_id=None,
+            created_by_type=PrincipalType.IMPORT,
+            created_by_id=context.principal_id,
+            updated_by_id=context.principal_id,
+            created_at_utc=now,
+            updated_at_utc=now,
+            etag=digest,
+            metadata={
+                "sourceEvidenceId": source.evidence_id,
+                "sourceEvidenceSha256": source.content_sha256,
+                "sourceRunId": source.source_run_id,
+            },
+        )
+        stored = self.store.create_evidence_artifact(
+            artifact,
+            revision,
+            payload,
+            source_evidence_id=source.evidence_id,
+            operation="import_evidence",
+            request_hash=request_hash,
+        )
+        return ArtifactOperationResult(
+            artifact=stored.artifact,
+            revision=stored.revision,
+            created=stored.created,
+            disposition=stored.disposition,
+        )
+
     @record_artifact_evidence("artifact.export.started")
     def begin_export(
         self,
@@ -807,13 +1047,6 @@ class ArtifactService:
         context: OperationContext,
     ) -> ArtifactExportBeginResult:
         artifact = self.store.get_artifact(context.workspace_id, command.artifact_id)
-        self.policy.authorize(
-            ArtifactPermission.EXPORT,
-            context,
-            artifact_workspace_id=artifact.workspace_id,
-            current_data_class=artifact.data_class,
-            approval_granted=False,
-        )
         if command.approval_id is not None:
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
@@ -829,6 +1062,16 @@ class ArtifactService:
             artifact.kind,
             stored_revision.content,
             schema_version=stored_revision.descriptor.schema_version,
+        )
+        effective_data_class = self._effective_content_data_class(
+            context.workspace_id, content, artifact.data_class
+        )
+        self.policy.authorize(
+            ArtifactPermission.EXPORT,
+            context,
+            artifact_workspace_id=artifact.workspace_id,
+            current_data_class=effective_data_class,
+            approval_granted=False,
         )
         basename = canonical_export_basename(artifact, content, format_name)
         request_hash = self._request_hash(command)
@@ -857,6 +1100,54 @@ class ArtifactService:
             disposition="created" if created else "idempotent_replay",
         )
 
+    @record_artifact_evidence("artifact.export.preflight")
+    def preflight_export(
+        self,
+        command: PreflightArtifactExportCommand,
+        context: OperationContext,
+    ) -> ArtifactExportResult:
+        current = self.store.get_export(context.workspace_id, command.export_id)
+        artifact = self.store.get_artifact(context.workspace_id, current.artifact_id)
+        stored_revision = self.store.get_revision(
+            context.workspace_id, artifact.artifact_id, current.revision_id
+        )
+        content = self._decode_content(
+            artifact.kind,
+            stored_revision.content,
+            schema_version=stored_revision.descriptor.schema_version,
+        )
+        effective_data_class = self._effective_content_data_class(
+            context.workspace_id, content, artifact.data_class
+        )
+        self.policy.authorize(
+            ArtifactPermission.EXPORT,
+            context,
+            artifact_workspace_id=artifact.workspace_id,
+            current_data_class=effective_data_class,
+            approval_granted=False,
+        )
+        record, updated = self.store.preflight_export(
+            workspace_id=context.workspace_id,
+            export_id=current.export_id,
+            actor_type=context.principal_type.value,
+            actor_id=context.principal_id,
+            basename=command.basename,
+            sha256=command.sha256,
+            size_bytes=command.size_bytes,
+        )
+        return ArtifactExportResult(
+            export_id=record.export_id,
+            artifact_id=record.artifact_id,
+            revision_id=record.revision_id,
+            format=record.format,
+            status=record.status,
+            basename=record.basename,
+            sha256=record.sha256,
+            size_bytes=record.size_bytes,
+            reason_code=record.reason_code,
+            disposition="updated" if updated else "idempotent_replay",
+        )
+
     @record_artifact_evidence("artifact.export.completed")
     def commit_export(
         self,
@@ -864,18 +1155,14 @@ class ArtifactService:
         context: OperationContext,
     ) -> ArtifactExportResult:
         current = self.store.get_export(context.workspace_id, command.export_id)
-        artifact = self.store.get_artifact(context.workspace_id, current.artifact_id)
-        self.policy.authorize(
-            ArtifactPermission.EXPORT,
-            context,
-            artifact_workspace_id=artifact.workspace_id,
-            current_data_class=artifact.data_class,
-            approval_granted=False,
-        )
-        if command.basename != current.basename:
+        if (
+            command.basename != current.basename
+            or command.sha256 != current.sha256
+            or command.size_bytes != current.size_bytes
+        ):
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_EXPORT_FAILED,
-                "artifact export basename does not match the authorized record",
+                "artifact export bytes were not preflight-authorized",
             )
         record, updated = self.store.transition_export(
             workspace_id=context.workspace_id,
@@ -915,8 +1202,6 @@ class ArtifactService:
             ArtifactPermission.EXPORT,
             context,
             artifact_workspace_id=artifact.workspace_id,
-            current_data_class=artifact.data_class,
-            approval_granted=False,
         )
         status = "failed" if command.reason != "user_cancelled" else "cancelled"
         record, updated = self.store.transition_export(
@@ -1187,6 +1472,187 @@ class ArtifactService:
                 ),
             )
             connection.commit()
+
+    def _load_asset_replay(
+        self,
+        workspace_id: str,
+        idempotency_key: str,
+        request_hash: str,
+    ) -> ArtifactAssetImportResult | None:
+        with self.store._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM artifact_operation_dedup
+                WHERE workspace_id = ? AND idempotency_key = ?
+                """,
+                (workspace_id, idempotency_key),
+            ).fetchone()
+        if row is None:
+            return None
+        if row["operation"] != "asset_import" or row["request_sha256"] != request_hash:
+            self._raise_conflict("idempotency key payload mismatch")
+        parsed = json.loads(row["result_json"])
+        descriptor = self.assets.get_descriptor(workspace_id, parsed["assetId"])
+        return ArtifactAssetImportResult(
+            asset=descriptor,
+            disposition="idempotent_replay",
+        )
+
+    def _reserve_asset_replay(
+        self,
+        workspace_id: str,
+        idempotency_key: str,
+        request_hash: str,
+    ) -> ArtifactAssetImportResult | None:
+        with self.store._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    """
+                    SELECT * FROM artifact_operation_dedup
+                    WHERE workspace_id = ? AND idempotency_key = ?
+                    """,
+                    (workspace_id, idempotency_key),
+                ).fetchone()
+                if row is not None:
+                    if (
+                        row["operation"] != "asset_import"
+                        or row["request_sha256"] != request_hash
+                    ):
+                        self._raise_conflict("idempotency key payload mismatch")
+                    parsed = json.loads(row["result_json"])
+                    if parsed.get("state") == "pending":
+                        expires_at = (
+                            datetime.fromisoformat(row["expires_at_utc"])
+                            if row["expires_at_utc"] is not None
+                            else None
+                        )
+                        if expires_at is None or expires_at > datetime.now(UTC):
+                            self._raise_conflict("asset import is already in progress")
+                        connection.execute(
+                            """
+                            DELETE FROM artifact_operation_dedup
+                            WHERE workspace_id = ? AND idempotency_key = ?
+                            """,
+                            (workspace_id, idempotency_key),
+                        )
+                        row = None
+                if row is not None:
+                    parsed = json.loads(row["result_json"])
+                    descriptor = self.assets.get_descriptor(
+                        workspace_id, parsed["assetId"]
+                    )
+                    connection.commit()
+                    return ArtifactAssetImportResult(
+                        asset=descriptor,
+                        disposition="idempotent_replay",
+                    )
+                connection.execute(
+                    """
+                    INSERT INTO artifact_operation_dedup (
+                        workspace_id, idempotency_key, operation, request_sha256,
+                        result_json, created_at_utc, expires_at_utc
+                    ) VALUES (?, ?, 'asset_import', ?, ?, ?, ?)
+                    """,
+                    (
+                        workspace_id,
+                        idempotency_key,
+                        request_hash,
+                        canonical_json({"state": "pending"}),
+                        datetime.now(UTC).isoformat(),
+                        (datetime.now(UTC) + _ASSET_IMPORT_RESERVATION_TTL).isoformat(),
+                    ),
+                )
+                connection.commit()
+                return None
+            except Exception:
+                connection.rollback()
+                raise
+
+    def _save_asset_replay(
+        self,
+        workspace_id: str,
+        idempotency_key: str,
+        request_hash: str,
+        result: ArtifactAssetImportResult,
+    ) -> None:
+        with self.store._connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                existing = connection.execute(
+                    """
+                    SELECT operation, request_sha256, result_json
+                    FROM artifact_operation_dedup
+                    WHERE workspace_id = ? AND idempotency_key = ?
+                    """,
+                    (workspace_id, idempotency_key),
+                ).fetchone()
+                if existing is None:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                        "asset import reservation disappeared",
+                    )
+                if (
+                    existing["operation"] != "asset_import"
+                    or existing["request_sha256"] != request_hash
+                ):
+                    self._raise_conflict("idempotency key payload mismatch")
+                parsed = json.loads(existing["result_json"])
+                if parsed.get("state") != "pending":
+                    connection.commit()
+                    return
+                connection.execute(
+                    """
+                    UPDATE artifact_operation_dedup
+                    SET result_json = ?, expires_at_utc = NULL
+                    WHERE workspace_id = ? AND idempotency_key = ?
+                    """,
+                    (
+                        canonical_json({"assetId": result.asset.asset_id}),
+                        workspace_id,
+                        idempotency_key,
+                    ),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+
+    def _release_asset_replay(
+        self,
+        workspace_id: str,
+        idempotency_key: str,
+        request_hash: str,
+    ) -> None:
+        with self.store._connect() as connection:
+            connection.execute(
+                """
+                DELETE FROM artifact_operation_dedup
+                WHERE workspace_id = ? AND idempotency_key = ?
+                  AND operation = 'asset_import' AND request_sha256 = ?
+                  AND result_json = ?
+                """,
+                (
+                    workspace_id,
+                    idempotency_key,
+                    request_hash,
+                    canonical_json({"state": "pending"}),
+                ),
+            )
+            connection.commit()
+
+    def _effective_content_data_class(
+        self,
+        workspace_id: str,
+        content: ArtifactContent,
+        base: ArtifactDataClass,
+    ) -> ArtifactDataClass:
+        effective = base
+        for asset_id in getattr(content, "asset_ids", ()):
+            attached = self.assets.get_descriptor(workspace_id, asset_id)
+            if can_transition_data_class(effective, attached.data_class):
+                effective = attached.data_class
+        return effective
 
     @staticmethod
     def _proposal_result(row: sqlite3.Row) -> ArtifactMutationProposalResult:

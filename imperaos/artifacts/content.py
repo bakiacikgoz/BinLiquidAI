@@ -734,6 +734,148 @@ class SlidesContentV1(ArtifactContentModel):
         return value
 
 
+class SlideThemeV2(ArtifactModel):
+    name: str = Field(min_length=1, max_length=100)
+    background_color: str = Field(pattern=r"^[0-9A-F]{6}$")
+    foreground_color: str = Field(pattern=r"^[0-9A-F]{6}$")
+    accent_color: str = Field(pattern=r"^[0-9A-F]{6}$")
+
+
+class SlideElementBaseV2(ArtifactModel):
+    id: BoundedId
+    x: float = Field(ge=0, le=13.333)
+    y: float = Field(ge=0, le=7.5)
+    width: float = Field(gt=0, le=13.333)
+    height: float = Field(gt=0, le=7.5)
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> SlideElementBaseV2:
+        if self.x + self.width > 13.333 or self.y + self.height > 7.5:
+            raise ValueError("slide element exceeds the wide-layout bounds")
+        return self
+
+
+class SlideTextElementV2(SlideElementBaseV2):
+    type: Literal["text"]
+    text: str = Field(max_length=20_000)
+    font_size: float = Field(default=18, ge=6, le=96)
+    color: str | None = Field(default=None, pattern=r"^[0-9A-F]{6}$")
+    bold: bool = False
+
+
+class SlideImageElementV2(SlideElementBaseV2):
+    type: Literal["image"]
+    asset_id: BoundedId
+    alt_text: str = Field(min_length=1, max_length=500)
+
+
+class SlideShapeElementV2(SlideElementBaseV2):
+    type: Literal["shape"]
+    shape: Literal["rectangle", "ellipse"]
+    fill_color: str = Field(default="FFFFFF", pattern=r"^[0-9A-F]{6}$")
+    line_color: str = Field(default="172033", pattern=r"^[0-9A-F]{6}$")
+
+
+class SlideLineElementV2(SlideElementBaseV2):
+    type: Literal["line"]
+    color: str = Field(default="172033", pattern=r"^[0-9A-F]{6}$")
+    line_width: float = Field(default=1, gt=0, le=20)
+
+
+class SlideTableElementV2(SlideElementBaseV2):
+    type: Literal["table"]
+    rows: list[list[str | float | bool | None]] = Field(min_length=1, max_length=100)
+
+    @field_validator("rows")
+    @classmethod
+    def validate_rows(
+        cls, value: list[list[str | float | bool | None]]
+    ) -> list[list[str | float | bool | None]]:
+        if any(not row or len(row) > 20 for row in value):
+            raise ValueError("slide tables require 1 to 20 columns")
+        width = len(value[0])
+        if any(len(row) != width for row in value):
+            raise ValueError("slide table rows must have equal widths")
+        if any(isinstance(cell, str) and len(cell) > 5_000 for row in value for cell in row):
+            raise ValueError("slide table cell text is too long")
+        return value
+
+
+class SlideChartSeriesV2(ArtifactModel):
+    name: str = Field(min_length=1, max_length=100)
+    values: list[float] = Field(min_length=1, max_length=100)
+
+    @field_validator("values")
+    @classmethod
+    def validate_values(cls, value: list[float]) -> list[float]:
+        if any(not math.isfinite(item) or abs(item) > 1e15 for item in value):
+            raise ValueError("slide chart values must be finite and bounded")
+        return value
+
+
+class SlideChartElementV2(SlideElementBaseV2):
+    type: Literal["chart"]
+    chart_type: Literal["bar", "line", "pie"]
+    categories: list[str] = Field(min_length=1, max_length=100)
+    series: list[SlideChartSeriesV2] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_series_lengths(self) -> SlideChartElementV2:
+        if any(len(series.values) != len(self.categories) for series in self.series):
+            raise ValueError("slide chart series must match category count")
+        return self
+
+
+SlideElementV2 = Annotated[
+    SlideTextElementV2
+    | SlideImageElementV2
+    | SlideShapeElementV2
+    | SlideLineElementV2
+    | SlideTableElementV2
+    | SlideChartElementV2,
+    Field(discriminator="type"),
+]
+
+
+class SlideV2(ArtifactModel):
+    id: BoundedId
+    title: str | None = Field(default=None, max_length=200)
+    elements: list[SlideElementV2] = Field(default_factory=list, max_length=500)
+
+    @field_validator("elements")
+    @classmethod
+    def validate_unique_element_ids(cls, value: list[SlideElementV2]) -> list[SlideElementV2]:
+        ids = [item.id for item in value]
+        if len(ids) != len(set(ids)):
+            raise ValueError("slide element ids must be unique")
+        return value
+
+
+class SlidesContentV2(ArtifactModel):
+    kind: Literal["slides"] = "slides"
+    schema_version: Literal[2] = 2
+    theme: SlideThemeV2
+    slides: list[SlideV2] = Field(min_length=1, max_length=200)
+    asset_ids: list[BoundedId] = Field(default_factory=list, max_length=10_000)
+
+    @model_validator(mode="after")
+    def validate_deck(self) -> SlidesContentV2:
+        slide_ids = [slide.id for slide in self.slides]
+        if len(slide_ids) != len(set(slide_ids)):
+            raise ValueError("slide ids must be unique")
+        if len(self.asset_ids) != len(set(self.asset_ids)):
+            raise ValueError("slide asset ids must be unique")
+        allowed_assets = set(self.asset_ids)
+        if any(
+            element.asset_id not in allowed_assets
+            for slide in self.slides
+            for element in slide.elements
+            if isinstance(element, SlideImageElementV2)
+        ):
+            raise ValueError("slide image references an unknown asset")
+        return self
+
+
 ArtifactContent = (
     DocumentContentV1
     | FormContentV1
@@ -746,6 +888,7 @@ ArtifactContent = (
     | CanvasContentV1
     | CanvasContentV2
     | SlidesContentV1
+    | SlidesContentV2
 )
 
 ARTIFACT_CONTENT_MODEL_BY_KIND: dict[ArtifactKind, type[ArtifactContentModel]] = {
@@ -766,6 +909,7 @@ ARTIFACT_CONTENT_MODEL_BY_KIND_VERSION: dict[
     (ArtifactKind.FLOW, 2): FlowContentV2,
     (ArtifactKind.SPREADSHEET, 2): SpreadsheetContentV2,
     (ArtifactKind.CANVAS, 2): CanvasContentV2,
+    (ArtifactKind.SLIDES, 2): SlidesContentV2,
 }
 
 

@@ -13,6 +13,7 @@ from imperaos.artifacts.commands import (
     GetArtifactQuery,
     ListArtifactsQuery,
 )
+from imperaos.artifacts.evidence_import import FileArtifactEvidenceResolver
 from imperaos.artifacts.licenses import ArtifactLicenseCapability, evaluate_artifact_license
 from imperaos.artifacts.migrations import ArtifactMigrationReport, migrate_artifact_metadata
 from imperaos.artifacts.models import ArtifactKind, OperationContext, PrincipalType
@@ -36,6 +37,11 @@ SPREADSHEET_LICENSE_EVIDENCE_OPTION = typer.Option(
     None, "--spreadsheet-license-evidence"
 )
 CANVAS_LICENSE_EVIDENCE_OPTION = typer.Option(None, "--canvas-license-evidence")
+ARTIFACT_EVIDENCE_ROOT_OPTION = typer.Option(
+    None,
+    "--artifact-evidence-root",
+    help="Workspace-scoped immutable evidence manifest root",
+)
 
 artifact_app = typer.Typer(help="Artifact workspace diagnostics")
 artifact_integrity_app = typer.Typer(help="Artifact integrity diagnostics")
@@ -216,6 +222,7 @@ def workspace_rpc(
     build_target: str = typer.Option("windows-x86_64", "--build-target"),
     spreadsheet_license_evidence: Path | None = SPREADSHEET_LICENSE_EVIDENCE_OPTION,
     canvas_license_evidence: Path | None = CANVAS_LICENSE_EVIDENCE_OPTION,
+    artifact_evidence_root: Path | None = ARTIFACT_EVIDENCE_ROOT_OPTION,
 ) -> None:
     if not stdio_json:
         raise typer.BadParameter("--stdio-json is required")
@@ -226,7 +233,13 @@ def workspace_rpc(
         canvas_evidence=canvas_license_evidence,
     )
     server = ArtifactRpcServer(
-        ArtifactService(root, license_capabilities=capabilities)
+        ArtifactService(
+            root,
+            license_capabilities=capabilities,
+            evidence_resolver=FileArtifactEvidenceResolver(
+                artifact_evidence_root or root / "evidence"
+            ),
+        )
     )
     exit_code = server.serve(sys.stdin.buffer, sys.stdout.buffer, sys.stderr.buffer)
     raise typer.Exit(exit_code)

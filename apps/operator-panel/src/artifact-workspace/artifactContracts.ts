@@ -71,6 +71,44 @@ export const ArtifactDescriptorSchema = z
   })
   .strict();
 
+export const ArtifactAssetDescriptorSchema = z.object({
+  assetId: boundedId,
+  workspaceId: boundedId,
+  sha256,
+  mediaType: z.enum(['image/png', 'image/jpeg', 'image/gif', 'image/webp']),
+  sizeBytes: z.number().int().min(1).max(20 * 1024 * 1024),
+  relativePath: z.string().min(1).max(512),
+  width: z.number().int().min(1).max(100_000).nullable(),
+  height: z.number().int().min(1).max(100_000).nullable(),
+  originalName: z.string().min(1).max(255).nullable(),
+  dataClass: ArtifactDataClassSchema,
+  createdById: boundedId,
+  createdAtUtc: utcTimestamp,
+}).strict();
+
+export const ArtifactAssetImportResultSchema = z.object({
+  asset: ArtifactAssetDescriptorSchema,
+  disposition: z.enum(['created', 'deduplicated', 'idempotent_replay']),
+}).strict();
+
+export const ArtifactAssetReadResultSchema = z.object({
+  asset: ArtifactAssetDescriptorSchema,
+  contentBase64: z.string().min(1).max(28_000_000),
+}).strict();
+
+export const ArtifactAssetSelectResultSchema = z.object({
+  cancelled: z.boolean(),
+  ticket: boundedId.nullable(),
+  fileName: z.string().min(1).max(255).nullable(),
+  expiresInMs: z.number().int().positive().nullable(),
+  maxBytes: z.number().int().min(1).max(20 * 1024 * 1024),
+}).strict().superRefine((result, context) => {
+  const selected = !result.cancelled;
+  if (selected !== (result.ticket !== null && result.fileName !== null && result.expiresInMs !== null)) {
+    context.addIssue({ code: 'custom', path: ['ticket'], message: 'Asset selection binding is inconsistent.' });
+  }
+});
+
 export const ArtifactRevisionSchema = z
   .object({
     revisionId: boundedId,
@@ -346,9 +384,106 @@ export const CanvasArtifactExportContentSchema = z.union([
   LegacyCanvasArtifactExportContentSchema,
 ]);
 
+const slidePosition = {
+  x: z.number().finite().min(0).max(13.333),
+  y: z.number().finite().min(0).max(7.5),
+  width: z.number().finite().positive().max(13.333),
+  height: z.number().finite().positive().max(7.5),
+};
+const SlideElementBaseSchema = z.object({ id: boundedId, ...slidePosition });
+const SlideTextElementSchema = SlideElementBaseSchema.extend({
+  type: z.literal('text'), text: z.string().max(20_000),
+  fontSize: z.number().finite().min(6).max(96).default(18),
+  color: z.string().regex(/^[0-9A-F]{6}$/).nullable().optional(), bold: z.boolean().default(false),
+}).strict();
+const SlideImageElementSchema = SlideElementBaseSchema.extend({
+  type: z.literal('image'), assetId: boundedId, altText: z.string().min(1).max(500),
+}).strict();
+const SlideShapeElementSchema = SlideElementBaseSchema.extend({
+  type: z.literal('shape'), shape: z.enum(['rectangle', 'ellipse']),
+  fillColor: z.string().regex(/^[0-9A-F]{6}$/).default('FFFFFF'),
+  lineColor: z.string().regex(/^[0-9A-F]{6}$/).default('172033'),
+}).strict();
+const SlideLineElementSchema = SlideElementBaseSchema.extend({
+  type: z.literal('line'), color: z.string().regex(/^[0-9A-F]{6}$/).default('172033'),
+  lineWidth: z.number().finite().positive().max(20).default(1),
+}).strict();
+const SlideScalarSchema = z.union([z.string().max(5_000), z.number().finite(), z.boolean(), z.null()]);
+const SlideTableElementSchema = SlideElementBaseSchema.extend({
+  type: z.literal('table'), rows: z.array(z.array(SlideScalarSchema).min(1).max(20)).min(1).max(100),
+}).strict().superRefine((table, context) => {
+  const width = table.rows[0]?.length ?? 0;
+  if (table.rows.some((row) => row.length !== width)) {
+    context.addIssue({ code: 'custom', path: ['rows'], message: 'Table rows must have equal widths.' });
+  }
+});
+const SlideChartSeriesSchema = z.object({
+  name: z.string().min(1).max(100),
+  values: z.array(z.number().finite().min(-1e15).max(1e15)).min(1).max(100),
+}).strict();
+const SlideChartElementSchema = SlideElementBaseSchema.extend({
+  type: z.literal('chart'), chartType: z.enum(['bar', 'line', 'pie']),
+  categories: z.array(z.string().max(500)).min(1).max(100),
+  series: z.array(SlideChartSeriesSchema).min(1).max(20),
+}).strict().superRefine((chart, context) => {
+  if (chart.series.some((series) => series.values.length !== chart.categories.length)) {
+    context.addIssue({ code: 'custom', path: ['series'], message: 'Chart series must match categories.' });
+  }
+});
+const SlideElementSchema = z.union([
+  SlideTextElementSchema, SlideImageElementSchema, SlideShapeElementSchema,
+  SlideLineElementSchema, SlideTableElementSchema, SlideChartElementSchema,
+]).superRefine((element, context) => {
+  if (element.x + element.width > 13.333 || element.y + element.height > 7.5) {
+    context.addIssue({ code: 'custom', path: ['width'], message: 'Element exceeds slide bounds.' });
+  }
+});
+const SlideSchema = z.object({
+  id: boundedId, title: z.string().max(200).nullable().optional(),
+  elements: z.array(SlideElementSchema).max(500).default([]),
+}).strict().superRefine((slide, context) => {
+  const ids = slide.elements.map((element) => element.id);
+  if (new Set(ids).size !== ids.length) {
+    context.addIssue({ code: 'custom', path: ['elements'], message: 'Element IDs must be unique.' });
+  }
+});
+
+export const SlidesArtifactContentSchema = z.object({
+  kind: z.literal('slides'), schemaVersion: z.literal(2),
+  theme: z.object({
+    name: z.string().min(1).max(100),
+    backgroundColor: z.string().regex(/^[0-9A-F]{6}$/),
+    foregroundColor: z.string().regex(/^[0-9A-F]{6}$/),
+    accentColor: z.string().regex(/^[0-9A-F]{6}$/),
+  }).strict(),
+  slides: z.array(SlideSchema).min(1).max(200),
+  assetIds: z.array(boundedId).max(10_000).default([]),
+}).strict().superRefine((deck, context) => {
+  const slideIds = deck.slides.map((slide) => slide.id);
+  if (new Set(slideIds).size !== slideIds.length) {
+    context.addIssue({ code: 'custom', path: ['slides'], message: 'Slide IDs must be unique.' });
+  }
+  const assets = new Set(deck.assetIds);
+  if (assets.size !== deck.assetIds.length) {
+    context.addIssue({ code: 'custom', path: ['assetIds'], message: 'Asset IDs must be unique.' });
+  }
+  deck.slides.forEach((slide, slideIndex) => slide.elements.forEach((element, elementIndex) => {
+    if (element.type === 'image' && !assets.has(element.assetId)) {
+      context.addIssue({
+        code: 'custom', path: ['slides', slideIndex, 'elements', elementIndex, 'assetId'],
+        message: 'Unknown slide asset ID.',
+      });
+    }
+  }));
+});
+
+const LegacySlidesArtifactContentSchema = z.object({
+  kind: z.literal('slides'), schemaVersion: z.literal(1),
+}).passthrough();
+
 const NonCodeArtifactContentSchema = z
   .object({
-    kind: z.enum(['document', 'form', 'slides']),
+    kind: z.enum(['document', 'form']),
     schemaVersion: z.number().int().min(1).max(1000),
   })
   .passthrough();
@@ -362,6 +497,8 @@ export const ArtifactContentSchema = z.union([
   LegacySpreadsheetArtifactContentSchema,
   CanvasArtifactContentSchema,
   LegacyCanvasArtifactContentSchema,
+  SlidesArtifactContentSchema,
+  LegacySlidesArtifactContentSchema,
   NonCodeArtifactContentSchema,
 ]);
 
@@ -483,6 +620,10 @@ export type ArtifactStatus = z.infer<typeof ArtifactStatusSchema>;
 export type ArtifactDataClass = z.infer<typeof ArtifactDataClassSchema>;
 export type ArtifactMutationType = z.infer<typeof ArtifactMutationTypeSchema>;
 export type ArtifactDescriptor = z.infer<typeof ArtifactDescriptorSchema>;
+export type ArtifactAssetDescriptor = z.infer<typeof ArtifactAssetDescriptorSchema>;
+export type ArtifactAssetImportResult = z.infer<typeof ArtifactAssetImportResultSchema>;
+export type ArtifactAssetReadResult = z.infer<typeof ArtifactAssetReadResultSchema>;
+export type ArtifactAssetSelectResult = z.infer<typeof ArtifactAssetSelectResultSchema>;
 export type ArtifactRevision = z.infer<typeof ArtifactRevisionSchema>;
 export type ArtifactContent = z.infer<typeof ArtifactContentSchema>;
 export type CodeArtifactLanguage = z.infer<typeof CodeArtifactLanguageSchema>;
@@ -491,6 +632,7 @@ export type ArtifactLicenseCapability = z.output<typeof ArtifactLicenseCapabilit
 export type FlowArtifactContent = z.output<typeof FlowArtifactContentSchema>;
 export type SpreadsheetArtifactContent = z.output<typeof SpreadsheetArtifactContentSchema>;
 export type CanvasArtifactContent = z.output<typeof CanvasArtifactContentSchema>;
+export type SlidesArtifactContent = z.output<typeof SlidesArtifactContentSchema>;
 export type ArtifactReadResult = z.infer<typeof ArtifactReadResultSchema>;
 export type ArtifactOperationResult = z.infer<typeof ArtifactOperationResultSchema>;
 export type ArtifactMutationProposalResult = z.output<typeof ArtifactMutationProposalResultSchema>;
@@ -510,6 +652,20 @@ export interface ArtifactListRequest {
 export interface ArtifactGetRequest {
   artifactId: string;
   revisionId?: string;
+}
+
+export interface ArtifactAssetImportRequest {
+  ticket: string;
+  dataClass: ArtifactDataClass;
+  idempotencyKey: string;
+}
+
+export interface ArtifactEvidenceImportRequest {
+  evidenceId: string;
+  expectedSha256: string;
+  artifactId?: string;
+  title?: string;
+  idempotencyKey: string;
 }
 
 export interface ArtifactCreateRequest {

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+import struct
+import zlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,7 +17,11 @@ from imperaos.artifacts.migrations import (
     connect_artifact_metadata,
     migrate_artifact_metadata,
 )
-from imperaos.artifacts.models import ArtifactAssetDescriptor, ArtifactDataClass
+from imperaos.artifacts.models import (
+    ArtifactAssetDescriptor,
+    ArtifactDataClass,
+    can_transition_data_class,
+)
 
 DEFAULT_MAX_ASSET_BYTES = 20 * 1024 * 1024
 DEFAULT_WORKSPACE_ASSET_QUOTA_BYTES = 2 * 1024 * 1024 * 1024
@@ -41,7 +47,10 @@ class ArtifactAssetStore:
         self.filesystem = GuardedArtifactFilesystem(root)
         self.database_path = self.filesystem.metadata_root / "artifacts.sqlite3"
         self.max_asset_bytes = min(max_asset_bytes, DEFAULT_MAX_ASSET_BYTES)
-        self.workspace_quota_bytes = workspace_quota_bytes
+        self.workspace_quota_bytes = min(
+            workspace_quota_bytes,
+            DEFAULT_WORKSPACE_ASSET_QUOTA_BYTES,
+        )
         self.busy_timeout_ms = busy_timeout_ms
         migrate_artifact_metadata(
             self.database_path,
@@ -88,6 +97,19 @@ class ArtifactAssetStore:
             self._raise_type_unsupported("magic_bytes_unknown")
         if declared_media_type != detected_media_type:
             self._raise_type_unsupported("declared_mime_mismatch")
+        try:
+            detected_width, detected_height = _validate_raster_structure(
+                payload,
+                detected_media_type,
+            )
+        except ValueError:
+            self._raise_type_unsupported("image_structure_invalid")
+        if width is not None and width != detected_width:
+            self._raise_type_unsupported("image_dimensions_mismatch")
+        if height is not None and height != detected_height:
+            self._raise_type_unsupported("image_dimensions_mismatch")
+        width = detected_width
+        height = detected_height
 
         existing = self._find_by_hash(workspace_id, digest)
         if existing is not None:
@@ -95,7 +117,10 @@ class ArtifactAssetStore:
                 existing.relative_path,
                 expected_sha256=existing.sha256,
             )
-            return AssetImportResult(existing, True)
+            return AssetImportResult(
+                self._promote_data_class(existing, data_class),
+                True,
+            )
 
         current_usage = self.workspace_usage_bytes(workspace_id)
         if current_usage + len(payload) > self.workspace_quota_bytes:
@@ -226,8 +251,24 @@ class ArtifactAssetStore:
                     (descriptor.workspace_id, descriptor.sha256),
                 ).fetchone()
                 if existing_row is not None:
-                    connection.rollback()
-                    return AssetImportResult(_asset_from_row(existing_row), True)
+                    existing = _asset_from_row(existing_row)
+                    promoted = existing
+                    if (
+                        existing.data_class is not descriptor.data_class
+                        and can_transition_data_class(
+                            existing.data_class,
+                            descriptor.data_class,
+                        )
+                    ):
+                        connection.execute(
+                            "UPDATE artifact_assets SET data_class = ? WHERE asset_id = ?",
+                            (descriptor.data_class.value, existing.asset_id),
+                        )
+                        promoted = existing.model_copy(
+                            update={"data_class": descriptor.data_class}
+                        )
+                    connection.commit()
+                    return AssetImportResult(promoted, True)
                 usage_row = connection.execute(
                     """
                     SELECT COALESCE(SUM(size_bytes), 0)
@@ -282,7 +323,45 @@ class ArtifactAssetStore:
                 ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
                 "asset metadata could not be committed",
             )
-        return AssetImportResult(existing, True)
+        return AssetImportResult(
+            self._promote_data_class(existing, descriptor.data_class),
+            True,
+        )
+
+    def _promote_data_class(
+        self,
+        descriptor: ArtifactAssetDescriptor,
+        requested: ArtifactDataClass,
+    ) -> ArtifactAssetDescriptor:
+        if descriptor.data_class is requested or not can_transition_data_class(
+            descriptor.data_class,
+            requested,
+        ):
+            return descriptor
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM artifact_assets WHERE asset_id = ? AND workspace_id = ?",
+                (descriptor.asset_id, descriptor.workspace_id),
+            ).fetchone()
+            if row is None:
+                connection.rollback()
+                raise ArtifactDomainError(
+                    ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                    "deduplicated asset metadata disappeared",
+                )
+            current = _asset_from_row(row)
+            if current.data_class is not requested and can_transition_data_class(
+                current.data_class,
+                requested,
+            ):
+                connection.execute(
+                    "UPDATE artifact_assets SET data_class = ? WHERE asset_id = ?",
+                    (requested.value, current.asset_id),
+                )
+                current = current.model_copy(update={"data_class": requested})
+            connection.commit()
+            return current
 
     def _quarantine_svg(self, payload: bytes, digest: str) -> str:
         relative_path = f"quarantine/unsafe-svg/{digest}.svg"
@@ -327,6 +406,185 @@ def _detect_media_type(payload: bytes) -> str | None:
     ):
         return "image/svg+xml"
     return None
+
+
+def _validate_raster_structure(payload: bytes, media_type: str) -> tuple[int, int]:
+    validators = {
+        "image/png": _validate_png,
+        "image/jpeg": _validate_jpeg,
+        "image/gif": _validate_gif,
+        "image/webp": _validate_webp,
+    }
+    validator = validators.get(media_type)
+    if validator is None:
+        raise ValueError("unsupported raster media type")
+    return validator(payload)
+
+
+def _validate_png(payload: bytes) -> tuple[int, int]:
+    if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("invalid PNG signature")
+    offset = 8
+    dimensions: tuple[int, int] | None = None
+    saw_idat = False
+    while offset < len(payload):
+        if offset + 12 > len(payload):
+            raise ValueError("truncated PNG chunk")
+        length = struct.unpack(">I", payload[offset : offset + 4])[0]
+        chunk_type = payload[offset + 4 : offset + 8]
+        end = offset + 12 + length
+        if end > len(payload):
+            raise ValueError("truncated PNG payload")
+        data = payload[offset + 8 : offset + 8 + length]
+        expected_crc = struct.unpack(">I", payload[offset + 8 + length : end])[0]
+        if zlib.crc32(chunk_type + data) & 0xFFFFFFFF != expected_crc:
+            raise ValueError("invalid PNG CRC")
+        if dimensions is None:
+            if chunk_type != b"IHDR" or length != 13:
+                raise ValueError("PNG must start with IHDR")
+            width, height = struct.unpack(">II", data[:8])
+            if width < 1 or height < 1:
+                raise ValueError("invalid PNG dimensions")
+            dimensions = (width, height)
+        elif chunk_type == b"IHDR":
+            raise ValueError("duplicate PNG IHDR")
+        if chunk_type == b"IDAT":
+            saw_idat = True
+        if chunk_type == b"IEND":
+            if length != 0 or not saw_idat or end != len(payload):
+                raise ValueError("invalid PNG end")
+            return dimensions
+        offset = end
+    raise ValueError("PNG is missing IEND")
+
+
+def _validate_gif(payload: bytes) -> tuple[int, int]:
+    if len(payload) < 14 or payload[:6] not in {b"GIF87a", b"GIF89a"}:
+        raise ValueError("invalid GIF header")
+    width, height = struct.unpack("<HH", payload[6:10])
+    if width < 1 or height < 1:
+        raise ValueError("invalid GIF dimensions")
+    packed = payload[10]
+    offset = 13 + (3 * (2 ** ((packed & 0x07) + 1)) if packed & 0x80 else 0)
+    saw_image = False
+
+    def skip_subblocks(start: int) -> int:
+        cursor = start
+        while cursor < len(payload):
+            size = payload[cursor]
+            cursor += 1
+            if size == 0:
+                return cursor
+            cursor += size
+            if cursor > len(payload):
+                break
+        raise ValueError("truncated GIF data blocks")
+
+    while offset < len(payload):
+        marker = payload[offset]
+        offset += 1
+        if marker == 0x3B:
+            if not saw_image or offset != len(payload):
+                raise ValueError("invalid GIF trailer")
+            return width, height
+        if marker == 0x21:
+            if offset >= len(payload):
+                raise ValueError("truncated GIF extension")
+            offset = skip_subblocks(offset + 1)
+            continue
+        if marker != 0x2C or offset + 9 > len(payload):
+            raise ValueError("invalid GIF block")
+        descriptor = payload[offset : offset + 9]
+        offset += 9
+        local_packed = descriptor[8]
+        if local_packed & 0x80:
+            offset += 3 * (2 ** ((local_packed & 0x07) + 1))
+        if offset >= len(payload):
+            raise ValueError("truncated GIF image")
+        offset = skip_subblocks(offset + 1)
+        saw_image = True
+    raise ValueError("GIF is missing trailer")
+
+
+def _validate_jpeg(payload: bytes) -> tuple[int, int]:
+    if len(payload) < 4 or not payload.startswith(b"\xff\xd8"):
+        raise ValueError("invalid JPEG header")
+    offset = 2
+    dimensions: tuple[int, int] | None = None
+    while offset < len(payload):
+        if payload[offset] != 0xFF:
+            raise ValueError("invalid JPEG marker")
+        while offset < len(payload) and payload[offset] == 0xFF:
+            offset += 1
+        if offset >= len(payload):
+            raise ValueError("truncated JPEG marker")
+        marker = payload[offset]
+        offset += 1
+        if marker == 0xD9:
+            if dimensions is None or offset != len(payload):
+                raise ValueError("invalid JPEG end")
+            return dimensions
+        if marker in {0x01, *range(0xD0, 0xD8)}:
+            continue
+        if offset + 2 > len(payload):
+            raise ValueError("truncated JPEG segment")
+        length = struct.unpack(">H", payload[offset : offset + 2])[0]
+        if length < 2 or offset + length > len(payload):
+            raise ValueError("invalid JPEG segment length")
+        data = payload[offset + 2 : offset + length]
+        if marker in {0xC0, 0xC1, 0xC2}:
+            if len(data) < 5:
+                raise ValueError("truncated JPEG dimensions")
+            height, width = struct.unpack(">HH", data[1:5])
+            if width < 1 or height < 1:
+                raise ValueError("invalid JPEG dimensions")
+            dimensions = (width, height)
+        offset += length
+        if marker == 0xDA:
+            while offset + 1 < len(payload):
+                if payload[offset] != 0xFF:
+                    offset += 1
+                    continue
+                next_byte = payload[offset + 1]
+                if next_byte in {0x00, *range(0xD0, 0xD8)}:
+                    offset += 2
+                    continue
+                break
+    raise ValueError("JPEG is missing EOI")
+
+
+def _validate_webp(payload: bytes) -> tuple[int, int]:
+    if len(payload) < 20 or payload[:4] != b"RIFF" or payload[8:12] != b"WEBP":
+        raise ValueError("invalid WebP header")
+    if struct.unpack("<I", payload[4:8])[0] + 8 != len(payload):
+        raise ValueError("invalid WebP RIFF size")
+    offset = 12
+    dimensions: tuple[int, int] | None = None
+    while offset + 8 <= len(payload):
+        chunk_type = payload[offset : offset + 4]
+        length = struct.unpack("<I", payload[offset + 4 : offset + 8])[0]
+        start = offset + 8
+        end = start + length
+        padded_end = end + (length & 1)
+        if padded_end > len(payload):
+            raise ValueError("truncated WebP chunk")
+        data = payload[start:end]
+        if chunk_type == b"VP8X" and len(data) >= 10:
+            width = int.from_bytes(data[4:7], "little") + 1
+            height = int.from_bytes(data[7:10], "little") + 1
+            dimensions = (width, height)
+        elif chunk_type == b"VP8 " and len(data) >= 10 and data[3:6] == b"\x9d\x01\x2a":
+            dimensions = (
+                struct.unpack("<H", data[6:8])[0] & 0x3FFF,
+                struct.unpack("<H", data[8:10])[0] & 0x3FFF,
+            )
+        elif chunk_type == b"VP8L" and len(data) >= 5 and data[0] == 0x2F:
+            bits = int.from_bytes(data[1:5], "little")
+            dimensions = ((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1)
+        offset = padded_end
+    if offset != len(payload) or dimensions is None or min(dimensions) < 1:
+        raise ValueError("invalid WebP image data")
+    return dimensions
 
 
 def _asset_from_row(row: sqlite3.Row) -> ArtifactAssetDescriptor:

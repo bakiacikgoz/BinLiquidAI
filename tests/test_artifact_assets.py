@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 
 import pytest
@@ -8,8 +9,11 @@ from imperaos.artifacts.assets import ArtifactAssetStore
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import ArtifactDataClass
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"p" * 12
+PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
 JPEG = b"\xff\xd8\xff\xe0" + b"j" * 16
+GIF = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==")
 
 
 def test_assets_validate_magic_store_by_hash_and_deduplicate_per_workspace(
@@ -42,6 +46,39 @@ def test_assets_validate_magic_store_by_hash_and_deduplicate_per_workspace(
     assert store.workspace_usage_bytes("workspace-1") == len(PNG)
 
 
+def test_asset_dedup_promotes_classification_and_never_downgrades(tmp_path: Path) -> None:
+    store = ArtifactAssetStore(tmp_path / "artifact-root")
+    first = store.import_bytes(
+        "workspace-1",
+        PNG,
+        declared_media_type="image/png",
+        data_class=ArtifactDataClass.INTERNAL,
+        created_by_id="user-1",
+    )
+    promoted = store.import_bytes(
+        "workspace-1",
+        PNG,
+        declared_media_type="image/png",
+        data_class=ArtifactDataClass.CONFIDENTIAL,
+        created_by_id="user-2",
+    )
+    lower_request = store.import_bytes(
+        "workspace-1",
+        PNG,
+        declared_media_type="image/png",
+        data_class=ArtifactDataClass.PUBLIC,
+        created_by_id="user-3",
+    )
+
+    assert promoted.descriptor.asset_id == first.descriptor.asset_id
+    assert promoted.descriptor.data_class is ArtifactDataClass.CONFIDENTIAL
+    assert lower_request.descriptor.data_class is ArtifactDataClass.CONFIDENTIAL
+    assert store.get_descriptor(
+        "workspace-1",
+        first.descriptor.asset_id,
+    ).data_class is ArtifactDataClass.CONFIDENTIAL
+
+
 def test_assets_reject_declared_mime_mismatch_and_unknown_magic(tmp_path: Path) -> None:
     store = ArtifactAssetStore(tmp_path / "artifact-root")
 
@@ -66,14 +103,50 @@ def test_assets_reject_declared_mime_mismatch_and_unknown_magic(tmp_path: Path) 
     assert unknown.value.code is ArtifactErrorCode.ARTIFACT_ASSET_TYPE_UNSUPPORTED
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"\x89PNG\r\n\x1a\n" + b"not-a-real-png",
+        PNG[:-8],
+        PNG + b"<script>polyglot</script>",
+    ],
+)
+def test_assets_reject_truncated_and_polyglot_images(
+    tmp_path: Path,
+    payload: bytes,
+) -> None:
+    store = ArtifactAssetStore(tmp_path / "artifact-root")
+
+    with pytest.raises(ArtifactDomainError) as caught:
+        store.import_bytes(
+            "workspace-1",
+            payload,
+            declared_media_type="image/png",
+            data_class=ArtifactDataClass.INTERNAL,
+            created_by_id="user-1",
+        )
+
+    assert caught.value.code is ArtifactErrorCode.ARTIFACT_ASSET_TYPE_UNSUPPORTED
+    assert caught.value.details == {"classification": "image_structure_invalid"}
+
+
+def test_workspace_asset_quota_cannot_exceed_the_governed_hard_cap(tmp_path: Path) -> None:
+    store = ArtifactAssetStore(
+        tmp_path / "artifact-root",
+        workspace_quota_bytes=4 * 1024 * 1024 * 1024,
+    )
+
+    assert store.workspace_quota_bytes == 2 * 1024 * 1024 * 1024
+
+
 def test_assets_enforce_individual_and_workspace_quotas(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ArtifactAssetStore(
         tmp_path / "artifact-root",
-        max_asset_bytes=32,
-        workspace_quota_bytes=45,
+        max_asset_bytes=100,
+        workspace_quota_bytes=len(PNG) + len(GIF) - 1,
     )
     store.import_bytes(
         "workspace-1",
@@ -87,15 +160,15 @@ def test_assets_enforce_individual_and_workspace_quotas(
     with pytest.raises(ArtifactDomainError) as workspace_quota:
         store.import_bytes(
             "workspace-1",
-            JPEG + b"x" * 10,
-            declared_media_type="image/jpeg",
+            GIF,
+            declared_media_type="image/gif",
             data_class=ArtifactDataClass.INTERNAL,
             created_by_id="user-1",
         )
     with pytest.raises(ArtifactDomainError) as item_limit:
         store.import_bytes(
             "workspace-2",
-            PNG + b"x" * 30,
+            PNG + b"x" * 40,
             declared_media_type="image/png",
             data_class=ArtifactDataClass.INTERNAL,
             created_by_id="user-1",

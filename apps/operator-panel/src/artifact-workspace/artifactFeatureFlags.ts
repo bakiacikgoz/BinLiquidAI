@@ -9,3 +9,7 @@ export function isArtifactCodeEditorEnabled(value: string | undefined): boolean 
 export function isArtifactFlowEditorEnabled(value: string | undefined): boolean {
   return value === '1';
 }
+
+export function isArtifactSlidesEditorEnabled(value: string | undefined): boolean {
+  return value === '1';
+}

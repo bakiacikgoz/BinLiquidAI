@@ -23,6 +23,9 @@ export default defineConfig({
       'Content-Security-Policy': productionCsp,
     },
   },
+  worker: {
+    format: 'es',
+  },
   test: {
     environment: 'jsdom',
     exclude: ['e2e/**', 'node_modules/**', 'dist/**'],

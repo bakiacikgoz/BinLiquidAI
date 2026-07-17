@@ -21,6 +21,7 @@ class ArtifactPermission(StrEnum):
     DUPLICATE = "artifact.duplicate"
     EXPORT = "artifact.export"
     ASSET_IMPORT = "artifact.asset.import"
+    IMPORT_EVIDENCE = "artifact.import_evidence"
     FORM_SUBMIT = "artifact.form.submit"
     AI_PROPOSE = "artifact.ai.propose"
     AI_APPLY = "artifact.ai.apply"
@@ -48,6 +49,7 @@ _EDITOR_PERMISSIONS = _VIEWER_PERMISSIONS | {
     ArtifactPermission.DUPLICATE,
     ArtifactPermission.EXPORT,
     ArtifactPermission.ASSET_IMPORT,
+    ArtifactPermission.IMPORT_EVIDENCE,
     ArtifactPermission.FORM_SUBMIT,
     ArtifactPermission.AI_PROPOSE,
 }
@@ -73,6 +75,7 @@ _ASSISTANT_ALWAYS_DENIED = {
     ArtifactPermission.DUPLICATE,
     ArtifactPermission.EXPORT,
     ArtifactPermission.ASSET_IMPORT,
+    ArtifactPermission.IMPORT_EVIDENCE,
     ArtifactPermission.FORM_SUBMIT,
 }
 

@@ -12,6 +12,9 @@ vi.mock('./code/CodeArtifactEditor', () => ({
 vi.mock('./flow/FlowArtifactEditor', () => ({
   FlowArtifactEditor: () => <div aria-label="Governed flow editor">Text outline</div>,
 }));
+vi.mock('./slides/SlidesArtifactEditor', () => ({
+  SlidesArtifactEditor: () => <div aria-label="Structured slides editor">Slide navigator</div>,
+}));
 
 const artifact = {
   artifactId: 'artifact-form-host', workspaceId: 'workspace-1', kind: 'form', title: 'Host form', status: 'active',
@@ -29,6 +32,25 @@ const revision = {
 } satisfies ArtifactRevision;
 
 describe('ArtifactEditorHost form integration', () => {
+  it('lazy-loads slides only through the scoped feature gate', async () => {
+    const slidesArtifact = { ...artifact, artifactId: 'slides-1', kind: 'slides' as const, schemaVersion: 2 };
+    const slidesRevision = { ...revision, artifactId: 'slides-1', schemaVersion: 2 };
+    const content = {
+      kind: 'slides' as const, schemaVersion: 2 as const,
+      theme: { name: 'ImperaOS', backgroundColor: 'FFFFFF', foregroundColor: '172033', accentColor: '6E57FF' },
+      slides: [{ id: 'slide-1', elements: [] }], assetIds: [],
+    };
+    const props = {
+      artifact: slidesArtifact, revision: slidesRevision, content, mode: 'edit' as const,
+      saveState: 'idle' as const, onChange: () => undefined, onSelectionChange: () => undefined,
+      onRequestExport: () => undefined,
+    };
+    const { rerender } = render(<ArtifactEditorHost {...props} />);
+    expect(screen.getByRole('status')).toHaveTextContent('disabled by policy');
+    rerender(<ArtifactEditorHost {...props} slidesEnabled />);
+    expect(await screen.findByLabelText('Structured slides editor')).toBeInTheDocument();
+  });
+
   it('keeps the form editor forced off unless explicitly enabled', () => {
     render(
       <ArtifactEditorHost
