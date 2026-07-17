@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { ArtifactFormSubmissionRequest, ArtifactFormSubmissionResult } from './artifactContracts';
 import { ArtifactEditorHost } from './editors/ArtifactEditorHost';
@@ -28,14 +28,23 @@ export function AssistantInlineFormPart({
   workspaceEnabled?: boolean;
   formEnabled?: boolean;
 }) {
+  const requestedArtifactId = useRef<string | null>(null);
   useEffect(() => {
-    if (!tab && !loading) onLoad(artifactId);
+    if (!tab && !loading && requestedArtifactId.current !== artifactId) {
+      requestedArtifactId.current = artifactId;
+      onLoad(artifactId);
+    }
   }, [artifactId, loading, onLoad, tab]);
 
   if (!tab) {
     return (
       <div className="assistant-inline-form" role="status">
         {locale === 'tr' ? 'GÃ¼venli form yÃ¼kleniyorâ€¦' : 'Loading governed formâ€¦'}
+        {!loading ? (
+          <button type="button" onClick={() => onLoad(artifactId)}>
+            {locale === 'tr' ? 'Formu yeniden dene' : 'Retry form'}
+          </button>
+        ) : null}
       </div>
     );
   }

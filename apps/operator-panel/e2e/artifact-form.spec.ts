@@ -43,9 +43,10 @@ test('governed form stays CSP-safe, memory-only, explicit, and approval-bound', 
   await openPrimaryView(page, 'AI Assistant', 'Welcome to ImperaOS Assistant');
   await page.getByLabel('Message').fill('Open a governed form artifact.');
   await page.getByLabel('Message').press('Enter');
-  await page.keyboard.press('F8');
   const openForm = page.getByRole('button', { name: 'Open Intake form' });
   await expect(openForm).toBeVisible();
+  await page.keyboard.press('F8');
+  await openForm.click();
   const inlineForm = page.getByRole('region', { name: 'Inline form: Intake form' });
   await expect(inlineForm).toBeVisible({ timeout: 30_000 });
   await page.context().setOffline(true);

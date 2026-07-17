@@ -138,6 +138,11 @@ export class ImperaTauriChatTransport implements ChatTransport<ImperaUIMessage> 
             const delta = readText(event.data, 'text', 'token', 'delta');
             if (delta) {
               emittedText = true;
+              controller.enqueue({
+                type: 'data-status',
+                id: event.eventId,
+                data: { event: event.event, data: event.data, sequence: event.sequence },
+              });
               controller.enqueue({ type: 'text-delta', id: textPartId, delta });
             }
             return;

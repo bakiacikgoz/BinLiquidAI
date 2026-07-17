@@ -73,6 +73,11 @@ describe('Impera Tauri AI SDK transport', () => {
     expect(await result).toEqual([
       { type: 'start', messageId: 'turn-1-assistant' },
       { type: 'text-start', id: 'turn-1-text' },
+      {
+        type: 'data-status',
+        id: 'event-1',
+        data: { event: 'text_delta', data: { text: 'Draft' }, sequence: 1 },
+      },
       { type: 'text-delta', id: 'turn-1-text', delta: 'Draft' },
       {
         type: 'data-artifact',

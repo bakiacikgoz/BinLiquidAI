@@ -7,9 +7,20 @@ const cspSafeDependencyRoots = {
   name: 'csp-safe-dependency-roots',
   enforce: 'pre' as const,
   transform(source: string, id: string) {
-    if (!id.includes('node_modules') || !source.includes("Function('return this')()")) return null
+    if (!id.includes('node_modules')) return null
+    const code = source
+      .replace(/\bFunction\(\s*(['"])return this\1\s*\)\(\)/g, 'globalThis')
+      .replace(
+        /\bFunction\(\s*(['"])r\1\s*,\s*(['"])regeneratorRuntime = r\2\s*\)\(([^)]*)\)/g,
+        '((r) => { globalThis.regeneratorRuntime = r; })($3)',
+      )
+      .replace(
+        /\bnew\s+Function\([^)]*\)/g,
+        '(() => { throw new TypeError("dynamic code disabled by CSP"); })',
+      )
+    if (code === source) return null
     return {
-      code: source.replaceAll("Function('return this')()", 'globalThis'),
+      code,
       map: null,
     }
   },
@@ -25,6 +36,7 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+    plugins: () => [cspSafeDependencyRoots],
   },
   test: {
     environment: 'jsdom',

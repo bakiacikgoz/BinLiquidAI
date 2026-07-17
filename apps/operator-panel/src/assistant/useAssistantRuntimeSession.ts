@@ -271,7 +271,9 @@ export function useAssistantRuntimeSession(
 
   const listen = useCallback<ImperaTauriTransportAdapter['listen']>(async (handler) => {
     pendingTurn.attachPreviewHandler(handler);
-    const unlisten = await listenAssistantEvents(handler);
+    const unlisten = isBridgePreviewMode()
+      ? () => undefined
+      : await listenAssistantEvents(handler);
     return () => {
       pendingTurn.detachPreviewHandler(handler);
       unlisten();

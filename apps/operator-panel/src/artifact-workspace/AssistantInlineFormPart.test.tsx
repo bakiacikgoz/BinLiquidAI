@@ -40,6 +40,8 @@ describe('AssistantInlineFormPart', () => {
     const view = render(<AssistantInlineFormPart {...props} tab={null} />);
     await waitFor(() => expect(onLoad).toHaveBeenCalledWith('artifact-form'));
     expect(screen.getByRole('status')).toHaveTextContent(/loading governed form/i);
+    view.rerender(<AssistantInlineFormPart {...props} tab={null} />);
+    expect(onLoad).toHaveBeenCalledTimes(1);
 
     view.rerender(<AssistantInlineFormPart {...props} tab={tab} />);
     await userEvent.click(screen.getByRole('button', { name: /expand in workbench/i }));
