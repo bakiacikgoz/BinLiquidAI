@@ -5,6 +5,13 @@ import { gotoOperatorPanel, openPrimaryView } from './helpers';
 
 test('document artifact edits, autosaves, reopens, restores history, and exports natively', async ({ page }) => {
   test.setTimeout(90_000);
+  const unexpectedRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = request.url();
+    if (!url.startsWith('http://127.0.0.1:5173') && !url.startsWith('blob:') && !url.startsWith('data:')) {
+      unexpectedRequests.push(url);
+    }
+  });
   const consoleHealth = await gotoOperatorPanel(page, { operatorId: 'e2e-operator' });
   await openPrimaryView(page, 'AI Assistant', 'Welcome to ImperaOS Assistant');
   await page.getByLabel('Message').fill('Create a governed document artifact.');
@@ -17,6 +24,7 @@ test('document artifact edits, autosaves, reopens, restores history, and exports
   const editor = workbench.getByRole('region', { name: 'Document editor: Launch plan' });
   await expect(editor).toBeVisible({ timeout: 30_000 });
   await expect(editor.getByRole('textbox')).toContainText('Initial governed draft');
+  await page.context().setOffline(true);
 
   await editor.getByRole('textbox').fill('Saved after autosave');
   await expect(workbench.getByLabel('Artifact status').getByText('saved')).toBeVisible({ timeout: 5_000 });
@@ -42,5 +50,6 @@ test('document artifact edits, autosaves, reopens, restores history, and exports
     'bridge_artifact_export_begin',
     'bridge_artifact_export_commit',
   ]);
+  expect(unexpectedRequests).toEqual([]);
   consoleHealth.assertNoCriticalErrors();
 });

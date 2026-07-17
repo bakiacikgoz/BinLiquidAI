@@ -676,18 +676,13 @@ class ArtifactStore:
     def get_artifact(self, workspace_id: str, artifact_id: str) -> ArtifactDescriptor:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM artifacts WHERE artifact_id = ?",
-                (artifact_id,),
+                "SELECT * FROM artifacts WHERE artifact_id = ? AND workspace_id = ?",
+                (artifact_id, workspace_id),
             ).fetchone()
         if row is None:
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_NOT_FOUND,
                 "artifact does not exist",
-            )
-        if row["workspace_id"] != workspace_id:
-            raise ArtifactDomainError(
-                ArtifactErrorCode.ARTIFACT_WORKSPACE_MISMATCH,
-                "artifact belongs to a different workspace",
             )
         return _artifact_from_row(row)
 

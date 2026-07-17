@@ -209,12 +209,14 @@ function toErrors(issues: ValidationIssue[]): RJSFValidationError[] {
 }
 
 function toErrorSchema(issues: ValidationIssue[]): ErrorSchema<Record<string, unknown>> {
-  const root: Record<string, unknown> = {};
+  const root: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   for (const issue of issues) {
     let current = root;
     for (const part of issue.path) {
       const child = current[part];
-      if (!isRecord(child)) current[part] = {};
+      if (!hasOwn(current, part) || !isRecord(child)) {
+        current[part] = Object.create(null) as Record<string, unknown>;
+      }
       current = current[part] as Record<string, unknown>;
     }
     const messages = Array.isArray(current.__errors) ? current.__errors as string[] : [];

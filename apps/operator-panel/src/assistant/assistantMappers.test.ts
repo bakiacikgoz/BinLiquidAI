@@ -55,6 +55,53 @@ describe('assistant mappers', () => {
     expect(state.turns[0].eventSequence).toBe(0);
   });
 
+  it('drops unknown event names instead of coercing them to status', () => {
+    const state = started();
+    const spoofed = {
+      contractVersion: '3.0',
+      assistantTurnId: 'turn-test',
+      sessionId: 'session-test',
+      event: 'artifact_patch_applied_without_approval',
+      sequence: 1,
+      timestampUtc: '2026-03-08T09:00:01Z',
+      data: { status: 'completed' },
+    };
+
+    expect(normalizeAssistantStreamEvent(spoofed)).toBeNull();
+    expect(mapCliAssistantEvent(spoofed, state)).toBe(state);
+  });
+
+  it('holds sequence gaps until the missing event arrives', () => {
+    const first = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0', assistantTurnId: 'turn-test', sessionId: 'session-test',
+        event: 'token', sequence: 1, timestampUtc: '2026-03-08T09:00:01Z', data: { text: 'A' },
+      },
+      started(),
+    );
+    const gap = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0', assistantTurnId: 'turn-test', sessionId: 'session-test',
+        event: 'token', sequence: 3, timestampUtc: '2026-03-08T09:00:03Z', data: { text: 'C' },
+      },
+      first,
+    );
+
+    expect(gap.turns[0].assistantMessage.text).toBe('A');
+    expect(gap.turns[0].eventSequence).toBe(1);
+    expect(gap.turns[0].assistantMessage.warning).toBe('Assistant event sequence gap detected.');
+
+    const recovered = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0', assistantTurnId: 'turn-test', sessionId: 'session-test',
+        event: 'token', sequence: 2, timestampUtc: '2026-03-08T09:00:02Z', data: { text: 'B' },
+      },
+      gap,
+    );
+    expect(recovered.turns[0].assistantMessage.text).toBe('AB');
+    expect(recovered.turns[0].eventSequence).toBe(2);
+  });
+
   it('appends token events and ignores duplicate sequences', () => {
     const state = started();
     const withToken = mapCliAssistantEvent(

@@ -62,4 +62,19 @@ describe('CSP-safe RJSF validator', () => {
   it('rejects responses above the 512 KiB byte ceiling', () => {
     expect(safeRjsfValidator.isValid({ type: 'object' }, { value: 'a'.repeat(512 * 1024) }, { type: 'object' })).toBe(false);
   });
+
+  it('never mutates Object.prototype while building adversarial error paths', () => {
+    const adversarial = JSON.parse('{"__proto__":{"selected source text":"secret"}}') as Record<string, unknown>;
+    const strictSchema = { type: 'object', additionalProperties: false } satisfies RJSFSchema;
+
+    try {
+      const result = safeRjsfValidator.validateFormData(adversarial, strictSchema);
+
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(Object.prototype).not.toHaveProperty('__errors');
+      expect(JSON.stringify(result)).not.toContain('selected source text');
+    } finally {
+      delete (Object.prototype as Record<string, unknown>).__errors;
+    }
+  });
 });

@@ -9,6 +9,13 @@ const SENSITIVE_RESPONSE = 'phase-13-sensitive-form-canary';
 test('governed form stays CSP-safe, memory-only, explicit, and approval-bound', async ({ page }) => {
   test.setTimeout(90_000);
   const responseHeaders: string[] = [];
+  const unexpectedRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = request.url();
+    if (!url.startsWith('http://127.0.0.1:5173') && !url.startsWith('blob:') && !url.startsWith('data:')) {
+      unexpectedRequests.push(url);
+    }
+  });
   page.on('response', (response) => {
     if (response.request().resourceType() === 'document') {
       responseHeaders.push(response.headers()['content-security-policy'] ?? '');
@@ -41,6 +48,7 @@ test('governed form stays CSP-safe, memory-only, explicit, and approval-bound', 
   await expect(openForm).toBeVisible();
   const inlineForm = page.getByRole('region', { name: 'Inline form: Intake form' });
   await expect(inlineForm).toBeVisible({ timeout: 30_000 });
+  await page.context().setOffline(true);
   const inlineField = inlineForm.getByLabel('Name');
   await expect(inlineField).toHaveAttribute('type', 'password');
   await inlineField.fill(SENSITIVE_RESPONSE);
@@ -83,5 +91,6 @@ test('governed form stays CSP-safe, memory-only, explicit, and approval-bound', 
   const violationCount = await violationEvidence.count();
   const violationDetail = violationCount > 0 ? await violationEvidence.first().getAttribute('content') : '';
   expect(violationCount, violationDetail ?? '').toBe(0);
+  expect(unexpectedRequests).toEqual([]);
   consoleHealth.assertNoCriticalErrors();
 });

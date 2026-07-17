@@ -159,6 +159,46 @@ def test_server_dispatches_service_calls_and_deduplicates_request_ids(tmp_path: 
     assert service.store.get_artifact("workspace-1", "artifact-1").current_revision_number == 1
 
 
+def test_cross_workspace_and_unknown_artifacts_are_indistinguishable(tmp_path: Path) -> None:
+    server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
+    created = server.handle_request(
+        _request(
+            "create-private-artifact",
+            ArtifactRpcMethod.ARTIFACT_CREATE,
+            {
+                "artifactId": "private-artifact",
+                "kind": "document",
+                "title": "Private artifact",
+                "dataClass": "internal",
+                "content": _document("private"),
+                "idempotencyKey": "create-private",
+            },
+            idempotency_key="create-private",
+        )
+    )
+    assert created.ok is True
+
+    foreign = _request(
+        "foreign-read",
+        ArtifactRpcMethod.ARTIFACT_GET,
+        {"artifactId": "private-artifact"},
+    ).model_copy(update={"workspace_id": "workspace-2"})
+    missing = _request(
+        "missing-read",
+        ArtifactRpcMethod.ARTIFACT_GET,
+        {"artifactId": "missing-artifact"},
+    ).model_copy(update={"workspace_id": "workspace-2"})
+
+    foreign_response = server.handle_request(foreign)
+    missing_response = server.handle_request(missing)
+
+    assert foreign_response.ok is False and missing_response.ok is False
+    assert foreign_response.error is not None and missing_response.error is not None
+    assert foreign_response.error.model_dump(exclude={"request_id"}) == (
+        missing_response.error.model_dump(exclude={"request_id"})
+    )
+
+
 def test_server_stdio_is_framed_protocol_only_and_shutdown_stops_admission(
     tmp_path: Path,
 ) -> None:

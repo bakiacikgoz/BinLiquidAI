@@ -192,7 +192,7 @@ def test_asset_lookup_is_workspace_scoped(tmp_path: Path) -> None:
     with pytest.raises(ArtifactDomainError) as caught:
         store.get_bytes("workspace-2", imported.descriptor.asset_id)
 
-    assert caught.value.code is ArtifactErrorCode.ARTIFACT_WORKSPACE_MISMATCH
+    assert caught.value.code is ArtifactErrorCode.ARTIFACT_NOT_FOUND
 
 
 def test_svg_is_quarantined_and_remote_fetch_is_fail_closed(tmp_path: Path) -> None:

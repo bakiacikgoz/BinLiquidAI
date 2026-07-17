@@ -401,6 +401,44 @@ def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: P
     assert wrong_executor.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
 
 
+def test_artifact_proposal_cross_workspace_lookup_is_indistinguishable(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    service.create(create_command(), user_context("artifact_admin"))
+    proposal = service.propose_mutation(
+        ProposeArtifactMutationCommand(
+            proposal_id="proposal-private",
+            artifact_id="artifact-1",
+            base_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content=document("Private proposal"),
+            idempotency_key="proposal-private-key",
+            summary="Private proposal",
+            context_sha256="1" * 64,
+            selection_sha256="2" * 64,
+        ),
+        assistant_context(),
+    )
+    foreign_context = assistant_context().model_copy(update={"workspace_id": "workspace-2"})
+
+    errors: list[ArtifactDomainError] = []
+    for proposal_id in (proposal.proposal_id, "proposal-missing"):
+        with pytest.raises(ArtifactDomainError) as caught:
+            service.apply_proposal(
+                ApplyArtifactProposalCommand(
+                    proposal_id=proposal_id,
+                    expected_revision_number=1,
+                    approval_id=proposal.approval_id,
+                ),
+                foreign_context,
+            )
+        errors.append(caught.value)
+
+    assert [(error.code, error.message) for error in errors] == [
+        (ArtifactErrorCode.ARTIFACT_NOT_FOUND, "artifact mutation proposal does not exist"),
+        (ArtifactErrorCode.ARTIFACT_NOT_FOUND, "artifact mutation proposal does not exist"),
+    ]
+
+
 def test_document_service_duplicate_and_archive_are_workspace_scoped(tmp_path: Path) -> None:
     service = ArtifactService(tmp_path / "artifact-root")
     admin = user_context("artifact_admin")

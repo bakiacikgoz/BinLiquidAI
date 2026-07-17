@@ -128,7 +128,7 @@ class FileArtifactEvidenceResolver:
             ) from exc
         if source.workspace_id != context.workspace_id or source.evidence_id != evidence_id:
             raise ArtifactDomainError(
-                ArtifactErrorCode.ARTIFACT_WORKSPACE_MISMATCH,
-                "evidence source identity does not match the requested workspace",
+                ArtifactErrorCode.ARTIFACT_NOT_FOUND,
+                "evidence source does not exist",
             )
         return source

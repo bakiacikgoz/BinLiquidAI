@@ -553,18 +553,16 @@ class ArtifactService:
     ) -> ArtifactOperationResult:
         with self.store._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM artifact_mutation_proposals WHERE proposal_id = ?",
-                (command.proposal_id,),
+                """
+                SELECT * FROM artifact_mutation_proposals
+                WHERE proposal_id = ? AND workspace_id = ?
+                """,
+                (command.proposal_id, context.workspace_id),
             ).fetchone()
         if row is None:
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_NOT_FOUND,
                 "artifact mutation proposal does not exist",
-            )
-        if row["workspace_id"] != context.workspace_id:
-            raise ArtifactDomainError(
-                ArtifactErrorCode.ARTIFACT_WORKSPACE_MISMATCH,
-                "proposal belongs to a different workspace",
             )
         artifact = self.store.get_artifact(context.workspace_id, row["artifact_id"])
         approval = self._proposal_approvals.claim(row, context, command.approval_id)
@@ -976,8 +974,8 @@ class ArtifactService:
         source = self.evidence_resolver.resolve(context, command.evidence_id)
         if source.workspace_id != context.workspace_id:
             raise ArtifactDomainError(
-                ArtifactErrorCode.ARTIFACT_WORKSPACE_MISMATCH,
-                "evidence source belongs to a different workspace",
+                ArtifactErrorCode.ARTIFACT_NOT_FOUND,
+                "evidence source does not exist",
             )
         if source.content_sha256 != command.expected_sha256:
             raise ArtifactDomainError(

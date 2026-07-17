@@ -50,9 +50,8 @@ test('code artifact uses local Monaco workers, autosaves, reopens, and exports w
   await expect(textbox).toHaveAttribute('aria-multiline', 'true');
   const monaco = editor.locator('.monaco-editor');
   await expect(monaco).toBeVisible({ timeout: 30_000 });
-  await monaco.click();
   await textbox.focus();
-  await page.keyboard.press('Control+A');
+  await page.context().setOffline(true);
   await textbox.evaluate((element, text) => {
     const input = element as HTMLTextAreaElement;
     input.value = text;
@@ -73,7 +72,9 @@ test('code artifact uses local Monaco workers, autosaves, reopens, and exports w
   await workbench.getByRole('button', { name: 'Export source' }).dispatchEvent('click');
   await expect.poll(async () => (await codeArtifactCommands(page)).filter((command) => command.includes('export')))
     .toEqual(['bridge_artifact_export_begin', 'bridge_artifact_export_commit']);
-  await expect.poll(() => codeArtifactExportedText(page)).toBe("print('saved locally')\n");
+  await expect.poll(() => codeArtifactExportedText(page)).toBe(
+    "print('saved locally')\nprint('display only')\n",
+  );
 
   expect(externalRequests).toEqual([]);
   const violations = page.locator('meta[name="artifact-code-csp-violation"]');

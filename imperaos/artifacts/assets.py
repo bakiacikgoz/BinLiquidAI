@@ -188,18 +188,13 @@ class ArtifactAssetStore:
     def get_descriptor(self, workspace_id: str, asset_id: str) -> ArtifactAssetDescriptor:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM artifact_assets WHERE asset_id = ?",
-                (asset_id,),
+                "SELECT * FROM artifact_assets WHERE asset_id = ? AND workspace_id = ?",
+                (asset_id, workspace_id),
             ).fetchone()
         if row is None:
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_NOT_FOUND,
                 "artifact asset does not exist",
-            )
-        if row["workspace_id"] != workspace_id:
-            raise ArtifactDomainError(
-                ArtifactErrorCode.ARTIFACT_WORKSPACE_MISMATCH,
-                "artifact asset belongs to a different workspace",
             )
         return _asset_from_row(row)
 

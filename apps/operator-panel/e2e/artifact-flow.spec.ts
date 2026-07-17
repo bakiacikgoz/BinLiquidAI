@@ -24,6 +24,7 @@ test('flow artifact edits through React Flow, exposes an outline, and exports sa
   const workbench = page.getByRole('complementary', { name: 'Workbench' });
   const editor = workbench.getByRole('region', { name: 'Flow editor: Approval flow' });
   await expect(editor).toBeVisible({ timeout: 30_000 });
+  await page.context().setOffline(true);
   const outline = editor.getByRole('navigation', { name: 'Flow outline' });
   await expect(outline).toContainText('<Start>');
   await expect(outline).toContainText('Review');

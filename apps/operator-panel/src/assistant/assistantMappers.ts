@@ -140,8 +140,8 @@ function appendTimeline(turn: AssistantTurn, event: AssistantStreamEvent, item: 
   ];
 }
 
-function normalizeEventName(value: unknown): AssistantStreamEventType {
-  const raw = typeof value === 'string' ? value : 'status';
+function normalizeEventName(value: unknown): AssistantStreamEventType | null {
+  const raw = typeof value === 'string' ? value : '';
   const allowed: AssistantStreamEventType[] = [
     'status',
     'token',
@@ -165,7 +165,7 @@ function normalizeEventName(value: unknown): AssistantStreamEventType {
     'error',
     'cancelled',
   ];
-  return allowed.includes(raw as AssistantStreamEventType) ? (raw as AssistantStreamEventType) : 'status';
+  return allowed.includes(raw as AssistantStreamEventType) ? (raw as AssistantStreamEventType) : null;
 }
 
 export function normalizeAssistantStreamEvent(value: unknown): AssistantStreamEvent | null {
@@ -174,12 +174,14 @@ export function normalizeAssistantStreamEvent(value: unknown): AssistantStreamEv
   if (contractVersion !== OPERATOR_PANEL_CONTRACT_VERSION) {
     return null;
   }
+  const event = normalizeEventName(record.event);
+  if (event === null) return null;
   return {
     contractVersion,
     eventId: readString(record, 'eventId') || undefined,
     assistantTurnId: readString(record, 'assistantTurnId'),
     sessionId: readString(record, 'sessionId'),
-    event: normalizeEventName(record.event),
+    event,
     sequence: typeof record.sequence === 'number' ? record.sequence : 0,
     timestampUtc: readString(record, 'timestampUtc', nowUtc()),
     traceId: readString(record, 'traceId') || undefined,
@@ -233,6 +235,10 @@ export function mapCliAssistantEvent(
   const turn = turns[turnIndex];
   if (event.sequence <= turn.eventSequence) {
     return previous;
+  }
+  if (event.event !== 'cancelled' && turn.eventSequence > 0 && event.sequence > turn.eventSequence + 1) {
+    turn.assistantMessage.warning = 'Assistant event sequence gap detected.';
+    return { ...previous, turns, error: null };
   }
 
   const data = unwrapTraceData(event.data);
