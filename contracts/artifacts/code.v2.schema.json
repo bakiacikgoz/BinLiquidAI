@@ -1,6 +1,34 @@
 {
   "$id": "https://schemas.imperaos.local/artifacts/code.v2.schema.json",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "text": {
+            "pattern": "^[^\\r]*$"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "lineEnding": {
+            "const": "crlf"
+          }
+        },
+        "required": [
+          "lineEnding"
+        ]
+      },
+      "then": {
+        "properties": {
+          "text": {
+            "pattern": "^(?![\\s\\S]*(?:\\r(?!\\n)|[^\\r]\\n|^\\n))[\\s\\S]*$"
+          }
+        }
+      }
+    }
+  ],
   "properties": {
     "executionPolicy": {
       "const": "deny",
@@ -11,6 +39,7 @@
     "filename": {
       "maxLength": 255,
       "minLength": 1,
+      "pattern": "^(?![ .])(?!.*[ .]$)(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|$))[^<>:\\\"/\\\\|?*\\u0000-\\u001f\\u007f-\\u009f\\u200b-\\u200f\\u202a-\\u202e\\u2060-\\u206f\\ufeff]+$",
       "title": "Filename",
       "type": "string"
     },

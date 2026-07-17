@@ -8,7 +8,12 @@ from typing import Any, Protocol
 
 from pydantic import Field, JsonValue, model_validator
 
-from imperaos.artifacts.context import ArtifactContextRequest
+from imperaos.artifacts.context import (
+    MAX_CONTEXT_BYTES,
+    ArtifactContextPack,
+    ArtifactContextRequest,
+)
+from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import (
     ArtifactDataClass,
     ArtifactModel,
@@ -129,13 +134,19 @@ class ArtifactAssistantToolLoop:
             binder(prompt_data_class)
         messages: list[dict[str, object]] = [{"role": "user", "content": prompt}]
         events: list[dict[str, JsonValue]] = []
+        grant_request: ArtifactContextRequest | None = None
+        grant_pack: ArtifactContextPack | None = None
+        effective_data_class = prompt_data_class
         if initial_context is not None:
             request = ArtifactContextRequest.model_validate(initial_context)
+            grant_request = request
             result = self._registry.invoke(
                 "artifact.get_context",
                 request.model_dump(mode="json", by_alias=True),
                 context,
             )
+            grant_pack = ArtifactContextPack.model_validate(result)
+            effective_data_class = _maximum_data_class(effective_data_class, grant_pack.data_class)
             _bind_result_classification(provider, result)
             self._append_result(
                 messages,
@@ -144,6 +155,7 @@ class ArtifactAssistantToolLoop:
                 tool_name="artifact.get_context",
                 result=result,
             )
+            _enforce_provider_message_budget(messages)
 
         tools = self._registry.provider_tools()
         for _ in range(self._max_tool_calls + 1):
@@ -158,8 +170,26 @@ class ArtifactAssistantToolLoop:
             call = response.tool_call
             if call is None:
                 raise AssertionError("validated response omitted both terminal forms")
-            result = self._registry.invoke(call.name, call.arguments, context)
+            arguments = dict(call.arguments)
+            if call.name == "artifact.get_context":
+                requested = ArtifactContextRequest.model_validate(arguments)
+                _require_context_subset(grant_request, requested)
+            elif call.name == "artifact.propose_mutation":
+                _require_grant_bound_proposal(grant_pack, arguments)
+            elif call.name == "artifact.request_export":
+                _require_grant_bound_export(grant_pack, arguments)
+            elif call.name in {"artifact.create_draft", "artifact.request_form"}:
+                requested_class = ArtifactDataClass(arguments.get("dataClass", "public"))
+                arguments["dataClass"] = _maximum_data_class(
+                    effective_data_class, requested_class
+                ).value
+            result = self._registry.invoke(call.name, arguments, context)
             _bind_result_classification(provider, result)
+            observed_class = _result_data_class(result)
+            if observed_class is not None:
+                effective_data_class = _maximum_data_class(
+                    effective_data_class, observed_class
+                )
             messages.append(
                 {
                     "role": "assistant",
@@ -173,6 +203,7 @@ class ArtifactAssistantToolLoop:
                 tool_name=call.name,
                 result=result,
             )
+            _enforce_provider_message_budget(messages)
         raise ValueError("artifact assistant tool budget exceeded")
 
     @staticmethod
@@ -185,6 +216,8 @@ class ArtifactAssistantToolLoop:
         result: ArtifactModel,
     ) -> None:
         payload = result.model_dump(mode="json", by_alias=True)
+        if isinstance(result, ArtifactContextPack):
+            payload.pop("canonicalProjection", None)
         messages.append(
             {
                 "role": "tool",
@@ -217,6 +250,87 @@ class ArtifactAssistantToolLoop:
         }
         summary.update({key: payload[key] for key in summary_keys if key in payload})
         events.append(summary)
+
+
+def _maximum_data_class(
+    left: ArtifactDataClass,
+    right: ArtifactDataClass,
+) -> ArtifactDataClass:
+    rank = {
+        ArtifactDataClass.PUBLIC: 0,
+        ArtifactDataClass.INTERNAL: 1,
+        ArtifactDataClass.CONFIDENTIAL: 2,
+        ArtifactDataClass.REGULATED: 3,
+    }
+    return left if rank[left] >= rank[right] else right
+
+
+def _result_data_class(result: ArtifactModel) -> ArtifactDataClass | None:
+    value = result.model_dump(mode="python", by_alias=True).get("dataClass")
+    return ArtifactDataClass(value) if value is not None else None
+
+
+def _require_context_subset(
+    grant: ArtifactContextRequest | None,
+    requested: ArtifactContextRequest,
+) -> None:
+    if grant is None:
+        _deny_context_expansion()
+    assert grant is not None
+    requested_scopes = set(requested.allowed_scopes)
+    if (
+        requested.artifact_id != grant.artifact_id
+        or requested.revision_id != grant.revision_id
+        or requested.purpose != grant.purpose
+        or not requested_scopes.issubset(grant.allowed_scopes)
+        or (
+            requested.selection is not None
+            and requested.selection != grant.selection
+        )
+    ):
+        _deny_context_expansion()
+
+
+def _require_grant_bound_proposal(
+    grant: ArtifactContextPack | None,
+    arguments: dict[str, JsonValue],
+) -> None:
+    if (
+        grant is None
+        or arguments.get("artifactId") != grant.artifact_id
+        or arguments.get("contextSha256") != grant.projection_sha256
+        or arguments.get("selectionSha256") != grant.selection_sha256
+    ):
+        _deny_context_expansion()
+
+
+def _require_grant_bound_export(
+    grant: ArtifactContextPack | None,
+    arguments: dict[str, JsonValue],
+) -> None:
+    if (
+        grant is None
+        or arguments.get("artifactId") != grant.artifact_id
+        or arguments.get("revisionId") != grant.revision_id
+    ):
+        _deny_context_expansion()
+
+
+def _deny_context_expansion() -> None:
+    raise ArtifactDomainError(
+        ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+        "artifact tool request exceeds the trusted per-turn context grant",
+        details={"reasonCode": "ARTIFACT_CONTEXT_GRANT_EXCEEDED"},
+    )
+
+
+def _enforce_provider_message_budget(messages: list[dict[str, object]]) -> None:
+    if len(canonical_json(messages).encode("utf-8")) > MAX_CONTEXT_BYTES:
+        raise ArtifactDomainError(
+            ArtifactErrorCode.ARTIFACT_CONTENT_TOO_LARGE,
+            "artifact assistant provider message budget exceeded",
+            details={"reasonCode": "ARTIFACT_CONTEXT_BUDGET_EXCEEDED"},
+        )
 
 
 def _bind_result_classification(

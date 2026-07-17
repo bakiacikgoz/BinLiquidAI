@@ -150,6 +150,7 @@ impl ExportBoundaryError {
     }
 }
 
+#[derive(Clone)]
 struct ExportTicketRecord {
     target: PathBuf,
     binding: ExportBinding,
@@ -270,7 +271,7 @@ impl ArtifactExportState {
         bytes: Vec<u8>,
         expected_sha256: &str,
     ) -> Result<ArtifactExportResult, ExportBoundaryError> {
-        let record = self.take_ticket(ticket, binding).await?;
+        let record = self.record_for_ticket(ticket, binding).await?;
         if bytes.len() > record.max_bytes {
             return Err(ExportBoundaryError::failed(
                 "artifact export exceeds its ticket size boundary",
@@ -316,6 +317,14 @@ impl ArtifactExportState {
         })
     }
 
+    pub async fn finalize(
+        &self,
+        ticket: &str,
+        binding: &ExportBinding,
+    ) -> Result<(), ExportBoundaryError> {
+        self.take_ticket(ticket, binding).await.map(|_| ())
+    }
+
     pub async fn cancel(
         &self,
         ticket: &str,
@@ -347,6 +356,25 @@ impl ArtifactExportState {
         tickets
             .remove(ticket)
             .ok_or_else(ExportBoundaryError::cancelled)
+    }
+
+    async fn record_for_ticket(
+        &self,
+        ticket: &str,
+        binding: &ExportBinding,
+    ) -> Result<ExportTicketRecord, ExportBoundaryError> {
+        let mut tickets = self.tickets.lock().await;
+        let record = tickets
+            .get(ticket)
+            .ok_or_else(ExportBoundaryError::cancelled)?;
+        if !record.binding.same_actor(binding) {
+            return Err(ExportBoundaryError::permission_denied());
+        }
+        if record.expires_at <= Instant::now() {
+            tickets.remove(ticket);
+            return Err(ExportBoundaryError::cancelled());
+        }
+        Ok(record.clone())
     }
 }
 
@@ -554,6 +582,14 @@ mod tests {
             assert_eq!(std::fs::read(&target).expect("target"), bytes);
             assert_eq!(result.sha256, digest);
             assert_eq!(result.size_bytes, 15);
+            assert!(state
+                .binding_for_ticket(&issued.ticket, &binding("user-1"))
+                .await
+                .is_ok());
+            state
+                .finalize(&issued.ticket, &binding("user-1"))
+                .await
+                .expect("terminal authority acknowledgement");
             assert!(state
                 .commit(&issued.ticket, &binding("user-1"), Vec::new(), &digest)
                 .await

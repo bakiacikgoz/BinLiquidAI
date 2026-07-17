@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 from pydantic import ValidationError
 
+from imperaos.artifacts.commands import MutateArtifactCommand, ProposeArtifactMutationCommand
 from imperaos.artifacts.errors import ArtifactErrorCode
 from imperaos.artifacts.models import (
     ARTIFACT_CONTENT_LIMITS_BYTES,
@@ -129,6 +130,31 @@ def test_data_class_transition_is_monotonic() -> None:
     assert not can_transition_data_class(ArtifactDataClass.REGULATED, ArtifactDataClass.PUBLIC)
 
 
+@pytest.mark.parametrize("command_type", [MutateArtifactCommand, ProposeArtifactMutationCommand])
+@pytest.mark.parametrize("reserved_type", ["import_evidence", "slide_patch", "cell_patch"])
+def test_general_mutation_contract_rejects_reserved_provenance_and_patch_types(
+    command_type: type,
+    reserved_type: str,
+) -> None:
+    payload = {
+        "artifactId": "artifact-1",
+        "mutationType": reserved_type,
+        "content": {"kind": "document", "schemaVersion": 1, "blocks": []},
+        "idempotencyKey": "mutation-1",
+    }
+    if command_type is MutateArtifactCommand:
+        payload["expectedRevisionNumber"] = 1
+    else:
+        payload.update({
+            "baseRevisionNumber": 1,
+            "contextSha256": "a" * 64,
+            "selectionSha256": "b" * 64,
+        })
+
+    with pytest.raises(ValidationError):
+        command_type.model_validate(payload)
+
+
 def test_artifact_limits_and_reason_codes_cover_the_plan_contract() -> None:
     assert set(ARTIFACT_CONTENT_LIMITS_BYTES) == set(ArtifactKind)
     assert ARTIFACT_CONTENT_LIMITS_BYTES[ArtifactKind.DOCUMENT] == 5 * 1024 * 1024
@@ -161,4 +187,5 @@ def test_artifact_limits_and_reason_codes_cover_the_plan_contract() -> None:
         "FORM_SENSITIVE_PERSISTENCE_DENIED",
         "ASSISTANT_EVENT_SEQUENCE_GAP",
         "ASSISTANT_ARTIFACT_PART_INVALID",
+        "IDEMPOTENCY_KEY_REUSE_MISMATCH",
     }

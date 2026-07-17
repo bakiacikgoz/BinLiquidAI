@@ -66,7 +66,7 @@ export function CodeArtifactEditor({
       ) : null}
       {legacyReadonly ? (
         <p className="artifact-workspace-banner">
-          Legacy code revision opened read-only. Duplicate it into the current schema to edit.
+          Legacy code revision opened read-only. Create a new current-schema code artifact to edit a reviewed copy.
         </p>
       ) : null}
       {!largeReadonly && !editable ? (

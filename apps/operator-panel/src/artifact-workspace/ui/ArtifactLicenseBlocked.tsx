@@ -4,7 +4,7 @@ type Props = {
   artifact: ArtifactDescriptor;
   content: ArtifactContent;
   capability: ArtifactLicenseCapability;
-  onExportJson?(): void;
+  onExport?(format: 'json' | 'svg' | 'png'): void;
 };
 
 function boundedSummary(content: ArtifactContent): string {
@@ -39,7 +39,7 @@ function boundedSummary(content: ArtifactContent): string {
   return encoded.length <= 8_192 ? encoded : `${encoded.slice(0, 8_192)}\n…`;
 }
 
-export function ArtifactLicenseBlocked({ artifact, content, capability, onExportJson }: Props) {
+export function ArtifactLicenseBlocked({ artifact, content, capability, onExport }: Props) {
   return (
     <section className="artifact-license-blocked" aria-label={`${artifact.kind} read-only fallback`}>
       <div className="artifact-workspace-banner" role="status">
@@ -51,8 +51,12 @@ export function ArtifactLicenseBlocked({ artifact, content, capability, onExport
         export actions are offered. Editing, paste, save, and AI apply are disabled.
       </p>
       <pre aria-label={`${artifact.kind} bounded content summary`}>{boundedSummary(content)}</pre>
-      {artifact.kind === 'canvas' && onExportJson ? (
-        <button type="button" onClick={onExportJson}>Export JSON</button>
+      {artifact.kind === 'canvas' && onExport ? (
+        <div role="group" aria-label="Canvas safe exports">
+          <button type="button" onClick={() => onExport('json')}>Export JSON</button>
+          <button type="button" onClick={() => onExport('svg')}>Export SVG</button>
+          <button type="button" onClick={() => onExport('png')}>Export PNG</button>
+        </div>
       ) : null}
       {artifact.kind === 'spreadsheet' ? (
         <p>Use the verified sheet-specific CSV or complete-workbook XLSX actions below.</p>

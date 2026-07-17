@@ -12,6 +12,7 @@ from imperaos.artifacts.assistant import (
     extract_artifact_context_request,
 )
 from imperaos.artifacts.commands import CreateArtifactCommand
+from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import (
     ArtifactDataClass,
     ArtifactKind,
@@ -112,6 +113,145 @@ def test_artifact_assistant_loop_exposes_exact_tools_and_invokes_results(tmp_pat
     ]
     assert all("projection" not in event for event in result.events)
     assert "bounded context" in str(provider.calls[-1][0])
+    assert "canonicalProjection" not in str(provider.calls[-1][0])
+
+
+def test_model_cannot_expand_the_trusted_context_grant(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    first = service.create(
+        CreateArtifactCommand(
+            artifact_id="artifact-1", kind="document", title="First", data_class="internal",
+            content=_document(), idempotency_key="create-first",
+        ),
+        _context(),
+    )
+    second = service.create(
+        CreateArtifactCommand(
+            artifact_id="artifact-2", kind="document", title="Second", data_class="internal",
+            content=_document(), idempotency_key="create-second",
+        ),
+        _context(),
+    )
+
+    class ExpandingProvider:
+        def complete(self, messages, tools):
+            del messages, tools
+            return ArtifactAssistantProviderResponse(
+                tool_call=ArtifactAssistantToolCall(
+                    call_id="expand-1",
+                    name="artifact.get_context",
+                    arguments={
+                        "artifactId": "artifact-2",
+                        "revisionId": second.revision.revision_id,
+                        "purpose": "explain",
+                        "allowedScopes": ["metadata"],
+                    },
+                )
+            )
+
+    with pytest.raises(ArtifactDomainError) as caught:
+        ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+            ExpandingProvider(),
+            prompt="Explain only the authorized artifact.",
+            context=_context(),
+            initial_context={
+                "artifactId": "artifact-1",
+                "revisionId": first.revision.revision_id,
+                "purpose": "explain",
+                "allowedScopes": ["metadata"],
+            },
+        )
+    assert caught.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
+    assert caught.value.details["reasonCode"] == "ARTIFACT_CONTEXT_GRANT_EXCEEDED"
+
+
+def test_derived_draft_inherits_the_turn_classification_floor(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    source = service.create(
+        CreateArtifactCommand(
+            artifact_id="artifact-source", kind="document", title="Source",
+            data_class="confidential", content=_document(), idempotency_key="create-source",
+        ),
+        _context(),
+    )
+
+    class DraftProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, messages, tools):
+            del messages, tools
+            self.calls += 1
+            if self.calls == 1:
+                return ArtifactAssistantProviderResponse(
+                    tool_call=ArtifactAssistantToolCall(
+                        call_id="draft-1",
+                        name="artifact.create_draft",
+                        arguments={
+                            "artifactId": "artifact-derived",
+                            "kind": "document",
+                            "title": "Derived",
+                            "dataClass": "public",
+                            "content": _document(),
+                            "idempotencyKey": "create-derived",
+                        },
+                    )
+                )
+            return ArtifactAssistantProviderResponse(final_text="Created.")
+
+    result = ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+        DraftProvider(),
+        prompt="Create a derived draft.",
+        context=_context(),
+        initial_context={
+            "artifactId": source.artifact.artifact_id,
+            "revisionId": source.revision.revision_id,
+            "purpose": "transform",
+            "allowedScopes": ["metadata"],
+        },
+    )
+
+    assert result.events[-1]["dataClass"] == "confidential"
+    assert (
+        service.store.get_artifact("workspace-1", "artifact-derived").data_class.value
+        == "confidential"
+    )
+
+
+def test_accumulated_provider_context_has_one_hard_turn_budget(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    document = _document()
+    document["blocks"][0]["content"] = [{"type": "text", "text": "x" * 20_000}]
+    source = service.create(
+        CreateArtifactCommand(
+            artifact_id="artifact-large", kind="document", title="Large", data_class="internal",
+            content=document, idempotency_key="create-large",
+        ),
+        _context(),
+    )
+    request = {
+        "artifactId": source.artifact.artifact_id,
+        "revisionId": source.revision.revision_id,
+        "purpose": "explain",
+        "allowedScopes": ["metadata", "selection"],
+        "selection": {"kind": "document", "blockIds": ["block-1"]},
+    }
+
+    class RepeatingProvider:
+        def complete(self, messages, tools):
+            del messages, tools
+            return ArtifactAssistantProviderResponse(
+                tool_call=ArtifactAssistantToolCall(
+                    call_id="repeat-1", name="artifact.get_context", arguments=request,
+                )
+            )
+
+    with pytest.raises(ArtifactDomainError) as caught:
+        ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+            RepeatingProvider(), prompt="Explain.", context=_context(), initial_context=request,
+        )
+    assert caught.value.code is ArtifactErrorCode.ARTIFACT_CONTENT_TOO_LARGE
+    assert caught.value.details["reasonCode"] == "ARTIFACT_CONTEXT_BUDGET_EXCEEDED"
 
 
 def test_extract_artifact_context_request_uses_only_governed_section() -> None:

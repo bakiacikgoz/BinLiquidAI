@@ -149,6 +149,30 @@ def schema_for(name: str, model: type[Any]) -> dict[str, Any]:
             "refs": "local definitions only; remote $ref is forbidden",
             "authority": "backend revalidation is mandatory",
         }
+    if name == "code.v2":
+        schema["properties"]["filename"]["pattern"] = (
+            r"^(?![ .])(?!.*[ .]$)"
+            r"(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|"
+            r"[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\.|$))"
+            r"[^<>:\"/\\|?*\u0000-\u001f\u007f-\u009f"
+            r"\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]+$"
+        )
+        schema["allOf"] = [
+            {
+                "if": {
+                    "properties": {"lineEnding": {"const": "crlf"}},
+                    "required": ["lineEnding"],
+                },
+                "then": {
+                    "properties": {
+                        "text": {
+                            "pattern": r"^(?![\s\S]*(?:\r(?!\n)|[^\r]\n|^\n))[\s\S]*$"
+                        }
+                    }
+                },
+                "else": {"properties": {"text": {"pattern": r"^[^\r]*$"}}},
+            }
+        ]
     if name == "safe-json-patch.v1":
         schema["x-imperaos-security"] = {
             "operations": "add/remove/replace/test only",

@@ -1,20 +1,5 @@
 {
   "$defs": {
-    "ArtifactMutationType": {
-      "enum": [
-        "create",
-        "replace_content",
-        "json_patch",
-        "text_edit",
-        "cell_patch",
-        "slide_patch",
-        "restore",
-        "duplicate",
-        "import_evidence"
-      ],
-      "title": "ArtifactMutationType",
-      "type": "string"
-    },
     "JsonValue": {}
   },
   "$id": "https://schemas.imperaos.local/artifacts/artifact-mutation-command.v1.schema.json",
@@ -53,7 +38,9 @@
       "type": "string"
     },
     "mutationType": {
-      "$ref": "#/$defs/ArtifactMutationType"
+      "const": "replace_content",
+      "title": "Mutationtype",
+      "type": "string"
     }
   },
   "required": [

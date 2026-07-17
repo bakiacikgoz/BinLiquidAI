@@ -43,7 +43,7 @@ class ListArtifactsQuery(ArtifactModel):
 class MutateArtifactCommand(ArtifactModel):
     artifact_id: BoundedId
     expected_revision_number: int = Field(ge=1)
-    mutation_type: ArtifactMutationType = Field(strict=False)
+    mutation_type: Literal[ArtifactMutationType.REPLACE_CONTENT]
     content: dict[str, JsonValue]
     idempotency_key: BoundedId
     change_summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""
@@ -86,7 +86,7 @@ class ProposeArtifactMutationCommand(ArtifactModel):
     proposal_id: BoundedId | None = None
     artifact_id: BoundedId
     base_revision_number: int = Field(ge=1)
-    mutation_type: ArtifactMutationType = Field(strict=False)
+    mutation_type: Literal[ArtifactMutationType.REPLACE_CONTENT]
     content: dict[str, JsonValue]
     idempotency_key: BoundedId
     summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""

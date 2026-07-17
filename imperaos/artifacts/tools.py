@@ -60,13 +60,7 @@ class ArtifactProposeMutationInput(ArtifactModel):
     proposal_id: BoundedId | None = None
     artifact_id: BoundedId
     base_revision_number: int = Field(ge=1)
-    mutation_type: Literal[
-        "replace_content",
-        "json_patch",
-        "text_edit",
-        "cell_patch",
-        "slide_patch",
-    ]
+    mutation_type: Literal["replace_content"]
     content: dict[str, JsonValue]
     idempotency_key: BoundedId
     summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""

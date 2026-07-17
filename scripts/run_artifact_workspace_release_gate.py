@@ -86,6 +86,8 @@ def gate_commands(gate: str) -> list[list[str]]:
             "tests/test_artifact_privacy.py",
             "tests/test_artifact_policy.py",
             "tests/test_artifact_proposal_approval.py",
+            "tests/test_artifact_assistant_integration.py",
+            "tests/test_artifact_form_submission.py",
         )],
         "ui": [
             _panel("test"),

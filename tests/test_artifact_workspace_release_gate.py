@@ -11,6 +11,7 @@ from scripts.run_artifact_workspace_release_gate import (
     _run_command,
     build_release_readiness,
     evaluate_forced_off_license_gate,
+    gate_commands,
 )
 
 
@@ -137,6 +138,12 @@ def test_release_surface_declares_exact_reports_make_targets_and_ci() -> None:
     assert "artifact-workspace-release" in product_closure
     package = json.loads((root / "apps/operator-panel/package.json").read_text(encoding="utf-8"))
     assert "pass-with-no-tests" not in package["scripts"]["test:e2e"]
+
+
+def test_security_gate_contains_artifact_assistant_and_form_trust_regressions() -> None:
+    flattened = " ".join(part for command in gate_commands("security") for part in command)
+    assert "tests/test_artifact_assistant_integration.py" in flattened
+    assert "tests/test_artifact_form_submission.py" in flattened
 
 
 def test_command_runner_reports_missing_executable_without_crashing(tmp_path: Path) -> None:

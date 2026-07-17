@@ -46,10 +46,14 @@ function maskSecrets(text: string): string {
   return text
     .replace(/synthetic-provider-secret-canary/gi, '[redacted-secret-canary]')
     .replace(
-      /(?:\\\\\?\\[A-Za-z]:\\|\\\\[^\\\s"'<>|]+\\[^\\\s"'<>|]+\\|\b[A-Za-z]:[\\/])[^\s"'<>|]*/g,
+      /(['"])(?:\\\\\?\\[A-Za-z]:\\|\\\\[^\\'"\r\n]+\\[^\\'"\r\n]+\\|[A-Za-z]:[\\/]|\/)[^'"\r\n]*\1/g,
       '[redacted-path]',
     )
-    .replace(/(^|[\s([{:;,="])\/[^\s"'<>|]+/g, '$1[redacted-path]')
+    .replace(
+      /(?:\\\\\?\\[A-Za-z]:\\|\\\\[^\\\s"'<>|]+\\[^\\\s"'<>|]+\\|\b[A-Za-z]:[\\/])[^\r\n,;'"<>|]*/g,
+      '[redacted-path]',
+    )
+    .replace(/(^|[\s([{:;,='"\u0060])\/[^\r\n,;'"<>|]+/g, '$1[redacted-path]')
     .replace(/sk-[A-Za-z0-9_-]{12,}/g, '[redacted-secret]')
     .replace(/ghp_[A-Za-z0-9_]{12,}/g, '[redacted-token]')
     .replace(/eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}/g, '[redacted-jwt]')

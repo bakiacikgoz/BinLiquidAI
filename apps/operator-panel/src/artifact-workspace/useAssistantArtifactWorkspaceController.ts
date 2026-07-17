@@ -8,7 +8,7 @@ import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './ar
 import type { ArtifactFormSubmissionRequest } from './artifactContracts';
 import { FormSessionRuntime } from './editors/form/formSessionRuntime';
 import { exportCodeArtifact } from './artifactCodeExport';
-import { exportCanvasArtifact } from './artifactCanvasExport';
+import { exportCanvasArtifact, type CanvasArtifactExportFormat } from './artifactCanvasExport';
 import { exportDocumentArtifact, type DocumentArtifactExportFormat } from './artifactDocumentExport';
 import { exportFlowArtifact, type FlowArtifactExportFormat } from './artifactFlowExport';
 import { exportSpreadsheetArtifact, type SpreadsheetExportFormat } from './artifactSpreadsheetExport';
@@ -567,7 +567,7 @@ export function useAssistantArtifactWorkspaceController({
     }
   }, [autosave, bridge, controller]);
 
-  const exportCanvas = useCallback(async (artifactId: string) => {
+  const exportCanvas = useCallback(async (artifactId: string, format: CanvasArtifactExportFormat) => {
     setError(null);
     setOperationNotice(null);
     try {
@@ -581,6 +581,7 @@ export function useAssistantArtifactWorkspaceController({
         artifact: tab.artifact,
         revision: tab.revision,
         content: tab.draftContent,
+        format,
         bridge,
       });
       setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
@@ -588,7 +589,7 @@ export function useAssistantArtifactWorkspaceController({
     } catch (caught) {
       setError(normalizeWorkspaceError(caught, {
         code: 'ARTIFACT_EXPORT_FAILED',
-        message: 'The canvas JSON could not be exported.',
+        message: 'The canvas could not be exported.',
         retryable: true,
       }));
       return null;

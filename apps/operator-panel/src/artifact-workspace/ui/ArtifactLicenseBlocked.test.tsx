@@ -34,8 +34,8 @@ describe('ArtifactLicenseBlocked', () => {
     expect(summary).not.toContain('shape-99999');
   });
 
-  it('is read-only, redacted, bounded, and exposes only safe JSON export', async () => {
-    const onExportJson = vi.fn();
+  it('is read-only, redacted, bounded, and exposes only safe canvas exports', async () => {
+    const onExport = vi.fn();
     render(<ArtifactLicenseBlocked
       artifact={artifact}
       content={{ kind: 'canvas', schemaVersion: 1, snapshot: {}, assetIds: [], embeds: 'deny', remoteAssets: 'deny' }}
@@ -43,12 +43,16 @@ describe('ArtifactLicenseBlocked', () => {
         contractVersion: 'artifact-license-capability/v1', kind: 'canvas', enabled: false,
         reasonCode: 'ARTIFACT_LICENSE_EVIDENCE_MISSING',
       }}
-      onExportJson={onExportJson}
+      onExport={onExport}
     />);
     expect(screen.getByRole('status')).toHaveTextContent('ARTIFACT_LICENSE_EVIDENCE_MISSING');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit|save|paste/i })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Export JSON' }));
-    expect(onExportJson).toHaveBeenCalledTimes(1);
+    expect(onExport).toHaveBeenNthCalledWith(1, 'json');
+    await userEvent.click(screen.getByRole('button', { name: 'Export SVG' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Export PNG' }));
+    expect(onExport).toHaveBeenNthCalledWith(2, 'svg');
+    expect(onExport).toHaveBeenNthCalledWith(3, 'png');
   });
 });

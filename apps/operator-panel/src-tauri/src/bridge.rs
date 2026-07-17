@@ -781,6 +781,7 @@ pub async fn bridge_artifact_export_commit(
     {
         Ok(result) => result,
         Err(error) => {
+            let _ = state.cancel(&request.ticket, &binding).await;
             let _ = cancel_export_authority(
                 app.clone(),
                 authorized_binding.export_id(),
@@ -818,6 +819,9 @@ pub async fn bridge_artifact_export_commit(
             )
         }));
     }
+    if let Err(error) = state.finalize(&request.ticket, &binding).await {
+        return BridgeResult::err(export_bridge_error("artifact export commit", error));
+    }
     BridgeResult::ok(result)
 }
 
@@ -837,21 +841,28 @@ pub async fn bridge_artifact_export_cancel(
             return BridgeResult::err(export_bridge_error("artifact export cancel", error))
         }
     };
-    let result = match app
-        .state::<ArtifactExportState>()
-        .cancel(&request.ticket, &binding)
-        .await
-    {
+    let state = app.state::<ArtifactExportState>();
+    let authorized_binding = match state.binding_for_ticket(&request.ticket, &binding).await {
         Ok(result) => result,
         Err(error) => {
             return BridgeResult::err(export_bridge_error("artifact export cancel", error))
         }
     };
-    if let Err(error) =
-        cancel_export_authority(app.clone(), result.binding.export_id(), "user_cancelled").await
+    if let Err(error) = cancel_export_authority(
+        app.clone(),
+        authorized_binding.export_id(),
+        "user_cancelled",
+    )
+    .await
     {
         return BridgeResult::err(error);
     }
+    let result = match state.cancel(&request.ticket, &binding).await {
+        Ok(result) => result,
+        Err(error) => {
+            return BridgeResult::err(export_bridge_error("artifact export cancel", error))
+        }
+    };
     BridgeResult::ok(result)
 }
 
@@ -1027,14 +1038,8 @@ fn trusted_artifact_profile() -> String {
 }
 
 fn trusted_artifact_command_config(config: &BridgeConfig) -> BridgeConfig {
-    let mut trusted = config.clone();
-    trusted.profile = Some(trusted_artifact_profile());
-    trusted.env.retain(|key, _| {
-        matches!(
-            key.as_str(),
-            "OPENAI_API_KEY" | "DEEPSEEK_API_KEY" | "ANTHROPIC_API_KEY" | "COMPANY_LLM_API_KEY"
-        )
-    });
+    let mut trusted = trusted_artifact_bridge_config();
+    trusted.timeout_ms = config.timeout_ms;
     trusted
 }
 
@@ -1358,14 +1363,15 @@ pub async fn bridge_approval_show(
 
 #[tauri::command]
 pub async fn bridge_approval_decide(
+    app: tauri::AppHandle,
     config: BridgeConfig,
     approval_id: String,
     approve: bool,
     reason: Option<String>,
-    operator_id: String,
+    _operator_id: String,
 ) -> BridgeResult<Value> {
     let config = trusted_artifact_command_config(&config);
-    let actor = match normalize_actor(&operator_id) {
+    let identity = match resolve_trusted_artifact_identity(&config, &app).await {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
@@ -1381,7 +1387,9 @@ pub async fn bridge_approval_decide(
             "--reject".to_string()
         },
         "--actor".to_string(),
-        actor,
+        identity.principal_id().to_string(),
+        "--workspace-id".to_string(),
+        identity.workspace_id().to_string(),
         "--profile".to_string(),
         config.profile(),
     ];
@@ -1401,12 +1409,13 @@ pub async fn bridge_approval_decide(
 
 #[tauri::command]
 pub async fn bridge_approval_execute(
+    app: tauri::AppHandle,
     config: BridgeConfig,
     approval_id: String,
-    operator_id: String,
+    _operator_id: String,
 ) -> BridgeResult<Value> {
     let config = trusted_artifact_command_config(&config);
-    let actor = match normalize_actor(&operator_id) {
+    let identity = match resolve_trusted_artifact_identity(&config, &app).await {
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
@@ -1419,7 +1428,9 @@ pub async fn bridge_approval_execute(
             "--id".to_string(),
             approval_id.trim().to_string(),
             "--actor".to_string(),
-            actor,
+            identity.principal_id().to_string(),
+            "--workspace-id".to_string(),
+            identity.workspace_id().to_string(),
             "--profile".to_string(),
             config.profile(),
         ],
@@ -3657,6 +3668,10 @@ fn configure_cli_env(command: &mut Command, config: &BridgeConfig, resolved: &Re
         "IMPERAOS_ARTIFACT_EXPORT_ENABLED",
         "IMPERAOS_ASSISTANT_UI_RUNTIME_ENABLED",
         "IMPERAOS_ASSISTANT_AI_SDK_RUNTIME_ENABLED",
+        "OPENAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "COMPANY_LLM_API_KEY",
     ] {
         if let Ok(value) = std::env::var(key) {
             command.env(key, value);
@@ -4614,11 +4629,11 @@ mod tests {
     #[test]
     fn governed_artifact_config_drops_renderer_authority_overrides() {
         let config = BridgeConfig {
-            mode: Some("auto".to_string()),
-            cli_path: None,
-            bundled_python_path: None,
+            mode: Some("external".to_string()),
+            cli_path: Some("renderer-controlled.exe".to_string()),
+            bundled_python_path: Some("renderer-python.exe".to_string()),
             profile: Some("balanced".to_string()),
-            root_dir: None,
+            root_dir: Some("renderer-root".to_string()),
             env: HashMap::from([
                 (
                     "IMPERAOS_GOVERNANCE_APPROVAL_STORE_PATH".to_string(),
@@ -4636,11 +4651,11 @@ mod tests {
         let trusted = trusted_artifact_command_config(&config);
 
         assert_eq!(trusted.profile(), trusted_artifact_profile());
-        assert_eq!(trusted.env.len(), 1);
-        assert_eq!(
-            trusted.env.get("OPENAI_API_KEY").map(String::as_str),
-            Some("provider-key")
-        );
+        assert_eq!(trusted.mode.as_deref(), Some("auto"));
+        assert!(trusted.cli_path.is_none());
+        assert!(trusted.bundled_python_path.is_none());
+        assert!(trusted.root_dir.is_none());
+        assert!(trusted.env.is_empty());
     }
 
     #[test]

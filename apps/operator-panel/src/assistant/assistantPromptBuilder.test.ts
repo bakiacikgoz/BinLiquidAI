@@ -110,13 +110,17 @@ describe('assistant prompt builder', () => {
         { message: 'credential at /root/.ssh/id_rsa' },
         { message: 'network at \\\\server\\share\\private\\trace.json' },
         { message: 'extended at \\\\?\\C:\\private\\trace.json' },
+        { message: "quoted at '/opt/impera/private/trace.json'" },
+        { message: "spaced at 'C:\\Program Files\\ImperaOS\\trace.json'" },
       ],
       selectedArtifacts: {},
       pendingApproval: null,
       systemHealth: null,
     });
 
-    for (const fragment of ['opt', 'impera', 'root', '.ssh', 'server', 'share', 'trace.json']) {
+    for (const fragment of [
+      'opt', 'impera', 'root', '.ssh', 'server', 'share', 'trace.json', 'Program Files', 'ImperaOS',
+    ]) {
       expect(result.compiledPrompt).not.toContain(fragment);
     }
     expect(result.compiledPrompt).toContain('[redacted-path]');

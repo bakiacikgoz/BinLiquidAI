@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from types import ModuleType
 
+from jsonschema import Draft202012Validator
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_ROOT = REPO_ROOT / "contracts/artifacts"
 GENERATOR_PATH = REPO_ROOT / "scripts/generate_artifact_contract_schemas.py"
@@ -38,6 +40,34 @@ def test_artifact_contract_schemas_are_generated_without_drift() -> None:
     assert not mismatches, (
         "Artifact contract schema drift detected. Run "
         "`uv run python scripts/generate_artifact_contract_schemas.py`: " + ", ".join(mismatches)
+    )
+
+
+def test_code_v2_contract_publishes_portable_filename_and_line_ending_rules() -> None:
+    schema = json.loads((SCHEMA_ROOT / "code.v2.schema.json").read_text(encoding="utf-8"))
+    assert schema["properties"]["filename"]["pattern"]
+    conditional = schema["allOf"][0]
+    assert conditional["if"]["properties"]["lineEnding"]["const"] == "crlf"
+    assert conditional["then"]["properties"]["text"]["pattern"]
+    assert conditional["else"]["properties"]["text"]["pattern"]
+
+    validator = Draft202012Validator(schema)
+    base = {
+        "kind": "code",
+        "schemaVersion": 2,
+        "language": "python",
+        "executionPolicy": "deny",
+    }
+    assert not list(
+        validator.iter_errors({**base, "filename": "main.py", "lineEnding": "lf", "text": "x\n"})
+    )
+    assert list(
+        validator.iter_errors({**base, "filename": "con.PY", "lineEnding": "lf", "text": "x\n"})
+    )
+    assert list(
+        validator.iter_errors(
+            {**base, "filename": "main.py", "lineEnding": "crlf", "text": "x\r\ny\n"}
+        )
     )
 
 

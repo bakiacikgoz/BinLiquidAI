@@ -1,10 +1,14 @@
 import { artifactBridge as defaultBridge, type ArtifactBridge } from './artifactBridge';
 import {
   CanvasArtifactExportContentSchema,
+  CanvasArtifactContentSchema,
   type ArtifactContent,
   type ArtifactDescriptor,
   type ArtifactRevision,
 } from './artifactContracts';
+import { renderFlowPng } from './artifactFlowExport';
+
+export type CanvasArtifactExportFormat = 'json' | 'svg' | 'png';
 
 export type CanvasExportOutcome =
   | { status: 'cancelled' }
@@ -15,36 +19,92 @@ export function serializeCanvasJson(content: unknown): Uint8Array {
   return new TextEncoder().encode(`${JSON.stringify(parsed, null, 2)}\n`);
 }
 
+const PADDING = 32;
+const MAX_RASTER_DIMENSION = 4_096;
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+export function serializeCanvasSvg(value: unknown): { text: string; width: number; height: number } {
+  const canvas = CanvasArtifactContentSchema.parse(value);
+  const objects = canvas.snapshot.objects;
+  const minimumX = Math.min(0, ...objects.map((item) => item.x)) - PADDING;
+  const minimumY = Math.min(0, ...objects.map((item) => item.y)) - PADDING;
+  const maximumX = Math.max(1, ...objects.map((item) => item.x + item.width)) + PADDING;
+  const maximumY = Math.max(1, ...objects.map((item) => item.y + item.height)) + PADDING;
+  const viewWidth = Math.max(1, maximumX - minimumX);
+  const viewHeight = Math.max(1, maximumY - minimumY);
+  const scale = Math.min(1, MAX_RASTER_DIMENSION / viewWidth, MAX_RASTER_DIMENSION / viewHeight);
+  const width = Math.max(1, Math.ceil(viewWidth * scale));
+  const height = Math.max(1, Math.ceil(viewHeight * scale));
+  const body = objects.map((item) => {
+    const label = escapeXml(item.text ?? (item.type === 'image' ? `Asset ${item.assetId}` : ''));
+    if (item.type === 'line' || item.type === 'arrow') {
+      return `<line x1="${item.x}" y1="${item.y}" x2="${item.x + item.width}" y2="${item.y + item.height}"${item.type === 'arrow' ? ' marker-end="url(#arrow)"' : ''}/>`;
+    }
+    const shape = item.type === 'ellipse'
+      ? `<ellipse cx="${item.x + item.width / 2}" cy="${item.y + item.height / 2}" rx="${item.width / 2}" ry="${item.height / 2}"/>`
+      : `<rect x="${item.x}" y="${item.y}" width="${item.width}" height="${item.height}" rx="${item.type === 'note' ? 8 : 0}"/>`;
+    const text = label
+      ? `<text x="${item.x + item.width / 2}" y="${item.y + item.height / 2}" text-anchor="middle" dominant-baseline="middle">${label}</text>`
+      : '';
+    return `<g data-object-type="${item.type}">${shape}${text}</g>`;
+  }).join('');
+  return {
+    width,
+    height,
+    text: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minimumX} ${minimumY} ${viewWidth} ${viewHeight}" role="img" aria-label="Governed canvas"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><style>rect,ellipse{fill:#fff;stroke:#334155;stroke-width:2}line{stroke:#64748b;stroke-width:2}text{fill:#0f172a;font:14px system-ui,sans-serif}</style>${body}</svg>`,
+  };
+}
+
 export async function exportCanvasArtifact({
   artifact,
   revision,
   content,
+  format = 'json',
   bridge = defaultBridge,
+  renderPng = renderFlowPng,
 }: {
   artifact: ArtifactDescriptor;
   revision: ArtifactRevision;
   content: ArtifactContent;
+  format?: CanvasArtifactExportFormat;
   bridge?: ArtifactBridge;
+  renderPng?: (svg: { text: string; width: number; height: number }) => Promise<Uint8Array>;
 }): Promise<CanvasExportOutcome> {
   if (
     artifact.kind !== 'canvas'
     || artifact.schemaVersion !== revision.schemaVersion
     || ![1, 2].includes(revision.schemaVersion)
   ) {
-    throw new Error('Canvas JSON export requires an exact supported canvas revision.');
+    throw new Error('Canvas export requires an exact supported canvas revision.');
   }
-  const bytes = serializeCanvasJson(content);
+  if (revision.schemaVersion === 1 && format !== 'json') {
+    throw new Error('Legacy canvas revisions support JSON export only.');
+  }
+  const svg = format === 'json' ? null : serializeCanvasSvg(content);
+  const bytes = format === 'json'
+    ? serializeCanvasJson(content)
+    : format === 'svg'
+      ? new TextEncoder().encode(svg?.text ?? '')
+      : await renderPng(svg as { text: string; width: number; height: number });
   const begin = await bridge.beginExport({
     artifactId: artifact.artifactId,
     revisionId: revision.revisionId,
-    format: 'json',
+    format,
     idempotencyKey: `export-${artifact.artifactId.slice(0, 48)}-${revision.revisionId.slice(0, 48)}-${globalThis.crypto.randomUUID()}`,
   });
   if (begin.cancelled) return { status: 'cancelled' };
   if (!begin.ticket) throw new Error('Native export did not return a ticket.');
   if (bytes.byteLength > begin.maxBytes) {
     await bridge.cancelExport(begin.ticket).catch(() => undefined);
-    throw new Error('Canvas JSON export exceeds the native size limit.');
+    throw new Error('Canvas export exceeds the native size limit.');
   }
   try {
     const result = await bridge.commitExport(begin.ticket, bytes);

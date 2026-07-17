@@ -1786,8 +1786,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           )?.artifact.kind;
           if (format === 'source') void assistantArtifactWorkspace.actions.exportCode(artifactId);
           else if (format === 'pptx') void assistantArtifactWorkspace.actions.exportSlides(artifactId);
-          else if (format === 'json' && artifactKind === 'canvas') {
-            void assistantArtifactWorkspace.actions.exportCanvas(artifactId);
+          else if (artifactKind === 'canvas' && (format === 'json' || format === 'svg' || format === 'png')) {
+            void assistantArtifactWorkspace.actions.exportCanvas(artifactId, format);
           } else if (format === 'json' || format === 'svg' || format === 'png') {
             void assistantArtifactWorkspace.actions.exportFlow(artifactId, format);
           } else if (format === 'csv' || format === 'xlsx') {

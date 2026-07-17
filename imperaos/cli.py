@@ -5456,12 +5456,36 @@ def approval_show(
         )
 
 
+def _require_approval_workspace(
+    ticket: object | None,
+    workspace_id: str | None,
+    approval_id: str,
+) -> None:
+    if ticket is None or workspace_id is None:
+        return
+    target_kind = str(getattr(ticket, "target_kind", ""))
+    if not target_kind.startswith("artifact"):
+        return
+    snapshot = getattr(ticket, "snapshot", {})
+    snapshot_workspace = snapshot.get("workspace_id") if isinstance(snapshot, dict) else None
+    target_ref = str(getattr(ticket, "target_ref", ""))
+    bound_workspace = str(snapshot_workspace or target_ref.split(":", 1)[0])
+    if bound_workspace != workspace_id:
+        typer.echo(
+            json.dumps(
+                {"error_code": "APPROVAL_WORKSPACE_MISMATCH", "approval_id": approval_id}
+            )
+        )
+        raise typer.Exit(code=1)
+
+
 @approval_app.command("decide")
 def approval_decide(
     approval_id: str = typer.Option(..., "--id", help="Approval ticket id"),
     approve: bool = typer.Option(False, "--approve", help="Approve ticket"),
     reject: bool = typer.Option(False, "--reject", help="Reject ticket"),
     actor: str = typer.Option(..., "--actor", help="Actor identity"),
+    workspace_id: str | None = typer.Option(None, "--workspace-id", help="Trusted workspace"),
     reason: str | None = typer.Option(None, "--reason", help="Decision note"),
     profile: str = typer.Option("balanced", help="Config profile"),
 ) -> None:
@@ -5475,6 +5499,8 @@ def approval_decide(
     if runtime is None:
         typer.echo("Governance disabled.")
         raise typer.Exit(code=1)
+
+    _require_approval_workspace(runtime.approval_store.get(approval_id), workspace_id, approval_id)
 
     result = runtime.decide_approval(
         approval_id=approval_id,
@@ -5498,6 +5524,7 @@ def approval_decide(
 def approval_execute(
     approval_id: str = typer.Option(..., "--id", help="Approval ticket id"),
     actor: str = typer.Option(..., "--actor", help="Execution actor identity"),
+    workspace_id: str | None = typer.Option(None, "--workspace-id", help="Trusted workspace"),
     profile: str = typer.Option("balanced", help="Config profile"),
 ) -> None:
     ensure_artifact_scaffold()
@@ -5517,6 +5544,7 @@ def approval_execute(
     if ticket is None:
         typer.echo(json.dumps({"error_code": "APPROVAL_NOT_FOUND", "approval_id": approval_id}))
         raise typer.Exit(code=1)
+    _require_approval_workspace(ticket, workspace_id, approval_id)
     if ticket.status.value == "expired":
         typer.echo(json.dumps({"error_code": "APPROVAL_EXPIRED", "approval_id": approval_id}))
         raise typer.Exit(code=1)

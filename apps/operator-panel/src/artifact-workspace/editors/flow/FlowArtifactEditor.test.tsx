@@ -17,6 +17,13 @@ vi.mock('@xyflow/react', async () => {
       }, 'Move Start'),
       React.createElement('button', {
         type: 'button',
+        onClick: () => {
+          (props.onEdgesChange as (changes: unknown[]) => void)([{ id: 'edge-1', type: 'remove' }]);
+          (props.onNodesChange as (changes: unknown[]) => void)([{ id: 'start', type: 'remove' }]);
+        },
+      }, 'Delete Start'),
+      React.createElement('button', {
+        type: 'button',
         onClick: () => (props.onSelectionChange as (selection: unknown) => void)({
           nodes: [{ id: 'start' }], edges: [{ id: 'edge-1' }],
         }),
@@ -27,13 +34,15 @@ vi.mock('@xyflow/react', async () => {
     Controls: () => null,
     Handle: () => null,
     Position: { Left: 'left', Right: 'right' },
-    applyNodeChanges: (changes: Array<{ id: string; position?: { x: number; y: number } }>, nodes: Array<Record<string, unknown>>) => (
-      nodes.map((node) => {
+    applyNodeChanges: (changes: Array<{ id: string; type?: string; position?: { x: number; y: number } }>, nodes: Array<Record<string, unknown>>) => (
+      nodes.filter((node) => !changes.some((item) => item.id === node.id && item.type === 'remove')).map((node) => {
         const change = changes.find((item) => item.id === node.id);
         return change?.position ? { ...node, position: change.position } : node;
       })
     ),
-    applyEdgeChanges: (_changes: unknown[], edges: unknown[]) => edges,
+    applyEdgeChanges: (changes: Array<{ id: string; type?: string }>, edges: Array<{ id: string }>) => (
+      edges.filter((edge) => !changes.some((item) => item.id === edge.id && item.type === 'remove'))
+    ),
     addEdge: (edge: unknown, edges: unknown[]) => [...edges, edge],
   };
 });
@@ -94,5 +103,31 @@ describe('FlowArtifactEditor', () => {
     }));
     await user.click(within(screen.getByLabelText('Flow canvas')).getByRole('button', { name: 'Select Start' }));
     expect(onSelectionChange).toHaveBeenCalledWith({ kind: 'flow', nodeIds: ['start'], edgeIds: ['edge-1'] });
+  });
+
+  it('atomically removes a connected node after React Flow removes its edge first', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ThemeProvider mode="light">
+        <FlowArtifactEditor
+          artifact={artifact}
+          revision={revision}
+          content={content}
+          mode="edit"
+          saveState="idle"
+          onChange={onChange}
+          onSelectionChange={() => undefined}
+          onRequestExport={() => undefined}
+        />
+      </ThemeProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Delete Start' }));
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      nodes: [expect.objectContaining({ id: 'end' })],
+      edges: [],
+    }));
   });
 });

@@ -24,7 +24,7 @@
       "category": "content",
       "file": "code.v2.schema.json",
       "name": "code.v2",
-      "sha256": "b72f996fe48771593401551891586fb60c1ce1fb6a8c8379275dd1da6cac0ea2"
+      "sha256": "065f94aab082dc8377ccf6eb5c65e1fa549d24b14fa3175f1f27ce4ae721a885"
     },
     {
       "category": "content",
@@ -126,7 +126,7 @@
       "category": "contract",
       "file": "artifact-mutation-command.v1.schema.json",
       "name": "artifact-mutation-command.v1",
-      "sha256": "5dc4bec508d45a9e6c94c440ccf3be7a5cf8b8a2e5594ba90ce7d7875e44af63"
+      "sha256": "e5e0483d2d087a4a096fe55e4f1f67505ca39316832988d60bb031fad65b0066"
     },
     {
       "category": "contract",
@@ -138,7 +138,7 @@
       "category": "contract",
       "file": "artifact-mutation-proposal-command.v1.schema.json",
       "name": "artifact-mutation-proposal-command.v1",
-      "sha256": "6878036f22d5a6a8c6781c4b68a8faa5d12cbecb399b7268d37f52a1cdb82abc"
+      "sha256": "c4b6fe45f5a59d8f7c95753867efe99526ce256042b4a22c7bf31810c378424e"
     },
     {
       "category": "contract",

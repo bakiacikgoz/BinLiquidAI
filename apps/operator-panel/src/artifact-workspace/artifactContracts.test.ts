@@ -22,7 +22,7 @@ const valid = {
   },
   revision: {
     revisionId: 'revision-1', artifactId: 'artifact-1', parentRevisionId: null, baseRevisionId: null,
-    revisionNumber: 1, mutationType: 'create', contentRelpath: 'workspace-1/artifact-1/revision-1.json',
+    revisionNumber: 1, schemaVersion: 1, mutationType: 'create', contentRelpath: 'workspace-1/artifact-1/revision-1.json',
     contentSha256: 'a'.repeat(64), contentSizeBytes: 32, contentEncoding: 'json', changeSummary: 'Created',
     authorType: 'user', authorId: 'user-1', idempotencyKey: 'create-1', createdAtUtc: '2026-07-16T08:00:00Z',
   },

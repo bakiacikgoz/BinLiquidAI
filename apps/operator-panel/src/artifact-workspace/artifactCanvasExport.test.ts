@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ArtifactBridge } from './artifactBridge';
-import { exportCanvasArtifact, serializeCanvasJson } from './artifactCanvasExport';
+import { exportCanvasArtifact, serializeCanvasJson, serializeCanvasSvg } from './artifactCanvasExport';
 import type { ArtifactDescriptor, ArtifactRevision, CanvasArtifactContent } from './artifactContracts';
 
 const content = {
@@ -51,6 +51,33 @@ describe('canvas fallback export', () => {
       },
       bridge,
     })).resolves.toEqual({ status: 'cancelled' });
+  });
+
+  it('serializes bounded SVG without interpreting canvas text as markup', () => {
+    const svg = serializeCanvasSvg(content);
+    expect(svg.text).toContain('&lt;script&gt;local text only&lt;/script&gt;');
+    expect(svg.text).not.toContain('<script>');
+    expect(svg.width).toBeGreaterThan(0);
+    expect(svg.height).toBeGreaterThan(0);
+  });
+
+  it.each(['svg', 'png'] as const)('routes canvas %s through the canvas export ticket', async (format) => {
+    const bytes = new TextEncoder().encode('png');
+    const bridge = {
+      beginExport: vi.fn().mockResolvedValue({ cancelled: false, ticket: 'ticket-1', maxBytes: 1_000_000 }),
+      commitExport: vi.fn().mockResolvedValue({ basename: `board.${format}`, sha256: 'a'.repeat(64), sizeBytes: 3 }),
+      cancelExport: vi.fn(),
+    } as unknown as ArtifactBridge;
+
+    await expect(exportCanvasArtifact({
+      artifact,
+      revision,
+      content,
+      format,
+      bridge,
+      renderPng: async () => bytes,
+    })).resolves.toMatchObject({ status: 'exported' });
+    expect(bridge.beginExport).toHaveBeenCalledWith(expect.objectContaining({ format }));
   });
 
   it('uses the canvas revision ticket and cancels oversized output', async () => {
