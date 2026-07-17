@@ -86,12 +86,28 @@ function summarizeToolIntents(intents: AssistantSafeToolIntent[]): string {
   return intents.map((intent) => `- ${intent}: ${TOOL_INTENT_LABELS[intent]}`).join('\n');
 }
 
+function boundedArtifactReference(name: string, value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { name };
+  const record = value as Record<string, unknown>;
+  const allowed = [
+    'artifactId', 'revisionId', 'kind', 'title', 'status', 'dataClass',
+    'currentRevisionId', 'currentRevisionNumber',
+  ];
+  return Object.fromEntries([
+    ['name', name],
+    ...allowed
+      .filter((key) => ['string', 'number'].includes(typeof record[key]))
+      .map((key) => [key, record[key]]),
+  ]);
+}
+
 export function buildAssistantPrompt(input: {
   userMessage: string;
   session: AssistantSessionState;
   selectedRunStatus: unknown | null;
   selectedRunEvents: unknown[];
   selectedArtifacts: Record<string, unknown>;
+  artifactContextRequest?: Record<string, unknown> | null;
   pendingApproval: unknown | null;
   systemHealth: unknown | null;
   controls?: AssistantComposerControls;
@@ -128,7 +144,10 @@ export function buildAssistantPrompt(input: {
   if (hasAttachment(input.controls, 'artifact_summary')) {
     const artifactEntries = Object.entries(input.selectedArtifacts).slice(0, 4);
     for (const [name, value] of artifactEntries) {
-      sections.push(section(`Artifact summary: ${name}`, safeJson(value), ARTIFACT_MAX));
+      sections.push(section(`Artifact reference: ${name}`, safeJson(boundedArtifactReference(name, value)), ARTIFACT_MAX));
+    }
+    if (input.artifactContextRequest) {
+      sections.push(section('Governed artifact context request', safeJson(input.artifactContextRequest), ARTIFACT_MAX));
     }
   }
 

@@ -110,6 +110,10 @@ class Orchestrator:
     def governance_runtime(self) -> GovernanceRuntime | None:
         return self._governance_runtime
 
+    @property
+    def llm(self) -> LLMClient:
+        return self._llm
+
     def process(
         self,
         user_input: str,

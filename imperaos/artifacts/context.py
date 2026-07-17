@@ -125,7 +125,16 @@ class ArtifactContextRequest(ArtifactModel):
     artifact_id: BoundedId
     revision_id: BoundedId
     purpose: ArtifactContextPurpose = Field(strict=False)
+    allowed_scopes: tuple[Literal["metadata", "selection"], ...] = Field(
+        default=("metadata", "selection"), min_length=1, max_length=2, strict=False
+    )
     selection: ArtifactContextSelection | None = None
+
+    @model_validator(mode="after")
+    def validate_scope(self) -> ArtifactContextRequest:
+        if self.selection is not None and "selection" not in self.allowed_scopes:
+            raise ValueError("artifact selection scope was not allowed")
+        return self
 
 
 class ArtifactContextPack(ArtifactModel):
@@ -136,6 +145,7 @@ class ArtifactContextPack(ArtifactModel):
     schema_version: int = Field(ge=1, le=1_000)
     data_class: ArtifactDataClass = Field(strict=False)
     purpose: ArtifactContextPurpose = Field(strict=False)
+    allowed_scopes: tuple[Literal["metadata", "selection"], ...]
     selection: ArtifactContextSelection | None
     projection: dict[str, JsonValue]
     canonical_projection: str
@@ -193,6 +203,7 @@ def build_artifact_context_pack(
         schema_version=artifact.schema_version,
         data_class=artifact.data_class,
         purpose=request.purpose,
+        allowed_scopes=request.allowed_scopes,
         selection=request.selection,
         projection=fitted,
         canonical_projection=canonical,

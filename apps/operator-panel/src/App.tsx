@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { AssistantArtifactProposalPart } from './assistant/assistantTypes';
+import type { ArtifactSelection } from './artifact-workspace/editors/ArtifactEditorHost';
 
 import {
   type BridgeErrorPayload,
@@ -401,6 +402,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [runReplay, setRunReplay] = useState<unknown>(null);
   const [artifactsByName, setArtifactsByName] = useState<Record<string, unknown>>({});
   const [selectedArtifactName, setSelectedArtifactName] = useState<string>('status.json');
+  const [artifactEditorSelection, setArtifactEditorSelection] = useState<ArtifactSelection | null>(null);
+  const [governedArtifactContext, setGovernedArtifactContext] = useState<Record<string, unknown> | null>(null);
   const [showRawArtifact, setShowRawArtifact] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportPath, setExportPath] = useState('');
@@ -1552,6 +1555,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     selectedRunStatus: runStatus,
     selectedRunEvents: events,
     selectedArtifacts: artifactsByName,
+    artifactContextRequest: governedArtifactContext,
     pendingApproval: approvalDetail || activeApproval,
     systemHealth,
   }));
@@ -1561,6 +1565,21 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     selectedLegacyArtifactName: selectedArtifactName,
     onSelectLegacyArtifact: setSelectedArtifactName,
   });
+
+  useEffect(() => {
+    const tab = assistantArtifactWorkspace.activeTab;
+    setGovernedArtifactContext(tab ? {
+      artifactId: tab.artifact.artifactId,
+      revisionId: tab.revision.revisionId,
+      purpose: 'edit',
+      allowedScopes: ['selection', 'metadata'],
+      selection: artifactEditorSelection,
+    } : null);
+  }, [
+    artifactEditorSelection,
+    assistantArtifactWorkspace.activeTab?.artifact.artifactId,
+    assistantArtifactWorkspace.activeTab?.revision.revisionId,
+  ]);
 
   useEffect(() => {
     const approvalId = assistantSession.state.pendingApprovalId;
@@ -1733,6 +1752,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         operationNotice={assistantArtifactWorkspace.operationNotice}
         formRuntime={assistantArtifactWorkspace.formRuntime}
         onSubmitForm={assistantArtifactWorkspace.actions.submitForm}
+        onEditorSelectionChange={setArtifactEditorSelection}
         onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
         onActivateArtifact={assistantArtifactWorkspace.actions.activate}
         onRequestClose={assistantArtifactWorkspace.actions.requestClose}

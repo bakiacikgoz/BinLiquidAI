@@ -155,6 +155,10 @@ impl TrustedArtifactIdentity {
     pub fn principal_type(&self) -> &str {
         &self.principal_type
     }
+
+    pub fn roles(&self) -> &[String] {
+        &self.roles
+    }
 }
 
 pub fn build_trusted_request(

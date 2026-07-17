@@ -321,6 +321,7 @@ export function useAssistantRuntimeSession(
         selectedRunStatus: context.selectedRunStatus,
         selectedRunEvents: context.selectedRunEvents,
         selectedArtifacts: context.selectedArtifacts,
+        artifactContextRequest: context.artifactContextRequest,
         pendingApproval: context.pendingApproval,
         systemHealth: context.systemHealth,
         controls: pendingTurn.getControls(),

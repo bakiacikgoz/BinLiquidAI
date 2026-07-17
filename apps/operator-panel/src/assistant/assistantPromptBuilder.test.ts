@@ -76,4 +76,37 @@ describe('assistant prompt builder', () => {
     expect(result.compiledPrompt).not.toContain('## Artifact summary');
     expect(result.compiledPrompt).not.toContain('## System health');
   });
+
+  it('projects artifact metadata and a typed context request without raw content', () => {
+    const result = buildAssistantPrompt({
+      userMessage: 'Update the selected paragraph.',
+      session: createAssistantSession('session-artifact'),
+      selectedRunStatus: null,
+      selectedRunEvents: [],
+      selectedArtifacts: {
+        brief: {
+          artifactId: 'artifact-1',
+          currentRevisionId: 'revision-2',
+          currentRevisionNumber: 2,
+          kind: 'document',
+          blocks: [{ text: 'raw-secret-artifact-body' }],
+        },
+      },
+      artifactContextRequest: {
+        artifactId: 'artifact-1',
+        revisionId: 'revision-2',
+        purpose: 'edit',
+        allowedScopes: ['selection', 'metadata'],
+        selection: { kind: 'document', blockIds: ['block-1'] },
+      },
+      pendingApproval: null,
+      systemHealth: null,
+    });
+
+    expect(result.compiledPrompt).toContain('## Governed artifact context request');
+    expect(result.compiledPrompt).toContain('artifact-1');
+    expect(result.compiledPrompt).toContain('block-1');
+    expect(result.compiledPrompt).not.toContain('raw-secret-artifact-body');
+    expect(result.compiledPrompt).not.toContain('"blocks"');
+  });
 });

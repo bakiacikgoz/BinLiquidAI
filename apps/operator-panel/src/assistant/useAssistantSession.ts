@@ -34,6 +34,7 @@ export type AssistantContextSnapshot = {
   selectedRunStatus: unknown | null;
   selectedRunEvents: unknown[];
   selectedArtifacts: Record<string, unknown>;
+  artifactContextRequest?: Record<string, unknown> | null;
   pendingApproval: unknown | null;
   systemHealth: unknown | null;
 };
@@ -190,6 +191,7 @@ export function useAssistantSession(
         selectedRunStatus: context.selectedRunStatus,
         selectedRunEvents: context.selectedRunEvents,
         selectedArtifacts: context.selectedArtifacts,
+        artifactContextRequest: context.artifactContextRequest,
         pendingApproval: context.pendingApproval,
         systemHealth: context.systemHealth,
         controls,

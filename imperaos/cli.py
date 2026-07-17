@@ -16,7 +16,15 @@ from benchmarks.run_ablation import run_ablation_benchmark, run_energy_benchmark
 from benchmarks.run_smoke import run_smoke_benchmark
 from benchmarks.run_team import run_team_benchmark
 from imperaos import __version__
+from imperaos.artifacts.assistant import (
+    ArtifactAssistantToolLoop,
+    CoreLlmArtifactProvider,
+    extract_artifact_context_request,
+)
 from imperaos.artifacts.cli import register_artifact_cli
+from imperaos.artifacts.models import OperationContext, PrincipalType
+from imperaos.artifacts.service import ArtifactService
+from imperaos.artifacts.tools import ArtifactToolRegistry
 from imperaos.computer_use import ComputerUseMode
 from imperaos.computer_use.runtime import ComputerUseRunner, SessionCommand
 from imperaos.computer_use.vision_runtime.capability_resolver import (
@@ -1314,6 +1322,10 @@ def _assistant_turn_events(
     fallback_provider_id: str | None,
     model: str | None,
     hf_model_id: str | None,
+    artifact_root: Path | None = None,
+    artifact_workspace_id: str | None = None,
+    artifact_principal_id: str | None = None,
+    artifact_roles: tuple[str, ...] = (),
 ) -> list[dict[str, object]]:
     config, source_map = resolve_runtime_config(
         profile=profile,
@@ -1346,6 +1358,64 @@ def _assistant_turn_events(
         ]
     context = {"session_id": session_id}
     context.update(_model_selection_context(config=config, source_map=source_map))
+    artifact_request = extract_artifact_context_request(prompt)
+    if artifact_request is not None:
+        if not artifact_root or not artifact_workspace_id or not artifact_principal_id:
+            return [
+                {
+                    "event": "error",
+                    "data": {
+                        "code": "ARTIFACT_TOOL_RUNTIME_UNAVAILABLE",
+                        "message": "Governed artifact assistant context is unavailable.",
+                    },
+                }
+            ]
+        try:
+            artifact_context = OperationContext(
+                workspace_id=artifact_workspace_id,
+                principal_type=PrincipalType.ASSISTANT,
+                principal_id=artifact_principal_id,
+                roles=artifact_roles,
+                request_id=turn_id,
+            )
+            loop = ArtifactAssistantToolLoop(
+                ArtifactToolRegistry(ArtifactService(artifact_root)),
+                max_tool_calls=min(8, config.limits.max_tool_calls),
+            )
+            governed = loop.run(
+                CoreLlmArtifactProvider(orchestrator.llm),
+                prompt=prompt,
+                context=artifact_context,
+                initial_context=artifact_request,
+            )
+        except Exception as exc:  # noqa: BLE001
+            code = getattr(getattr(exc, "code", None), "value", None)
+            return [
+                {
+                    "event": "error",
+                    "data": {
+                        "code": code or "ARTIFACT_TOOL_RUNTIME_FAILED",
+                        "message": "Governed artifact assistant processing failed.",
+                    },
+                }
+            ]
+        events = [
+            {"event": "tool_result", "data": event}
+            for event in governed.events
+        ]
+        events.append(
+            {
+                "event": "final",
+                "data": {
+                    "traceId": turn_id,
+                    "finalText": governed.final_text,
+                    "usedPath": "governed_artifact_tools",
+                    "fallbackEvents": [],
+                    "metrics": {"artifactToolCalls": len(governed.events)},
+                },
+            }
+        )
+        return events
     result = orchestrator.process(prompt, session_context=context, use_router=True)
     events: list[dict[str, object]] = []
     for trace_event in orchestrator.trace_events(result.trace_id):
@@ -1634,6 +1704,16 @@ def assistant_turn(
     model: str | None = typer.Option(None, "--model", help="Model override"),
     hf_model_id: str | None = typer.Option(None, "--hf-model-id", help="HF model override"),
     stream_json: bool = typer.Option(False, "--stream-json", help="Emit assistant JSONL events"),
+    artifact_root: Annotated[
+        Path | None, typer.Option("--artifact-root", help="Governed artifact root")
+    ] = None,
+    artifact_workspace_id: Annotated[
+        str | None, typer.Option("--artifact-workspace-id")
+    ] = None,
+    artifact_principal_id: Annotated[
+        str | None, typer.Option("--artifact-principal-id")
+    ] = None,
+    artifact_role: Annotated[list[str] | None, typer.Option("--artifact-role")] = None,
 ) -> None:
     """Run one assistant turn and emit the product stream event contract."""
     if not prompt_file.exists() or not prompt_file.is_file():
@@ -1650,6 +1730,10 @@ def assistant_turn(
         fallback_provider_id=fallback_provider_id,
         model=model,
         hf_model_id=hf_model_id,
+        artifact_root=artifact_root,
+        artifact_workspace_id=artifact_workspace_id,
+        artifact_principal_id=artifact_principal_id,
+        artifact_roles=tuple(artifact_role or ()),
     )
     saw_final = False
     for sequence, event in enumerate(events, start=1):

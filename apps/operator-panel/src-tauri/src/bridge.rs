@@ -2528,7 +2528,7 @@ pub async fn bridge_assistant_start_turn(
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
-    let user_message = match normalize_assistant_prompt(
+    let _user_message = match normalize_assistant_prompt(
         &user_message,
         DEFAULT_ASSISTANT_PROMPT_MAX_CHARS,
         "user_message",
@@ -2536,7 +2536,7 @@ pub async fn bridge_assistant_start_turn(
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
-    let _compiled_prompt = match normalize_assistant_prompt(
+    let compiled_prompt = match normalize_assistant_prompt(
         &compiled_prompt,
         DEFAULT_ASSISTANT_PROMPT_MAX_CHARS,
         "compiled_prompt",
@@ -2591,9 +2591,40 @@ pub async fn bridge_assistant_start_turn(
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
-    let args = build_assistant_chat_args(
+    let identity =
+        match resolve_trusted_artifact_identity(&trusted_artifact_bridge_config(), &app).await {
+            Ok(value) => value,
+            Err(error) => return BridgeResult::err(error),
+        };
+    let runtime_root = default_cli_workdir().unwrap_or_else(|| PathBuf::from("."));
+    let artifact_root = runtime_root.join(".imperaos").join("artifacts");
+    let prompt_dir = runtime_root
+        .join(".imperaos")
+        .join("assistant")
+        .join("prompts");
+    if let Err(error) = std::fs::create_dir_all(&prompt_dir) {
+        return BridgeResult::err(BridgeError::new(
+            "CLI_FAILED",
+            format!("Assistant prompt directory could not be prepared: {error}"),
+            "",
+            "assistant prompt preparation",
+            true,
+        ));
+    }
+    let prompt_path = prompt_dir.join(format!("{assistant_turn_id}.md"));
+    if let Err(error) = std::fs::write(&prompt_path, compiled_prompt.as_bytes()) {
+        return BridgeResult::err(BridgeError::new(
+            "CLI_FAILED",
+            format!("Assistant prompt could not be prepared: {error}"),
+            "",
+            "assistant prompt preparation",
+            true,
+        ));
+    }
+    let args = build_assistant_turn_args(
         &config,
-        &user_message,
+        &prompt_path,
+        &assistant_turn_id,
         &session_id,
         provider.as_deref(),
         provider_id.as_deref(),
@@ -2601,6 +2632,8 @@ pub async fn bridge_assistant_start_turn(
         fallback_provider_id.as_deref(),
         model.as_deref(),
         hf_model_id.as_deref(),
+        &artifact_root,
+        &identity,
     );
     let command_preview =
         format_assistant_command_preview(&resolved.program, &resolved.prefix_args, &args);
@@ -2616,6 +2649,7 @@ pub async fn bridge_assistant_start_turn(
     let mut child = match command.spawn() {
         Ok(value) => value,
         Err(error) => {
+            let _ = std::fs::remove_file(&prompt_path);
             let code = if error.kind() == std::io::ErrorKind::NotFound {
                 "CLI_NOT_FOUND"
             } else {
@@ -2662,6 +2696,7 @@ pub async fn bridge_assistant_start_turn(
     let task_turn_id = assistant_turn_id.clone();
     let task_session_id = session_id.clone();
     let task_command_preview = command_preview.clone();
+    let task_prompt_path = prompt_path.clone();
 
     tokio::spawn(async move {
         let stderr_task = tokio::spawn(read_assistant_stderr_preview(stderr));
@@ -2749,6 +2784,7 @@ pub async fn bridge_assistant_start_turn(
             .lock()
             .await
             .remove(&task_turn_id);
+        let _ = std::fs::remove_file(task_prompt_path);
     });
 
     BridgeResult::ok(AssistantStartTurnPayload {
@@ -2916,6 +2952,53 @@ fn normalize_assistant_prompt(
     Ok(normalized.to_string())
 }
 
+fn build_assistant_turn_args(
+    config: &BridgeConfig,
+    prompt_path: &Path,
+    assistant_turn_id: &str,
+    session_id: &str,
+    provider: Option<&str>,
+    provider_id: Option<&str>,
+    fallback_provider: Option<&str>,
+    fallback_provider_id: Option<&str>,
+    model: Option<&str>,
+    hf_model_id: Option<&str>,
+    artifact_root: &Path,
+    identity: &TrustedArtifactIdentity,
+) -> Vec<String> {
+    let mut args = vec![
+        "assistant".to_string(),
+        "turn".to_string(),
+        "--profile".to_string(),
+        config.profile(),
+        "--session-id".to_string(),
+        session_id.to_string(),
+        "--turn-id".to_string(),
+        assistant_turn_id.to_string(),
+        "--prompt-file".to_string(),
+        prompt_path.to_string_lossy().to_string(),
+        "--stream-json".to_string(),
+        "--artifact-root".to_string(),
+        artifact_root.to_string_lossy().to_string(),
+        "--artifact-workspace-id".to_string(),
+        identity.workspace_id().to_string(),
+        "--artifact-principal-id".to_string(),
+        identity.principal_id().to_string(),
+    ];
+    for role in identity.roles() {
+        args.push("--artifact-role".to_string());
+        args.push(role.clone());
+    }
+    push_optional_arg(&mut args, "--provider", provider);
+    push_optional_arg(&mut args, "--provider-id", provider_id);
+    push_optional_arg(&mut args, "--fallback-provider", fallback_provider);
+    push_optional_arg(&mut args, "--fallback-provider-id", fallback_provider_id);
+    push_optional_arg(&mut args, "--model", model);
+    push_optional_arg(&mut args, "--hf-model-id", hf_model_id);
+    args
+}
+
+#[cfg(test)]
 fn build_assistant_chat_args(
     config: &BridgeConfig,
     user_message: &str,
@@ -2954,6 +3037,12 @@ fn format_assistant_command_preview(program: &str, prefix: &[String], args: &[St
         .map(|(index, value)| {
             if index > 0 && args[index - 1] == "--once" {
                 "[user_message]".to_string()
+            } else if index > 0 && args[index - 1] == "--prompt-file" {
+                "[compiled_prompt_file]".to_string()
+            } else if index > 0 && args[index - 1] == "--artifact-root" {
+                "[artifact_root]".to_string()
+            } else if index > 0 && args[index - 1] == "--artifact-principal-id" {
+                "[artifact_principal]".to_string()
             } else {
                 value.clone()
             }
@@ -3026,8 +3115,26 @@ fn parse_assistant_json_line(
 
 fn normalize_assistant_event_name(value: &str) -> &str {
     match value {
-        "status" | "token" | "router_decision" | "policy_decision" | "approval_pending"
-        | "expert_start" | "expert_end" | "audit_artifact" | "final" | "warning" | "error"
+        "status"
+        | "token"
+        | "delta"
+        | "text_delta"
+        | "router_decision"
+        | "policy_decision"
+        | "approval_pending"
+        | "expert_start"
+        | "expert_end"
+        | "artifact_proposed"
+        | "artifact_committed"
+        | "artifact_patch_proposed"
+        | "artifact_patch_applied"
+        | "form_requested"
+        | "form_submitted"
+        | "tool_result"
+        | "audit_artifact"
+        | "final"
+        | "warning"
+        | "error"
         | "cancelled" => value,
         _ => "status",
     }
@@ -4333,6 +4440,61 @@ mod tests {
 
         assert!(preview.contains("[user_message]"));
         assert!(!preview.contains("secret prompt body"));
+    }
+
+    #[test]
+    fn governed_assistant_args_use_compiled_prompt_file_and_trusted_identity() {
+        let config = BridgeConfig {
+            mode: Some("external".to_string()),
+            cli_path: Some("imperaos".to_string()),
+            bundled_python_path: None,
+            profile: Some("balanced".to_string()),
+            root_dir: None,
+            env: HashMap::new(),
+            timeout_ms: None,
+        };
+        let identity = TrustedArtifactIdentity::new(
+            "workspace-1",
+            "user-1",
+            "user",
+            vec!["artifact_admin".to_string()],
+        )
+        .expect("identity");
+        let args = build_assistant_turn_args(
+            &config,
+            Path::new("C:/tmp/compiled-prompt.md"),
+            "turn-1",
+            "session-1",
+            Some("ollama"),
+            Some("local-ollama"),
+            None,
+            None,
+            None,
+            None,
+            Path::new("C:/tmp/artifacts"),
+            &identity,
+        );
+
+        assert_eq!(&args[..2], &["assistant", "turn"]);
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--prompt-file" && pair[1] == "C:/tmp/compiled-prompt.md"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--artifact-workspace-id" && pair[1] == "workspace-1"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--artifact-principal-id" && pair[1] == "user-1"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--artifact-role" && pair[1] == "artifact_admin"));
+
+        let preview = format_assistant_command_preview("imperaos", &[], &args);
+        assert!(preview.contains("[compiled_prompt_file]"));
+        assert!(preview.contains("[artifact_root]"));
+        assert!(preview.contains("[artifact_principal]"));
+        assert!(!preview.contains("C:/tmp"));
+        assert!(!preview.contains("user-1"));
     }
 
     #[test]

@@ -56,6 +56,7 @@ type WorkspaceProps = {
   onSubmitForm?: (request: ArtifactFormSubmissionRequest) => Promise<ArtifactFormSubmissionResult>;
   workspaceError?: ArtifactWorkspaceUiError | null;
   operationNotice?: string | null;
+  onEditorSelectionChange?: (selection: ArtifactSelection | null) => void;
 };
 
 function stringifyPreview(value: unknown): string {
@@ -123,6 +124,7 @@ export function AssistantWorkbench({
   onSubmitForm,
   workspaceError = null,
   operationNotice = null,
+  onEditorSelectionChange,
 }: {
   state: AssistantSessionState;
   artifacts: AssistantWorkbenchArtifact[];
@@ -151,7 +153,8 @@ export function AssistantWorkbench({
 
   useEffect(() => {
     setEditorSelection(null);
-  }, [activeTab?.artifact.artifactId]);
+    onEditorSelectionChange?.(null);
+  }, [activeTab?.artifact.artifactId, onEditorSelectionChange]);
   const filteredCatalog = useMemo(() => {
     const localeCode = locale === 'tr' ? 'tr' : 'en';
     const needle = search.trim().toLocaleLowerCase(localeCode);
@@ -350,7 +353,10 @@ export function AssistantWorkbench({
                   mode={activeTab.artifact.status === 'archived' ? 'view' : 'edit'}
                   saveState={activeTab.saveState}
                   onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
-                  onSelectionChange={setEditorSelection}
+                  onSelectionChange={(selection) => {
+                    setEditorSelection(selection);
+                    onEditorSelectionChange?.(selection);
+                  }}
                   onRequestExport={(format) => {
                     if (format === 'markdown' || format === 'html' || format === 'source' || format === 'json' || format === 'svg' || format === 'png' || format === 'pptx') {
                       onExportArtifact?.(activeTab.artifact.artifactId, format);
