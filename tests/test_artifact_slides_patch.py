@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from imperaos.artifacts.commands import CreateArtifactCommand, PatchArtifactSlideCommand
+from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import (
     ArtifactDataClass,
     ArtifactKind,
@@ -82,3 +85,47 @@ def test_slide_patch_is_atomic_idempotent_and_records_dedicated_mutation(tmp_pat
     loaded = service.store.get_revision("workspace-1", "slides-1", result.revision.revision_id)
     assert b'"title":"After"' in loaded.content
     assert b'"id":"text-1"' in loaded.content
+
+
+def test_slide_patch_error_before_mutate_records_one_error_observation(
+    tmp_path: Path,
+) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    service.create(
+        CreateArtifactCommand(
+            artifact_id="slides-1",
+            kind=ArtifactKind.SLIDES,
+            title="Deck",
+            data_class=ArtifactDataClass.INTERNAL,
+            content=_slides(),
+            idempotency_key="slides-create",
+        ),
+        _context(),
+    )
+    command = PatchArtifactSlideCommand.model_validate(
+        {
+            "artifactId": "slides-1",
+            "expectedRevisionNumber": 1,
+            "slideId": "missing-slide",
+            "operations": [{"op": "set_title", "title": "After"}],
+            "idempotencyKey": "slides-patch-missing",
+        }
+    )
+
+    with pytest.raises(ArtifactDomainError) as caught:
+        service.patch_artifact_slide(command, _context())
+
+    assert caught.value.code is ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID
+    mutation_series = [
+        item
+        for item in service.operations.series_snapshot()
+        if item["name"] == "imperaos_artifact_mutation_total"
+        and item["labels"] == {"kind": "slides", "actor": "user", "result": "error"}
+    ]
+    assert mutation_series == [
+        {
+            "name": "imperaos_artifact_mutation_total",
+            "labels": {"kind": "slides", "actor": "user", "result": "error"},
+            "value": 1,
+        }
+    ]

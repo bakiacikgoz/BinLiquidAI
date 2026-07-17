@@ -278,7 +278,7 @@ def test_team_resume_replays_approved_task_gate(monkeypatch, tmp_path: Path) -> 
     first_payload = json.loads(first_run.stdout)
     assert first_payload["job"]["status"] == "blocked"
 
-    approval_id = runtime.approval_store.list_pending()[0].approval_id
+    approval_id = runtime.approval_store.list_pending(workspace_id="default")[0].approval_id
     approval = runtime.decide_approval(
         approval_id=approval_id,
         approve=True,
@@ -356,7 +356,7 @@ def test_team_resume_rejects_approved_but_not_executed_ticket(monkeypatch, tmp_p
     assert first_run.exit_code == 0
     first_payload = json.loads(first_run.stdout)
 
-    approval_id = runtime.approval_store.list_pending()[0].approval_id
+    approval_id = runtime.approval_store.list_pending(workspace_id="default")[0].approval_id
     approval = runtime.decide_approval(
         approval_id=approval_id,
         approve=True,

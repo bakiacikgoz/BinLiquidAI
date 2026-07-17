@@ -113,6 +113,7 @@ def test_vision_approval_resume_requires_executed_unconsumed_ticket(tmp_path) ->
     )
     store = ApprovalStore(tmp_path / "approvals.sqlite3")
     ticket = store.create_ticket(
+        workspace_id="default",
         run_id="job-1",
         target_kind="device_action",
         target_ref="act-approval",
@@ -127,6 +128,7 @@ def test_vision_approval_resume_requires_executed_unconsumed_ticket(tmp_path) ->
 
     approved = store.decide(
         approval_id=ticket.approval_id,
+        workspace_id="default",
         approve=True,
         actor="operator",
         reason="approved",

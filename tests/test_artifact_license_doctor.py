@@ -252,6 +252,20 @@ def test_enabled_cell_patch_is_atomic_bounded_and_preserves_other_cells(tmp_path
         ),
         context,
     )
+    mutation_series = [
+        item
+        for item in service.operations.series_snapshot()
+        if item["name"] == "imperaos_artifact_mutation_total"
+        and item["labels"]
+        == {"kind": "spreadsheet", "actor": "user", "result": "success"}
+    ]
+    assert mutation_series == [
+        {
+            "name": "imperaos_artifact_mutation_total",
+            "labels": {"kind": "spreadsheet", "actor": "user", "result": "success"},
+            "value": 1,
+        }
+    ]
     loaded = service.get(
         GetArtifactQuery(artifact_id=created.artifact.artifact_id), context
     )

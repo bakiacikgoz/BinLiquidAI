@@ -128,7 +128,7 @@ def test_step_approval_records_device_action_snapshot(tmp_path: Path) -> None:
 
     assert outcome.status.value == "awaiting_approval"
     assert len(outcome.approval_ids) == 1
-    ticket = runtime.approval_store.get(outcome.approval_ids[0])
+    ticket = runtime.get_approval(outcome.approval_ids[0])
     assert ticket is not None
     assert ticket.target_kind == "device_action"
     assert ticket.snapshot["kind"] == "device_action"

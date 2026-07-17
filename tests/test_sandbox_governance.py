@@ -71,4 +71,4 @@ def test_sandbox_runner_creates_approval_ticket_when_policy_requires(tmp_path: P
     assert result.allowed is False
     assert result.exit_code == 125
     assert "approval_id" in result.stderr
-    assert len(runtime.approval_store.list_pending()) == 1
+    assert len(runtime.approval_store.list_pending(workspace_id="default")) == 1

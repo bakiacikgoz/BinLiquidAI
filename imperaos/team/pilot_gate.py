@@ -949,7 +949,7 @@ def _collect_resume_overrides(
         if not task_id or not approval_id:
             continue
         target = _normalize_resume_target(str(data.get("target") or "handoff"))
-        ticket = governance_runtime.approval_store.get(approval_id)
+        ticket = governance_runtime.get_approval(approval_id)
         if ticket is None:
             continue
         if ticket.status.value != "executed":

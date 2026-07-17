@@ -175,6 +175,11 @@ class Orchestrator:
                 override_approval_id=session_context.get("governance_approval_id"),
                 execution_contract_hash=session_context.get("governance_execution_contract_hash"),
                 resume_token_ref=session_context.get("governance_resume_token_ref"),
+                **(
+                    {"workspace_id": session_context["governance_workspace_id"]}
+                    if session_context.get("governance_workspace_id")
+                    else {}
+                ),
             )
             self._tracer.emit(
                 request_id,
@@ -616,6 +621,11 @@ class Orchestrator:
                 override_approval_id=session_context.get("governance_approval_id"),
                 execution_contract_hash=session_context.get("governance_execution_contract_hash"),
                 resume_token_ref=session_context.get("governance_resume_token_ref"),
+                **(
+                    {"workspace_id": session_context["governance_workspace_id"]}
+                    if session_context.get("governance_workspace_id")
+                    else {}
+                ),
             )
             self._tracer.emit(
                 request_id,

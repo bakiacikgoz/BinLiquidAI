@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import re
+from copy import deepcopy
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -251,10 +252,12 @@ def _project_content(
         properties = schema.get("properties", {}) if isinstance(schema, dict) else {}
         selected: dict[str, JsonValue] = {}
         for path in selection.field_paths:
-            key = path.removeprefix("/").split("/", 1)[0].replace("~1", "/").replace("~0", "~")
-            if key not in properties:
-                _invalid("form selection references an unknown field")
-            selected[key] = properties[key]
+            parts = [
+                part.replace("~1", "/").replace("~0", "~")
+                for part in path.removeprefix("/").split("/")
+            ]
+            branch = _project_form_field(properties, parts)
+            _merge_form_projection(selected, branch)
         return {"fields": selected}
     if selection.kind == "code":
         lines = str(content.get("text", "")).splitlines(keepends=True)
@@ -343,6 +346,53 @@ def _select_by_ids(
     if len({str(item.get(key)) for item in selected}) != len(wanted):
         _invalid("artifact context selection references an unknown item")
     return selected
+
+
+def _project_form_field(
+    properties: dict[str, JsonValue],
+    parts: list[str],
+) -> dict[str, JsonValue]:
+    if not parts or parts[0] not in properties:
+        _invalid("form selection references an unknown field")
+    name = parts[0]
+    field = properties[name]
+    if len(parts) == 1:
+        return {name: deepcopy(field)}
+    if (
+        not isinstance(field, dict)
+        or field.get("type") != "object"
+        or not isinstance(field.get("properties"), dict)
+    ):
+        _invalid("form selection traverses a non-object field")
+    nested = _project_form_field(field["properties"], parts[1:])
+    selected_names = set(nested)
+    parent: dict[str, JsonValue] = {
+        key: deepcopy(value)
+        for key, value in field.items()
+        if key != "properties" and not isinstance(value, (dict, list))
+    }
+    required = field.get("required")
+    if isinstance(required, list):
+        selected_required = [item for item in required if item in selected_names]
+        if selected_required:
+            parent["required"] = selected_required
+    parent["properties"] = nested
+    return {name: parent}
+
+
+def _merge_form_projection(
+    target: dict[str, JsonValue],
+    source: dict[str, JsonValue],
+) -> None:
+    for key, value in source.items():
+        if key not in target:
+            target[key] = value
+            continue
+        existing = target[key]
+        if isinstance(existing, dict) and isinstance(value, dict):
+            _merge_form_projection(existing, value)
+        elif existing != value:
+            _invalid("form selection projection is inconsistent")
 
 
 def _redact(value: JsonValue) -> tuple[JsonValue, int]:

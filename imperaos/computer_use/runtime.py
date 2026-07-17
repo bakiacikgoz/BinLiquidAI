@@ -1540,7 +1540,7 @@ end tell
     def _approval_ready(self, approval_id: str) -> bool:
         if not approval_id:
             return False
-        ticket = self._governance.approval_store.get(approval_id)
+        ticket = self._governance.get_approval(approval_id)
         return ticket is not None and ticket.execution_status.value == "executed"
 
     def _build_recovery_state(
@@ -2508,7 +2508,7 @@ end tell
         approval_id = str(computer_use.get("pending_approval_id") or "")
         approval_ready = False
         if approval_id:
-            ticket = self._governance.approval_store.get(approval_id)
+            ticket = self._governance.get_approval(approval_id)
             approval_ready = ticket is not None and ticket.execution_status.value == "executed"
 
         if (
@@ -3673,7 +3673,7 @@ end tell
                 )
                 raise RuntimeError("session stopped by operator")
             if command == SessionCommand.RESUME:
-                ticket = self._governance.approval_store.get(ticket_id)
+                ticket = self._governance.get_approval(ticket_id)
                 if ticket is not None and ticket.execution_status.value == "executed":
                     previous_state = self._execution_state(state)
                     recorder.emit(

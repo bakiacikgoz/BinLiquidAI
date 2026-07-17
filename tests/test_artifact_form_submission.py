@@ -168,7 +168,7 @@ def test_assistant_cannot_submit_and_continuation_never_executes(tmp_path: Path)
     assert result.approval_id is not None
     assert result.reason_code == "FORM_CONTINUATION_APPROVAL_REQUIRED"
     assert result.action_hash is not None
-    ticket = approvals.get(result.approval_id)
+    ticket = approvals.get(result.approval_id, workspace_id="workspace-1")
     assert ticket is not None
     assert ticket.status.value == "pending"
     assert ticket.target_kind == "artifact_form_continuation"
@@ -198,7 +198,7 @@ def test_default_form_continuation_reuses_injected_approval_store(tmp_path: Path
     result = service.submit_form(_submit(artifact_id, revision_id), _context())
 
     assert result.approval_id is not None
-    ticket = approvals.get(result.approval_id)
+    ticket = approvals.get(result.approval_id, workspace_id="workspace-1")
     assert ticket is not None
     assert ticket.target_kind == "artifact_form_continuation"
 
@@ -224,7 +224,7 @@ def test_form_continuation_never_creates_ticket_before_submission_commit(
     with pytest.raises(ArtifactDomainError) as caught:
         service.submit_form(_submit(artifact_id, revision_id), _context())
     assert caught.value.code is ArtifactErrorCode.ARTIFACT_STORAGE_LOCKED
-    assert approvals.list_pending() == []
+    assert approvals.list_pending(workspace_id="workspace-1") == []
 
 
 def test_form_continuation_gateway_failure_replays_from_durable_outbox(
@@ -257,7 +257,7 @@ def test_form_continuation_gateway_failure_replays_from_durable_outbox(
     assert failed is not None
     assert failed["status"] == "failed"
     assert failed["attempt_count"] == 1
-    assert approvals.list_pending() == []
+    assert approvals.list_pending(workspace_id="workspace-1") == []
 
     replay = service.submit_form(_submit(artifact_id, revision_id), _context())
     assert replay.disposition == "idempotent_replay"
@@ -296,14 +296,14 @@ def test_form_continuation_replay_heals_ticket_created_before_outbox_mark(
     with pytest.raises(ArtifactDomainError) as caught:
         service.submit_form(_submit(artifact_id, revision_id), _context())
     assert caught.value.code is ArtifactErrorCode.ARTIFACT_STORAGE_LOCKED
-    pending = approvals.list_pending()
+    pending = approvals.list_pending(workspace_id="workspace-1")
     assert len(pending) == 1
     approval_id = pending[0].approval_id
 
     replay = service.submit_form(_submit(artifact_id, revision_id), _context())
     assert replay.disposition == "idempotent_replay"
     assert replay.approval_id == approval_id
-    assert len(approvals.list_pending()) == 1
+    assert len(approvals.list_pending(workspace_id="workspace-1")) == 1
     with service.store._connect() as connection:
         healed = connection.execute(
             "SELECT * FROM artifact_form_continuation_outbox"

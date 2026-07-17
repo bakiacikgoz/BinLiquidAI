@@ -30,6 +30,7 @@ _MUTATION_OPERATIONS = {
     "artifact.archive",
     "artifact.duplicate",
     "artifact.spreadsheet.cell_patch",
+    "artifact.slides.slide_patch",
     "artifact.apply_proposal",
 }
 

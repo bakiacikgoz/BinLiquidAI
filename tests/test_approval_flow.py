@@ -84,7 +84,7 @@ def test_expired_ticket_cannot_be_decided(tmp_path) -> None:
         )
     runtime.approval_store.expire_pending()
 
-    expired = runtime.approval_store.get(ticket.approval_id)
+    expired = runtime.get_approval(ticket.approval_id, workspace_id=ticket.workspace_id)
     assert expired is not None
     assert expired.status.value == "expired"
 

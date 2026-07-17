@@ -301,7 +301,18 @@ def test_approval_show_redacts_snapshot(monkeypatch, tmp_path) -> None:
     assert ticket is not None
 
     monkeypatch.setattr("imperaos.cli._build_governance_runtime", lambda _cfg: runtime)
-    result = runner.invoke(app, ["approval", "show", "--id", ticket.approval_id, "--json"])
+    result = runner.invoke(
+        app,
+        [
+            "approval",
+            "show",
+            "--id",
+            ticket.approval_id,
+            "--workspace-id",
+            "default",
+            "--json",
+        ],
+    )
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)

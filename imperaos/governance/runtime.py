@@ -56,6 +56,7 @@ class GovernanceRuntime:
         self._policy_bundle: PolicyBundle | None = None
         self._policy_error: str | None = None
         self._runs: dict[str, GovernanceRunState] = {}
+        self._run_workspaces: dict[str, str] = {}
         self._approval_store = ApprovalStore(self._gov.approval_store_path)
         self._audit_dir = Path(self._gov.audit_dir)
         self._audit_dir.mkdir(parents=True, exist_ok=True)
@@ -86,6 +87,32 @@ class GovernanceRuntime:
     def _approval_workspace_id(self) -> str:
         return self._config.memory.workspace_authority.default_workspace_id
 
+    def get_approval(
+        self,
+        approval_id: str,
+        *,
+        workspace_id: str | None = None,
+        run_id: str | None = None,
+    ) -> ApprovalTicket | None:
+        effective_workspace = self._workspace_for_run(run_id, workspace_id)
+        if not effective_workspace:
+            return None
+        return self._approval_store.get(
+            approval_id, workspace_id=effective_workspace
+        )
+
+    def _workspace_for_run(
+        self, run_id: str | None, workspace_id: str | None = None
+    ) -> str:
+        explicit = (workspace_id or "").strip()
+        if explicit:
+            if run_id:
+                self._run_workspaces[run_id] = explicit
+            return explicit
+        if run_id and run_id in self._run_workspaces:
+            return self._run_workspaces[run_id]
+        return self._approval_workspace_id().strip()
+
     def _load_policy(self) -> None:
         if not self._gov.enabled:
             return
@@ -114,7 +141,9 @@ class GovernanceRuntime:
         override_approval_id: str | None = None,
         execution_contract_hash: str | None = None,
         resume_token_ref: str | None = None,
+        workspace_id: str | None = None,
     ) -> tuple[GovernanceDecision, ApprovalTicket | None]:
+        effective_workspace = self._workspace_for_run(run_id, workspace_id)
         if not self._gov.enabled:
             decision = self._default_allow_decision(phase=GovernancePhase.TASK, target=task_type)
             return decision, None
@@ -145,6 +174,7 @@ class GovernanceRuntime:
             policy_hash=self._policy_bundle.policy_hash,
             execution_contract_hash=execution_contract_hash,
             resume_token_ref=resume_token_ref,
+            workspace_id=effective_workspace,
         )
         if override_ticket is not None:
             decision = GovernanceDecision(
@@ -174,6 +204,7 @@ class GovernanceRuntime:
                 policy_hash=self._policy_bundle.policy_hash,
                 execution_contract_hash=execution_contract_hash,
                 resume_token_ref=resume_token_ref,
+                workspace_id=effective_workspace,
             )
             if override_error is not None:
                 decision = GovernanceDecision(
@@ -220,7 +251,7 @@ class GovernanceRuntime:
             }
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
-                workspace_id=self._approval_workspace_id(),
+                workspace_id=effective_workspace,
                 run_id=run_id,
                 target_kind="task",
                 target_ref=target_ref,
@@ -302,7 +333,7 @@ class GovernanceRuntime:
             request_hash = self._hash_payload(snapshot["normalized"])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
-                workspace_id=self._approval_workspace_id(),
+                workspace_id=self._workspace_for_run(run_id),
                 run_id=run_id,
                 target_kind="tool",
                 target_ref=command_root,
@@ -470,7 +501,7 @@ class GovernanceRuntime:
             request_hash = self._hash_payload([from_role, to_role, payload_hash])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
-                workspace_id=self._approval_workspace_id(),
+                workspace_id=self._workspace_for_run(run_id),
                 run_id=run_id,
                 target_kind="handoff",
                 target_ref=target_ref,
@@ -644,7 +675,7 @@ class GovernanceRuntime:
             request_hash = self._hash_payload([scope, producer_role, visibility])
             snapshot_hash = self._hash_payload(snapshot)
             ticket = self._approval_store.create_ticket(
-                workspace_id=self._approval_workspace_id(),
+                workspace_id=self._workspace_for_run(run_id),
                 run_id=run_id,
                 target_kind="memory_write",
                 target_ref=target_ref,
@@ -843,7 +874,7 @@ class GovernanceRuntime:
         request_hash = self._hash_payload({"task_type": task_type, "user_input": user_input})
         snapshot_hash = self._hash_payload(snapshot)
         ticket = self._approval_store.create_ticket(
-            workspace_id=self._approval_workspace_id(),
+            workspace_id=self._workspace_for_run(run_id),
             run_id=run_id,
             target_kind="task",
             target_ref=target_ref,
@@ -930,7 +961,7 @@ class GovernanceRuntime:
         )
         snapshot_hash = self._hash_payload(snapshot)
         ticket = self._approval_store.create_ticket(
-            workspace_id=self._approval_workspace_id(),
+            workspace_id=self._workspace_for_run(run_id),
             run_id=run_id,
             target_kind="device_action",
             target_ref=target_ref,
@@ -981,10 +1012,13 @@ class GovernanceRuntime:
         consumed_by_job_id: str,
         execution_contract_hash: str | None = None,
         resume_token_ref: str | None = None,
+        workspace_id: str | None = None,
     ) -> ApprovalDecisionResult:
         return self._approval_store.mark_consumed(
             approval_id=approval_id,
-            workspace_id=self._approval_workspace_id(),
+            workspace_id=self._workspace_for_run(
+                consumed_by_job_id, workspace_id
+            ),
             consumed_by_job_id=consumed_by_job_id,
             execution_contract_hash=execution_contract_hash,
             resume_token_ref=resume_token_ref,
@@ -1021,10 +1055,13 @@ class GovernanceRuntime:
         task_run_id: str,
         target_kind: str,
         execution_contract_hash: str,
+        workspace_id: str | None = None,
     ) -> ApprovalDecisionResult:
         self._approval_store.expire_pending()
-        workspace_id = self._approval_workspace_id()
-        ticket = self._approval_store.get(approval_id, workspace_id=workspace_id)
+        effective_workspace = self._workspace_for_run(run_id, workspace_id)
+        ticket = self._approval_store.get(
+            approval_id, workspace_id=effective_workspace
+        )
         if ticket is None:
             return ApprovalDecisionResult(ticket=None, error_code="APPROVAL_NOT_FOUND")
         contract_task_run_id = str(
@@ -1041,7 +1078,7 @@ class GovernanceRuntime:
         )
         return self._approval_store.claim_resume(
             approval_id=approval_id,
-            workspace_id=workspace_id,
+            workspace_id=effective_workspace,
             resume_job_id=run_id,
             resume_token_ref=resume_token_ref,
             execution_contract_hash=execution_contract_hash,
@@ -1117,11 +1154,14 @@ class GovernanceRuntime:
         policy_hash: str,
         execution_contract_hash: str | None = None,
         resume_token_ref: str | None = None,
+        workspace_id: str | None = None,
     ) -> ApprovalTicket | None:
         if not approval_id:
             return None
         self._approval_store.expire_pending()
-        ticket = self._approval_store.get(approval_id)
+        ticket = self.get_approval(
+            approval_id, workspace_id=workspace_id, run_id=run_id
+        )
         if ticket is None:
             return None
         if ticket.status != ApprovalStatus.EXECUTED:
@@ -1163,6 +1203,7 @@ class GovernanceRuntime:
                 ),
                 target_kind=target_kind,
                 execution_contract_hash=execution_contract_hash,
+                workspace_id=workspace_id,
             )
             if claim.error_code:
                 return None
@@ -1180,8 +1221,11 @@ class GovernanceRuntime:
         policy_hash: str,
         execution_contract_hash: str | None = None,
         resume_token_ref: str | None = None,
+        workspace_id: str | None = None,
     ) -> str | None:
-        ticket = self._approval_store.get(approval_id)
+        ticket = self.get_approval(
+            approval_id, workspace_id=workspace_id, run_id=run_id
+        )
         if ticket is None:
             return "APPROVAL_NOT_FOUND"
         if ticket.status in {ApprovalStatus.PENDING, ApprovalStatus.APPROVED}:

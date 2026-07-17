@@ -183,7 +183,7 @@ class ApprovalStore:
                 raise ValueError("artifact approval workspace binding is malformed")
             candidates.add(prefix.strip())
         if not candidates:
-            return "default"
+            raise ValueError("approval workspace binding is required")
         if len(candidates) != 1:
             raise ValueError("approval workspace binding is inconsistent")
         bound = next(iter(candidates))
@@ -314,37 +314,29 @@ class ApprovalStore:
 
     def list_pending(self, *, workspace_id: str | None = None) -> list[ApprovalTicket]:
         self.expire_pending()
+        if workspace_id is None or not workspace_id.strip():
+            return []
         with self._conn() as conn:
-            if workspace_id is None:
-                rows = conn.execute(
-                    "SELECT * FROM approvals WHERE status = ? ORDER BY created_at ASC",
-                    (ApprovalStatus.PENDING.value,),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM approvals
-                    WHERE status = ? AND workspace_id = ?
-                    ORDER BY created_at ASC
-                    """,
-                    (ApprovalStatus.PENDING.value, workspace_id),
-                ).fetchall()
+            rows = conn.execute(
+                """
+                SELECT * FROM approvals
+                WHERE status = ? AND workspace_id = ?
+                ORDER BY created_at ASC
+                """,
+                (ApprovalStatus.PENDING.value, workspace_id),
+            ).fetchall()
         return [self._row_to_ticket(row) for row in rows]
 
     def get(
         self, approval_id: str, *, workspace_id: str | None = None
     ) -> ApprovalTicket | None:
+        if workspace_id is None or not workspace_id.strip():
+            return None
         with self._conn() as conn:
-            if workspace_id is None:
-                row = conn.execute(
-                    "SELECT * FROM approvals WHERE approval_id = ?",
-                    (approval_id,),
-                ).fetchone()
-            else:
-                row = conn.execute(
-                    "SELECT * FROM approvals WHERE approval_id = ? AND workspace_id = ?",
-                    (approval_id, workspace_id),
-                ).fetchone()
+            row = conn.execute(
+                "SELECT * FROM approvals WHERE approval_id = ? AND workspace_id = ?",
+                (approval_id, workspace_id),
+            ).fetchone()
         if row is None:
             return None
         return self._row_to_ticket(row)
@@ -352,6 +344,8 @@ class ApprovalStore:
     def get_by_idempotency_key(
         self, idempotency_key: str, *, workspace_id: str | None = None
     ) -> ApprovalTicket | None:
+        if workspace_id is None or not workspace_id.strip():
+            return None
         with self._conn() as conn:
             return self._get_by_idempotency_key(conn, idempotency_key, workspace_id)
 

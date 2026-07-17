@@ -368,7 +368,7 @@ class ArtifactService:
         validated = self._validate_content(
             ArtifactKind.SPREADSHEET, payload, schema_version=2
         )
-        return self.mutate(
+        return self._mutate(
             MutateArtifactCommand(
                 artifact_id=artifact.artifact_id,
                 expected_revision_number=command.expected_revision_number,
@@ -449,7 +449,7 @@ class ArtifactService:
                         "slide patch element does not exist",
                     )
         validated = self._validate_content(ArtifactKind.SLIDES, payload, schema_version=2)
-        return self.mutate(
+        return self._mutate(
             MutateArtifactCommand(
                 artifact_id=artifact.artifact_id,
                 expected_revision_number=command.expected_revision_number,
@@ -509,6 +509,27 @@ class ArtifactService:
 
     @record_artifact_evidence("artifact.mutate")
     def mutate(
+        self,
+        command: MutateArtifactCommand,
+        context: OperationContext,
+        *,
+        _operation: str = "mutate",
+        _request_hash: str | None = None,
+        _approval_verified: bool = False,
+        _proposal_id: str | None = None,
+        _revision_mutation_type: ArtifactMutationType | None = None,
+    ) -> ArtifactOperationResult:
+        return self._mutate(
+            command,
+            context,
+            _operation=_operation,
+            _request_hash=_request_hash,
+            _approval_verified=_approval_verified,
+            _proposal_id=_proposal_id,
+            _revision_mutation_type=_revision_mutation_type,
+        )
+
+    def _mutate(
         self,
         command: MutateArtifactCommand,
         context: OperationContext,

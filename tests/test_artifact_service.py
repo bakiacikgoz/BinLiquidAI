@@ -305,6 +305,7 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
         )
     approval_store.decide(
         approval_id=proposal.approval_id,
+        workspace_id="workspace-1",
         approve=True,
         actor="user-1",
         reason="Reviewed exact proposal",
@@ -392,6 +393,7 @@ def test_default_artifact_proposal_uses_the_operator_governance_approval_store(
     operator_store = ApprovalStore(Path(state_path("governance", "approvals.sqlite3")))
     decision = operator_store.decide(
         approval_id=proposal.approval_id,
+        workspace_id="workspace-1",
         approve=True,
         actor="user-1",
         reason="operator reviewed exact proposal",
@@ -466,6 +468,7 @@ def test_artifact_proposal_revalidates_content_hash_and_scope_before_claim(
     )
     approval_store.decide(
         approval_id=proposal.approval_id,
+        workspace_id="workspace-1",
         approve=True,
         actor="user-1",
         reason="Reviewed exact proposal",
@@ -495,7 +498,9 @@ def test_artifact_proposal_revalidates_content_hash_and_scope_before_claim(
     assert service.get(
         GetArtifactQuery(artifact_id="artifact-1"), user_context()
     ).artifact.current_revision_number == 1
-    assert approval_store.get(proposal.approval_id).status.value == "approved"
+    assert approval_store.get(
+        proposal.approval_id, workspace_id="workspace-1"
+    ).status.value == "approved"
 
 
 def test_artifact_proposal_revalidates_complete_request_hash_before_claim(
@@ -518,6 +523,7 @@ def test_artifact_proposal_revalidates_complete_request_hash_before_claim(
     )
     approval_store.decide(
         approval_id=proposal.approval_id,
+        workspace_id="workspace-1",
         approve=True,
         actor="user-1",
         reason="Reviewed exact proposal",
@@ -562,6 +568,7 @@ def test_applied_proposal_replay_does_not_depend_on_mutable_payload(tmp_path: Pa
     )
     approval_store.decide(
         approval_id=proposal.approval_id,
+        workspace_id="workspace-1",
         approve=True,
         actor="user-1",
         reason="Reviewed exact proposal",
@@ -605,6 +612,7 @@ def test_artifact_proposal_stale_base_does_not_claim_approval_or_write_revision(
     )
     approval_store.decide(
         approval_id=proposal.approval_id,
+        workspace_id="workspace-1",
         approve=True,
         actor="user-1",
         reason="Reviewed exact proposal",
@@ -634,7 +642,7 @@ def test_artifact_proposal_stale_base_does_not_claim_approval_or_write_revision(
     assert service.get(
         GetArtifactQuery(artifact_id="artifact-1"), user_context()
     ).artifact.current_revision_number == 2
-    ticket = approval_store.get(proposal.approval_id)
+    ticket = approval_store.get(proposal.approval_id, workspace_id="workspace-1")
     assert ticket is not None
     assert ticket.status.value == "approved"
     with service.store._connect() as connection:
@@ -663,6 +671,7 @@ def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: P
         assistant_context(),
     )
     rogue = approval_store.create_ticket(
+        workspace_id="workspace-1",
         run_id="rogue-request",
         target_kind="artifact_mutation_proposal",
         target_ref="workspace-1:artifact-1:proposal-1",
@@ -676,6 +685,7 @@ def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: P
     )
     approval_store.decide(
         approval_id=rogue.approval_id,
+        workspace_id="workspace-1",
         approve=True,
         actor="user-1",
         reason="wrong payload",
@@ -693,6 +703,7 @@ def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: P
 
     approval_store.decide(
         approval_id=proposal.approval_id,
+        workspace_id="workspace-1",
         approve=True,
         actor="user-1",
         reason="right payload",

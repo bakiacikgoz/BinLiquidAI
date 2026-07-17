@@ -117,7 +117,7 @@ def test_registry_routes_five_tools_through_governed_boundaries(tmp_path: Path) 
         {
             "artifactId": "artifact-1",
             "revisionId": created.revision_id,
-            "purpose": "explain",
+            "purpose": "edit",
             "selection": {"kind": "document", "blockIds": ["block-1"]},
         },
         context,
@@ -138,6 +138,7 @@ def test_registry_routes_five_tools_through_governed_boundaries(tmp_path: Path) 
             "sourceTurnId": "turn-1",
         },
         context,
+        trusted_context=context_result,
     )
     form = registry.invoke(
         "artifact.request_form",

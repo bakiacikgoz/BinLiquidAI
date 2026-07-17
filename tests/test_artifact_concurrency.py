@@ -52,7 +52,7 @@ def test_store_replays_same_idempotency_key_and_rejects_payload_mismatch(
     assert first.created is True
     assert replay.created is False
     assert replay.disposition == "idempotent_replay"
-    assert caught.value.code is ArtifactErrorCode.ARTIFACT_REVISION_CONFLICT
+    assert caught.value.code is ArtifactErrorCode.IDEMPOTENCY_KEY_REUSE_MISMATCH
 
 
 def test_store_rejects_stale_expected_revision_without_writing_file(tmp_path: Path) -> None:

@@ -377,7 +377,7 @@ class TeamSupervisor:
                 task_def = tasks_by_id.get(task_id)
                 for target, approval_id in sorted(target_map.items()):
                     ticket = (
-                        self._governance_runtime.approval_store.get(approval_id)
+                        self._governance_runtime.get_approval(approval_id)
                         if self._governance_runtime is not None
                         else None
                     )
@@ -485,7 +485,7 @@ class TeamSupervisor:
                     target="handoff",
                 )
                 handoff_override_ticket = (
-                    self._governance_runtime.approval_store.get(handoff_override)
+                    self._governance_runtime.get_approval(handoff_override)
                     if self._governance_runtime is not None and handoff_override
                     else None
                 )
@@ -745,7 +745,7 @@ class TeamSupervisor:
                 approval_overrides, task_id=task_def.task_id, target="task"
             )
             task_override_ticket = (
-                self._governance_runtime.approval_store.get(task_override)
+                self._governance_runtime.get_approval(task_override)
                 if self._governance_runtime is not None and task_override
                 else None
             )
@@ -1522,7 +1522,7 @@ class TeamSupervisor:
                             action_hash=approval_action_hash,
                             contract=approval_task_contract,
                         )
-                        ticket = self._governance_runtime.approval_store.get(approval_id)
+                        ticket = self._governance_runtime.get_approval(approval_id)
                         approval_requested = emit(
                             "approval_requested",
                             task_id=task_def.task_id,
@@ -1604,7 +1604,7 @@ class TeamSupervisor:
                 target="memory_write",
             )
             memory_write_override_ticket = (
-                self._governance_runtime.approval_store.get(memory_write_override)
+                self._governance_runtime.get_approval(memory_write_override)
                 if self._governance_runtime is not None and memory_write_override
                 else None
             )
@@ -2590,7 +2590,7 @@ def _attach_contract(
     action_hash: str,
     contract: dict[str, Any],
 ) -> tuple[str | None, str | None]:
-    ticket = governance_runtime.approval_store.get(approval_id)
+    ticket = governance_runtime.get_approval(approval_id)
     if ticket is None:
         return None, None
     new_snapshot_hash = payload_hash(
@@ -2628,7 +2628,7 @@ def _override_contract_refs(
 ) -> tuple[str | None, str | None, str | None]:
     if governance_runtime is None or not approval_id:
         return None, None, None
-    ticket = governance_runtime.approval_store.get(approval_id)
+    ticket = governance_runtime.get_approval(approval_id)
     if ticket is None:
         return None, None, None
     resume_token_ref, execution_contract_hash = derive_execution_contract_refs(

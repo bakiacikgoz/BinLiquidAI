@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from imperaos.artifacts.content import CodeContentV2, DocumentContentV1
+from imperaos.artifacts.content import CodeContentV2, DocumentContentV1, FormContentV1
 from imperaos.artifacts.context import (
     ArtifactContextPurpose,
     ArtifactContextRequest,
@@ -101,6 +101,96 @@ def test_document_context_projects_only_selected_blocks() -> None:
         "language": "en",
     }
     assert "exclude" not in pack.canonical_projection
+
+
+def test_form_context_projects_and_merges_only_nested_selected_fields() -> None:
+    result = _read_result(
+        FormContentV1(
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "profile": {
+                        "type": "object",
+                        "title": "Profile",
+                        "properties": {
+                            "name": {"type": "string", "title": "Name"},
+                            "email": {"type": "string", "format": "email"},
+                            "fixed": {"type": "string", "default": "exclude"},
+                        },
+                        "additionalProperties": False,
+                    },
+                    "outside": {"type": "string", "default": "exclude"},
+                },
+                "additionalProperties": False,
+            }
+        ),
+        kind=ArtifactKind.FORM,
+    )
+
+    pack = build_artifact_context_pack(
+        result,
+        ArtifactContextRequest.model_validate(
+            {
+                "artifactId": "artifact-1",
+                "revisionId": "revision-1",
+                "purpose": "edit",
+                "selection": {
+                    "kind": "form",
+                    "fieldPaths": ["/profile/name", "/profile/email"],
+                },
+            }
+        ),
+    )
+
+    assert pack.projection == {
+        "fields": {
+            "profile": {
+                "type": "object",
+                "title": "Profile",
+                "properties": {
+                    "name": {"type": "string", "title": "Name"},
+                    "email": {"type": "string", "format": "email"},
+                },
+                "additionalProperties": False,
+            }
+        }
+    }
+    assert "fixed" not in pack.canonical_projection
+    assert "outside" not in pack.canonical_projection
+
+
+@pytest.mark.parametrize("field_path", ("/profile/missing", "/outside/name"))
+def test_form_context_rejects_unknown_or_non_object_nested_paths(field_path: str) -> None:
+    result = _read_result(
+        FormContentV1(
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "profile": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string"}},
+                    },
+                    "outside": {"type": "string"},
+                },
+            }
+        ),
+        kind=ArtifactKind.FORM,
+    )
+
+    with pytest.raises(ArtifactDomainError) as caught:
+        build_artifact_context_pack(
+            result,
+            ArtifactContextRequest.model_validate(
+                {
+                    "artifactId": "artifact-1",
+                    "revisionId": "revision-1",
+                    "purpose": "edit",
+                    "selection": {"kind": "form", "fieldPaths": [field_path]},
+                }
+            ),
+        )
+
+    assert caught.value.code is ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID
 
 
 @pytest.mark.parametrize(

@@ -5211,6 +5211,7 @@ def _collect_resume_overrides(
     *,
     events: list[dict[str, object]],
     governance_runtime: GovernanceRuntime | None,
+    workspace_id: str | None = None,
 ) -> tuple[dict[str, dict[str, str]], list[dict[str, str]]]:
     if governance_runtime is None:
         return {}, []
@@ -5230,7 +5231,9 @@ def _collect_resume_overrides(
             continue
 
         target = _normalize_resume_target(str(data.get("target") or "handoff"))
-        ticket = governance_runtime.approval_store.get(approval_id)
+        ticket = governance_runtime.get_approval(
+            approval_id, workspace_id=workspace_id
+        )
         if ticket is None:
             continue
         status = ticket.status.value
@@ -5697,10 +5700,11 @@ def operator_panel(
         "--stream/--no-stream",
         help="Reserved for future trace tail",
     ),
+    workspace_id: str = typer.Option("default", "--workspace-id"),
 ) -> None:
     _ = stream
     config = RuntimeConfig.from_profile(profile)
-    _require_permission_or_exit(config, "audit.read")
+    identity = _require_permission_or_exit(config, "approval.decide")
     runtime = _build_governance_runtime(config)
     startup_error = _startup_abort(config, runtime)
     if startup_error:
@@ -5719,7 +5723,7 @@ def operator_panel(
         if text in {"/exit", "exit", "quit", "/quit"}:
             break
         if text == "/pending":
-            pending = runtime.approval_store.list_pending()
+            pending = runtime.approval_store.list_pending(workspace_id=workspace_id)
             typer.echo(
                 json.dumps(
                     {"pending": [item.model_dump(mode="json") for item in pending]},
@@ -5732,8 +5736,9 @@ def operator_panel(
             approval_id = text.split(maxsplit=1)[1]
             result = runtime.decide_approval(
                 approval_id=approval_id,
+                workspace_id=workspace_id,
                 approve=True,
-                actor="operator-panel",
+                actor=identity.actor_id,
                 reason="approved from panel",
             )
             typer.echo(
@@ -5751,8 +5756,9 @@ def operator_panel(
             approval_id = text.split(maxsplit=1)[1]
             result = runtime.decide_approval(
                 approval_id=approval_id,
+                workspace_id=workspace_id,
                 approve=False,
-                actor="operator-panel",
+                actor=identity.actor_id,
                 reason="rejected from panel",
             )
             typer.echo(
@@ -6815,6 +6821,7 @@ def team_resume(
         help="Optional explicit resume job id",
     ),
     profile: str = typer.Option("balanced", "--profile", help="Runtime profile"),
+    workspace_id: str = typer.Option("default", "--workspace-id"),
     provider: str | None = typer.Option(None, help="Override provider"),
     fallback_provider: str | None = typer.Option(None, help="Override fallback provider"),
     model: str | None = typer.Option(None, "--model", help="Override model"),
@@ -6888,6 +6895,7 @@ def team_resume(
     overrides, resolved = _collect_resume_overrides(
         events=source_events,
         governance_runtime=governance_runtime,
+        workspace_id=workspace_id,
     )
     if not overrides:
         typer.echo(
