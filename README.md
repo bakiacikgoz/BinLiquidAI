@@ -1,6 +1,6 @@
-# ImperaOS / ImperaOS
+# ImperaOS
 
-**ImperaOS / ImperaOS** is a self-hosted Agent Control Plane for governed AI
+**ImperaOS** is a self-hosted Agent Control Plane for governed AI
 agent production readiness. It helps operators register agents, simulate policy
 decisions, enforce approval lifecycle, bind runs to verified identity, preserve
 audit/replay artifacts, export signed evidence packs, and block unsupported
