@@ -295,7 +295,11 @@ export function useAssistantSession(
     setState((previous) => {
       let matched = false;
       const turns = previous.turns.map((turn) => {
-        if (turn.assistantMessage.approval?.approvalId !== approvalId) {
+        const approvalMatches = turn.assistantMessage.approval?.approvalId === approvalId;
+        const proposalMatches = turn.assistantMessage.parts.some(
+          (part) => part.type === 'artifact-proposal' && part.approvalId === approvalId,
+        );
+        if (!approvalMatches && !proposalMatches) {
           return turn;
         }
         matched = true;
@@ -305,10 +309,18 @@ export function useAssistantSession(
           completedAtUtc: turn.completedAtUtc ?? completedAtUtc,
           assistantMessage: {
             ...turn.assistantMessage,
-            approval: {
-              ...turn.assistantMessage.approval,
-              status,
-            },
+            approval: approvalMatches && turn.assistantMessage.approval
+              ? { ...turn.assistantMessage.approval, status }
+              : turn.assistantMessage.approval,
+            parts: turn.assistantMessage.parts.map((part) => {
+              if (part.type !== 'artifact-proposal' || part.approvalId !== approvalId) return part;
+              const proposalStatus = status === 'executed'
+                ? 'applied'
+                : status === 'approved' || status === 'rejected' || status === 'failed'
+                  ? status
+                  : part.status;
+              return { ...part, status: proposalStatus };
+            }),
           },
         };
       });

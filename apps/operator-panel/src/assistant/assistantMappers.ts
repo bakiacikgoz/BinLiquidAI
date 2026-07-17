@@ -34,6 +34,15 @@ function readArray(source: RecordValue, key: string): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function readPositiveInt(source: RecordValue, key: string): number | null {
+  const value = source[key];
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : null;
+}
+
+function readProposalStatus(value: unknown): 'pending' | 'approved' | 'rejected' | 'applied' | 'failed' {
+  return value === 'approved' || value === 'rejected' || value === 'applied' || value === 'failed' ? value : 'pending';
+}
+
 function readRisk(value: unknown): 'low' | 'medium' | 'high' {
   return value === 'high' || value === 'low' || value === 'medium' ? value : 'medium';
 }
@@ -100,6 +109,7 @@ export function createAssistantTurn(input: {
       approval: null,
       referencedRuns: [],
       referencedArtifacts: [],
+      parts: [],
       metrics: null,
       warning: null,
       error: null,
@@ -217,6 +227,7 @@ export function mapCliAssistantEvent(
       timeline: [...item.assistantMessage.timeline],
       referencedRuns: [...item.assistantMessage.referencedRuns],
       referencedArtifacts: [...item.assistantMessage.referencedArtifacts],
+      parts: [...item.assistantMessage.parts],
     },
   }));
   const turn = turns[turnIndex];
@@ -330,6 +341,39 @@ export function mapCliAssistantEvent(
         summary: readString(data, 'summary', event.event.replaceAll('_', ' ')),
       };
       turn.assistantMessage.referencedArtifacts.push(artifact);
+      if (artifactId) {
+        turn.assistantMessage.parts.push({
+          type: 'artifact',
+          artifactId,
+          revisionId: revisionId || null,
+          kind: kind || 'unknown',
+          title: artifact.name,
+          summary: artifact.summary,
+          openable: artifact.openable,
+        });
+      }
+      if (event.event === 'artifact_patch_proposed') {
+        const proposalId = readString(data, 'proposalId') || readString(data, 'proposal_id');
+        const approvalId = readString(data, 'approvalId') || readString(data, 'approval_id');
+        const actionHash = readString(data, 'actionHash') || readString(data, 'action_hash');
+        const baseRevisionNumber = readPositiveInt(data, 'baseRevisionNumber') ?? readPositiveInt(data, 'base_revision_number');
+        if (artifactId && proposalId && approvalId && /^[a-f0-9]{64}$/.test(actionHash) && baseRevisionNumber !== null) {
+          const error = readString(data, 'error');
+          turn.assistantMessage.parts.push({
+            type: 'artifact-proposal',
+            proposalId,
+            artifactId,
+            approvalId,
+            actionHash,
+            baseRevisionNumber,
+            title: artifact.name,
+            kind: kind || 'unknown',
+            summary: artifact.summary,
+            status: readProposalStatus(data.status),
+            error: error ? error.slice(0, 500) : null,
+          });
+        }
+      }
       appendTimeline(turn, event, {
         tone: event.event.endsWith('committed') || event.event.endsWith('applied') ? 'success' : 'info',
         title: event.event.replaceAll('_', ' '),
@@ -356,6 +400,19 @@ export function mapCliAssistantEvent(
         summary: event.event.replaceAll('_', ' '),
       };
       turn.assistantMessage.referencedArtifacts.push(artifact);
+      if (artifactId && revisionId) {
+        turn.assistantMessage.parts.push({
+          type: 'form',
+          artifactId,
+          revisionId,
+          title: artifact.name,
+          status: event.event === 'form_requested'
+            ? 'requested'
+            : (data.status === 'accepted' || data.status === 'rejected' || data.status === 'pending_continuation'
+                ? data.status
+                : 'rejected'),
+        });
+      }
       appendTimeline(turn, event, {
         tone: event.event === 'form_submitted' ? 'success' : 'info',
         title: event.event.replaceAll('_', ' '),

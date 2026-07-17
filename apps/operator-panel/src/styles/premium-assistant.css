@@ -2201,6 +2201,37 @@
   background: var(--assistant-panel);
 }
 
+.assistant-artifact-proposal,
+.assistant-inline-artifact {
+  display: grid;
+  gap: 10px;
+  max-width: 720px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--assistant-blue) 34%, var(--assistant-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--assistant-panel-soft) 70%, transparent);
+}
+
+.assistant-artifact-proposal-heading,
+.assistant-inline-artifact {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.assistant-artifact-proposal-heading p,
+.assistant-artifact-proposal > p,
+.assistant-inline-artifact p {
+  margin: 0;
+  color: var(--assistant-muted);
+  overflow-wrap: anywhere;
+}
+
+.assistant-artifact-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .assistant-error-card {
   border-color: color-mix(in srgb, var(--assistant-red) 38%, var(--assistant-line));
   background: var(--assistant-red-soft);

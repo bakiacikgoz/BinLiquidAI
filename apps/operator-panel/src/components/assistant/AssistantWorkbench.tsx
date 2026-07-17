@@ -10,7 +10,7 @@ import type {
   ArtifactWorkspaceUiError,
 } from '../../artifact-workspace/useAssistantArtifactWorkspaceController';
 import { ArtifactEditorHost, type ArtifactSelection } from '../../artifact-workspace/editors/ArtifactEditorHost';
-import { contextSelectionLabel } from '../../artifact-workspace/selectionContext';
+import { ArtifactSelectionChip } from '../../artifact-workspace/ui/ArtifactSelectionChip';
 import { ArtifactDiffView } from '../../artifact-workspace/ui/ArtifactDiffView';
 import { ArtifactConflictPanel } from '../../artifact-workspace/ui/ArtifactConflictPanel';
 import { translateAssistantText, type UiLocale } from '../../i18n';
@@ -361,9 +361,7 @@ export function AssistantWorkbench({
                   onSubmitForm={onSubmitForm}
                   locale={locale}
                 />
-                <p className="artifact-workspace-selection-status" role="status" aria-live="polite">
-                  {contextSelectionLabel(editorSelection)}
-                </p>
+                <ArtifactSelectionChip selection={editorSelection} />
               </div>
               {activeTab.artifact.kind === 'document' && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Document export">

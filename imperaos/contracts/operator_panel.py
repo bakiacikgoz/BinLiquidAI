@@ -275,6 +275,10 @@ class AssistantArtifactEventDataContract(ContractModel):
     artifact_id: str = Field(alias="artifactId", min_length=1, max_length=128)
     revision_id: str | None = Field(default=None, alias="revisionId", max_length=128)
     proposal_id: str | None = Field(default=None, alias="proposalId", max_length=128)
+    approval_id: str | None = Field(default=None, alias="approvalId", max_length=128)
+    action_hash: str | None = Field(
+        default=None, alias="actionHash", pattern=r"^[a-f0-9]{64}$"
+    )
     kind: (
         Literal["document", "form", "code", "flow", "spreadsheet", "canvas", "slides"]
         | None
@@ -367,6 +371,12 @@ class AssistantStreamEventPayloadContract(ContractModel):
                 raise ValueError("committed artifact events require revisionId")
             if self.event.startswith("artifact_patch_") and parsed.proposal_id is None:
                 raise ValueError("artifact patch events require proposalId")
+            if self.event == "artifact_patch_proposed" and (
+                parsed.approval_id is None or parsed.action_hash is None
+            ):
+                raise ValueError(
+                    "artifact patch proposal events require approvalId and actionHash"
+                )
         elif self.event == "form_requested":
             AssistantFormRequestedDataContract.model_validate(self.data)
         elif self.event == "form_submitted":

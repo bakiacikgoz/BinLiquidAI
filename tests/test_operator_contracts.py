@@ -266,6 +266,35 @@ def test_assistant_stream_v3_validates_artifact_and_form_events() -> None:
     assert form.data_class == "confidential"
 
 
+def test_assistant_stream_v3_requires_bound_patch_proposal_approval() -> None:
+    payload = {
+        "contractVersion": "3.0",
+        "eventId": "event-proposal-1",
+        "assistantTurnId": "turn-proposal",
+        "sessionId": "session-proposal",
+        "event": "artifact_patch_proposed",
+        "sequence": 5,
+        "timestampUtc": "2026-07-16T08:00:02Z",
+        "traceId": "trace-proposal",
+        "dataClass": "internal",
+        "data": {
+            "artifactId": "artifact-1",
+            "proposalId": "proposal-1",
+            "approvalId": "approval-1",
+            "actionHash": "a" * 64,
+            "baseRevisionNumber": 3,
+            "kind": "document",
+        },
+    }
+
+    event = AssistantStreamEventPayloadContract.model_validate(payload)
+    assert event.event == "artifact_patch_proposed"
+
+    del payload["data"]["approvalId"]
+    with pytest.raises(ValueError, match="approvalId and actionHash"):
+        AssistantStreamEventPayloadContract.model_validate(payload)
+
+
 def test_assistant_stream_v3_rejects_missing_identity_and_invalid_sequence() -> None:
     payload = {
         "contractVersion": "3.0",

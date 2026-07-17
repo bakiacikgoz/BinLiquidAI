@@ -218,6 +218,15 @@ function applyOverlays(
         assistantMessage: {
           ...turn.assistantMessage,
           approval: approval && override ? { ...approval, ...override } : approval,
+          parts: turn.assistantMessage.parts.map((part) => {
+            if (part.type !== 'artifact-proposal') return part;
+            const proposalOverride = approvals[part.approvalId]?.status;
+            if (proposalOverride === 'executed') return { ...part, status: 'applied' as const };
+            if (proposalOverride === 'approved' || proposalOverride === 'rejected' || proposalOverride === 'failed') {
+              return { ...part, status: proposalOverride };
+            }
+            return part;
+          }),
           timeline: [
             ...turn.assistantMessage.timeline,
             ...notes.map((item, index) => ({

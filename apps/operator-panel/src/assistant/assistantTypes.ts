@@ -137,6 +137,40 @@ export interface AssistantArtifactRef {
   summary?: string;
 }
 
+export interface AssistantArtifactPart {
+  type: 'artifact';
+  artifactId: string;
+  revisionId: string | null;
+  kind: string;
+  title: string;
+  summary: string;
+  openable: boolean;
+}
+
+export interface AssistantArtifactProposalPart {
+  type: 'artifact-proposal';
+  proposalId: string;
+  artifactId: string;
+  approvalId: string;
+  actionHash: string;
+  baseRevisionNumber: number;
+  title: string;
+  kind: string;
+  summary: string;
+  status: 'pending' | 'approved' | 'rejected' | 'applied' | 'failed';
+  error: string | null;
+}
+
+export interface AssistantFormPart {
+  type: 'form';
+  artifactId: string;
+  revisionId: string;
+  title: string;
+  status: 'requested' | 'accepted' | 'rejected' | 'pending_continuation';
+}
+
+export type AssistantInlinePart = AssistantArtifactPart | AssistantArtifactProposalPart | AssistantFormPart;
+
 export interface AssistantProposedAction {
   id: string;
   title: string;
@@ -170,6 +204,7 @@ export interface AssistantAssistantMessage {
   approval: AssistantApprovalSummary | null;
   referencedRuns: AssistantRunRef[];
   referencedArtifacts: AssistantArtifactRef[];
+  parts: AssistantInlinePart[];
   metrics: AssistantMetrics | null;
   warning: string | null;
   error: AssistantUiError | null;

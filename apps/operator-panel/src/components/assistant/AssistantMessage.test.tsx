@@ -29,6 +29,7 @@ function turnWithText(userText: string, assistantText: string): AssistantTurn {
       approval: null,
       referencedRuns: [],
       referencedArtifacts: [],
+      parts: [],
       metrics: null,
       warning: null,
       error: null,
@@ -155,5 +156,43 @@ describe('AssistantMessage', () => {
     expect(onOpenArtifact).toHaveBeenCalledWith('artifact-project-brief');
     expect(screen.queryByRole('button', { name: 'Open Project brief proposal' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open status.json' })).not.toBeInTheDocument();
+  });
+
+  it('renders governed artifact proposal parts through approval callbacks', async () => {
+    const turn = turnWithText('Update the brief.', 'I prepared a governed proposal.');
+    turn.assistantMessage.parts = [{
+      type: 'artifact-proposal',
+      proposalId: 'proposal-1',
+      artifactId: 'artifact-1',
+      approvalId: 'approval-1',
+      actionHash: 'a'.repeat(64),
+      baseRevisionNumber: 1,
+      title: 'Brief update',
+      kind: 'document',
+      summary: 'Update the opening paragraph',
+      status: 'pending',
+      error: null,
+    }];
+    const onApprove = vi.fn();
+    const { user } = renderOperatorPanel(
+      <AssistantMessage
+        turn={turn}
+        approvalDisabled={false}
+        approvalDisabledReason=""
+        emptyRunLabel="No run"
+        debugRawEnabled={false}
+        onReviewApproval={noop}
+        onApprove={onApprove}
+        onReject={noop}
+        onExecute={noop}
+        onRegenerate={noop}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Approve proposal' }));
+
+    expect(onApprove).toHaveBeenCalledWith('approval-1');
+    expect(screen.getByRole('region', { name: 'Artifact proposal' })).toHaveTextContent('Update the opening paragraph');
+    expect(screen.queryByText(/actionHash/)).not.toBeInTheDocument();
   });
 });

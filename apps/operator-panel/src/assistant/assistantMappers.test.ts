@@ -193,6 +193,45 @@ describe('assistant mappers', () => {
     expect(awaitingApproval.turns[0].assistantMessage.approval?.detailLoaded).toBe(false);
   });
 
+  it('maps only fully bound artifact patch proposals to typed inline parts', () => {
+    const proposed = mapCliAssistantEvent(
+      {
+        contractVersion: '3.0',
+        eventId: 'event-proposal',
+        assistantTurnId: 'turn-test',
+        sessionId: 'session-test',
+        event: 'artifact_patch_proposed',
+        sequence: 1,
+        timestampUtc: '2026-07-16T08:00:00Z',
+        traceId: 'trace-1',
+        dataClass: 'internal',
+        data: {
+          artifactId: 'artifact-1',
+          proposalId: 'proposal-1',
+          approvalId: 'approval-1',
+          actionHash: 'a'.repeat(64),
+          baseRevisionNumber: 3,
+          kind: 'document',
+          title: 'Brief update',
+          summary: 'Update the opening paragraph',
+          status: 'pending',
+        },
+      },
+      started(),
+    );
+
+    expect(proposed.turns[0].assistantMessage.parts).toEqual([
+      expect.objectContaining({ type: 'artifact', artifactId: 'artifact-1', openable: false }),
+      expect.objectContaining({
+        type: 'artifact-proposal',
+        proposalId: 'proposal-1',
+        approvalId: 'approval-1',
+        actionHash: 'a'.repeat(64),
+        baseRevisionNumber: 3,
+      }),
+    ]);
+  });
+
   it('unwraps legacy nested trace data for approvals and audit artifacts', () => {
     const awaitingApproval = mapCliAssistantEvent(
       {

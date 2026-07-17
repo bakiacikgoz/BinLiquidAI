@@ -28,6 +28,7 @@ const baseTurn: AssistantTurn = {
     approval: null,
     referencedRuns: [],
     referencedArtifacts: [],
+    parts: [],
     metrics: null,
     warning: null,
     error: null,
