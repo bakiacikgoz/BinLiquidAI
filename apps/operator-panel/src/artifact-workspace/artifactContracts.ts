@@ -637,6 +637,7 @@ export type FlowArtifactContent = z.output<typeof FlowArtifactContentSchema>;
 export type SpreadsheetArtifactContent = z.output<typeof SpreadsheetArtifactContentSchema>;
 export type CanvasArtifactContent = z.output<typeof CanvasArtifactContentSchema>;
 export type SlidesArtifactContent = z.output<typeof SlidesArtifactContentSchema>;
+export type SlideArtifactElement = z.output<typeof SlideElementSchema>;
 export type ArtifactReadResult = z.infer<typeof ArtifactReadResultSchema>;
 export type ArtifactOperationResult = z.infer<typeof ArtifactOperationResultSchema>;
 export type ArtifactMutationProposalResult = z.output<typeof ArtifactMutationProposalResultSchema>;
@@ -702,6 +703,20 @@ export interface SpreadsheetCellPatchRequest {
   expectedRevisionNumber: number;
   sheetId: string;
   operations: SpreadsheetCellOperation[];
+  idempotencyKey: string;
+  changeSummary?: string;
+}
+
+export type SlidePatchOperation =
+  | { op: 'set_title'; title: string | null }
+  | { op: 'upsert_element'; element: SlideArtifactElement }
+  | { op: 'remove_element'; elementId: string };
+
+export interface SlidePatchRequest {
+  artifactId: string;
+  expectedRevisionNumber: number;
+  slideId: string;
+  operations: SlidePatchOperation[];
   idempotencyKey: string;
   changeSummary?: string;
 }

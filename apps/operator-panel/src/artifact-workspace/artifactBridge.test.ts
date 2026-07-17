@@ -116,6 +116,29 @@ describe('artifact bridge', () => {
     });
   });
 
+  it('sends bounded slide patches through the dedicated RPC method', async () => {
+    const invoke = mockInvoke({
+      artifact: { ...descriptor, kind: 'slides', schemaVersion: 2 },
+      revision: {
+        revisionId: 'revision-2', artifactId: 'artifact-1', parentRevisionId: 'revision-1',
+        baseRevisionId: null, revisionNumber: 2, schemaVersion: 2, mutationType: 'slide_patch',
+        contentRelpath: 'content/slides.json', contentSha256: 'a'.repeat(64), contentSizeBytes: 10,
+        contentEncoding: 'json', changeSummary: 'Patch', authorType: 'user', authorId: 'user-1',
+        idempotencyKey: 'slide-patch-1', createdAtUtc: '2026-07-16T08:01:00Z',
+      },
+      created: false,
+      disposition: 'updated',
+    });
+    const { artifactBridge } = await import('./artifactBridge');
+    await artifactBridge.patchSlide({
+      artifactId: 'artifact-1', expectedRevisionNumber: 1, slideId: 'slide-1',
+      operations: [{ op: 'set_title', title: 'Updated' }], idempotencyKey: 'slide-patch-1',
+    });
+    expect(invoke).toHaveBeenCalledWith('bridge_artifact_slides_patch', {
+      payload: expect.objectContaining({ idempotencyKey: 'slide-patch-1' }),
+    });
+  });
+
   it('fails closed when a successful native response violates the runtime contract', async () => {
     mockInvoke({ items: [{ ...descriptor, kind: 'unknown' }], next_cursor: null });
     const { ArtifactContractError, artifactBridge } = await import('./artifactBridge');

@@ -183,6 +183,8 @@ class ArtifactToolRegistry:
         name: str,
         arguments: dict[str, Any],
         context: OperationContext,
+        *,
+        trusted_context: ArtifactContextPack | None = None,
     ) -> ArtifactToolResult:
         model = self._inputs.get(name)
         if model is None:
@@ -197,7 +199,7 @@ class ArtifactToolRegistry:
         if name == "artifact.get_context":
             return get_artifact_context(self._service, parsed, context)
         if name == "artifact.propose_mutation":
-            return self._propose_mutation(parsed, context)
+            return self._propose_mutation(parsed, context, trusted_context)
         if name == "artifact.request_form":
             return self._request_form(parsed, context)
         if name == "artifact.request_export":
@@ -227,9 +229,23 @@ class ArtifactToolRegistry:
         self,
         value: ArtifactModel,
         context: OperationContext,
+        trusted_context: ArtifactContextPack | None,
     ) -> ArtifactProposalToolResult:
         request = ArtifactProposeMutationInput.model_validate(value)
-        command = ProposeArtifactMutationCommand(**request.model_dump(mode="python"))
+        if trusted_context is None or trusted_context.selection is None:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+                "artifact mutation proposal requires a trusted selection context",
+                details={"reasonCode": "ARTIFACT_CONTEXT_GRANT_EXCEEDED"},
+            )
+        command = ProposeArtifactMutationCommand(
+            **request.model_dump(mode="python"),
+            context_revision_id=trusted_context.revision_id,
+            context_purpose=trusted_context.purpose.value,
+            target_selection=trusted_context.selection.model_dump(
+                mode="json", by_alias=True
+            ),
+        )
         result = self._service.propose_mutation(command, context)
         artifact = self._service.store.get_artifact(context.workspace_id, request.artifact_id)
         return ArtifactProposalToolResult(

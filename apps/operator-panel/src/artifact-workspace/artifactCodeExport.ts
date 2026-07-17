@@ -32,11 +32,6 @@ export async function exportCodeArtifact({
     await bridge.cancelExport(begin.ticket).catch(() => undefined);
     throw new Error('Code export exceeds the native size limit.');
   }
-  try {
-    const result = await bridge.commitExport(begin.ticket, bytes);
-    return { status: 'exported', ...result };
-  } catch (error) {
-    await bridge.cancelExport(begin.ticket).catch(() => undefined);
-    throw error;
-  }
+  const result = await bridge.commitExport(begin.ticket, bytes);
+  return { status: 'exported', ...result };
 }

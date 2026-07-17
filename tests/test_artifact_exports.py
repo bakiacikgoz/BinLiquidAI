@@ -181,6 +181,57 @@ def test_export_authority_denies_wrong_format_revision_and_assistant(tmp_path: P
     assert denied.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
 
 
+def test_preflighted_export_cannot_be_user_cancelled_and_failure_keeps_hash(
+    tmp_path: Path,
+) -> None:
+    service = ArtifactService(tmp_path / "artifacts")
+    artifact_id, revision_id = _create_code(service)
+    begun = service.begin_export(
+        BeginArtifactExportCommand(
+            artifact_id=artifact_id,
+            revision_id=revision_id,
+            format="source",
+            idempotency_key="export-preflight-cancel",
+        ),
+        _context(),
+    )
+    payload = b"print('display only')\n"
+    digest = hashlib.sha256(payload).hexdigest()
+    service.preflight_export(
+        PreflightArtifactExportCommand(
+            export_id=begun.export_id,
+            basename=begun.basename,
+            sha256=digest,
+            size_bytes=len(payload),
+            idempotency_key="preflight-cancel",
+        ),
+        _context(),
+    )
+
+    with pytest.raises(ArtifactDomainError) as denied:
+        service.cancel_export(
+            CancelArtifactExportCommand(
+                export_id=begun.export_id,
+                reason="user_cancelled",
+                idempotency_key="cancel-preflighted",
+            ),
+            _context(),
+        )
+    assert denied.value.code is ArtifactErrorCode.ARTIFACT_EXPORT_FAILED
+
+    failed = service.cancel_export(
+        CancelArtifactExportCommand(
+            export_id=begun.export_id,
+            reason="native_write_failed",
+            idempotency_key="fail-preflighted",
+        ),
+        _context(),
+    )
+    assert failed.status == "failed"
+    assert failed.sha256 == digest
+    assert failed.size_bytes == len(payload)
+
+
 def test_export_rpc_dispatches_envelope_bound_begin_commit_cancel(tmp_path: Path) -> None:
     service = ArtifactService(tmp_path / "artifacts")
     artifact_id, revision_id = _create_code(service)

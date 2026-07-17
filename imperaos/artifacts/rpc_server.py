@@ -25,6 +25,7 @@ from imperaos.artifacts.commands import (
     ImportEvidenceArtifactCommand,
     ListArtifactsQuery,
     MutateArtifactCommand,
+    PatchArtifactSlideCommand,
     PatchSpreadsheetCellsCommand,
     PreflightArtifactExportCommand,
     ProposeArtifactMutationCommand,
@@ -244,6 +245,10 @@ class ArtifactRpcServer:
             ArtifactRpcMethod.ARTIFACT_SPREADSHEET_PATCH: (
                 PatchSpreadsheetCellsCommand,
                 self.service.patch_spreadsheet_cells,
+            ),
+            ArtifactRpcMethod.ARTIFACT_SLIDES_PATCH: (
+                PatchArtifactSlideCommand,
+                self.service.patch_artifact_slide,
             ),
             ArtifactRpcMethod.ARTIFACT_PROPOSE_MUTATION: (
                 ProposeArtifactMutationCommand,

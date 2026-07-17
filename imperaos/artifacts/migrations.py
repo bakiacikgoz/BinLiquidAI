@@ -426,6 +426,21 @@ MIGRATIONS: tuple[ArtifactMigration, ...] = (
             """,
         ),
     ),
+    ArtifactMigration(
+        version=12,
+        name="bind_artifact_proposal_context_scope",
+        statements=(
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN context_revision_id TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN context_purpose TEXT",
+            "ALTER TABLE artifact_mutation_proposals ADD COLUMN target_scope_json TEXT",
+            """
+            UPDATE artifact_mutation_proposals
+            SET status = 'stale',
+                completed_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE status = 'pending'
+            """,
+        ),
+    ),
 )
 
 

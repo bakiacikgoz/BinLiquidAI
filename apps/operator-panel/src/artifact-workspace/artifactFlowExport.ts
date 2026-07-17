@@ -115,11 +115,6 @@ export async function exportFlowArtifact({
     await bridge.cancelExport(begin.ticket).catch(() => undefined);
     throw new Error('Flow export exceeds the native size limit.');
   }
-  try {
-    const result = await bridge.commitExport(begin.ticket, bytes);
-    return { status: 'exported', ...result };
-  } catch (error) {
-    await bridge.cancelExport(begin.ticket).catch(() => undefined);
-    throw error;
-  }
+  const result = await bridge.commitExport(begin.ticket, bytes);
+  return { status: 'exported', ...result };
 }

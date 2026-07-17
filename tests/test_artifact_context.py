@@ -35,6 +35,7 @@ def _read_result(content: object, *, kind: ArtifactKind) -> SimpleNamespace:
         ),
         revision=SimpleNamespace(
             revision_id="revision-1",
+            revision_number=1,
             content_sha256="a" * 64,
         ),
         content=content,
@@ -60,6 +61,7 @@ def test_context_without_selection_is_metadata_only() -> None:
     )
 
     assert pack.selection is None
+    assert pack.revision_number == 1
     assert pack.projection == {
         "dataClass": "confidential",
         "kind": "document",
@@ -99,6 +101,73 @@ def test_document_context_projects_only_selected_blocks() -> None:
         "language": "en",
     }
     assert "exclude" not in pack.canonical_projection
+
+
+@pytest.mark.parametrize(
+    "secret, fragment",
+    (
+        ("ghp_abcdefghijklmnopqrstuvwxyz1234567890", "ghp_"),
+        ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature123456", "eyJhbGci"),
+        ("-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----", "PRIVATE KEY"),
+        ("AKIAABCDEFGHIJKLMNOP", "AKIA"),
+        ("https://service-user:service-password@example.com/private", "service-password"),
+    ),
+)
+def test_selected_context_redacts_common_credential_families(
+    secret: str,
+    fragment: str,
+) -> None:
+    result = _read_result(
+        DocumentContentV1.model_construct(
+            kind="document",
+            schema_version=1,
+            language="en",
+            page_mode="document",
+            blocks=[{"id": "block-1", "type": "paragraph", "content": secret}],
+        ),
+        kind=ArtifactKind.DOCUMENT,
+    )
+
+    pack = build_artifact_context_pack(
+        result,
+        ArtifactContextRequest(
+            artifact_id="artifact-1",
+            revision_id="revision-1",
+            purpose="explain",
+            selection=DocumentArtifactSelection(block_ids=("block-1",)),
+        ),
+    )
+
+    assert pack.redaction_count >= 1
+    assert "[REDACTED]" in pack.canonical_projection
+    assert fragment not in pack.canonical_projection
+
+
+def test_selected_context_redacts_structured_aws_secret_key() -> None:
+    result = _read_result(
+        DocumentContentV1(
+            language="en",
+            blocks=[
+                {
+                    "id": "block-1",
+                    "type": "paragraph",
+                    "aws_secret_access_key": "very-secret-value",
+                }
+            ],
+        ),
+        kind=ArtifactKind.DOCUMENT,
+    )
+    pack = build_artifact_context_pack(
+        result,
+        ArtifactContextRequest(
+            artifact_id="artifact-1",
+            revision_id="revision-1",
+            purpose="explain",
+            selection=DocumentArtifactSelection(block_ids=("block-1",)),
+        ),
+    )
+    assert "very-secret-value" not in pack.canonical_projection
+    assert pack.redaction_count >= 1
 
 
 def test_code_context_is_coordinate_bounded_and_truncates_to_budget() -> None:

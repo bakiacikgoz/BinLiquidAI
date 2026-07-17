@@ -216,6 +216,7 @@ artifact_bridge_command!(
     bridge_artifact_spreadsheet_patch,
     "artifact.spreadsheet.patch"
 );
+artifact_bridge_command!(bridge_artifact_slides_patch, "artifact.slides.patch");
 artifact_bridge_command!(
     bridge_artifact_propose_mutation,
     "artifact.propose_mutation"
@@ -842,6 +843,9 @@ pub async fn bridge_artifact_export_cancel(
         }
     };
     let state = app.state::<ArtifactExportState>();
+    if let Err(error) = state.require_cancellable(&request.ticket, &binding).await {
+        return BridgeResult::err(export_bridge_error("artifact export cancel", error));
+    }
     let authorized_binding = match state.binding_for_ticket(&request.ticket, &binding).await {
         Ok(result) => result,
         Err(error) => {
@@ -1308,8 +1312,15 @@ pub async fn bridge_handshake(
 }
 
 #[tauri::command]
-pub async fn bridge_approval_pending(config: BridgeConfig) -> BridgeResult<Value> {
+pub async fn bridge_approval_pending(
+    app: tauri::AppHandle,
+    config: BridgeConfig,
+) -> BridgeResult<Value> {
     let config = trusted_artifact_command_config(&config);
+    let identity = match resolve_trusted_artifact_identity(&config, &app).await {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
     match run_cli_json_owned(
         &config,
         vec![
@@ -1317,6 +1328,8 @@ pub async fn bridge_approval_pending(config: BridgeConfig) -> BridgeResult<Value
             "pending".to_string(),
             "--profile".to_string(),
             config.profile(),
+            "--workspace-id".to_string(),
+            identity.workspace_id().to_string(),
             "--json".to_string(),
         ],
     )
@@ -1329,10 +1342,15 @@ pub async fn bridge_approval_pending(config: BridgeConfig) -> BridgeResult<Value
 
 #[tauri::command]
 pub async fn bridge_approval_show(
+    app: tauri::AppHandle,
     config: BridgeConfig,
     approval_id: String,
 ) -> BridgeResult<Value> {
     let config = trusted_artifact_command_config(&config);
+    let identity = match resolve_trusted_artifact_identity(&config, &app).await {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
     if approval_id.trim().is_empty() {
         return BridgeResult::err(BridgeError::new(
             "INVALID_INPUT",
@@ -1351,6 +1369,8 @@ pub async fn bridge_approval_show(
             approval_id.trim().to_string(),
             "--profile".to_string(),
             config.profile(),
+            "--workspace-id".to_string(),
+            identity.workspace_id().to_string(),
             "--json".to_string(),
         ],
     )

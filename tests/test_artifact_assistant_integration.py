@@ -9,9 +9,11 @@ from imperaos.artifacts.assistant import (
     ArtifactAssistantToolCall,
     ArtifactAssistantToolLoop,
     CoreLlmArtifactProvider,
+    _require_grant_bound_proposal,
     extract_artifact_context_request,
 )
-from imperaos.artifacts.commands import CreateArtifactCommand
+from imperaos.artifacts.commands import CreateArtifactCommand, GetArtifactQuery
+from imperaos.artifacts.context import ArtifactContextRequest, build_artifact_context_pack
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import (
     ArtifactDataClass,
@@ -165,6 +167,47 @@ def test_model_cannot_expand_the_trusted_context_grant(tmp_path: Path) -> None:
     assert caught.value.details["reasonCode"] == "ARTIFACT_CONTEXT_GRANT_EXCEEDED"
 
 
+def test_proposal_base_revision_is_bound_to_the_context_grant(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    created = service.create(
+        CreateArtifactCommand(
+            artifact_id="artifact-1",
+            kind="document",
+            title="Bound revision",
+            data_class="internal",
+            content=_document(),
+            idempotency_key="create-bound-revision",
+        ),
+        _context(),
+    )
+    grant = build_artifact_context_pack(
+        service.get(
+            GetArtifactQuery(
+                artifact_id="artifact-1", revision_id=created.revision.revision_id
+            ),
+            _context(),
+        ),
+        ArtifactContextRequest(
+            artifact_id="artifact-1",
+            revision_id=created.revision.revision_id,
+            purpose="transform",
+            allowed_scopes=("metadata",),
+        ),
+    )
+
+    with pytest.raises(ArtifactDomainError) as caught:
+        _require_grant_bound_proposal(
+            grant,
+            {
+                "artifactId": "artifact-1",
+                "baseRevisionNumber": 2,
+                "contextSha256": grant.projection_sha256,
+                "selectionSha256": grant.selection_sha256,
+            },
+        )
+    assert caught.value.details["reasonCode"] == "ARTIFACT_CONTEXT_GRANT_EXCEEDED"
+
+
 def test_derived_draft_inherits_the_turn_classification_floor(tmp_path: Path) -> None:
     service = ArtifactService(tmp_path / "artifact-root")
     source = service.create(
@@ -252,6 +295,42 @@ def test_accumulated_provider_context_has_one_hard_turn_budget(tmp_path: Path) -
         )
     assert caught.value.code is ArtifactErrorCode.ARTIFACT_CONTENT_TOO_LARGE
     assert caught.value.details["reasonCode"] == "ARTIFACT_CONTEXT_BUDGET_EXCEEDED"
+
+
+def test_oversized_mutating_tool_call_is_rejected_before_side_effects(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    oversized = _document()
+    oversized["blocks"][0]["content"] = [{"type": "text", "text": "x" * 40_000}]
+
+    class OversizedDraftProvider:
+        def complete(self, messages, tools):
+            del messages, tools
+            return ArtifactAssistantProviderResponse(
+                tool_call=ArtifactAssistantToolCall(
+                    call_id="oversized-draft",
+                    name="artifact.create_draft",
+                    arguments={
+                        "artifactId": "artifact-oversized",
+                        "kind": "document",
+                        "title": "Oversized",
+                        "dataClass": "internal",
+                        "content": oversized,
+                        "idempotencyKey": "oversized-draft",
+                    },
+                )
+            )
+
+    with pytest.raises(ArtifactDomainError) as caught:
+        ArtifactAssistantToolLoop(ArtifactToolRegistry(service)).run(
+            OversizedDraftProvider(),
+            prompt="Create a draft.",
+            context=_context(),
+        )
+
+    assert caught.value.details["reasonCode"] == "ARTIFACT_CONTEXT_BUDGET_EXCEEDED"
+    with pytest.raises(ArtifactDomainError) as missing:
+        service.store.get_artifact("workspace-1", "artifact-oversized")
+    assert missing.value.code is ArtifactErrorCode.ARTIFACT_NOT_FOUND
 
 
 def test_extract_artifact_context_request_uses_only_governed_section() -> None:

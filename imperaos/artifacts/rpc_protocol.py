@@ -29,6 +29,7 @@ class ArtifactRpcMethod(StrEnum):
     ARTIFACT_CREATE = "artifact.create"
     ARTIFACT_MUTATE = "artifact.mutate"
     ARTIFACT_SPREADSHEET_PATCH = "artifact.spreadsheet.patch"
+    ARTIFACT_SLIDES_PATCH = "artifact.slides.patch"
     ARTIFACT_PROPOSE_MUTATION = "artifact.propose_mutation"
     ARTIFACT_APPLY_PROPOSAL = "artifact.apply_proposal"
     ARTIFACT_HISTORY = "artifact.history"

@@ -597,7 +597,12 @@ class ArtifactStore:
         )
         if operation is not None or request_hash is not None:
             if (
-                operation not in {"mutate", "restore", "spreadsheet_cell_patch"}
+                operation not in {
+                    "mutate",
+                    "restore",
+                    "spreadsheet_cell_patch",
+                    "slides_slide_patch",
+                }
                 or request_hash is None
                 or len(request_hash) != 64
             ):

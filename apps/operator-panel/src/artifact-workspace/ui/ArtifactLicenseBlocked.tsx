@@ -4,7 +4,7 @@ type Props = {
   artifact: ArtifactDescriptor;
   content: ArtifactContent;
   capability: ArtifactLicenseCapability;
-  onExport?(format: 'json' | 'svg' | 'png'): void;
+  onExport?(format: 'json' | 'svg' | 'png' | 'csv' | 'xlsx'): void;
 };
 
 function boundedSummary(content: ArtifactContent): string {
@@ -54,8 +54,12 @@ export function ArtifactLicenseBlocked({ artifact, content, capability, onExport
       {artifact.kind === 'canvas' && onExport ? (
         <div role="group" aria-label="Canvas safe exports">
           <button type="button" onClick={() => onExport('json')}>Export JSON</button>
-          <button type="button" onClick={() => onExport('svg')}>Export SVG</button>
-          <button type="button" onClick={() => onExport('png')}>Export PNG</button>
+          {artifact.schemaVersion === 2 ? (
+            <>
+              <button type="button" onClick={() => onExport('svg')}>Export SVG</button>
+              <button type="button" onClick={() => onExport('png')}>Export PNG</button>
+            </>
+          ) : null}
         </div>
       ) : null}
       {artifact.kind === 'spreadsheet' ? (

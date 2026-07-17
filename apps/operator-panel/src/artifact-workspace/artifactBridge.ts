@@ -39,6 +39,7 @@ import {
   type ArtifactReadResult,
   type ArtifactRestoreRequest,
   type SpreadsheetCellPatchRequest,
+  type SlidePatchRequest,
 } from './artifactContracts';
 
 
@@ -197,6 +198,15 @@ export const artifactBridge = {
   patchSpreadsheetCells(request: SpreadsheetCellPatchRequest): Promise<ArtifactOperationResult> {
     return callArtifact(
       'bridge_artifact_spreadsheet_patch',
+      { ...request },
+      ArtifactOperationResultSchema,
+      request.idempotencyKey,
+    );
+  },
+
+  patchSlide(request: SlidePatchRequest): Promise<ArtifactOperationResult> {
+    return callArtifact(
+      'bridge_artifact_slides_patch',
       { ...request },
       ArtifactOperationResultSchema,
       request.idempotencyKey,

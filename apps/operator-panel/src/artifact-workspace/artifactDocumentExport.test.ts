@@ -90,7 +90,7 @@ describe('document artifact native export', () => {
     expect(bridge.commitExport).not.toHaveBeenCalled();
   });
 
-  it('best-effort cancels the ticket while preserving a commit failure', async () => {
+  it('retains the ticket for terminal reconciliation after a commit failure', async () => {
     const commitFailure = new Error('native commit failed');
     const cancelExport = vi.fn().mockResolvedValue(undefined);
     const bridge = {
@@ -102,6 +102,6 @@ describe('document artifact native export', () => {
     await expect(
       exportDocumentArtifact({ artifact, revision, content, format: 'html', bridge }),
     ).rejects.toBe(commitFailure);
-    expect(cancelExport).toHaveBeenCalledWith('ticket-fail');
+    expect(cancelExport).not.toHaveBeenCalled();
   });
 });

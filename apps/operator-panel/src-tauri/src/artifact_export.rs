@@ -151,11 +151,23 @@ impl ExportBoundaryError {
 }
 
 #[derive(Clone)]
+enum ExportTicketPhase {
+    Issued,
+    Writing,
+    Written {
+        basename: String,
+        sha256: String,
+        size_bytes: usize,
+    },
+}
+
+#[derive(Clone)]
 struct ExportTicketRecord {
     target: PathBuf,
     binding: ExportBinding,
     max_bytes: usize,
     expires_at: Instant,
+    phase: ExportTicketPhase,
 }
 
 #[derive(Default)]
@@ -255,6 +267,7 @@ impl ArtifactExportState {
                 binding,
                 max_bytes,
                 expires_at: Instant::now() + ttl,
+                phase: ExportTicketPhase::Issued,
             },
         );
         Ok(IssuedExportTicket {
@@ -304,11 +317,70 @@ impl ArtifactExportState {
             .to_string();
         let ticket_owned = ticket.to_string();
         let size_bytes = bytes.len();
-        tokio::task::spawn_blocking(move || atomic_write(&target, &ticket_owned, &bytes))
-            .await
-            .map_err(|_| {
-                ExportBoundaryError::failed("artifact export write task failed", true)
-            })??;
+        {
+            let mut tickets = self.tickets.lock().await;
+            let current = tickets
+                .get_mut(ticket)
+                .ok_or_else(ExportBoundaryError::cancelled)?;
+            match &current.phase {
+                ExportTicketPhase::Issued => current.phase = ExportTicketPhase::Writing,
+                ExportTicketPhase::Writing => {
+                    return Err(ExportBoundaryError::failed(
+                        "artifact export write is already in progress",
+                        true,
+                    ));
+                }
+                ExportTicketPhase::Written {
+                    basename,
+                    sha256,
+                    size_bytes,
+                } => {
+                    if sha256 != &observed_sha256 || *size_bytes != bytes.len() {
+                        return Err(ExportBoundaryError::failed(
+                            "written artifact export retry does not match",
+                            false,
+                        ));
+                    }
+                    return Ok(ArtifactExportResult {
+                        basename: basename.clone(),
+                        sha256: sha256.clone(),
+                        size_bytes: *size_bytes,
+                        binding: current.binding.clone(),
+                    });
+                }
+            }
+        }
+        let write_result = match tokio::task::spawn_blocking(move || {
+            atomic_write(&target, &ticket_owned, &bytes)
+        })
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                if let Some(current) = self.tickets.lock().await.get_mut(ticket) {
+                    current.phase = ExportTicketPhase::Issued;
+                }
+                return Err(ExportBoundaryError::failed(
+                    "artifact export write task failed",
+                    true,
+                ));
+            }
+        };
+        if let Err(error) = write_result {
+            if let Some(current) = self.tickets.lock().await.get_mut(ticket) {
+                current.phase = ExportTicketPhase::Issued;
+            }
+            return Err(error);
+        }
+        if let Some(current) = self.tickets.lock().await.get_mut(ticket) {
+            current.phase = ExportTicketPhase::Written {
+                basename: basename.clone(),
+                sha256: observed_sha256.clone(),
+                size_bytes,
+            };
+        } else {
+            return Err(ExportBoundaryError::cancelled());
+        }
         Ok(ArtifactExportResult {
             basename,
             sha256: observed_sha256,
@@ -330,11 +402,29 @@ impl ArtifactExportState {
         ticket: &str,
         binding: &ExportBinding,
     ) -> Result<ArtifactExportCancelResult, ExportBoundaryError> {
+        self.require_cancellable(ticket, binding).await?;
         let record = self.take_ticket(ticket, binding).await?;
         Ok(ArtifactExportCancelResult {
             cancelled: true,
             binding: record.binding,
         })
+    }
+
+    pub async fn require_cancellable(
+        &self,
+        ticket: &str,
+        binding: &ExportBinding,
+    ) -> Result<(), ExportBoundaryError> {
+        let record = self.record_for_ticket(ticket, binding).await?;
+        match record.phase {
+            ExportTicketPhase::Issued => Ok(()),
+            ExportTicketPhase::Writing | ExportTicketPhase::Written { .. } => Err(
+                ExportBoundaryError::failed(
+                    "written artifact export requires terminal completion",
+                    true,
+                ),
+            ),
+        }
     }
 
     async fn take_ticket(
@@ -586,6 +676,11 @@ mod tests {
                 .binding_for_ticket(&issued.ticket, &binding("user-1"))
                 .await
                 .is_ok());
+            let cancel_error = state
+                .cancel(&issued.ticket, &binding("user-1"))
+                .await
+                .expect_err("written ticket must remain completion-only");
+            assert_eq!(cancel_error.code, "ARTIFACT_EXPORT_FAILED");
             state
                 .finalize(&issued.ticket, &binding("user-1"))
                 .await

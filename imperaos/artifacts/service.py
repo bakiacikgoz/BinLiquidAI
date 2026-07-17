@@ -28,6 +28,7 @@ from imperaos.artifacts.commands import (
     ImportEvidenceArtifactCommand,
     ListArtifactsQuery,
     MutateArtifactCommand,
+    PatchArtifactSlideCommand,
     PatchSpreadsheetCellsCommand,
     PreflightArtifactExportCommand,
     ProposeArtifactMutationCommand,
@@ -37,6 +38,7 @@ from imperaos.artifacts.commands import (
 from imperaos.artifacts.content import (
     ArtifactContent,
     FormContentV1,
+    SlidesContentV2,
     SpreadsheetContentV2,
     validate_artifact_content,
 )
@@ -70,6 +72,7 @@ from imperaos.artifacts.models import (
     can_transition_data_class,
     canonical_json,
 )
+from imperaos.artifacts.mutation_scope import require_scoped_replacement
 from imperaos.artifacts.operations import ArtifactOperationMetrics
 from imperaos.artifacts.policy import ArtifactPermission, ArtifactPolicyGateway
 from imperaos.artifacts.proposal_approval import ArtifactProposalApprovalGateway
@@ -91,6 +94,12 @@ from imperaos.runtime.paths import state_path
 
 _DEFAULT_CONTINUATION_GATEWAY = object()
 _ASSET_IMPORT_RESERVATION_TTL = timedelta(minutes=5)
+_EDITOR_FLAG_SAFE_OPERATIONS = {
+    "artifact.get",
+    "artifact.history",
+    "artifact.archive",
+    "artifact.asset.read",
+}
 
 
 class ArtifactService:
@@ -160,7 +169,11 @@ class ArtifactService:
         kind = self._operation_artifact_kind(subject, context)
         if kind is not None:
             required = f"artifact_workspace.{kind.value}.enabled"
-            if flags.get(required) is not True:
+            safe_without_editor = (
+                operation in _EDITOR_FLAG_SAFE_OPERATIONS
+                or operation.startswith("artifact.export.")
+            )
+            if flags.get(required) is not True and not safe_without_editor:
                 self._raise_feature_disabled(required)
 
     def _operation_artifact_kind(
@@ -369,6 +382,87 @@ class ArtifactService:
             _revision_mutation_type=ArtifactMutationType.CELL_PATCH,
         )
 
+    @record_artifact_evidence("artifact.slides.slide_patch")
+    def patch_artifact_slide(
+        self,
+        command: PatchArtifactSlideCommand,
+        context: OperationContext,
+    ) -> ArtifactOperationResult:
+        artifact = self.store.get_artifact(context.workspace_id, command.artifact_id)
+        if artifact.kind is not ArtifactKind.SLIDES or artifact.schema_version != 2:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_SCHEMA_VERSION_UNSUPPORTED,
+                "slide patches require a slides.v2 artifact",
+            )
+        request_hash = self._request_hash(command)
+        replay = self._load_operation_replay(
+            context.workspace_id,
+            command.idempotency_key,
+            "slides_slide_patch",
+            request_hash,
+        )
+        if replay is not None:
+            return replay
+        stored = self.store.get_revision(
+            context.workspace_id, artifact.artifact_id, artifact.current_revision_id
+        )
+        content = self._decode_content(
+            artifact.kind, stored.content, schema_version=stored.descriptor.schema_version
+        )
+        if not isinstance(content, SlidesContentV2):
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_STORAGE_CORRUPT,
+                "stored slides content has an invalid type",
+            )
+        payload = content.model_dump(mode="json", by_alias=True)
+        slide = next(
+            (item for item in payload["slides"] if item["id"] == command.slide_id),
+            None,
+        )
+        if slide is None:
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID,
+                "slide patch target does not exist",
+            )
+        for operation in command.operations:
+            if operation.op == "set_title":
+                slide["title"] = operation.title
+            elif operation.op == "upsert_element":
+                element_id = operation.element.get("id")
+                index = next(
+                    (i for i, item in enumerate(slide["elements"]) if item["id"] == element_id),
+                    None,
+                )
+                if index is None:
+                    slide["elements"].append(operation.element)
+                else:
+                    slide["elements"][index] = operation.element
+            else:
+                before = len(slide["elements"])
+                slide["elements"] = [
+                    item for item in slide["elements"] if item["id"] != operation.element_id
+                ]
+                if len(slide["elements"]) == before:
+                    raise ArtifactDomainError(
+                        ArtifactErrorCode.ARTIFACT_SCHEMA_INVALID,
+                        "slide patch element does not exist",
+                    )
+        validated = self._validate_content(ArtifactKind.SLIDES, payload, schema_version=2)
+        return self.mutate(
+            MutateArtifactCommand(
+                artifact_id=artifact.artifact_id,
+                expected_revision_number=command.expected_revision_number,
+                mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+                content=validated.model_dump(mode="json", by_alias=True),
+                idempotency_key=command.idempotency_key,
+                change_summary=command.change_summary,
+            ),
+            context,
+            _operation="slides_slide_patch",
+            _request_hash=request_hash,
+            _revision_mutation_type=ArtifactMutationType.SLIDE_PATCH,
+        )
+
     @record_artifact_evidence("artifact.get")
     def get(
         self,
@@ -544,8 +638,46 @@ class ArtifactService:
             context,
             artifact_workspace_id=artifact.workspace_id,
         )
+        from imperaos.artifacts.context import (
+            ArtifactContextRequest,
+            build_artifact_context_pack,
+        )
+
+        base_read = self.get(
+            GetArtifactQuery(
+                artifact_id=command.artifact_id,
+                revision_id=command.context_revision_id,
+            ),
+            context,
+        )
+        context_request = ArtifactContextRequest.model_validate(
+            {
+                "artifactId": command.artifact_id,
+                "revisionId": command.context_revision_id,
+                "purpose": command.context_purpose,
+                "allowedScopes": ["metadata", "selection"],
+                "selection": command.target_selection,
+            }
+        )
+        context_pack = build_artifact_context_pack(base_read, context_request)
+        if (
+            context_pack.revision_number != command.base_revision_number
+            or context_pack.projection_sha256 != command.context_sha256
+            or context_pack.selection_sha256 != command.selection_sha256
+        ):
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED,
+                "artifact proposal context binding is invalid",
+                details={"reasonCode": "ARTIFACT_PROPOSAL_CONTEXT_INVALID"},
+            )
         content = self._validate_content(
             artifact.kind, command.content, schema_version=artifact.schema_version
+        )
+        require_scoped_replacement(
+            artifact.kind,
+            base_read.content.model_dump(mode="json", by_alias=True),
+            content.model_dump(mode="json", by_alias=True),
+            command.target_selection,
         )
         content_json = canonical_json(content)
         digest = hashlib.sha256(content_json.encode("utf-8")).hexdigest()
@@ -578,8 +710,8 @@ class ArtifactService:
                         mutation_type, content_json, content_sha256, idempotency_key,
                         summary, proposed_by_id, status, created_at_utc, request_sha256,
                         context_sha256, selection_sha256, source_session_id, source_turn_id,
-                        trace_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+                        trace_id, context_revision_id, context_purpose, target_scope_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         proposal_id,
@@ -599,6 +731,9 @@ class ArtifactService:
                         command.source_session_id,
                         command.source_turn_id,
                         context.trace_id,
+                        command.context_revision_id,
+                        command.context_purpose,
+                        canonical_json(command.target_selection),
                     ),
                 )
                 connection.commit()
@@ -1330,6 +1465,15 @@ class ArtifactService:
             context,
             artifact_workspace_id=artifact.workspace_id,
         )
+        if (
+            command.reason == "user_cancelled"
+            and current.sha256 is not None
+            and current.size_bytes is not None
+        ):
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_EXPORT_FAILED,
+                "preflighted artifact export requires terminal completion",
+            )
         status = "failed" if command.reason != "user_cancelled" else "cancelled"
         record, updated = self.store.transition_export(
             workspace_id=context.workspace_id,
@@ -1338,8 +1482,8 @@ class ArtifactService:
             actor_id=context.principal_id,
             status=status,
             basename=current.basename,
-            sha256=None,
-            size_bytes=None,
+            sha256=current.sha256,
+            size_bytes=current.size_bytes,
             reason_code=command.reason,
             idempotency_key=command.idempotency_key,
             request_sha256=self._request_hash(command),

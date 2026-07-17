@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+import math
 import re
 from typing import Any, Protocol
 
@@ -10,6 +11,7 @@ from pydantic import Field, JsonValue, model_validator
 
 from imperaos.artifacts.context import (
     MAX_CONTEXT_BYTES,
+    MAX_CONTEXT_TOKENS,
     ArtifactContextPack,
     ArtifactContextRequest,
 )
@@ -84,15 +86,8 @@ class CoreLlmArtifactProvider:
         messages: tuple[dict[str, object], ...],
         tools: tuple[ProviderRequestedTool, ...],
     ) -> ArtifactAssistantProviderResponse:
-        tool_contracts = [tool.model_dump(mode="json") for tool in tools]
-        system = (
-            "You are a governed artifact planner. Return one strict JSON object only. "
-            "Use either {\"finalText\":\"...\"} or "
-            "{\"toolCall\":{\"callId\":\"...\",\"name\":\"...\",\"arguments\":{...}}}. "
-            "Only the supplied tools are allowed; never invent a tool, apply a proposal, "
-            "write an export, execute code, or perform external side effects.\n"
-            f"TOOLS={canonical_json(tool_contracts)}"
-        )
+        system = _provider_system(tools)
+        _enforce_provider_request_budget(list(messages), tools)
         generate = self._llm.generate
         parameters = inspect.signature(generate).parameters.values()
         supports_data_classes = any(
@@ -134,6 +129,7 @@ class ArtifactAssistantToolLoop:
             binder(prompt_data_class)
         messages: list[dict[str, object]] = [{"role": "user", "content": prompt}]
         events: list[dict[str, JsonValue]] = []
+        tools = self._registry.provider_tools()
         grant_request: ArtifactContextRequest | None = None
         grant_pack: ArtifactContextPack | None = None
         effective_data_class = prompt_data_class
@@ -155,10 +151,10 @@ class ArtifactAssistantToolLoop:
                 tool_name="artifact.get_context",
                 result=result,
             )
-            _enforce_provider_message_budget(messages)
+            _enforce_provider_request_budget(messages, tools)
 
-        tools = self._registry.provider_tools()
         for _ in range(self._max_tool_calls + 1):
+            _enforce_provider_request_budget(messages, tools)
             response = provider.complete(tuple(messages), tools)
             if response.final_text is not None:
                 return ArtifactAssistantTurnResult(
@@ -183,7 +179,33 @@ class ArtifactAssistantToolLoop:
                 arguments["dataClass"] = _maximum_data_class(
                     effective_data_class, requested_class
                 ).value
-            result = self._registry.invoke(call.name, arguments, context)
+            prospective_messages = [
+                *messages,
+                {
+                    "role": "assistant",
+                    "toolCall": {
+                        **call.model_dump(mode="json", by_alias=True),
+                        "arguments": arguments,
+                    },
+                },
+            ]
+            requested_tool = next(tool for tool in tools if tool.name == call.name)
+            if requested_tool.mutating:
+                prospective_messages.append(
+                    {
+                        "role": "tool",
+                        "callId": call.call_id,
+                        "name": call.name,
+                        "content": "x" * 4_096,
+                    }
+                )
+            _enforce_provider_request_budget(prospective_messages, tools)
+            result = self._registry.invoke(
+                call.name,
+                arguments,
+                context,
+                trusted_context=grant_pack if call.name == "artifact.propose_mutation" else None,
+            )
             _bind_result_classification(provider, result)
             observed_class = _result_data_class(result)
             if observed_class is not None:
@@ -203,7 +225,7 @@ class ArtifactAssistantToolLoop:
                 tool_name=call.name,
                 result=result,
             )
-            _enforce_provider_message_budget(messages)
+            _enforce_provider_request_budget(messages, tools)
         raise ValueError("artifact assistant tool budget exceeded")
 
     @staticmethod
@@ -298,6 +320,7 @@ def _require_grant_bound_proposal(
     if (
         grant is None
         or arguments.get("artifactId") != grant.artifact_id
+        or arguments.get("baseRevisionNumber") != grant.revision_number
         or arguments.get("contextSha256") != grant.projection_sha256
         or arguments.get("selectionSha256") != grant.selection_sha256
     ):
@@ -324,8 +347,26 @@ def _deny_context_expansion() -> None:
     )
 
 
-def _enforce_provider_message_budget(messages: list[dict[str, object]]) -> None:
-    if len(canonical_json(messages).encode("utf-8")) > MAX_CONTEXT_BYTES:
+def _provider_system(tools: tuple[ProviderRequestedTool, ...]) -> str:
+    tool_contracts = [tool.model_dump(mode="json") for tool in tools]
+    return (
+        "You are a governed artifact planner. Return one strict JSON object only. "
+        "Use either {\"finalText\":\"...\"} or "
+        "{\"toolCall\":{\"callId\":\"...\",\"name\":\"...\",\"arguments\":{...}}}. "
+        "Only the supplied tools are allowed; never invent a tool, apply a proposal, "
+        "write an export, execute code, or perform external side effects.\n"
+        f"TOOLS={canonical_json(tool_contracts)}"
+    )
+
+
+def _enforce_provider_request_budget(
+    messages: list[dict[str, object]],
+    tools: tuple[ProviderRequestedTool, ...],
+) -> None:
+    payload = canonical_json({"system": _provider_system(tools), "messages": messages})
+    size_bytes = len(payload.encode("utf-8"))
+    estimated_tokens = math.ceil(size_bytes / 4)
+    if size_bytes > MAX_CONTEXT_BYTES or estimated_tokens > MAX_CONTEXT_TOKENS:
         raise ArtifactDomainError(
             ArtifactErrorCode.ARTIFACT_CONTENT_TOO_LARGE,
             "artifact assistant provider message budget exceeded",

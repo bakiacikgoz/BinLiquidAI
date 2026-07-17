@@ -25,6 +25,7 @@ from imperaos.artifacts.commands import (  # noqa: E402
     ImportEvidenceArtifactCommand,
     ListArtifactsQuery,
     MutateArtifactCommand,
+    PatchArtifactSlideCommand,
     PatchSpreadsheetCellsCommand,
     PreflightArtifactExportCommand,
     ProposeArtifactMutationCommand,
@@ -95,6 +96,7 @@ SCHEMAS = {
     "artifact-list-query.v1": ListArtifactsQuery,
     "artifact-mutation-command.v1": MutateArtifactCommand,
     "artifact-spreadsheet-cell-patch-command.v1": PatchSpreadsheetCellsCommand,
+    "artifact-slide-patch-command.v1": PatchArtifactSlideCommand,
     "artifact-mutation-proposal-command.v1": ProposeArtifactMutationCommand,
     "artifact-apply-proposal-command.v1": ApplyArtifactProposalCommand,
     "artifact-history-query.v1": ArtifactHistoryQuery,
@@ -150,12 +152,20 @@ def schema_for(name: str, model: type[Any]) -> dict[str, Any]:
             "authority": "backend revalidation is mandatory",
         }
     if name == "code.v2":
+        unicode_format_characters = (
+            "\u00ad\u0600-\u0605\u061c\u06dd\u070f\u0890-\u0891\u08e2\u180e"
+            "\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff\ufff9-\ufffb"
+            f"{chr(0x110BD)}{chr(0x110CD)}{chr(0x13430)}-{chr(0x1343F)}"
+            f"{chr(0x1BCA0)}-{chr(0x1BCA3)}{chr(0x1D173)}-{chr(0x1D17A)}"
+            f"{chr(0xE0001)}{chr(0xE0020)}-{chr(0xE007F)}"
+        )
         schema["properties"]["filename"]["pattern"] = (
             r"^(?![ .])(?!.*[ .]$)"
             r"(?!(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|"
             r"[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\.|$))"
             r"[^<>:\"/\\|?*\u0000-\u001f\u007f-\u009f"
-            r"\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]+$"
+            + unicode_format_characters
+            + r"]+$"
         )
         schema["allOf"] = [
             {

@@ -48,3 +48,18 @@ def test_renderer_payload_cannot_supply_artifact_identity_or_shell_command() -> 
     assert "Command::new(&self.launch.program)" in supervisor
     assert 'Command::new("sh")' not in supervisor
     assert '.arg("-c")' not in supervisor
+
+
+def test_approval_read_surfaces_use_trusted_workspace_identity() -> None:
+    bridge = BRIDGE.read_text(encoding="utf-8")
+    pending = bridge.split("pub async fn bridge_approval_pending", 1)[1].split(
+        "pub async fn bridge_approval_show", 1
+    )[0]
+    show = bridge.split("pub async fn bridge_approval_show", 1)[1].split(
+        "pub async fn bridge_approval_decide", 1
+    )[0]
+
+    for command in (pending, show):
+        assert "app: tauri::AppHandle" in command
+        assert "resolve_trusted_artifact_identity" in command
+        assert '"--workspace-id"' in command

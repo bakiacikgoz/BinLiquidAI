@@ -57,6 +57,7 @@
         "artifact.create",
         "artifact.mutate",
         "artifact.spreadsheet.patch",
+        "artifact.slides.patch",
         "artifact.propose_mutation",
         "artifact.apply_proposal",
         "artifact.history",

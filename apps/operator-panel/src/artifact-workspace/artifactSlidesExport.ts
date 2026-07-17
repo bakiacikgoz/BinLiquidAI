@@ -49,6 +49,7 @@ export async function exportSlidesArtifact({
   });
   if (begin.cancelled) return { status: 'cancelled' };
   if (!begin.ticket) throw new Error('Native export did not return a ticket.');
+  let commitStarted = false;
   try {
     const referencedAssetIds = [...new Set(parsed.slides.flatMap((slide) =>
       slide.elements.filter((element) => element.type === 'image').map((element) => element.assetId),
@@ -71,10 +72,11 @@ export async function exportSlidesArtifact({
     if (bytes.byteLength > begin.maxBytes) {
       throw new Error('Slides PPTX export exceeds the native size limit.');
     }
+    commitStarted = true;
     const result = await bridge.commitExport(begin.ticket, bytes);
     return { status: 'exported', ...result };
   } catch (error) {
-    await bridge.cancelExport(begin.ticket).catch(() => undefined);
+    if (!commitStarted) await bridge.cancelExport(begin.ticket).catch(() => undefined);
     throw error;
   }
 }

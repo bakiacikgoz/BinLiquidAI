@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from typing import Any
 
@@ -45,6 +46,9 @@ class ArtifactProposalApprovalGateway:
             "requestSha256": row["request_sha256"],
             "contextSha256": row["context_sha256"],
             "selectionSha256": row["selection_sha256"],
+            "contextRevisionId": row["context_revision_id"],
+            "contextPurpose": row["context_purpose"],
+            "targetScope": json.loads(row["target_scope_json"]),
             "sourceSessionId": row["source_session_id"],
             "sourceTurnId": row["source_turn_id"],
             "traceId": row["trace_id"],
@@ -114,6 +118,9 @@ class ArtifactProposalApprovalGateway:
                 "requestSha256": row["request_sha256"],
                 "contextSha256": row["context_sha256"],
                 "selectionSha256": row["selection_sha256"],
+                "contextRevisionId": row["context_revision_id"],
+                "contextPurpose": row["context_purpose"],
+                "targetScope": json.loads(row["target_scope_json"]),
                 "sourceSessionId": row["source_session_id"],
                 "sourceTurnId": row["source_turn_id"],
                 "traceId": row["trace_id"],
@@ -135,6 +142,16 @@ class ArtifactProposalApprovalGateway:
                     "artifact proposal provenance is incomplete",
                     details={"reasonCode": "ARTIFACT_PROPOSAL_PROVENANCE_INVALID"},
                 )
+        if (
+            not row["context_revision_id"]
+            or row["context_purpose"] not in {"edit", "transform"}
+            or not row["target_scope_json"]
+        ):
+            raise ArtifactDomainError(
+                ArtifactErrorCode.ARTIFACT_POLICY_UNAVAILABLE,
+                "artifact proposal scope provenance is incomplete",
+                details={"reasonCode": "ARTIFACT_PROPOSAL_PROVENANCE_INVALID"},
+            )
 
     @staticmethod
     def _target_ref(row: Any) -> str:

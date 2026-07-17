@@ -5,7 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from imperaos.artifacts.commands import CreateArtifactCommand
+from imperaos.artifacts.commands import (
+    ArchiveArtifactCommand,
+    ArtifactHistoryQuery,
+    BeginArtifactExportCommand,
+    CreateArtifactCommand,
+    GetArtifactQuery,
+)
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.feature_flags import (
     ARTIFACT_FEATURE_FLAG_NAMES,
@@ -93,3 +99,60 @@ def test_runtime_flags_default_off_and_service_revalidates_authority(
     assert enabled["artifact_workspace.enabled"] is True
     assert enabled["artifact_workspace.document.enabled"] is True
     assert enabled["artifact_workspace.form.enabled"] is False
+
+
+def test_forced_off_editor_flag_preserves_read_archive_and_safe_export_fallback(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "artifacts"
+    context = OperationContext(
+        workspace_id="workspace-1",
+        principal_type=PrincipalType.USER,
+        principal_id="user-1",
+        roles=("artifact_admin",),
+        request_id="request-fallback",
+    )
+    created = ArtifactService(root).create(
+        CreateArtifactCommand(
+            artifact_id="spreadsheet-fallback",
+            kind=ArtifactKind.SPREADSHEET,
+            title="Fallback sheet",
+            data_class=ArtifactDataClass.INTERNAL,
+            content={
+                "kind": "spreadsheet",
+                "schemaVersion": 1,
+                "calculationMode": "disabled",
+                "sheets": [
+                    {"id": "sheet-1", "name": "Sheet 1", "cells": {}, "columns": []}
+                ],
+            },
+            idempotency_key="create-fallback",
+        ),
+        context,
+    )
+    flags = {name: True for name in ARTIFACT_FEATURE_FLAG_NAMES}
+    flags["artifact_workspace.spreadsheet.enabled"] = False
+    fallback = ArtifactService(root, feature_flags=flags)
+
+    assert fallback.get(GetArtifactQuery(artifact_id="spreadsheet-fallback"), context).artifact
+    assert fallback.history(
+        ArtifactHistoryQuery(artifact_id="spreadsheet-fallback"), context
+    ).items
+    export = fallback.begin_export(
+        BeginArtifactExportCommand(
+            artifact_id="spreadsheet-fallback",
+            revision_id=created.revision.revision_id,
+            format="xlsx",
+            idempotency_key="export-fallback",
+        ),
+        context,
+    )
+    assert export.disposition == "created"
+    archived = fallback.archive(
+        ArchiveArtifactCommand(
+            artifact_id="spreadsheet-fallback",
+            expected_revision_number=1,
+        ),
+        context,
+    )
+    assert archived.artifact.status.value == "archived"

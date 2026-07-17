@@ -163,7 +163,7 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
       artifact={props.artifact}
       content={props.content}
       capability={capability}
-      onExport={props.artifact.kind === 'canvas' ? props.onRequestExport : undefined}
+      onExport={props.onRequestExport}
     />;
   }
   if (props.artifact.kind === 'slides') {

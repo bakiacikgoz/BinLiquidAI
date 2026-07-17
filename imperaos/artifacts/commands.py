@@ -82,6 +82,36 @@ class PatchSpreadsheetCellsCommand(ArtifactModel):
         return self
 
 
+class SlideSetTitleOperation(ArtifactModel):
+    op: Literal["set_title"]
+    title: Annotated[str | None, StringConstraints(max_length=200, strict=True)] = None
+
+
+class SlideUpsertElementOperation(ArtifactModel):
+    op: Literal["upsert_element"]
+    element: dict[str, JsonValue]
+
+
+class SlideRemoveElementOperation(ArtifactModel):
+    op: Literal["remove_element"]
+    element_id: BoundedId
+
+
+SlidePatchOperation = Annotated[
+    SlideSetTitleOperation | SlideUpsertElementOperation | SlideRemoveElementOperation,
+    Field(discriminator="op"),
+]
+
+
+class PatchArtifactSlideCommand(ArtifactModel):
+    artifact_id: BoundedId
+    expected_revision_number: int = Field(ge=1)
+    slide_id: BoundedId
+    operations: list[SlidePatchOperation] = Field(min_length=1, max_length=500)
+    idempotency_key: BoundedId
+    change_summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""
+
+
 class ProposeArtifactMutationCommand(ArtifactModel):
     proposal_id: BoundedId | None = None
     artifact_id: BoundedId
@@ -92,6 +122,9 @@ class ProposeArtifactMutationCommand(ArtifactModel):
     summary: Annotated[str, StringConstraints(max_length=500, strict=True)] = ""
     context_sha256: Sha256
     selection_sha256: Sha256
+    context_revision_id: BoundedId
+    context_purpose: Literal["edit", "transform"]
+    target_selection: dict[str, JsonValue]
     source_session_id: BoundedId | None = None
     source_turn_id: BoundedId | None = None
 

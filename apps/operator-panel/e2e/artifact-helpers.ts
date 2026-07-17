@@ -420,6 +420,113 @@ export async function codeArtifactCommands(page: Page): Promise<string[]> {
   });
 }
 
+export async function installStructuredArtifactBridgeStub(
+  page: Page,
+  kind: 'spreadsheet' | 'canvas' | 'slides',
+): Promise<void> {
+  await page.evaluate((artifactKind) => {
+    const now = '2026-07-17T09:00:00Z';
+    const contents = {
+      spreadsheet: {
+        kind: 'spreadsheet', schemaVersion: 2, calculationMode: 'disabled',
+        sheets: [{
+          id: 'sheet-1', name: 'Budget', columns: [],
+          cells: { A1: { value: '=1+1' }, B1: { value: 42 } },
+        }],
+      },
+      canvas: {
+        kind: 'canvas', schemaVersion: 2,
+        snapshot: { objects: [{
+          id: 'note-1', type: 'note', x: 1, y: 2, width: 200, height: 100,
+          text: '<script>local text only</script>',
+        }] },
+        assetIds: [], embeds: 'deny', remoteAssets: 'deny',
+      },
+      slides: {
+        kind: 'slides', schemaVersion: 2,
+        theme: { name: 'ImperaOS', backgroundColor: 'FFFFFF', foregroundColor: '172033', accentColor: '6E57FF' },
+        slides: [{ id: 'slide-1', title: 'Overview', elements: [{
+          id: 'text-1', type: 'text', x: 0.5, y: 0.5, width: 8, height: 1,
+          text: 'Governed deck', fontSize: 30, bold: false,
+        }] }],
+        assetIds: [],
+      },
+    } as const;
+    let content: Record<string, unknown> = structuredClone(contents[artifactKind]);
+    let descriptor = {
+      artifactId: `artifact-preview-${artifactKind}`, workspaceId: 'workspace-preview', kind: artifactKind,
+      title: artifactKind === 'slides' ? 'Deck' : artifactKind === 'canvas' ? 'Board' : 'Budget',
+      status: 'active', schemaVersion: 2, dataClass: 'internal', currentRevisionId: `${artifactKind}-revision-1`,
+      currentRevisionNumber: 1, sourceSessionId: 'assistant-preview-session', sourceTurnId: 'assistant-preview-turn',
+      createdByType: 'assistant', createdById: 'assistant-preview', updatedById: 'assistant-preview',
+      createdAtUtc: now, updatedAtUtc: now, archivedAtUtc: null, etag: `${artifactKind}-etag-1`,
+      metadata: { policyStatus: 'governed', licenseStatus: 'forced_off' },
+    };
+    let revision = {
+      revisionId: `${artifactKind}-revision-1`, artifactId: descriptor.artifactId,
+      parentRevisionId: null as string | null, baseRevisionId: null as string | null,
+      revisionNumber: 1, schemaVersion: 2, mutationType: 'create',
+      contentRelpath: `workspace-preview/${descriptor.artifactId}/revision-1.json`,
+      contentSha256: 'a'.repeat(64), contentSizeBytes: 256, contentEncoding: 'json',
+      changeSummary: 'Created governed artifact', authorType: 'assistant', authorId: 'assistant-preview',
+      idempotencyKey: `create-${artifactKind}`, createdAtUtc: now,
+    };
+    const history = [revision];
+    const commands: string[] = [];
+    let exportedBytes: number[] = [];
+    const ok = (data: unknown) => ({ ok: true, data, error: null });
+    (window as unknown as { __structuredArtifactE2eState: unknown }).__structuredArtifactE2eState = {
+      commands,
+      snapshot: () => ({ descriptor, revision, content, exportedBytes: [...exportedBytes] }),
+    };
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
+      invoke: async (command: string, args: Record<string, unknown>) => {
+        commands.push(command);
+        if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
+        if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
+        if (command === 'bridge_artifact_history') return ok({ items: history, next_cursor: null });
+        if (command === 'bridge_artifact_mutate' || command === 'bridge_artifact_slides_patch') {
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          if (command === 'bridge_artifact_mutate') content = params.content as Record<string, unknown>;
+          const previous = revision;
+          const revisionNumber = previous.revisionNumber + 1;
+          revision = {
+            ...previous, revisionId: `${artifactKind}-revision-${revisionNumber}`,
+            parentRevisionId: previous.revisionId, revisionNumber,
+            mutationType: command === 'bridge_artifact_slides_patch' ? 'slide_patch' : 'replace_content',
+            idempotencyKey: String(params.idempotencyKey), changeSummary: 'Structured edit',
+          };
+          descriptor = {
+            ...descriptor, currentRevisionId: revision.revisionId,
+            currentRevisionNumber: revisionNumber, etag: `${artifactKind}-etag-${revisionNumber}`,
+          };
+          history.unshift(revision);
+          return ok({ artifact: descriptor, revision, created: false, disposition: 'updated' });
+        }
+        if (command === 'bridge_artifact_export_begin') {
+          return ok({ cancelled: false, ticket: `${artifactKind}-ticket-1`, expiresInMs: 60_000, maxBytes: 5_000_000 });
+        }
+        if (command === 'bridge_artifact_export_commit') {
+          const request = args.request as { bytes: number[]; sha256: string };
+          exportedBytes = [...request.bytes];
+          return ok({ basename: `${artifactKind}.export`, sha256: request.sha256, sizeBytes: request.bytes.length });
+        }
+        if (command === 'bridge_artifact_export_cancel') return ok({ cancelled: true });
+        throw new Error(`Unexpected structured artifact E2E command: ${command}`);
+      },
+    };
+  }, kind);
+}
+
+export async function structuredArtifactCommands(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const state = (window as unknown as {
+      __structuredArtifactE2eState: { commands: string[] };
+    }).__structuredArtifactE2eState;
+    return [...state.commands];
+  });
+}
+
 export async function codeArtifactExportedText(page: Page): Promise<string | null> {
   return page.evaluate(() => {
     const state = (window as unknown as {

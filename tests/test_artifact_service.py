@@ -19,6 +19,7 @@ from imperaos.artifacts.commands import (
     ProposeArtifactMutationCommand,
     RestoreArtifactCommand,
 )
+from imperaos.artifacts.context import ArtifactContextRequest, get_artifact_context
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
 from imperaos.artifacts.models import (
     ArtifactDataClass,
@@ -77,6 +78,36 @@ def create_command(*, key: str = "create-1") -> CreateArtifactCommand:
         data_class=ArtifactDataClass.INTERNAL,
         content=document("v1"),
         idempotency_key=key,
+    )
+
+
+def proposal_command(
+    service: ArtifactService,
+    **values: object,
+) -> ProposeArtifactMutationCommand:
+    values.pop("context_sha256", None)
+    values.pop("selection_sha256", None)
+    revision = next(
+        item
+        for item in service.store.list_revisions("workspace-1", str(values["artifact_id"]))
+        if item.revision_number == values["base_revision_number"]
+    )
+    request = ArtifactContextRequest.model_validate(
+        {
+            "artifactId": values["artifact_id"],
+            "revisionId": revision.revision_id,
+            "purpose": "edit",
+            "selection": {"kind": "document", "blockIds": ["block-1"]},
+        }
+    )
+    pack = get_artifact_context(service, request, assistant_context())
+    return ProposeArtifactMutationCommand(
+        **values,
+        context_sha256=pack.projection_sha256,
+        selection_sha256=pack.selection_sha256,
+        context_revision_id=pack.revision_id,
+        context_purpose="edit",
+        target_selection=pack.selection.model_dump(mode="json", by_alias=True),
     )
 
 
@@ -248,7 +279,7 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
     service.create(create_command(), user_context())
     assistant = assistant_context()
     proposal = service.propose_mutation(
-        ProposeArtifactMutationCommand(
+        proposal_command(service,
             proposal_id="proposal-1",
             artifact_id="artifact-1",
             base_revision_number=1,
@@ -305,8 +336,11 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
             "SELECT * FROM artifact_mutation_proposals WHERE proposal_id = 'proposal-1'"
         ).fetchone()
     assert stored["request_sha256"]
-    assert stored["context_sha256"] == "1" * 64
-    assert stored["selection_sha256"] == "2" * 64
+    assert len(stored["context_sha256"]) == 64
+    assert len(stored["selection_sha256"]) == 64
+    assert stored["context_revision_id"]
+    assert stored["context_purpose"] == "edit"
+    assert stored["target_scope_json"] == '{"blockIds":["block-1"],"kind":"document"}'
     assert stored["source_session_id"] == "session-1"
     assert stored["source_turn_id"] == "turn-1"
     assert stored["trace_id"] is None
@@ -317,7 +351,7 @@ def test_document_service_ai_proposal_is_approval_bound_and_applies_new_revision
 
     with pytest.raises(ArtifactDomainError) as replay_mismatch:
         service.propose_mutation(
-            ProposeArtifactMutationCommand(
+            proposal_command(service,
                 proposal_id="proposal-1",
                 artifact_id="artifact-1",
                 base_revision_number=1,
@@ -343,7 +377,7 @@ def test_default_artifact_proposal_uses_the_operator_governance_approval_store(
     service = ArtifactService(tmp_path / "artifact-root")
     service.create(create_command(), user_context())
     proposal = service.propose_mutation(
-        ProposeArtifactMutationCommand(
+        proposal_command(service,
             proposal_id="proposal-default-store",
             artifact_id="artifact-1",
             base_revision_number=1,
@@ -375,6 +409,43 @@ def test_default_artifact_proposal_uses_the_operator_governance_approval_store(
     assert applied.artifact.current_revision_number == 2
 
 
+def test_artifact_proposal_rejects_changes_outside_trusted_selection(tmp_path: Path) -> None:
+    service = ArtifactService(tmp_path / "artifact-root")
+    base = document("selected")
+    base["blocks"].append(
+        {"id": "block-2", "type": "paragraph", "content": [{"type": "text", "text": "fixed"}]}
+    )
+    service.create(
+        create_command().model_copy(update={"content": base}),
+        user_context(),
+    )
+    proposed = document("selected update")
+    proposed["blocks"].append(
+        {"id": "block-2", "type": "paragraph", "content": [{"type": "text", "text": "escaped"}]}
+    )
+
+    with pytest.raises(ArtifactDomainError) as denied:
+        service.propose_mutation(
+            proposal_command(
+                service,
+                proposal_id="proposal-scope-escape",
+                artifact_id="artifact-1",
+                base_revision_number=1,
+                mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+                content=proposed,
+                idempotency_key="proposal-scope-escape-key",
+            ),
+            assistant_context(),
+        )
+
+    assert denied.value.code is ArtifactErrorCode.ARTIFACT_PERMISSION_DENIED
+    with service.store._connect() as connection:
+        count = connection.execute(
+            "SELECT count(*) FROM artifact_mutation_proposals"
+        ).fetchone()[0]
+    assert count == 0
+
+
 def test_artifact_proposal_stale_base_does_not_claim_approval_or_write_revision(
     tmp_path: Path,
 ) -> None:
@@ -383,7 +454,7 @@ def test_artifact_proposal_stale_base_does_not_claim_approval_or_write_revision(
     service.create(create_command(), user_context())
     assistant = assistant_context()
     proposal = service.propose_mutation(
-        ProposeArtifactMutationCommand(
+        proposal_command(service,
             proposal_id="proposal-stale",
             artifact_id="artifact-1",
             base_revision_number=1,
@@ -442,7 +513,7 @@ def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: P
     service = ArtifactService(tmp_path / "artifact-root", approval_store=approval_store)
     service.create(create_command(), user_context())
     proposal = service.propose_mutation(
-        ProposeArtifactMutationCommand(
+        proposal_command(service,
             proposal_id="proposal-1",
             artifact_id="artifact-1",
             base_revision_number=1,
@@ -505,10 +576,13 @@ def test_artifact_proposal_rejects_wrong_action_or_executor_approval(tmp_path: P
 
 
 def test_artifact_proposal_cross_workspace_lookup_is_indistinguishable(tmp_path: Path) -> None:
-    service = ArtifactService(tmp_path / "artifact-root")
+    service = ArtifactService(
+        tmp_path / "artifact-root",
+        approval_store=ApprovalStore(tmp_path / "approvals.sqlite3"),
+    )
     service.create(create_command(), user_context("artifact_admin"))
     proposal = service.propose_mutation(
-        ProposeArtifactMutationCommand(
+        proposal_command(service,
             proposal_id="proposal-private",
             artifact_id="artifact-1",
             base_revision_number=1,

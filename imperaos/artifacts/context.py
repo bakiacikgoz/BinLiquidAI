@@ -23,11 +23,19 @@ from imperaos.artifacts.models import (
 MAX_CONTEXT_BYTES = 32 * 1024
 MAX_CONTEXT_TOKENS = 8_192
 _SECRET_KEY = re.compile(
-    r"(?:api[_-]?key|access[_-]?token|authorization|password|client[_-]?secret|private[_-]?key|credential)",
+    r"(?:api[_-]?key|access[_-]?token|authorization|password|client[_-]?secret|private[_-]?key|secret[_-]?access[_-]?key|aws[_-]?secret[_-]?access[_-]?key|credential)",
     re.IGNORECASE,
 )
 _SECRET_VALUE = re.compile(
-    r"(?:\bBearer\s+[A-Za-z0-9._~+/=-]{8,}|\bsk-[A-Za-z0-9_-]{8,})",
+    r"(?:"
+    r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"
+    r"|\bsk-[A-Za-z0-9_-]{8,}"
+    r"|\bgh[pousr]_[A-Za-z0-9]{20,}"
+    r"|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"
+    r"|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"
+    r"|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"
+    r"|\b[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@"
+    r")",
     re.IGNORECASE,
 )
 _CELL_RANGE = re.compile(r"^([A-Z]{1,3})([1-9][0-9]{0,6})(?::([A-Z]{1,3})([1-9][0-9]{0,6}))?$")
@@ -141,6 +149,7 @@ class ArtifactContextPack(ArtifactModel):
     contract_version: Literal["artifact-context-pack/v1"] = "artifact-context-pack/v1"
     artifact_id: BoundedId
     revision_id: BoundedId
+    revision_number: int = Field(ge=1)
     kind: ArtifactKind = Field(strict=False)
     schema_version: int = Field(ge=1, le=1_000)
     data_class: ArtifactDataClass = Field(strict=False)
@@ -199,6 +208,7 @@ def build_artifact_context_pack(
     return ArtifactContextPack(
         artifact_id=artifact.artifact_id,
         revision_id=revision.revision_id,
+        revision_number=revision.revision_number,
         kind=artifact.kind,
         schema_version=artifact.schema_version,
         data_class=artifact.data_class,

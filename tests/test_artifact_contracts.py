@@ -64,6 +64,17 @@ def test_code_v2_contract_publishes_portable_filename_and_line_ending_rules() ->
     assert list(
         validator.iter_errors({**base, "filename": "con.PY", "lineEnding": "lf", "text": "x\n"})
     )
+    for format_character in ("\u00ad", "\u0600", "\U000110bd", "\U000e0001"):
+        assert list(
+            validator.iter_errors(
+                {
+                    **base,
+                    "filename": f"safe{format_character}.py",
+                    "lineEnding": "lf",
+                    "text": "x\n",
+                }
+            )
+        )
     assert list(
         validator.iter_errors(
             {**base, "filename": "main.py", "lineEnding": "crlf", "text": "x\r\ny\n"}
