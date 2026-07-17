@@ -40,6 +40,13 @@ export type ArtifactRevisionComparison = {
   error: ArtifactWorkspaceUiError | null;
 };
 
+export type ArtifactProposalApplyRequest = {
+  proposalId: string;
+  artifactId: string;
+  approvalId: string;
+  baseRevisionNumber: number;
+};
+
 export interface AssistantArtifactWorkspaceControllerOptions {
   assistantState: AssistantSessionState;
   legacyArtifacts: LegacyWorkbenchArtifact[];
@@ -403,6 +410,40 @@ export function useAssistantArtifactWorkspaceController({
     [autosave, controller, invalidateComparison, loadHistory],
   );
 
+  const applyProposal = useCallback(
+    async (proposal: ArtifactProposalApplyRequest) => {
+      invalidateComparison();
+      setError(null);
+      setOperationNotice(null);
+      try {
+        if (controller.getState().tabs.some((tab) => tab.artifact.artifactId === proposal.artifactId)) {
+          await autosave.flush(proposal.artifactId);
+        }
+        const operation = await bridge.applyProposal({
+          proposalId: proposal.proposalId,
+          expectedRevisionNumber: proposal.baseRevisionNumber,
+          approvalId: proposal.approvalId,
+        });
+        if (operation.artifact.artifactId !== proposal.artifactId) {
+          throw new Error('Applied proposal returned a different artifact.');
+        }
+        await controller.open(proposal.artifactId);
+        await loadHistory(proposal.artifactId, false);
+        setOpen(true);
+        setOperationNotice('Approved proposal applied.');
+        return operation;
+      } catch (caught) {
+        setError(normalizeWorkspaceError(caught, {
+          code: 'ARTIFACT_PROPOSAL_APPLY_FAILED',
+          message: 'The approved proposal could not be applied.',
+          retryable: true,
+        }));
+        throw caught;
+      }
+    },
+    [autosave, bridge, controller, invalidateComparison, loadHistory],
+  );
+
   const exportDocument = useCallback(
     async (artifactId: string, format: DocumentArtifactExportFormat) => {
       setError(null);
@@ -688,6 +729,7 @@ export function useAssistantArtifactWorkspaceController({
         controller.discardAndClose(artifactId);
       },
       restore: restoreArtifact,
+      applyProposal,
         exportDocument,
         exportCode,
         exportFlow,
@@ -704,7 +746,7 @@ export function useAssistantArtifactWorkspaceController({
       loadHistory: (artifactId: string) => loadHistory(artifactId, false),
       loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSlides, exportSpreadsheet, formRuntime, forkConflict, importAsset, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, restoreArtifact, submitForm, toggle],
+    [applyProposal, autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSlides, exportSpreadsheet, formRuntime, forkConflict, importAsset, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, restoreArtifact, submitForm, toggle],
   );
 
   const activeTab =

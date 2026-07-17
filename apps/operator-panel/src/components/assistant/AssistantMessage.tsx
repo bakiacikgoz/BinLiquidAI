@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
-import type { AssistantArtifactRef, AssistantTurn } from '../../assistant/assistantTypes';
+import type { AssistantArtifactProposalPart, AssistantArtifactRef, AssistantTurn } from '../../assistant/assistantTypes';
 import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import { Card } from '../primitives/Card';
 import { Button } from '../primitives/Button';
@@ -285,6 +285,7 @@ export function AssistantMessage({
   onApprove,
   onReject,
   onExecute,
+  onApplyProposal,
   onRegenerate,
   onOpenArtifact,
   renderInlineArtifact,
@@ -299,6 +300,7 @@ export function AssistantMessage({
   onApprove: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
+  onApplyProposal?: (proposal: AssistantArtifactProposalPart) => void;
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
   renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
@@ -407,7 +409,7 @@ export function AssistantMessage({
             onReview={onReviewApproval}
             onApprove={onApprove}
             onReject={onReject}
-            onExecute={onExecute}
+            onApply={onApplyProposal ?? (() => undefined)}
           />
         ))}
         {message.parts.filter((part) => part.type === 'artifact').map((artifact) => (

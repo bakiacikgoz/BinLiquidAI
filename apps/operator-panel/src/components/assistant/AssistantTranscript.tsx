@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { ThreadPrimitive, useAuiState } from '@assistant-ui/react';
 
-import type { AssistantArtifactRef, AssistantTurn } from '../../assistant/assistantTypes';
+import type { AssistantArtifactProposalPart, AssistantArtifactRef, AssistantTurn } from '../../assistant/assistantTypes';
 import type { UiLocale } from '../../i18n';
 import { AssistantMessage } from './AssistantMessage';
 
@@ -28,6 +28,7 @@ interface RuntimeTranscriptContextValue {
   onApprove: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
+  onApplyProposal?: (proposal: AssistantArtifactProposalPart) => void;
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
   renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
@@ -54,6 +55,7 @@ function RuntimeTurnMessage() {
         onApprove={context.onApprove}
         onReject={context.onReject}
         onExecute={context.onExecute}
+        onApplyProposal={context.onApplyProposal}
         onRegenerate={context.onRegenerate}
         onOpenArtifact={context.onOpenArtifact}
         renderInlineArtifact={context.renderInlineArtifact}
@@ -77,6 +79,7 @@ export function AssistantTranscript({
   onApprove,
   onReject,
   onExecute,
+  onApplyProposal,
   onRegenerate,
   onOpenArtifact,
   renderInlineArtifact,
@@ -91,6 +94,7 @@ export function AssistantTranscript({
   onApprove: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
   onExecute: (approvalId: string) => void;
+  onApplyProposal?: (proposal: AssistantArtifactProposalPart) => void;
   onRegenerate: (turnId: string) => void;
   onOpenArtifact?: (artifactId: string) => void;
   renderInlineArtifact?: (artifact: AssistantArtifactRef) => ReactNode;
@@ -111,6 +115,7 @@ export function AssistantTranscript({
     onApprove,
     onReject,
     onExecute,
+    onApplyProposal,
     onRegenerate,
     onOpenArtifact,
     renderInlineArtifact,

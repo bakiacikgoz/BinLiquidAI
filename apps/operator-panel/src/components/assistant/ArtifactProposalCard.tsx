@@ -8,7 +8,7 @@ export function ArtifactProposalCard({
   onReview,
   onApprove,
   onReject,
-  onExecute,
+  onApply,
 }: {
   proposal: AssistantArtifactProposalPart;
   disabled: boolean;
@@ -16,7 +16,7 @@ export function ArtifactProposalCard({
   onReview: (approvalId: string) => void;
   onApprove: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
-  onExecute: (approvalId: string) => void;
+  onApply: (proposal: AssistantArtifactProposalPart) => void;
 }) {
   const decisionDisabled = disabled || proposal.status !== 'pending';
   const executeDisabled = disabled || proposal.status !== 'approved';
@@ -47,7 +47,7 @@ export function ArtifactProposalCard({
           </>
         ) : null}
         {proposal.status === 'approved' ? (
-          <Button disabled={executeDisabled} title={executeDisabled ? disabledReason : undefined} onClick={() => onExecute(proposal.approvalId)}>
+          <Button disabled={executeDisabled} title={executeDisabled ? disabledReason : undefined} onClick={() => onApply(proposal)}>
             Apply approved proposal
           </Button>
         ) : null}

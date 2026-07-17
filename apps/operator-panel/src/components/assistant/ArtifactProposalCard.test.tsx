@@ -31,7 +31,7 @@ describe('ArtifactProposalCard', () => {
         onReview={onReview}
         onApprove={onApprove}
         onReject={onReject}
-        onExecute={vi.fn()}
+        onApply={vi.fn()}
       />,
     );
 
@@ -45,8 +45,8 @@ describe('ArtifactProposalCard', () => {
     expect(screen.queryByText(/\{"/)).not.toBeInTheDocument();
   });
 
-  it('offers execute only after approval and renders bounded failure state', async () => {
-    const onExecute = vi.fn();
+  it('applies the exact governed proposal only after approval and renders bounded failure state', async () => {
+    const onApply = vi.fn();
     const { user } = renderOperatorPanel(
       <ArtifactProposalCard
         proposal={{ ...proposal, status: 'approved', error: 'Revision changed before apply.' }}
@@ -55,12 +55,12 @@ describe('ArtifactProposalCard', () => {
         onReview={vi.fn()}
         onApprove={vi.fn()}
         onReject={vi.fn()}
-        onExecute={onExecute}
+        onApply={onApply}
       />,
     );
 
     await user.click(screen.getByRole('button', { name: 'Apply approved proposal' }));
-    expect(onExecute).toHaveBeenCalledWith('approval-1');
+    expect(onApply).toHaveBeenCalledWith({ ...proposal, status: 'approved', error: 'Revision changed before apply.' });
     expect(screen.getByRole('alert')).toHaveTextContent('Revision changed before apply.');
   });
 });

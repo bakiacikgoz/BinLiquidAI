@@ -52,6 +52,53 @@ function documentResult(): ArtifactReadResult {
 }
 
 describe('assistant artifact workspace controller hook', () => {
+  it('applies a proposal through artifact RPC and refreshes the authoritative revision', async () => {
+    const initial = documentResult();
+    const refreshed = documentResult();
+    refreshed.artifact = {
+      ...refreshed.artifact,
+      currentRevisionId: 'revision-2',
+      currentRevisionNumber: 2,
+    };
+    refreshed.revision = {
+      ...refreshed.revision,
+      revisionId: 'revision-2',
+      revisionNumber: 2,
+      mutationType: 'replace_content',
+    };
+    const applyProposal = vi.fn().mockResolvedValue({
+      artifact: refreshed.artifact,
+      revision: refreshed.revision,
+      created: false,
+      disposition: 'updated',
+    });
+    const get = vi.fn().mockResolvedValueOnce(initial).mockResolvedValueOnce(refreshed);
+    const bridge = { get, applyProposal } as unknown as ArtifactBridge;
+    const { result } = renderHook(() => useAssistantArtifactWorkspaceController({
+      assistantState: createAssistantSession('session-1'),
+      legacyArtifacts: [],
+      selectedLegacyArtifactName: '',
+      onSelectLegacyArtifact: vi.fn(),
+      bridge,
+    }));
+    await act(async () => result.current.actions.openArtifact('artifact-1'));
+
+    await act(async () => result.current.actions.applyProposal({
+      proposalId: 'proposal-1',
+      artifactId: 'artifact-1',
+      approvalId: 'approval-1',
+      baseRevisionNumber: 1,
+    }));
+
+    expect(applyProposal).toHaveBeenCalledWith({
+      proposalId: 'proposal-1',
+      expectedRevisionNumber: 1,
+      approvalId: 'approval-1',
+    });
+    expect(get).toHaveBeenNthCalledWith(2, { artifactId: 'artifact-1' });
+    expect(result.current.activeTab?.revision.revisionNumber).toBe(2);
+  });
+
   it('appends later history pages without duplicating revisions', async () => {
     const current = documentResult().revision;
     const older = { ...current, revisionId: 'revision-0', revisionNumber: 0 };

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import type { AssistantArtifactProposalPart } from './assistant/assistantTypes';
+
 import {
   type BridgeErrorPayload,
   BridgeError,
@@ -1650,6 +1652,34 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
+  async function onApplyAssistantProposal(proposal: AssistantArtifactProposalPart) {
+    if (!canMutate) {
+      pushToast('error', approvalDisabledReason || t.setOperatorId);
+      return;
+    }
+    try {
+      await assistantArtifactWorkspace.actions.applyProposal({
+        proposalId: proposal.proposalId,
+        artifactId: proposal.artifactId,
+        approvalId: proposal.approvalId,
+        baseRevisionNumber: proposal.baseRevisionNumber,
+      });
+      assistantSession.actions.updateApprovalStatus(proposal.approvalId, 'executed');
+      pushToast(
+        'ok',
+        locale === 'tr'
+          ? 'OnaylÄ± artifact Ã¶nerisi uygulandÄ±'
+          : 'Approved artifact proposal applied',
+      );
+    } catch (error) {
+      const parsed = getErrorPayload(error);
+      pushToast(
+        'error',
+        parsed ? `${parsed.code}: ${parsed.message}` : 'ARTIFACT_PROPOSAL_APPLY_FAILED',
+      );
+    }
+  }
+
   async function onCancelAssistantTurn() {
     try {
       await assistantSession.actions.cancel();
@@ -2016,6 +2046,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             onApprove={(approvalId) => void onDecideAssistantApproval(approvalId, true)}
             onReject={(approvalId) => void onDecideAssistantApproval(approvalId, false)}
             onExecute={(approvalId) => void onExecuteAssistantApproval(approvalId)}
+            onApplyProposal={(proposal) => void onApplyAssistantProposal(proposal)}
             onRegenerate={(turnId) => void assistantSession.actions.regenerate(turnId, assistantRuntimeSettings)}
             onOpenArtifact={(artifactId) => void assistantArtifactWorkspace.actions.openArtifact(artifactId)}
             renderInlineArtifact={(artifact) => {
