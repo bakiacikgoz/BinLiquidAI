@@ -11,7 +11,6 @@ import type {
 } from '../../artifact-workspace/useAssistantArtifactWorkspaceController';
 import { ArtifactEditorHost, type ArtifactSelection } from '../../artifact-workspace/editors/ArtifactEditorHost';
 import type { ArtifactFeatureFlagState } from '../../artifact-workspace/artifactFeatureFlags';
-import { ArtifactSelectionChip } from '../../artifact-workspace/ui/ArtifactSelectionChip';
 import { ArtifactDiffView } from '../../artifact-workspace/ui/ArtifactDiffView';
 import { ArtifactConflictPanel } from '../../artifact-workspace/ui/ArtifactConflictPanel';
 import { translateAssistantText, type UiLocale } from '../../i18n';
@@ -152,7 +151,6 @@ export function AssistantWorkbench({
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [editorSelection, setEditorSelection] = useState<ArtifactSelection | null>(null);
   const activeTabButtonRef = useRef<HTMLButtonElement>(null);
   const previousConflictArtifactId = useRef<string | null>(null);
   const previousSaveState = useRef<string | null>(null);
@@ -168,7 +166,6 @@ export function AssistantWorkbench({
   );
 
   useEffect(() => {
-    setEditorSelection(null);
     onEditorSelectionChange?.(null);
   }, [activeTab?.artifact.artifactId, onEditorSelectionChange]);
   const filteredCatalog = useMemo(() => {
@@ -370,7 +367,6 @@ export function AssistantWorkbench({
                   saveState={activeTab.saveState}
                   onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
                   onSelectionChange={(selection) => {
-                    setEditorSelection(selection);
                     onEditorSelectionChange?.(selection);
                   }}
                   onRequestExport={(format) => {
@@ -391,7 +387,6 @@ export function AssistantWorkbench({
                   canvasEnabled={enabledFeatures.canvas}
                   slidesEnabled={enabledFeatures.slides}
                 />
-                <ArtifactSelectionChip selection={editorSelection} />
               </div>
               {enabledFeatures.export && activeTab.artifact.kind === 'document' && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Document export">

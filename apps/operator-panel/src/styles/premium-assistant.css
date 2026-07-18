@@ -2232,6 +2232,69 @@
   gap: 8px;
 }
 
+.assistant-artifact-proposal-status {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  background: var(--assistant-panel);
+  border: 1px solid var(--assistant-line);
+}
+
+.assistant-artifact-proposal-status.status-pending,
+.assistant-artifact-proposal-status.status-failed {
+  color: var(--assistant-yellow);
+}
+
+.assistant-artifact-proposal-status.status-approved,
+.assistant-artifact-proposal-status.status-applied {
+  color: var(--assistant-green);
+}
+
+.assistant-artifact-proposal-status.status-rejected {
+  color: var(--assistant-red);
+}
+
+.assistant-artifact-proposal-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.assistant-artifact-proposal-details > div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--assistant-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--assistant-panel) 80%, transparent);
+}
+
+.assistant-artifact-proposal-details dt {
+  color: var(--assistant-muted);
+  font-size: 11px;
+}
+
+.assistant-artifact-proposal-details dd {
+  margin: 3px 0 0;
+  color: var(--assistant-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.assistant-inline-form-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.assistant-inline-form-heading p {
+  margin: 0;
+  color: var(--assistant-muted);
+  font-size: 12px;
+}
+
 .assistant-error-card {
   border-color: color-mix(in srgb, var(--assistant-red) 38%, var(--assistant-line));
   background: var(--assistant-red-soft);

@@ -45,6 +45,27 @@ describe('ArtifactProposalCard', () => {
     expect(screen.queryByText(/\{"/)).not.toBeInTheDocument();
   });
 
+  it('makes the governed approval, base revision, scope, and risk legible without exposing identifiers', () => {
+    renderOperatorPanel(
+      <ArtifactProposalCard
+        proposal={proposal}
+        disabled={false}
+        disabledReason=""
+        onReview={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Approval required')).toBeInTheDocument();
+    expect(screen.getByText('Base revision')).toBeInTheDocument();
+    expect(screen.getByText('Scoped artifact change')).toBeInTheDocument();
+    expect(screen.getByText('Risk review required')).toBeInTheDocument();
+    expect(screen.queryByText('proposal-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('approval-1')).not.toBeInTheDocument();
+  });
+
   it('applies the exact governed proposal only after approval and renders bounded failure state', async () => {
     const onApply = vi.fn();
     const { user } = renderOperatorPanel(

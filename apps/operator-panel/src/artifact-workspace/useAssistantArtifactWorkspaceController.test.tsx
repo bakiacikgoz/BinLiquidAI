@@ -99,6 +99,45 @@ describe('assistant artifact workspace controller hook', () => {
     expect(result.current.activeTab?.revision.revisionNumber).toBe(2);
   });
 
+  it('blocks a proposal when saving an open draft advances past its governed base revision', async () => {
+    const initial = documentResult();
+    const saved = documentResult();
+    saved.artifact = { ...saved.artifact, currentRevisionId: 'revision-2', currentRevisionNumber: 2 };
+    saved.revision = { ...saved.revision, revisionId: 'revision-2', revisionNumber: 2, mutationType: 'replace_content' };
+    const applyProposal = vi.fn().mockResolvedValue({
+      artifact: saved.artifact,
+      revision: saved.revision,
+      created: false,
+      disposition: 'updated',
+    });
+    const bridge = {
+      get: vi.fn().mockResolvedValue(initial),
+      history: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+      mutate: vi.fn().mockResolvedValue({ artifact: saved.artifact, revision: saved.revision, created: false, disposition: 'updated' }),
+      applyProposal,
+    } as unknown as ArtifactBridge;
+    const { result } = renderHook(() => useAssistantArtifactWorkspaceController({
+      assistantState: createAssistantSession('session-1'),
+      legacyArtifacts: [],
+      selectedLegacyArtifactName: '',
+      onSelectLegacyArtifact: vi.fn(),
+      bridge,
+    }));
+    await act(async () => result.current.actions.openArtifact('artifact-1'));
+    act(() => result.current.actions.edit('artifact-1', {
+      kind: 'document', schemaVersion: 1, language: 'en', pageMode: 'document', blocks: [{
+        id: 'draft-block', type: 'paragraph', props: {}, content: [], children: [],
+      }],
+    }));
+
+    await expect(result.current.actions.applyProposal({
+      proposalId: 'proposal-1', artifactId: 'artifact-1', approvalId: 'approval-1', baseRevisionNumber: 1,
+    })).rejects.toThrow('Proposal base revision is stale.');
+
+    expect(applyProposal).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.error).toMatchObject({ code: 'ARTIFACT_PROPOSAL_STALE' }));
+  });
+
   it('appends later history pages without duplicating revisions', async () => {
     const current = documentResult().revision;
     const older = { ...current, revisionId: 'revision-0', revisionNumber: 0 };

@@ -53,6 +53,12 @@ export function AssistantInlineFormPart({
   }
   return (
     <section className="assistant-inline-form" aria-label={`Inline form: ${tab.artifact.title}`}>
+      <header className="assistant-inline-form-heading">
+        <strong>{locale === 'tr' ? 'Doğrulanmış form' : 'Validated form'}</strong>
+        <p>{locale === 'tr'
+          ? 'Yanıtlarınız gönderilmeden önce kontrol edilir. Aynı gönderim güvenle yeniden denenebilir.'
+          : 'Your answers are checked before submission. The same submission can be retried safely.'}</p>
+      </header>
       <ArtifactEditorHost
         artifact={tab.artifact}
         revision={tab.revision}
@@ -69,7 +75,7 @@ export function AssistantInlineFormPart({
         locale={locale}
       />
       <button type="button" onClick={() => onExpand(artifactId)}>
-        {locale === 'tr' ? 'Ã‡alÄ±ÅŸma alanÄ±nda geniÅŸlet' : 'Expand in Workbench'}
+        {locale === 'tr' ? 'Çalışma alanında genişlet' : 'Expand in Workbench'}
       </button>
     </section>
   );

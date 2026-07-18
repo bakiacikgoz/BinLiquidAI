@@ -157,6 +157,7 @@ describe('AssistantWorkbench', () => {
     expect(screen.getByText('Updated title')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Export failed safely.');
     expect(screen.getByRole('status', { name: 'Artifact operation status' })).toHaveTextContent('Previous export completed.');
+    expect(screen.queryByRole('status', { name: 'Artifact selection' })).not.toBeInTheDocument();
 
     await user.type(screen.getByRole('searchbox', { name: 'Search artifacts' }), 'Policy');
     await user.click(screen.getByRole('button', { name: /Policy code/ }));

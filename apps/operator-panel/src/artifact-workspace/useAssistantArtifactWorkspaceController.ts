@@ -418,6 +418,23 @@ export function useAssistantArtifactWorkspaceController({
       try {
         if (controller.getState().tabs.some((tab) => tab.artifact.artifactId === proposal.artifactId)) {
           await autosave.flush(proposal.artifactId);
+          const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === proposal.artifactId);
+          if (!tab || tab.dirty || tab.saveState === 'saving' || tab.saveState === 'error' || tab.saveState === 'conflict') {
+            throw new ArtifactBridgeError(
+              'ARTIFACT_PROPOSAL_DIRTY',
+              'Save or resolve the artifact draft before applying this proposal.',
+              true,
+              'bridge_artifact_apply_proposal',
+            );
+          }
+          if (tab.revision.revisionNumber !== proposal.baseRevisionNumber) {
+            throw new ArtifactBridgeError(
+              'ARTIFACT_PROPOSAL_STALE',
+              'Proposal base revision is stale. Review a new proposal before applying changes.',
+              false,
+              'bridge_artifact_apply_proposal',
+            );
+          }
         }
         const operation = await bridge.applyProposal({
           proposalId: proposal.proposalId,

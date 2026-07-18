@@ -44,6 +44,8 @@ describe('AssistantInlineFormPart', () => {
     expect(onLoad).toHaveBeenCalledTimes(1);
 
     view.rerender(<AssistantInlineFormPart {...props} tab={tab} />);
+    expect(screen.getByText('Validated form')).toBeInTheDocument();
+    expect(screen.getByText(/answers are checked before submission/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /expand in workbench/i }));
     expect(onExpand).toHaveBeenCalledWith('artifact-form');
   });

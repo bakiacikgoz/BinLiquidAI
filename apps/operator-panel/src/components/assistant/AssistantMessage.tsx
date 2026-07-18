@@ -410,6 +410,7 @@ export function AssistantMessage({
             onApprove={onApprove}
             onReject={onReject}
             onApply={onApplyProposal ?? (() => undefined)}
+            risk={message.approval?.approvalId === proposal.approvalId ? message.approval.risk : undefined}
           />
         ))}
         {message.parts.filter((part) => part.type === 'artifact').map((artifact) => (
