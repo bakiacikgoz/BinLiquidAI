@@ -367,8 +367,10 @@ function mergeRunStatusWithSessionState(runStatusPayload: unknown, sessionStateP
 function AppContent({ settings, updateSettings }: AppContentProps) {
   const previewMode = isBridgePreviewMode();
   const artifactFeatureFlags = resolveArtifactFeatureFlags(import.meta.env, {
-    spreadsheet: false,
-    canvas: false,
+    // These are bundled fallback adapters. Deployment policy is still enforced
+    // by the backend rollout snapshot and the explicit VITE enable flags.
+    spreadsheet: true,
+    canvas: true,
   });
 
   const [activeView, setActiveView] = useState<ViewKey>('workspace');

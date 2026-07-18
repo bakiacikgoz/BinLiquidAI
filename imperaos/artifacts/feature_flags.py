@@ -21,6 +21,7 @@ def resolve_artifact_feature_flags(
     requested: Mapping[str, bool],
     *,
     license_capabilities: Mapping[str, bool] | None = None,
+    fallback_capabilities: Mapping[str, bool] | None = None,
 ) -> dict[str, bool]:
     """Resolve the fail-closed enterprise rollout state.
 
@@ -37,10 +38,11 @@ def resolve_artifact_feature_flags(
         resolved[name] = requested.get(name) is True
 
     capabilities = license_capabilities or {}
+    fallbacks = fallback_capabilities or {}
     resolved["artifact_workspace.spreadsheet.enabled"] &= (
-        capabilities.get("spreadsheet") is True
+        capabilities.get("spreadsheet") is True or fallbacks.get("spreadsheet") is True
     )
     resolved["artifact_workspace.canvas.enabled"] &= (
-        capabilities.get("canvas") is True
+        capabilities.get("canvas") is True or fallbacks.get("canvas") is True
     )
     return resolved

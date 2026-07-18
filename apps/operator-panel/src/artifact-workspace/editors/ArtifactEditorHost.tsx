@@ -75,6 +75,18 @@ const SlidesArtifactEditor = lazy(() =>
   })),
 );
 
+const SpreadsheetArtifactEditor = lazy(() =>
+  import('./spreadsheet/SpreadsheetArtifactEditor').then((module) => ({
+    default: module.SpreadsheetArtifactEditor,
+  })),
+);
+
+const CanvasArtifactEditor = lazy(() =>
+  import('./canvas/CanvasArtifactEditor').then((module) => ({
+    default: module.CanvasArtifactEditor,
+  })),
+);
+
 export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
   const [ownedFormRuntime] = useState(() => new FormSessionRuntime());
   const resolvedFlags = resolveArtifactFeatureFlags(import.meta.env, {
@@ -148,16 +160,19 @@ export function ArtifactEditorHost(props: ArtifactEditorHostProps) {
     const kindEnabled = props.artifact.kind === 'spreadsheet'
       ? props.spreadsheetEnabled ?? resolvedFlags.spreadsheet
       : props.canvasEnabled ?? resolvedFlags.canvas;
-    const capability = !kindEnabled ? {
+    if (kindEnabled) {
+      const Editor = props.artifact.kind === 'spreadsheet' ? SpreadsheetArtifactEditor : CanvasArtifactEditor;
+      return (
+        <Suspense fallback={<div className="artifact-editor-loading" role="status">Loading {props.artifact.kind} editor…</div>}>
+          <Editor {...props} />
+        </Suspense>
+      );
+    }
+    const capability = {
       contractVersion: 'artifact-license-capability/v1' as const,
       kind: props.artifact.kind,
       enabled: false,
       reasonCode: 'ARTIFACT_LICENSE_FEATURE_DISABLED',
-    } : props.licenseCapability ?? {
-      contractVersion: 'artifact-license-capability/v1' as const,
-      kind: props.artifact.kind,
-      enabled: false,
-      reasonCode: 'ARTIFACT_LICENSE_EVIDENCE_MISSING',
     };
     return <ArtifactLicenseBlocked
       artifact={props.artifact}

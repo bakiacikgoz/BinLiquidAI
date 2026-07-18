@@ -274,6 +274,52 @@
   justify-content: end;
 }
 
+.spreadsheet-artifact-editor {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.spreadsheet-artifact-editor > header,
+.spreadsheet-artifact-editor [role="toolbar"],
+.spreadsheet-sheet-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.spreadsheet-grid {
+  max-height: 32rem;
+  overflow: auto;
+  border: 1px solid var(--aw-border);
+}
+
+.spreadsheet-grid-row {
+  display: grid;
+  grid-template-columns: 3.25rem repeat(100, minmax(7.5rem, 1fr));
+  min-width: max-content;
+}
+
+.spreadsheet-grid-row > span,
+.spreadsheet-grid-row > input {
+  min-height: 2rem;
+  box-sizing: border-box;
+  border: 0;
+  border-right: 1px solid var(--aw-border);
+  border-bottom: 1px solid var(--aw-border);
+  padding: 0 var(--space-1);
+  background: var(--aw-background);
+  color: var(--aw-foreground);
+  font: inherit;
+}
+
+.spreadsheet-grid-header > span,
+.spreadsheet-grid-row > span {
+  background: var(--aw-muted);
+  font-weight: 700;
+}
+
 @media (max-width: 640px) {
   .artifact-workspace-panel .artifact-workspace-filters {
     grid-template-columns: minmax(0, 1fr);

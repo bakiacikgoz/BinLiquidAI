@@ -15,6 +15,12 @@ vi.mock('./flow/FlowArtifactEditor', () => ({
 vi.mock('./slides/SlidesArtifactEditor', () => ({
   SlidesArtifactEditor: () => <div aria-label="Structured slides editor">Slide navigator</div>,
 }));
+vi.mock('./spreadsheet/SpreadsheetArtifactEditor', () => ({
+  SpreadsheetArtifactEditor: () => <div aria-label="Governed spreadsheet editor">Formula evaluation is disabled.</div>,
+}));
+vi.mock('./canvas/CanvasArtifactEditor', () => ({
+  CanvasArtifactEditor: () => <div aria-label="Governed canvas editor">Local canvas fallback.</div>,
+}));
 
 const artifact = {
   artifactId: 'artifact-form-host', workspaceId: 'workspace-1', kind: 'form', title: 'Host form', status: 'active',
@@ -173,5 +179,25 @@ describe('ArtifactEditorHost flow integration', () => {
       onChange={() => undefined} onSelectionChange={() => undefined} onRequestExport={() => undefined}
     />);
     expect(await screen.findByLabelText('Governed flow editor')).toHaveTextContent('Text outline');
+  });
+});
+
+describe('ArtifactEditorHost fallback editor integration', () => {
+  const spreadsheetArtifact = { ...artifact, artifactId: 'spreadsheet-host', kind: 'spreadsheet' as const, schemaVersion: 2 };
+  const spreadsheetRevision = { ...revision, artifactId: spreadsheetArtifact.artifactId, revisionId: 'spreadsheet-revision', schemaVersion: 2 };
+  const spreadsheetContent = {
+    kind: 'spreadsheet' as const, schemaVersion: 2 as const, calculationMode: 'disabled' as const,
+    sheets: [{ id: 'sheet-1', name: 'Sheet 1', cells: {}, columns: [] }],
+  };
+  const canvasArtifact = { ...artifact, artifactId: 'canvas-host', kind: 'canvas' as const, schemaVersion: 2 };
+  const canvasRevision = { ...revision, artifactId: canvasArtifact.artifactId, revisionId: 'canvas-revision', schemaVersion: 2 };
+  const canvasContent = { kind: 'canvas' as const, schemaVersion: 2 as const, snapshot: { objects: [] }, assetIds: [], embeds: 'deny' as const, remoteAssets: 'deny' as const };
+
+  it('loads governed open-source fallback editors when their rollout flags are enabled', async () => {
+    const common = { mode: 'edit' as const, saveState: 'idle' as const, onChange: () => undefined, onSelectionChange: () => undefined, onRequestExport: () => undefined };
+    const { rerender } = render(<ArtifactEditorHost {...common} artifact={spreadsheetArtifact} revision={spreadsheetRevision} content={spreadsheetContent} spreadsheetEnabled />);
+    expect(await screen.findByLabelText('Governed spreadsheet editor')).toHaveTextContent('Formula evaluation is disabled');
+    rerender(<ArtifactEditorHost {...common} artifact={canvasArtifact} revision={canvasRevision} content={canvasContent} canvasEnabled />);
+    expect(await screen.findByLabelText('Governed canvas editor')).toHaveTextContent('Local canvas fallback');
   });
 });

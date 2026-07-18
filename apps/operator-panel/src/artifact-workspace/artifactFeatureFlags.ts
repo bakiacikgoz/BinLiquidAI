@@ -14,7 +14,7 @@ export type ArtifactFeatureFlagState = {
 
 type ArtifactFeatureFlagEnvironment = Record<string, string | boolean | undefined>;
 
-type CommercialLicenseCapabilities = {
+type ArtifactEditorCapabilities = {
   spreadsheet?: boolean;
   canvas?: boolean;
 };
@@ -39,7 +39,7 @@ function enabled(value: string | boolean | undefined): boolean {
 
 export function resolveArtifactFeatureFlags(
   environment: ArtifactFeatureFlagEnvironment,
-  capabilities: CommercialLicenseCapabilities = {},
+  capabilities: ArtifactEditorCapabilities = {},
 ): ArtifactFeatureFlagState {
   if (!enabled(environment.VITE_ARTIFACT_WORKSPACE)) return { ...ALL_OFF };
   return {

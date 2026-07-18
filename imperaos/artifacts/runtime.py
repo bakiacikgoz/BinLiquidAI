@@ -89,6 +89,7 @@ def resolve_runtime_artifact_feature_flags(
     return resolve_artifact_feature_flags(
         requested,
         license_capabilities=license_capabilities,
+        fallback_capabilities={"spreadsheet": True, "canvas": True},
     )
 
 
@@ -111,10 +112,10 @@ def build_runtime_artifact_capability_snapshot(
         name: (feature_flags or {}).get(name) is True
         for name in ARTIFACT_FEATURE_FLAG_NAMES
     }
-    resolved = resolve_artifact_feature_flags(
-        requested,
-        license_capabilities=licenses,
-    )
+    # ArtifactService supplies already-resolved backend authority. Do not let a
+    # renderer-facing snapshot re-apply commercial-license gating over the
+    # supported open-source fallback adapters.
+    resolved = requested
     enabled_kinds = tuple(
         kind
         for kind, flag_name in _ARTIFACT_KIND_FEATURE_FLAGS.items()
