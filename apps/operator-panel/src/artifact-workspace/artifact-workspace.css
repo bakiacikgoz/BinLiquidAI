@@ -122,6 +122,168 @@
   }
 }
 
+.artifact-workspace-panel {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-md);
+  background: var(--aw-background);
+}
+
+.artifact-workspace-panel-head,
+.artifact-workspace-history > header,
+.artifact-workspace-status-row,
+.artifact-export-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.artifact-workspace-panel-head h2,
+.artifact-workspace-history h3 {
+  margin: 0;
+  font-size: var(--text-body-sm);
+}
+
+.artifact-workspace-panel-head .mc-button,
+.artifact-workspace-history > header .mc-button {
+  margin-left: auto;
+}
+
+.artifact-workspace-panel .artifact-workspace-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(2, minmax(8rem, 0.45fr));
+  gap: var(--space-2);
+}
+
+.artifact-workspace-panel .artifact-workspace-filters input,
+.artifact-workspace-panel .artifact-workspace-filters select {
+  min-width: 0;
+  min-height: 2.25rem;
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-sm);
+  padding: 0 var(--space-2);
+  background: var(--aw-muted);
+  color: var(--aw-foreground);
+  font: inherit;
+}
+
+.artifact-workspace-panel .artifact-workspace-navigator {
+  display: grid;
+  max-height: 14rem;
+  gap: var(--space-2);
+  overflow: auto;
+}
+
+.artifact-workspace-panel .artifact-workspace-navigator > button {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-sm);
+  background: var(--aw-muted);
+  color: var(--aw-foreground);
+  text-align: left;
+}
+
+.artifact-workspace-panel .artifact-workspace-navigator span,
+.artifact-workspace-panel .artifact-workspace-history article,
+.artifact-workspace-panel .artifact-workspace-banner {
+  color: var(--aw-foreground-muted);
+  font-size: var(--text-caption);
+}
+
+.artifact-workspace-panel .artifact-workspace-tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+
+.artifact-workspace-panel .artifact-workspace-tab-button {
+  flex: 0 0 auto;
+  min-height: 2rem;
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-sm);
+  padding: 0 var(--space-2);
+  background: var(--aw-muted);
+  color: var(--aw-foreground);
+}
+
+.artifact-workspace-panel .artifact-workspace-tab-button[aria-selected="true"] {
+  border-color: var(--aw-primary);
+  background: color-mix(in srgb, var(--aw-primary) 12%, var(--aw-background));
+}
+
+.artifact-workspace-panel .artifact-workspace-active,
+.artifact-workspace-panel .artifact-workspace-history,
+.artifact-workspace-panel .artifact-workspace-history article {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.artifact-export-dialog-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-3);
+  background: rgb(0 0 0 / 0.48);
+}
+
+.artifact-export-dialog {
+  display: grid;
+  width: min(100%, 29rem);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-md);
+  background: var(--aw-background-strong);
+  box-shadow: var(--aw-shadow);
+}
+
+.artifact-export-dialog h3,
+.artifact-export-dialog p {
+  margin: 0;
+}
+
+.artifact-export-dialog label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--aw-foreground-muted);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.artifact-export-dialog select,
+.artifact-export-dialog button {
+  min-height: 2.25rem;
+  border: 1px solid var(--aw-border);
+  border-radius: var(--aw-radius-sm);
+  padding: 0 var(--space-2);
+  background: var(--aw-muted);
+  color: var(--aw-foreground);
+  font: inherit;
+}
+
+.artifact-export-dialog-actions {
+  justify-content: end;
+}
+
+@media (max-width: 640px) {
+  .artifact-workspace-panel .artifact-workspace-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .artifact-export-dialog-actions > * {
+    flex: 1 1 100%;
+  }
+}
+
 .document-artifact-editor {
   display: grid;
   min-width: 0;
