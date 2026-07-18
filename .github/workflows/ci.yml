@@ -29,7 +29,7 @@ jobs:
         run: uv run ruff check .
 
       - name: Tests
-        run: uv run pytest -q
+        run: uv run --extra dev python -m pytest -q
 
       - name: Config resolve gate
         run: uv run imperaos config resolve --profile balanced --json
