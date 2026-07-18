@@ -16,7 +16,9 @@ function run(args) {
   });
 }
 
-const build = run(['build']);
+// A committed Vite mode keeps browser-preview authority deterministic. Process
+// environment alone is not enough when a package-manager child rebuilds the app.
+const build = run(['build', '--', '--mode', 'e2e']);
 
 build.on('exit', (buildCode, buildSignal) => {
   if (buildSignal) {

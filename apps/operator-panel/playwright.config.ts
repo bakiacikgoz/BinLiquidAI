@@ -45,6 +45,7 @@ export default defineConfig({
         command: 'node scripts/start-preview-server.mjs',
         env: {
           ...process.env,
+          VITE_OPERATOR_PANEL_PREVIEW: '1',
           VITE_ARTIFACT_WORKSPACE: '1',
           VITE_ARTIFACT_DOCUMENT_EDITOR: '1',
           VITE_ARTIFACT_FORM_EDITOR: '1',
