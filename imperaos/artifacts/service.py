@@ -151,6 +151,11 @@ class ArtifactService:
     def license_capabilities(self) -> tuple[ArtifactLicenseCapability, ...]:
         return tuple(self._license_capabilities.values())
 
+    def feature_flags(self) -> dict[str, bool]:
+        """Return the already-resolved rollout state without process configuration."""
+
+        return dict(self._feature_flags or {})
+
     def require_operation_enabled(
         self,
         operation: str,

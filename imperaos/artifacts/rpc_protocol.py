@@ -14,6 +14,10 @@ from imperaos.artifacts.models import (
     PrincipalType,
     canonical_json,
 )
+from imperaos.artifacts.runtime import (
+    ArtifactRuntimeCapabilitySnapshot,
+    build_runtime_artifact_capability_snapshot,
+)
 
 ARTIFACT_RPC_CONTRACT_VERSION = "1.0"
 ARTIFACT_RPC_MAX_FRAME_BYTES = 32 * 1024 * 1024
@@ -96,12 +100,24 @@ class RpcHandshake(ArtifactModel):
     stdout_protocol_only: Literal[True]
     graceful_shutdown: Literal[True]
     license_capabilities: tuple[ArtifactLicenseCapability, ...]
+    capability_snapshot: ArtifactRuntimeCapabilitySnapshot
 
     @classmethod
     def default(
         cls,
         license_capabilities: tuple[ArtifactLicenseCapability, ...] | None = None,
+        capability_snapshot: dict[str, object] | None = None,
     ) -> RpcHandshake:
+        resolved_licenses = license_capabilities or (
+            ArtifactLicenseCapability(
+                kind="spreadsheet", enabled=False,
+                reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
+            ),
+            ArtifactLicenseCapability(
+                kind="canvas", enabled=False,
+                reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
+            ),
+        )
         return cls(
             contract_version=ARTIFACT_RPC_CONTRACT_VERSION,
             transport="stdio-length-prefixed-json",
@@ -110,15 +126,14 @@ class RpcHandshake(ArtifactModel):
             network_listener=False,
             stdout_protocol_only=True,
             graceful_shutdown=True,
-            license_capabilities=license_capabilities or (
-                ArtifactLicenseCapability(
-                    kind="spreadsheet", enabled=False,
-                    reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
-                ),
-                ArtifactLicenseCapability(
-                    kind="canvas", enabled=False,
-                    reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
-                ),
+            license_capabilities=resolved_licenses,
+            capability_snapshot=capability_snapshot
+            or build_runtime_artifact_capability_snapshot(
+                None,
+                license_capabilities={
+                    capability.kind: capability.enabled
+                    for capability in resolved_licenses
+                },
             ),
         )
 

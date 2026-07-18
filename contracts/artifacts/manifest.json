@@ -300,7 +300,7 @@
       "category": "contract",
       "file": "artifact-rpc-handshake.v1.schema.json",
       "name": "artifact-rpc-handshake.v1",
-      "sha256": "379657c385ccb3d6d2bfbb660d7d09a39cc780105a257094f653c36870849b1b"
+      "sha256": "615d7d1524cdf8c1738ea9c34faf676879d0c3ef8db301384bbbd1dbf4f5c9e1"
     }
   ]
 }

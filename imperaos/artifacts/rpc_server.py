@@ -46,6 +46,7 @@ from imperaos.artifacts.rpc_protocol import (
     encode_frame,
     parse_request_payload,
 )
+from imperaos.artifacts.runtime import build_runtime_artifact_capability_snapshot
 from imperaos.artifacts.service import ArtifactService
 from imperaos.artifacts.store import StorageReconciliationReport
 
@@ -196,8 +197,16 @@ class ArtifactRpcServer:
 
     def _dispatch(self, request: RpcRequest) -> dict[str, Any]:
         if request.method is ArtifactRpcMethod.RPC_HANDSHAKE:
+            license_capabilities = self.service.license_capabilities()
             return RpcHandshake.default(
-                self.service.license_capabilities()
+                license_capabilities,
+                capability_snapshot=build_runtime_artifact_capability_snapshot(
+                    self.service.feature_flags(),
+                    license_capabilities={
+                        capability.kind: capability.enabled
+                        for capability in license_capabilities
+                    },
+                ),
             ).model_dump(mode="json", by_alias=True)
         if request.method is ArtifactRpcMethod.RPC_HEALTH:
             recovery = self._ensure_startup_reconciled()

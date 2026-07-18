@@ -24,7 +24,10 @@ from imperaos.artifacts.models import (
     OperationContext,
     PrincipalType,
 )
-from imperaos.artifacts.runtime import resolve_runtime_artifact_feature_flags
+from imperaos.artifacts.runtime import (
+    build_runtime_artifact_capability_snapshot,
+    resolve_runtime_artifact_feature_flags,
+)
 from imperaos.artifacts.service import ArtifactService
 
 
@@ -100,6 +103,37 @@ def test_runtime_flags_default_off_and_service_revalidates_authority(
     assert enabled["artifact_workspace.enabled"] is True
     assert enabled["artifact_workspace.document.enabled"] is True
     assert enabled["artifact_workspace.form.enabled"] is False
+
+
+def test_runtime_capability_snapshot_reports_effective_rollout_without_environment() -> None:
+    disabled = build_runtime_artifact_capability_snapshot(
+        resolve_runtime_artifact_feature_flags(env={}),
+        license_capabilities={"spreadsheet": False, "canvas": False},
+    )
+    assert disabled["contractVersion"] == "artifact-runtime-capability-snapshot/v1"
+    assert disabled["rolloutStage"] == "disabled"
+    assert disabled["globalEnabled"] is False
+    assert disabled["enabledArtifactKinds"] == []
+    assert set(disabled["features"]) == set(ARTIFACT_FEATURE_FLAG_NAMES)
+    assert "environment" not in disabled
+    assert "path" not in disabled
+
+    enabled = build_runtime_artifact_capability_snapshot(
+        resolve_runtime_artifact_feature_flags(
+            env={
+                "IMPERAOS_ARTIFACT_WORKSPACE_ENABLED": "true",
+                "IMPERAOS_ARTIFACT_DOCUMENT_EDITOR_ENABLED": "true",
+                "IMPERAOS_ARTIFACT_SPREADSHEET_EDITOR_ENABLED": "true",
+            },
+            license_capabilities={"spreadsheet": True, "canvas": False},
+        ),
+        license_capabilities={"spreadsheet": True, "canvas": False},
+    )
+    assert enabled["rolloutStage"] == "document"
+    assert enabled["globalEnabled"] is True
+    assert enabled["enabledArtifactKinds"] == ["document", "spreadsheet"]
+    assert enabled["features"]["artifact_workspace.spreadsheet.enabled"] is True
+    assert enabled["licenses"] == {"spreadsheet": True, "canvas": False}
 
 
 def test_forced_off_editor_flag_preserves_read_archive_and_safe_export_fallback(

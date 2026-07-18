@@ -99,6 +99,26 @@ def test_handshake_exposes_only_redacted_backend_license_capabilities(tmp_path: 
             "enabled": False, "reasonCode": "ARTIFACT_LICENSE_EVIDENCE_MISSING",
         },
     ]
+    assert response.result["capabilitySnapshot"] == {
+        "contractVersion": "artifact-runtime-capability-snapshot/v1",
+        "rolloutStage": "disabled",
+        "globalEnabled": False,
+        "enabledArtifactKinds": [],
+        "features": {
+            "artifact_workspace.enabled": False,
+            "artifact_workspace.document.enabled": False,
+            "artifact_workspace.form.enabled": False,
+            "artifact_workspace.code.enabled": False,
+            "artifact_workspace.flow.enabled": False,
+            "artifact_workspace.spreadsheet.enabled": False,
+            "artifact_workspace.canvas.enabled": False,
+            "artifact_workspace.slides.enabled": False,
+            "artifact_workspace.export.enabled": False,
+            "assistant_ui_runtime.enabled": False,
+            "ai_sdk_tauri_transport.enabled": False,
+        },
+        "licenses": {"spreadsheet": False, "canvas": False},
+    }
     serialized = json.dumps(response.result)
     assert "secret" not in serialized.lower()
     assert "signature" not in serialized.lower()
