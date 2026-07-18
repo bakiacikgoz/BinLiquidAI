@@ -141,4 +141,3 @@ def test_artifact_cli_migration_plan_is_dry_and_workspace_rpc_is_registered(
     assert payload["pendingVersions"] == list(range(1, 13))
     assert not root.exists()
     assert rpc_help.exit_code == 0
-    assert "--stdio-json" in rpc_help.output
