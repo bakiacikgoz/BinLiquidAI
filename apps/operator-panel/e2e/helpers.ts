@@ -95,8 +95,11 @@ export async function gotoOperatorPanel(page: Page, settings: Partial<E2eSetting
   await page.addInitScript(
     ({ key, value }) => {
       // Each scenario defines its own operator authority. Do not inherit a
-      // persisted identity from a previous navigation in the same browser.
-      localStorage.setItem(key, JSON.stringify(value));
+      // persisted identity from another scenario, but preserve a setting that
+      // the current scenario saves before it reloads the page.
+      if (localStorage.getItem(key) === null) {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
     },
     { key: SETTINGS_KEY, value: seededSettings },
   );
