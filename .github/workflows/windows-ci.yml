@@ -13,6 +13,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ matrix.canary }}
     timeout-minutes: 55
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
     strategy:
       fail-fast: false
       matrix:

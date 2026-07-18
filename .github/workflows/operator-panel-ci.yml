@@ -21,6 +21,8 @@ on:
 jobs:
   operator-panel:
     runs-on: macos-14
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
 
     steps:
       - name: Checkout
