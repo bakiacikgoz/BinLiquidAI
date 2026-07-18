@@ -110,7 +110,7 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
     <div role="toolbar" aria-label="Spreadsheet tools">
       <button type="button" disabled={!editable} onClick={addSheet}>Add sheet</button>
       <button type="button" disabled={!editable} onClick={renameSheet}>Rename sheet</button>
-      <button type="button" disabled={!editable || !navigator.clipboard?.readText} onClick={() => void pasteSelection()}>Paste cells</button>
+      <button type="button" disabled={!editable || !navigator.clipboard?.readText} data-disabled-reason={!editable ? 'Spreadsheet is read-only.' : !navigator.clipboard?.readText ? 'Clipboard access is unavailable.' : undefined} onClick={() => void pasteSelection()}>Paste cells</button>
       <button type="button" disabled={!editable} onClick={() => setExtraRows((value) => value + 20)}>Add rows</button>
       <button type="button" disabled={!editable} onClick={() => setExtraColumns((value) => value + 4)}>Add columns</button>
       <button type="button" onClick={() => props.onRequestExport('csv')}>Export CSV</button>

@@ -66,7 +66,9 @@ function normalizeStoredOperatorId(value: unknown): string {
   if (typeof value !== 'string') {
     return DEFAULT_OPERATOR_ID;
   }
-  return value.trim() ? value : DEFAULT_OPERATOR_ID;
+  // An explicitly cleared identity must remain cleared so mutation controls
+  // fail closed. Only a missing/invalid stored field receives the local default.
+  return value.trim();
 }
 
 export function getAssistantRuntimeSettings(settings: PanelSettings): AssistantRuntimeSettings {

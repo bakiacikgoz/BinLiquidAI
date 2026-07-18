@@ -45,7 +45,7 @@ describe('operator id validation', () => {
     expect(isOperatorIdValid(DEFAULT_SETTINGS.operatorId)).toBe(true);
   });
 
-  it('migrates missing or blank legacy operator id settings to the local default', () => {
+  it('keeps an explicitly cleared operator id fail-closed while defaulting a missing legacy field', () => {
     localStorage.setItem(
       SETTINGS_KEY,
       JSON.stringify({
@@ -56,7 +56,7 @@ describe('operator id validation', () => {
       }),
     );
 
-    expect(loadSettings().operatorId).toBe(DEFAULT_OPERATOR_ID);
+    expect(loadSettings().operatorId).toBe('');
 
     localStorage.setItem(
       SETTINGS_KEY,
