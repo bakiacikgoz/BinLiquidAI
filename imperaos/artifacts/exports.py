@@ -7,7 +7,13 @@ from pydantic import Field
 
 from imperaos.artifacts.content import ArtifactContent, CodeContentV1, CodeContentV2
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
-from imperaos.artifacts.models import ArtifactDescriptor, ArtifactKind, ArtifactModel, BoundedId, Sha256
+from imperaos.artifacts.models import (
+    ArtifactDescriptor,
+    ArtifactKind,
+    ArtifactModel,
+    BoundedId,
+    Sha256,
+)
 
 ArtifactExportFormat = Literal[
     "source", "zip", "json", "markdown", "html", "svg", "png", "csv", "xlsx", "pptx"

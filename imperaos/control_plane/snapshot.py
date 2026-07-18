@@ -516,7 +516,9 @@ def _run_summaries(coordinator: ControlPlaneRunCoordinator) -> list[RunSnapshotS
 def _approval_summaries(config: RuntimeConfig) -> list[ApprovalSnapshotSummary]:
     store = ApprovalStore(config.governance.approval_store_path)
     items: list[ApprovalSnapshotSummary] = []
-    for ticket in store.list_pending():
+    for ticket in store.list_pending(
+        workspace_id=config.memory.workspace_authority.default_workspace_id
+    ):
         items.append(
             ApprovalSnapshotSummary(
                 approval_id=ticket.approval_id,

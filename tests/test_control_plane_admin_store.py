@@ -48,6 +48,7 @@ def test_admin_apply_requires_approval_and_writes_signed_audit(
     )
     ApprovalStore(tmp_path / "control-plane" / "approvals.sqlite3").decide(
         approval_id=proposal.approval_id or "",
+        workspace_id="default",
         approve=True,
         actor=actor.actor_id,
         reason="test",
