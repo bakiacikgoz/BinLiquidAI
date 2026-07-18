@@ -161,6 +161,18 @@
           "default": null,
           "title": "Executed At"
         },
+        "executed_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Executed By"
+        },
         "execution_contract_hash": {
           "anyOf": [
             {
@@ -271,6 +283,11 @@
           "minimum": 0,
           "title": "Version",
           "type": "integer"
+        },
+        "workspace_id": {
+          "default": "default",
+          "title": "Workspace Id",
+          "type": "string"
         }
       },
       "required": [
