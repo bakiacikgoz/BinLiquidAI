@@ -524,7 +524,7 @@ export async function installStructuredArtifactBridgeStub(
             text: '<script>local text only</script>',
           },
           {
-            id: 'image-1', type: 'image', x: 240, y: 2, width: 160, height: 100,
+            id: 'image-1', type: 'image', x: 20, y: 2, width: 160, height: 100,
             assetId: 'asset-local-1',
           },
         ] },

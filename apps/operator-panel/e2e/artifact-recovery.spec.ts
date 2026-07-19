@@ -20,8 +20,10 @@ test('full renderer reload never persists a sensitive in-flight draft to Web Sto
   await openPrimaryView(page, 'AI Assistant', 'Welcome to ImperaOS Assistant');
   await page.getByLabel('Message').fill('Create a governed document artifact.');
   await page.getByLabel('Message').press('Enter');
+  const openArtifact = page.getByRole('button', { name: 'Open Launch plan' });
+  await expect(openArtifact).toBeVisible();
   await installArtifactBridgeStub(page);
-  await page.getByRole('button', { name: 'Open Launch plan' }).click();
+  await openArtifact.click();
 
   const workbench = page.getByRole('complementary', { name: 'Workbench' });
   const editor = workbench
