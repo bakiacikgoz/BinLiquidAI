@@ -9,6 +9,7 @@ test('revision conflict preserves, compares, and forks the local draft without s
   await openPrimaryView(page, 'AI Assistant', 'Welcome to ImperaOS Assistant');
   await page.getByLabel('Message').fill('Create a governed document artifact.');
   await page.getByLabel('Message').press('Enter');
+  await expect(page.getByRole('button', { name: 'Open Launch plan' })).toBeVisible();
   await installArtifactBridgeStub(page);
   await page.getByRole('button', { name: 'Open Launch plan' }).click();
 

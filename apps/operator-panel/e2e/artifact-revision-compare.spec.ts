@@ -9,6 +9,7 @@ test('historical revision comparison is bounded, read-only, and preserves the ed
   await openPrimaryView(page, 'AI Assistant', 'Welcome to ImperaOS Assistant');
   await page.getByLabel('Message').fill('Create a governed document artifact.');
   await page.getByLabel('Message').press('Enter');
+  await expect(page.getByRole('button', { name: 'Open Launch plan' })).toBeVisible();
   await installArtifactBridgeStub(page);
   await page.getByRole('button', { name: 'Open Launch plan' }).click();
 
@@ -49,6 +50,7 @@ test('revision comparison announces bounded output truncation', async ({ page })
   await openPrimaryView(page, 'AI Assistant', 'Welcome to ImperaOS Assistant');
   await page.getByLabel('Message').fill('Create a governed document artifact.');
   await page.getByLabel('Message').press('Enter');
+  await expect(page.getByRole('button', { name: 'Open Launch plan' })).toBeVisible();
   await installArtifactBridgeStub(page);
   await page.evaluate(() => {
     const state = (window as unknown as { __artifactE2eState: { seedBulkRevision: (count: number) => void } }).__artifactE2eState;
