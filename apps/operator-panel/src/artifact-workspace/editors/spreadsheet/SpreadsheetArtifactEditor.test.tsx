@@ -36,4 +36,20 @@ describe('SpreadsheetArtifactEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Clear cells' }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ sheets: [expect.objectContaining({ cells: {} })] }), expect.objectContaining({ ranges: ['A1:B2'] }));
   });
+
+  it('virtualizes large sheets while keeping the final used row reachable', () => {
+    const cells = Object.fromEntries(Array.from({ length: 10_000 }, (_, index) => [
+      `A${index + 1}`,
+      { value: index + 1 },
+    ]));
+    render(<SpreadsheetArtifactEditor artifact={artifact} revision={revision} mode="edit" saveState="idle"
+      content={{ kind: 'spreadsheet', schemaVersion: 2, calculationMode: 'disabled', sheets: [{ id: 'sheet-a', name: 'Sheet A', cells, columns: [] }] }}
+      onChange={vi.fn()} onSelectionChange={vi.fn()} onRequestExport={vi.fn()} />);
+
+    const grid = screen.getByRole('grid', { name: 'Sheet A cells' });
+    expect(screen.getAllByRole('gridcell')).toHaveLength(40 * 12);
+    fireEvent.scroll(grid, { target: { scrollTop: 9_999 * 32 } });
+    expect(screen.getByLabelText('A10000')).toHaveValue('10000');
+    expect(screen.getAllByRole('gridcell')).toHaveLength(40 * 12);
+  });
 });

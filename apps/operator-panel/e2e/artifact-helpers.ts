@@ -256,7 +256,7 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
           const request = args.request as Record<string, unknown>;
           pendingExportFormat = String(request.format);
           exportRequests.push({ command, request });
-          return ok({ cancelled: false, ticket: `ticket-${exportRequests.length}`, expiresInMs: 60_000, maxBytes: 1_000_000 });
+          return ok({ cancelled: false, exportId: `document-export-${exportRequests.length}`, ticket: `ticket-${exportRequests.length}`, expiresInMs: 60_000, maxBytes: 1_000_000 });
         }
         if (command === 'bridge_artifact_export_commit') {
           const request = args.request as { bytes: number[]; sha256: string } & Record<string, unknown>;
@@ -399,7 +399,7 @@ export async function installCodeArtifactBridgeStub(page: Page): Promise<void> {
           return ok({ artifact: descriptor, revision, created: false, disposition: 'updated' });
         }
         if (command === 'bridge_artifact_export_begin') {
-          return ok({ cancelled: false, ticket: 'code-ticket-1', expiresInMs: 60_000, maxBytes: 1_000_000 });
+          return ok({ cancelled: false, exportId: 'code-export-1', ticket: 'code-ticket-1', expiresInMs: 60_000, maxBytes: 1_000_000 });
         }
         if (command === 'bridge_artifact_export_commit') {
           const request = args.request as { bytes: number[]; sha256: string };
@@ -466,7 +466,7 @@ export async function installStructuredArtifactBridgeStub(
     } as const;
     let content: Record<string, unknown> = structuredClone(contents[artifactKind]);
     let descriptor = {
-      artifactId: `artifact-preview-${artifactKind}`, workspaceId: 'workspace-preview', kind: artifactKind,
+      artifactId: 'artifact-preview-document', workspaceId: 'workspace-preview', kind: artifactKind,
       title: artifactKind === 'slides' ? 'Deck' : artifactKind === 'canvas' ? 'Board' : 'Budget',
       status: 'active', schemaVersion: 2, dataClass: 'internal', currentRevisionId: `${artifactKind}-revision-1`,
       currentRevisionNumber: 1, sourceSessionId: 'assistant-preview-session', sourceTurnId: 'assistant-preview-turn',
@@ -516,7 +516,7 @@ export async function installStructuredArtifactBridgeStub(
           return ok({ artifact: descriptor, revision, created: false, disposition: 'updated' });
         }
         if (command === 'bridge_artifact_export_begin') {
-          return ok({ cancelled: false, ticket: `${artifactKind}-ticket-1`, expiresInMs: 60_000, maxBytes: 5_000_000 });
+          return ok({ cancelled: false, exportId: `${artifactKind}-export-1`, ticket: `${artifactKind}-ticket-1`, expiresInMs: 60_000, maxBytes: 5_000_000 });
         }
         if (command === 'bridge_artifact_export_commit') {
           const request = args.request as { bytes: number[]; sha256: string };
@@ -608,7 +608,7 @@ export async function installFlowArtifactBridgeStub(page: Page): Promise<void> {
           return ok({ artifact: descriptor, revision, created: false, disposition: 'updated' });
         }
         if (command === 'bridge_artifact_export_begin') {
-          return ok({ cancelled: false, ticket: 'flow-ticket-1', expiresInMs: 60_000, maxBytes: 1_000_000 });
+          return ok({ cancelled: false, exportId: 'flow-export-1', ticket: 'flow-ticket-1', expiresInMs: 60_000, maxBytes: 1_000_000 });
         }
         if (command === 'bridge_artifact_export_commit') {
           const request = args.request as { bytes: number[]; sha256: string };

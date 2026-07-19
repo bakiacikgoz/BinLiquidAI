@@ -42,7 +42,10 @@ test('flow artifact edits through React Flow, exposes an outline, and exports sa
     .toEqual(['bridge_artifact_mutate']);
   await expect(workbench.getByLabel('Artifact status').getByText('Revision 2')).toBeVisible();
 
-  await workbench.getByRole('button', { name: 'Export SVG' }).dispatchEvent('click');
+  await workbench.getByRole('button', { name: 'Export', exact: true }).click();
+  const exportDialog = workbench.getByRole('dialog', { name: 'Export Approval flow' });
+  await exportDialog.getByLabel('Export format').selectOption('svg');
+  await exportDialog.getByRole('button', { name: 'Choose destination and export' }).click();
   await expect.poll(async () => (await flowArtifactEvidence(page)).commands.filter((item) => item.includes('export')))
     .toEqual(['bridge_artifact_export_begin', 'bridge_artifact_export_commit']);
   const exported = (await flowArtifactEvidence(page)).exportedText ?? '';

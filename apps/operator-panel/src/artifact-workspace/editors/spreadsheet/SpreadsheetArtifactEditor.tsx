@@ -8,6 +8,9 @@ import type { ArtifactEditorProps } from '../ArtifactEditorHost';
 
 const DEFAULT_COLUMNS = 12;
 const DEFAULT_ROWS = 30;
+const MAX_ROWS = 1_048_576;
+const VISIBLE_ROW_COUNT = 40;
+const ROW_HEIGHT_PX = 32;
 
 function columnLabel(index: number): string {
   let value = index;
@@ -82,13 +85,12 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
   const [visibleRowStart, setVisibleRowStart] = useState(1);
   const activeSheet = content.sheets[activeSheetIndex] ?? content.sheets[0];
   const bounds = usedBounds(content, activeSheetIndex);
-  const rows = Math.min(250, bounds.rows + extraRows);
+  const rows = Math.min(MAX_ROWS, bounds.rows + extraRows);
   const columns = Math.min(100, bounds.columns + extraColumns);
   const editable = props.mode !== 'view' && props.artifact.status !== 'archived';
   const selectedRange = rangeBetween(selectionAnchor, selectedAddress);
-  const visibleRowCount = 40;
   const visibleRows = Array.from(
-    { length: Math.min(visibleRowCount, rows - visibleRowStart + 1) },
+    { length: Math.min(VISIBLE_ROW_COUNT, rows - visibleRowStart + 1) },
     (_, index) => visibleRowStart + index,
   );
 
@@ -187,11 +189,12 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
       {content.sheets.map((sheet, index) => <button key={sheet.id} type="button" role="tab" aria-selected={index === activeSheetIndex} onClick={() => { setActiveSheetIndex(index); setSelectedAddress('A1'); }}>{sheet.name}</button>)}
     </div>
     <div className="spreadsheet-grid" role="grid" aria-label={`${activeSheet.name} cells`} onScroll={(event) => {
-      const next = Math.min(Math.max(1, Math.floor(event.currentTarget.scrollTop / 28) + 1), Math.max(1, rows - visibleRowCount + 1));
+      const next = Math.min(Math.max(1, Math.floor(event.currentTarget.scrollTop / ROW_HEIGHT_PX) + 1), Math.max(1, rows - VISIBLE_ROW_COUNT + 1));
       setVisibleRowStart(next);
     }}>
       <div className="spreadsheet-grid-row spreadsheet-grid-header" role="row"><span role="columnheader">#</span>{Array.from({ length: columns }, (_, index) => <span key={index} role="columnheader">{columnLabel(index + 1)}</span>)}</div>
-      <span className="sr-only" aria-live="polite">Visible rows {visibleRowStart}–{Math.min(rows, visibleRowStart + visibleRowCount - 1)} of {rows}</span>
+      <span className="sr-only" aria-live="polite">Visible rows {visibleRowStart}–{Math.min(rows, visibleRowStart + VISIBLE_ROW_COUNT - 1)} of {rows}</span>
+      {visibleRowStart > 1 ? <div aria-hidden="true" style={{ height: (visibleRowStart - 1) * ROW_HEIGHT_PX }} /> : null}
       {visibleRows.map((row) => {
         return <div key={row} className="spreadsheet-grid-row" role="row"><span role="rowheader">{row}</span>{Array.from({ length: columns }, (_, columnIndex) => {
           const address = `${columnLabel(columnIndex + 1)}${row}`;
@@ -199,6 +202,7 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
           return <input key={address} aria-label={address} role="gridcell" readOnly={!editable} value={value === undefined || value === null ? '' : String(value)} onFocus={() => selectAddress(address, false)} onClick={(event: MouseEvent<HTMLInputElement>) => selectAddress(address, event.shiftKey)} onChange={(event) => updateCell(address, event.target.value)} />;
         })}</div>;
       })}
+      {visibleRowStart + visibleRows.length <= rows ? <div aria-hidden="true" style={{ height: (rows - visibleRowStart - visibleRows.length + 1) * ROW_HEIGHT_PX }} /> : null}
     </div>
     <footer>Sheet: {activeSheet.name} · Selection: {selectedRange} · {Object.keys(activeSheet.cells).length} filled cells · Revision {props.revision.revisionNumber} · {editable ? 'Edit' : 'Read-only'} · Formula disabled</footer>
   </section>;

@@ -16,6 +16,7 @@ test('slides editor edits structured content and exports PPTX', async ({ page })
   const editor = workbench.getByRole('region', { name: 'Structured slides editor' });
   await expect(editor).toBeVisible();
   await editor.getByRole('button', { name: 'Export PPTX' }).click();
+  await workbench.getByRole('dialog', { name: 'Export Deck' }).getByRole('button', { name: 'Choose destination and export' }).click();
   await expect.poll(async () => (await structuredArtifactCommands(page)).filter((item) => item.includes('export')))
     .toEqual(['bridge_artifact_export_begin', 'bridge_artifact_export_commit']);
   await editor.getByRole('button', { name: 'text element text-1' }).click();

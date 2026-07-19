@@ -42,8 +42,14 @@ test('document artifact edits, autosaves, reopens, restores history, and exports
   await expect(workbench.getByLabel('Artifact status').getByText('Revision 3')).toBeVisible();
   await expect(editor.getByRole('textbox')).toContainText('Initial governed draft');
 
-  await workbench.getByRole('button', { name: 'Export Markdown' }).click();
-  await workbench.getByRole('button', { name: 'Export HTML' }).click();
+  await workbench.getByRole('button', { name: 'Export', exact: true }).click();
+  let exportDialog = workbench.getByRole('dialog', { name: 'Export Launch plan' });
+  await exportDialog.getByLabel('Export format').selectOption('markdown');
+  await exportDialog.getByRole('button', { name: 'Choose destination and export' }).click();
+  await workbench.getByRole('button', { name: 'Export', exact: true }).click();
+  exportDialog = workbench.getByRole('dialog', { name: 'Export Launch plan' });
+  await exportDialog.getByLabel('Export format').selectOption('html');
+  await exportDialog.getByRole('button', { name: 'Choose destination and export' }).click();
   await expect.poll(() => artifactExportCommands(page)).toEqual([
     'bridge_artifact_export_begin',
     'bridge_artifact_export_commit',

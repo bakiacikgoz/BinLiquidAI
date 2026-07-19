@@ -273,6 +273,7 @@ export class ArtifactWorkspaceController {
   private readonly listeners = new Set<WorkspaceListener>();
   private readonly bridge: ArtifactBridge;
   private readonly tabIncarnations = new Map<string, number>();
+  private readonly opening = new Map<string, Promise<void>>();
   private incarnationSequence = 0;
 
   constructor(bridge: ArtifactBridge = defaultBridge) {
@@ -295,11 +296,23 @@ export class ArtifactWorkspaceController {
     this.listeners.forEach((listener) => listener(this.state));
   }
 
-  async open(artifactId: string): Promise<void> {
-    const result = await this.bridge.get({ artifactId });
-    this.incarnationSequence += 1;
-    this.tabIncarnations.set(artifactId, this.incarnationSequence);
-    this.dispatch({ type: 'opened', result });
+  open(artifactId: string): Promise<void> {
+    const existing = this.opening.get(artifactId);
+    if (existing) return existing;
+    const operation = (async () => {
+      const result = await this.bridge.get({ artifactId });
+      if (result.artifact.artifactId !== artifactId || result.revision.artifactId !== artifactId) {
+        throw new Error('Artifact read identity does not match the requested artifact.');
+      }
+      this.incarnationSequence += 1;
+      this.tabIncarnations.set(artifactId, this.incarnationSequence);
+      this.dispatch({ type: 'opened', result });
+    })();
+    const tracked = operation.finally(() => {
+      if (this.opening.get(artifactId) === tracked) this.opening.delete(artifactId);
+    });
+    this.opening.set(artifactId, tracked);
+    return tracked;
   }
 
   activate(artifactId: string): void {

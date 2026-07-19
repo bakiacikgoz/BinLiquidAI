@@ -12,13 +12,13 @@ async function prepareArtifactCard(page: import('@playwright/test').Page) {
   return consoleHealth;
 }
 
-test('artifact fallback renders hostile markup as text without script execution', async ({ page }) => {
+test('artifact editor renders hostile markup as text without script execution', async ({ page }) => {
   const consoleHealth = await prepareArtifactCard(page);
   await installStructuredArtifactBridgeStub(page, 'canvas');
   await page.getByRole('button', { name: 'Open Launch plan' }).dispatchEvent('click');
 
-  const fallback = page.getByRole('region', { name: 'canvas read-only fallback' });
-  await expect(fallback).toContainText('<script>local text only</script>');
+  const editor = page.getByRole('region', { name: 'Canvas editor: Board' });
+  await expect(editor).toContainText('<script>local text only</script>');
   await expect(page.locator('script', { hasText: 'local text only' })).toHaveCount(0);
   consoleHealth.assertNoCriticalErrors();
 });

@@ -55,6 +55,29 @@ function loaded(text = 'v1'): ArtifactReadResult {
 }
 
 describe('artifact workspace controller', () => {
+  it('coalesces concurrent opens for the same artifact', async () => {
+    let resolveGet: ((result: ArtifactReadResult) => void) | undefined;
+    const get = vi.fn(() => new Promise<ArtifactReadResult>((resolve) => { resolveGet = resolve; }));
+    const controller = new ArtifactWorkspaceController({ get } as unknown as ArtifactBridge);
+
+    const first = controller.open('artifact-1');
+    const second = controller.open('artifact-1');
+
+    expect(get).toHaveBeenCalledOnce();
+    resolveGet?.(loaded());
+    await Promise.all([first, second]);
+    expect(controller.getState().tabs).toHaveLength(1);
+  });
+
+  it('rejects an artifact read whose identity differs from the request', async () => {
+    const controller = new ArtifactWorkspaceController({
+      get: vi.fn().mockResolvedValue(loaded()),
+    } as unknown as ArtifactBridge);
+
+    await expect(controller.open('artifact-other')).rejects.toThrow('identity');
+    expect(controller.getState().tabs).toHaveLength(0);
+  });
+
   it('opens tabs once, tracks active tab, and marks edited content dirty', () => {
     let state = createArtifactWorkspaceState();
     state = artifactWorkspaceReducer(state, { type: 'opened', result: loaded() });
