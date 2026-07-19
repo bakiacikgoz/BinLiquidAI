@@ -83,6 +83,30 @@ describe('canvas fallback export', () => {
     expect(svg.height).toBeGreaterThan(0);
   });
 
+  it('resolves governed local images into SVG export data', async () => {
+    const imageContent = {
+      ...content,
+      snapshot: { objects: [{ id: 'image-1', type: 'image' as const, x: 0, y: 0, width: 40, height: 30, assetId: 'asset-1' }] },
+      assetIds: ['asset-1'],
+    };
+    const commitExport = vi.fn().mockResolvedValue({ basename: 'board.svg', sha256: 'a'.repeat(64), sizeBytes: 100 });
+    const bridge = {
+      beginExport: vi.fn().mockResolvedValue({ cancelled: false, ticket: 'ticket-1', maxBytes: 1_000_000 }),
+      getAsset: vi.fn().mockResolvedValue({
+        asset: { assetId: 'asset-1', workspaceId: 'workspace-1', sha256: 'b'.repeat(64), mediaType: 'image/png', sizeBytes: 4, relativePath: 'assets/a.png', width: 1, height: 1, originalName: 'a.png', dataClass: 'internal', createdById: 'user-1', createdAtUtc: '2026-07-16T08:00:00Z' },
+        contentBase64: 'iVBORw0KGgo=',
+      }),
+      commitExport,
+      cancelExport: vi.fn(),
+    } as unknown as ArtifactBridge;
+
+    await exportCanvasArtifact({ artifact, revision, content: imageContent, format: 'svg', bridge });
+    const svg = new TextDecoder().decode(commitExport.mock.calls[0][1]);
+    expect(svg).toContain('<image');
+    expect(svg).toContain('data:image/png;base64,iVBORw0KGgo=');
+    expect(bridge.getAsset).toHaveBeenCalledWith('asset-1');
+  });
+
   it.each(['svg', 'png'] as const)('routes canvas %s through the canvas export ticket', async (format) => {
     const bytes = new TextEncoder().encode('png');
     const bridge = {

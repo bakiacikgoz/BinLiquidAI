@@ -1,7 +1,61 @@
 import type { Page } from '@playwright/test';
 
-export async function installArtifactBridgeStub(page: Page): Promise<void> {
+const ARTIFACT_E2E_CAPABILITY_SNAPSHOT = {
+  contractVersion: 'artifact-runtime-capability-snapshot/v1',
+  rolloutStage: 'all_noncommercial',
+  globalEnabled: true,
+  enabledArtifactKinds: ['document', 'form', 'code', 'flow', 'spreadsheet', 'canvas', 'slides'],
+  features: {
+    'artifact_workspace.enabled': true,
+    'artifact_workspace.document.enabled': true,
+    'artifact_workspace.form.enabled': true,
+    'artifact_workspace.code.enabled': true,
+    'artifact_workspace.flow.enabled': true,
+    'artifact_workspace.spreadsheet.enabled': true,
+    'artifact_workspace.canvas.enabled': true,
+    'artifact_workspace.slides.enabled': true,
+    'artifact_workspace.export.enabled': true,
+    'assistant_ui_runtime.enabled': false,
+    'ai_sdk_tauri_transport.enabled': false,
+  },
+  licenses: { spreadsheet: false, canvas: false },
+  kindCapabilities: Object.fromEntries(['document', 'form', 'code', 'flow', 'spreadsheet', 'canvas', 'slides'].map((kind) => [kind, {
+    enabled: true,
+    editable: true,
+    exportable: true,
+    reasonCode: null,
+    requiresLicense: false,
+    adapter: kind === 'spreadsheet' || kind === 'canvas' ? 'bundled_fallback' : 'built_in',
+  }])),
+};
+
+async function installTauriCallbackHarness(page: Page): Promise<void> {
   await page.evaluate(() => {
+    const internals = (window as unknown as { __TAURI_INTERNALS__: Record<string, unknown> }).__TAURI_INTERNALS__;
+    const invoke = internals.invoke as (command: string, args: Record<string, unknown>) => Promise<unknown>;
+    const callbacks = new Map<number, (data: unknown) => void>();
+    let callbackId = 1;
+    internals.callbacks = callbacks;
+    internals.transformCallback = (callback?: (data: unknown) => void, once = false) => {
+      const id = callbackId++;
+      callbacks.set(id, (data) => {
+        if (once) callbacks.delete(id);
+        callback?.(data);
+      });
+      return id;
+    };
+    internals.unregisterCallback = (id: number) => callbacks.delete(id);
+    internals.runCallback = (id: number, data: unknown) => callbacks.get(id)?.(data);
+    internals.invoke = async (command: string, args: Record<string, unknown>) => {
+      if (command === 'plugin:event|listen') return callbackId++;
+      if (command === 'plugin:event|unlisten') return null;
+      return invoke(command, args);
+    };
+  });
+}
+
+export async function installArtifactBridgeStub(page: Page): Promise<void> {
+  await page.evaluate((capabilitySnapshot) => {
     const now = '2026-07-16T09:00:00Z';
     const contents = new Map<string, unknown>();
     let descriptor = {
@@ -151,6 +205,7 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
     };
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: Record<string, unknown>) => {
+        if (command === 'bridge_artifact_handshake') return ok({ capabilitySnapshot });
         if (command === 'bridge_artifact_list') {
           return ok({ items: [descriptor, ...Array.from(forks.values(), (item) => item.descriptor)], next_cursor: null });
         }
@@ -271,7 +326,8 @@ export async function installArtifactBridgeStub(page: Page): Promise<void> {
         throw new Error(`Unexpected artifact E2E command: ${command}`);
       },
     };
-  });
+  }, ARTIFACT_E2E_CAPABILITY_SNAPSHOT);
+  await installTauriCallbackHarness(page);
 }
 
 export async function artifactExportCommands(page: Page): Promise<string[]> {
@@ -284,7 +340,7 @@ export async function artifactExportCommands(page: Page): Promise<string[]> {
 }
 
 export async function installFormArtifactBridgeStub(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+  await page.addInitScript((capabilitySnapshot) => {
     window.addEventListener('keydown', (event) => {
       if (event.key !== 'F8') return;
     const now = '2026-07-16T09:00:00Z';
@@ -319,6 +375,7 @@ export async function installFormArtifactBridgeStub(page: Page): Promise<void> {
     };
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: Record<string, unknown>) => {
+        if (command === 'bridge_artifact_handshake') return ok({ capabilitySnapshot });
         if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
         if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
         if (command === 'bridge_artifact_history') return ok({ items: [revision], next_cursor: null });
@@ -340,12 +397,29 @@ export async function installFormArtifactBridgeStub(page: Page): Promise<void> {
         throw new Error(`Unexpected form artifact E2E command: ${command}`);
       },
     };
+    const internals = (window as unknown as { __TAURI_INTERNALS__: Record<string, unknown> }).__TAURI_INTERNALS__;
+    const invoke = internals.invoke as (command: string, args: Record<string, unknown>) => Promise<unknown>;
+    const callbacks = new Map<number, (data: unknown) => void>();
+    let callbackId = 1;
+    internals.callbacks = callbacks;
+    internals.transformCallback = (callback?: (data: unknown) => void, once = false) => {
+      const id = callbackId++;
+      callbacks.set(id, (data) => { if (once) callbacks.delete(id); callback?.(data); });
+      return id;
+    };
+    internals.unregisterCallback = (id: number) => callbacks.delete(id);
+    internals.runCallback = (id: number, data: unknown) => callbacks.get(id)?.(data);
+    internals.invoke = async (command: string, args: Record<string, unknown>) => {
+      if (command === 'plugin:event|listen') return callbackId++;
+      if (command === 'plugin:event|unlisten') return null;
+      return invoke(command, args);
+    };
     });
-  });
+  }, ARTIFACT_E2E_CAPABILITY_SNAPSHOT);
 }
 
 export async function installCodeArtifactBridgeStub(page: Page): Promise<void> {
-  await page.evaluate(() => {
+  await page.evaluate((capabilitySnapshot) => {
     const now = '2026-07-16T09:00:00Z';
     let descriptor = {
       artifactId: 'artifact-preview-document', workspaceId: 'workspace-preview', kind: 'code', title: 'Safe code',
@@ -378,6 +452,7 @@ export async function installCodeArtifactBridgeStub(page: Page): Promise<void> {
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: Record<string, unknown>) => {
         commands.push(command);
+        if (command === 'bridge_artifact_handshake') return ok({ capabilitySnapshot });
         if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
         if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
         if (command === 'bridge_artifact_history') return ok({ items: history, next_cursor: null });
@@ -410,7 +485,8 @@ export async function installCodeArtifactBridgeStub(page: Page): Promise<void> {
         throw new Error(`Unexpected code artifact E2E command: ${command}`);
       },
     };
-  });
+  }, ARTIFACT_E2E_CAPABILITY_SNAPSHOT);
+  await installTauriCallbackHarness(page);
 }
 
 export async function codeArtifactCommands(page: Page): Promise<string[]> {
@@ -424,7 +500,7 @@ export async function installStructuredArtifactBridgeStub(
   page: Page,
   kind: 'spreadsheet' | 'canvas' | 'slides',
 ): Promise<void> {
-  await page.evaluate((artifactKind) => {
+  await page.evaluate(({ artifactKind, capabilitySnapshot }) => {
     const now = '2026-07-17T09:00:00Z';
     const spreadsheetCells = Object.fromEntries(
       Array.from({ length: 10_000 }, (_, index) => [
@@ -494,9 +570,24 @@ export async function installStructuredArtifactBridgeStub(
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: Record<string, unknown>) => {
         commands.push(command);
+        if (command === 'bridge_artifact_handshake') return ok({ capabilitySnapshot });
         if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
         if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
         if (command === 'bridge_artifact_history') return ok({ items: history, next_cursor: null });
+        if (command === 'bridge_artifact_asset_get' && artifactKind === 'canvas') {
+          const params = (args.payload as { params: Record<string, unknown> }).params;
+          const assetId = String(params.assetId);
+          if (assetId !== 'asset-local-1') throw new Error('Unknown canvas asset');
+          return ok({
+            asset: {
+              assetId, workspaceId: descriptor.workspaceId, sha256: 'b'.repeat(64), mediaType: 'image/png',
+              sizeBytes: 68, relativePath: 'assets/asset-local-1.png', width: 1, height: 1,
+              originalName: 'asset-local-1.png', dataClass: descriptor.dataClass,
+              createdById: 'assistant-preview', createdAtUtc: now,
+            },
+            contentBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+          });
+        }
         if (command === 'bridge_artifact_mutate' || command === 'bridge_artifact_slides_patch') {
           const params = (args.payload as { params: Record<string, unknown> }).params;
           if (command === 'bridge_artifact_mutate') content = params.content as Record<string, unknown>;
@@ -527,7 +618,8 @@ export async function installStructuredArtifactBridgeStub(
         throw new Error(`Unexpected structured artifact E2E command: ${command}`);
       },
     };
-  }, kind);
+  }, { artifactKind: kind, capabilitySnapshot: ARTIFACT_E2E_CAPABILITY_SNAPSHOT });
+  await installTauriCallbackHarness(page);
 }
 
 export async function structuredArtifactCommands(page: Page): Promise<string[]> {
@@ -550,7 +642,7 @@ export async function codeArtifactExportedText(page: Page): Promise<string | nul
 }
 
 export async function installFlowArtifactBridgeStub(page: Page): Promise<void> {
-  await page.evaluate(() => {
+  await page.evaluate((capabilitySnapshot) => {
     const now = '2026-07-16T10:00:00Z';
     let descriptor = {
       artifactId: 'artifact-preview-document', workspaceId: 'workspace-preview', kind: 'flow', title: 'Approval flow',
@@ -587,6 +679,7 @@ export async function installFlowArtifactBridgeStub(page: Page): Promise<void> {
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: Record<string, unknown>) => {
         commands.push(command);
+        if (command === 'bridge_artifact_handshake') return ok({ capabilitySnapshot });
         if (command === 'bridge_artifact_list') return ok({ items: [descriptor], next_cursor: null });
         if (command === 'bridge_artifact_get') return ok({ artifact: descriptor, revision, content });
         if (command === 'bridge_artifact_history') return ok({ items: history, next_cursor: null });
@@ -619,7 +712,8 @@ export async function installFlowArtifactBridgeStub(page: Page): Promise<void> {
         throw new Error(`Unexpected flow artifact E2E command: ${command}`);
       },
     };
-  });
+  }, ARTIFACT_E2E_CAPABILITY_SNAPSHOT);
+  await installTauriCallbackHarness(page);
 }
 
 export async function flowArtifactEvidence(page: Page): Promise<{ commands: string[]; exportedText: string | null }> {

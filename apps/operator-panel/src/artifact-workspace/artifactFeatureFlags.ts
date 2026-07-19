@@ -33,6 +33,11 @@ const ALL_OFF: ArtifactFeatureFlagState = {
   aiSdkTauriTransport: false,
 };
 
+type ArtifactBackendCapabilityFlags = {
+  globalEnabled: boolean;
+  features: Record<string, boolean>;
+};
+
 function enabled(value: string | boolean | undefined): boolean {
   return value === true || value === '1' || value?.toString().toLowerCase() === 'true';
 }
@@ -54,6 +59,29 @@ export function resolveArtifactFeatureFlags(
     export: enabled(environment.VITE_ARTIFACT_EXPORT),
     assistantUiRuntime: enabled(environment.VITE_ASSISTANT_UI_RUNTIME),
     aiSdkTauriTransport: enabled(environment.VITE_ASSISTANT_AI_SDK_RUNTIME),
+  };
+}
+
+export function resolveEffectiveArtifactFeatureFlags(
+  renderer: ArtifactFeatureFlagState,
+  backend: ArtifactBackendCapabilityFlags | null,
+  allowRendererOnly = false,
+): ArtifactFeatureFlagState {
+  if (allowRendererOnly) return { ...renderer };
+  if (!backend) return { ...ALL_OFF };
+  const enabled = (name: string) => backend.features[name] === true;
+  return {
+    workspace: renderer.workspace && backend.globalEnabled,
+    document: renderer.document && enabled('artifact_workspace.document.enabled'),
+    form: renderer.form && enabled('artifact_workspace.form.enabled'),
+    code: renderer.code && enabled('artifact_workspace.code.enabled'),
+    flow: renderer.flow && enabled('artifact_workspace.flow.enabled'),
+    spreadsheet: renderer.spreadsheet && enabled('artifact_workspace.spreadsheet.enabled'),
+    canvas: renderer.canvas && enabled('artifact_workspace.canvas.enabled'),
+    slides: renderer.slides && enabled('artifact_workspace.slides.enabled'),
+    export: renderer.export && enabled('artifact_workspace.export.enabled'),
+    assistantUiRuntime: renderer.assistantUiRuntime && enabled('assistant_ui_runtime.enabled'),
+    aiSdkTauriTransport: renderer.aiSdkTauriTransport && enabled('ai_sdk_tauri_transport.enabled'),
   };
 }
 

@@ -11,9 +11,9 @@ import { Group, Panel, Separator } from 'react-resizable-panels';
 import type { ArtifactKind } from '../artifactContracts';
 import { recordArtifactEditorLoadFailure } from '../artifactUiMetrics';
 
-type ErrorBoundaryProps = PropsWithChildren<{ artifactKind?: ArtifactKind }>;
+type ErrorBoundaryProps = PropsWithChildren<{ artifactKind?: ArtifactKind; readOnlyFallback?: ReactNode }>;
 
-class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed: boolean; readOnly: boolean }> {
+export class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed: boolean; readOnly: boolean }> {
   state = { failed: false, readOnly: false };
 
   static getDerivedStateFromError(): { failed: boolean; readOnly: boolean } {
@@ -30,7 +30,8 @@ class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed
     if (this.state.readOnly) {
       return <section className="artifact-workbench-error" aria-label="Read-only artifact fallback">
         <strong>Artifact opened read-only.</strong>
-        <p>The editor is isolated. The assistant, navigator, revision history, and governed export remain available.</p>
+        <p>The editor is isolated. The surrounding navigator, revision history, and governed export remain available.</p>
+        {this.props.readOnlyFallback}
         <p>Support reference: <code>{supportReference}</code></p>
         <button type="button" onClick={() => this.setState({ failed: false, readOnly: false })}>Retry editor</button>
       </section>;
@@ -81,7 +82,6 @@ export function ArtifactWorkbenchShell({
   children,
   workbench,
   onCloseWorkbench,
-  activeArtifactKind,
 }: PropsWithChildren<{
   workbench: ReactNode;
   onCloseWorkbench: () => void;
@@ -113,11 +113,7 @@ export function ArtifactWorkbenchShell({
 
   if (!workbench) return children;
 
-  const guardedWorkbench = (
-    <ArtifactEditorErrorBoundary artifactKind={activeArtifactKind}>
-      {workbench}
-    </ArtifactEditorErrorBoundary>
-  );
+  const guardedWorkbench = workbench;
   if (compact) {
     return (
       <>

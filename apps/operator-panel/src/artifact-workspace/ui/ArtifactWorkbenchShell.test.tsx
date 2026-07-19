@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderOperatorPanel } from '../../test/render';
-import { ArtifactWorkbenchShell } from './ArtifactWorkbenchShell';
+import { ArtifactEditorErrorBoundary, ArtifactWorkbenchShell } from './ArtifactWorkbenchShell';
 import { artifactUiMetricSnapshot, resetArtifactUiMetricsForTest } from '../artifactUiMetrics';
 
 function setCompact(matches: boolean): void {
@@ -89,20 +89,25 @@ describe('ArtifactWorkbenchShell', () => {
     expect(trigger).toHaveFocus();
   });
 
-  it('isolates editor crashes behind an actionable error boundary', () => {
+  it('isolates only the editor and exposes real read-only content after a crash', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    renderOperatorPanel(
-      <ArtifactWorkbenchShell workbench={<BrokenEditor />} activeArtifactKind="document" onCloseWorkbench={vi.fn()}>
-        <main>Assistant chat remains available</main>
-      </ArtifactWorkbenchShell>,
-    );
+    const { user } = renderOperatorPanel(<div>
+      <nav>Revision history remains available</nav>
+      <ArtifactEditorErrorBoundary artifactKind="document" readOnlyFallback={<section>Bounded artifact content</section>}>
+        <BrokenEditor />
+      </ArtifactEditorErrorBoundary>
+      <button type="button">Export</button>
+    </div>);
 
-    expect(screen.getByText('Assistant chat remains available')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('The artifact editor could not be displayed.');
     expect(screen.getByRole('button', { name: 'Retry editor' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open artifact read-only' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy support reference' })).toBeInTheDocument();
     expect(screen.getByText(/support reference:/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open artifact read-only' }));
+    expect(screen.getByText('Bounded artifact content')).toBeInTheDocument();
+    expect(screen.getByText('Revision history remains available')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
     expect(artifactUiMetricSnapshot()).toContainEqual({
       name: 'imperaos_artifact_editor_load_failure_total',
       labels: { kind: 'document' },

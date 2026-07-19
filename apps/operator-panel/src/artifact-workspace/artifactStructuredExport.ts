@@ -4,9 +4,10 @@ import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './ar
 export type StructuredArtifactExportFormat = 'json' | 'submission-json' | 'csv';
 
 function csvCell(value: unknown): string {
-  const text = value === null || value === undefined
+  let text = value === null || value === undefined
     ? ''
     : typeof value === 'object' ? JSON.stringify(value) : String(value);
+  if (typeof value === 'string' && /^[\t\r\n ]*[=+\-@]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
 

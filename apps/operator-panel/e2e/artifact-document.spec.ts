@@ -34,7 +34,8 @@ test('document artifact edits, autosaves, reopens, restores history, and exports
 
   await workbench.getByRole('button', { name: 'Close Launch plan' }).click();
   await expect(workbench.getByRole('tab', { name: 'Launch plan' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Open Launch plan' }).click();
+  await workbench.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await workbench.getByLabel('Artifact navigator').getByRole('button', { name: /Launch plan/ }).click();
   await expect(editor.getByRole('textbox')).toContainText('Saved after autosave');
   await expect(workbench.getByLabel('Artifact status').getByText('Revision 2')).toBeVisible();
 

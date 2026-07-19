@@ -90,7 +90,7 @@ import {
 import { useAssistantRuntimeSession } from './assistant/useAssistantRuntimeSession';
 import { useAssistantArtifactWorkspaceController } from './artifact-workspace/useAssistantArtifactWorkspaceController';
 import { AssistantInlineFormPart } from './artifact-workspace/AssistantInlineFormPart';
-import { resolveArtifactFeatureFlags } from './artifact-workspace/artifactFeatureFlags';
+import { resolveArtifactFeatureFlags, resolveEffectiveArtifactFeatureFlags } from './artifact-workspace/artifactFeatureFlags';
 import { artifactBridge } from './artifact-workspace/artifactBridge';
 import type { ArtifactRuntimeCapabilitySnapshot } from './artifact-workspace/artifactContracts';
 import { useAssistantModels } from './assistant/useAssistantModels';
@@ -390,24 +390,18 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
   const [handshakeData, setHandshakeData] = useState<unknown>(null);
   const [artifactCapabilitySnapshot, setArtifactCapabilitySnapshot] = useState<ArtifactRuntimeCapabilitySnapshot | null>(null);
+  const [artifactCapabilityStatus, setArtifactCapabilityStatus] = useState<'loading' | 'ready' | 'failed'>(
+    previewMode ? 'ready' : 'loading',
+  );
   const [configData, setConfigData] = useState<unknown>(null);
-  const artifactFeatureFlags = useMemo(() => {
-    if (!artifactCapabilitySnapshot) return rendererArtifactFeatureFlags;
-    const enabled = (name: string) => artifactCapabilitySnapshot.features[name] === true;
-    return {
-      workspace: rendererArtifactFeatureFlags.workspace && artifactCapabilitySnapshot.globalEnabled,
-      document: rendererArtifactFeatureFlags.document && enabled('artifact_workspace.document.enabled'),
-      form: rendererArtifactFeatureFlags.form && enabled('artifact_workspace.form.enabled'),
-      code: rendererArtifactFeatureFlags.code && enabled('artifact_workspace.code.enabled'),
-      flow: rendererArtifactFeatureFlags.flow && enabled('artifact_workspace.flow.enabled'),
-      spreadsheet: rendererArtifactFeatureFlags.spreadsheet && enabled('artifact_workspace.spreadsheet.enabled'),
-      canvas: rendererArtifactFeatureFlags.canvas && enabled('artifact_workspace.canvas.enabled'),
-      slides: rendererArtifactFeatureFlags.slides && enabled('artifact_workspace.slides.enabled'),
-      export: rendererArtifactFeatureFlags.export && enabled('artifact_workspace.export.enabled'),
-      assistantUiRuntime: rendererArtifactFeatureFlags.assistantUiRuntime && enabled('assistant_ui_runtime.enabled'),
-      aiSdkTauriTransport: rendererArtifactFeatureFlags.aiSdkTauriTransport && enabled('ai_sdk_tauri_transport.enabled'),
-    };
-  }, [artifactCapabilitySnapshot, rendererArtifactFeatureFlags]);
+  const artifactFeatureFlags = useMemo(
+    () => resolveEffectiveArtifactFeatureFlags(
+      rendererArtifactFeatureFlags,
+      artifactCapabilityStatus === 'ready' ? artifactCapabilitySnapshot : null,
+      previewMode,
+    ),
+    [artifactCapabilitySnapshot, artifactCapabilityStatus, previewMode, rendererArtifactFeatureFlags],
+  );
   const [handshakeError, setHandshakeError] = useState<BridgeErrorPayload | null>(null);
   const [controlPlaneDoctor, setControlPlaneDoctor] = useState<unknown>(null);
   const [controlPlaneAgents, setControlPlaneAgents] = useState<unknown>({ agents: [] });
@@ -762,15 +756,24 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   useEffect(() => {
     if (previewMode || !rendererArtifactFeatureFlags.workspace) {
       setArtifactCapabilitySnapshot(null);
+      setArtifactCapabilityStatus('ready');
       return;
     }
     let cancelled = false;
+    setArtifactCapabilitySnapshot(null);
+    setArtifactCapabilityStatus('loading');
     void artifactBridge.getRuntimeCapabilitySnapshot()
       .then((snapshot) => {
-        if (!cancelled) setArtifactCapabilitySnapshot(snapshot);
+        if (!cancelled) {
+          setArtifactCapabilitySnapshot(snapshot);
+          setArtifactCapabilityStatus('ready');
+        }
       })
       .catch(() => {
-        if (!cancelled) setArtifactCapabilitySnapshot(null);
+        if (!cancelled) {
+          setArtifactCapabilitySnapshot(null);
+          setArtifactCapabilityStatus('failed');
+        }
       });
     return () => { cancelled = true; };
   }, [previewMode, rendererArtifactFeatureFlags.workspace, settings.profile, settings.rootDir]);
@@ -1818,6 +1821,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
           void assistantArtifactWorkspace.actions.restore(artifactId, revisionId)
         }
         onImportAsset={assistantArtifactWorkspace.actions.importAsset}
+        onResolveAsset={assistantArtifactWorkspace.actions.resolveAsset}
         onExportArtifact={(artifactId, format, sheetId) => {
           const artifactKind = assistantArtifactWorkspace.state.tabs.find(
             (tab) => tab.artifact.artifactId === artifactId,
@@ -3573,12 +3577,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
               <article className="operator-work-card" aria-label="Artifact Workspace capabilities">
                 <h3>Artifact Workspace</h3>
                 <dl className="metric-list">
-                  <div className="metric-row"><dt>Rollout</dt><dd>{artifactCapabilitySnapshot?.rolloutStage ?? (artifactFeatureFlags.workspace ? 'unavailable' : 'disabled')}</dd></div>
-                  <div className="metric-row"><dt>Workspace</dt><dd>{artifactCapabilitySnapshot?.globalEnabled ? 'enabled' : 'disabled'}</dd></div>
+                  <div className="metric-row"><dt>Rollout</dt><dd>{artifactCapabilityStatus === 'failed' ? 'capability unavailable (ARTIFACT_CAPABILITY_UNAVAILABLE)' : artifactCapabilitySnapshot?.rolloutStage ?? (previewMode ? 'preview' : rendererArtifactFeatureFlags.workspace ? artifactCapabilityStatus : 'disabled')}</dd></div>
+                  <div className="metric-row"><dt>Workspace</dt><dd>{artifactFeatureFlags.workspace ? 'enabled' : 'disabled'}</dd></div>
                   <div className="metric-row"><dt>Assistant UI runtime</dt><dd>{(artifactCapabilitySnapshot?.features['assistant_ui_runtime.enabled'] ?? artifactFeatureFlags.assistantUiRuntime) ? 'enabled' : 'disabled'}</dd></div>
                   <div className="metric-row"><dt>AI SDK transport</dt><dd>{(artifactCapabilitySnapshot?.features['ai_sdk_tauri_transport.enabled'] ?? artifactFeatureFlags.aiSdkTauriTransport) ? 'enabled' : 'disabled'}</dd></div>
                   <div className="metric-row"><dt>Export</dt><dd>{(artifactCapabilitySnapshot?.features['artifact_workspace.export.enabled'] ?? artifactFeatureFlags.export) ? 'enabled' : 'disabled'}</dd></div>
-                  <div className="metric-row"><dt>Backend doctor</dt><dd>{artifactCapabilitySnapshot ? `spreadsheet ${artifactCapabilitySnapshot.licenses.spreadsheet ? 'verified' : 'fallback'} · canvas ${artifactCapabilitySnapshot.licenses.canvas ? 'verified' : 'fallback'}` : 'unavailable'}</dd></div>
+                  <div className="metric-row"><dt>Backend doctor</dt><dd>{artifactCapabilitySnapshot ? `spreadsheet ${artifactCapabilitySnapshot.licenses.spreadsheet ? 'verified' : 'fallback'} · canvas ${artifactCapabilitySnapshot.licenses.canvas ? 'verified' : 'fallback'}` : artifactCapabilityStatus === 'failed' ? 'capability unavailable; workspace disabled' : 'unavailable'}</dd></div>
                   <div className="metric-row"><dt>Runtime config</dt><dd><code>IMPERAOS_ARTIFACT_WORKSPACE_PROFILE</code> · <code>IMPERAOS_ARTIFACT_*_EDITOR_ENABLED</code></dd></div>
                   {(artifactCapabilitySnapshot
                     ? Object.entries(artifactCapabilitySnapshot.kindCapabilities)

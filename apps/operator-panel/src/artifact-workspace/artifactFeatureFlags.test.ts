@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveArtifactFeatureFlags } from './artifactFeatureFlags';
+import { resolveArtifactFeatureFlags, resolveEffectiveArtifactFeatureFlags } from './artifactFeatureFlags';
 
 describe('artifact feature flags', () => {
   it('keeps every surface off when the global authority is off', () => {
@@ -26,5 +26,21 @@ describe('artifact feature flags', () => {
     expect(flags.document).toBe(true);
     expect(flags.spreadsheet).toBe(false);
     expect(flags.canvas).toBe(false);
+  });
+
+  it('fails closed until backend authority is successfully known', () => {
+    const renderer = resolveArtifactFeatureFlags({
+      VITE_ARTIFACT_WORKSPACE: '1',
+      VITE_ARTIFACT_DOCUMENT_EDITOR: '1',
+      VITE_ARTIFACT_EXPORT: '1',
+    });
+    expect(Object.values(resolveEffectiveArtifactFeatureFlags(renderer, null)).every((value) => value === false)).toBe(true);
+    expect(resolveEffectiveArtifactFeatureFlags(renderer, {
+      globalEnabled: true,
+      features: {
+        'artifact_workspace.document.enabled': true,
+        'artifact_workspace.export.enabled': true,
+      },
+    })).toMatchObject({ workspace: true, document: true, export: true });
   });
 });

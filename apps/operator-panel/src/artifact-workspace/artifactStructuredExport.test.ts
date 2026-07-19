@@ -33,4 +33,27 @@ describe('exportStructuredArtifact', () => {
     expect(bridge.beginExport).toHaveBeenCalledWith(expect.objectContaining({ format: 'csv' }));
     expect(new TextDecoder().decode(commitExport.mock.calls[0][1])).toBe('"name","note"\r\n"Ada","a,b"\r\n');
   });
+
+  it('neutralizes every spreadsheet formula prefix in form CSV values', async () => {
+    const commitExport = vi.fn().mockResolvedValue({ basename: 'Intake.csv', sha256: 'b'.repeat(64), sizeBytes: 20 });
+    const bridge = {
+      beginExport: vi.fn().mockResolvedValue({ cancelled: false, ticket: 'ticket-1', maxBytes: 4096 }),
+      commitExport,
+      cancelExport: vi.fn(),
+    } as unknown as ArtifactBridge;
+    await exportStructuredArtifact({
+      artifact, revision,
+      content: { kind: 'form', schemaVersion: 1, schema: { type: 'object' }, uiSchema: {}, submissionPolicy: { persistence: 'none' } },
+      format: 'csv',
+      submission: { at: '@SUM(A1:A2)', equals: '=1+1', minus: '-2+3', plus: '+cmd', whitespace: ' \n=HYPERLINK("x")' },
+      bridge,
+    });
+
+    const csv = new TextDecoder().decode(commitExport.mock.calls[0][1]);
+    expect(csv).toContain('"\'@SUM(A1:A2)"');
+    expect(csv).toContain('"\'=1+1"');
+    expect(csv).toContain('"\'-2+3"');
+    expect(csv).toContain('"\'+cmd"');
+    expect(csv).toContain('"\' \n=HYPERLINK(""x"")"');
+  });
 });

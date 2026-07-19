@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -89,5 +89,73 @@ describe('CanvasArtifactEditor', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
     expect(screen.getByRole('navigation', { name: 'Canvas outline' })).toHaveTextContent('Local note');
     expect(screen.getByRole('button', { name: 'Export JSON' })).toBeEnabled();
+  });
+
+  it('renders a resolved governed local image instead of an asset-id placeholder', async () => {
+    const onResolveAsset = vi.fn().mockResolvedValueOnce({
+      asset: { assetId: 'asset-1', workspaceId: artifact.workspaceId, sha256: 'b'.repeat(64), mediaType: 'image/png', sizeBytes: 4, relativePath: 'assets/a.png', width: 1, height: 1, originalName: 'a.png', dataClass: 'internal', createdById: 'user-1', createdAtUtc: '2026-07-16T08:00:00Z' },
+      contentBase64: 'iVBORw0KGgo=',
+    });
+    const imageContent = { ...content, snapshot: { objects: [{ id: 'image-1', type: 'image' as const, x: 0, y: 0, width: 40, height: 30, assetId: 'asset-1' }] }, assetIds: ['asset-1'] };
+    const view = render(<CanvasArtifactEditor
+      artifact={artifact} revision={revision} mode="view" saveState="idle"
+      content={imageContent}
+      onChange={vi.fn()} onSelectionChange={vi.fn()} onRequestExport={vi.fn()} onResolveAsset={onResolveAsset}
+    />);
+
+    expect(await screen.findByRole('img', { name: 'Local asset asset-1' })).toHaveAttribute('src', 'data:image/png;base64,iVBORw0KGgo=');
+    expect(onResolveAsset).toHaveBeenCalledWith('asset-1');
+
+    onResolveAsset.mockResolvedValueOnce({
+      asset: { assetId: 'asset-1', workspaceId: 'workspace-2', sha256: 'c'.repeat(64), mediaType: 'image/png', sizeBytes: 4, relativePath: 'assets/b.png', width: 1, height: 1, originalName: 'b.png', dataClass: 'internal', createdById: 'user-1', createdAtUtc: '2026-07-16T08:00:00Z' },
+      contentBase64: 'd29ya3NwYWNlLTI=',
+    });
+    view.rerender(<CanvasArtifactEditor
+      artifact={{ ...artifact, workspaceId: 'workspace-2' }} revision={revision} mode="view" saveState="idle"
+      content={imageContent}
+      onChange={vi.fn()} onSelectionChange={vi.fn()} onRequestExport={vi.fn()} onResolveAsset={onResolveAsset}
+    />);
+    expect(screen.queryByRole('img', { name: 'Local asset asset-1' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'Local asset asset-1' })).toHaveAttribute('src', 'data:image/png;base64,d29ya3NwYWNlLTI=');
+  });
+
+  it('bounds visible image loading concurrency, count, and repeat resolution', async () => {
+    let activeLoads = 0;
+    let maximumActiveLoads = 0;
+    const onResolveAsset = vi.fn().mockImplementation(async (assetId: string) => {
+      activeLoads += 1;
+      maximumActiveLoads = Math.max(maximumActiveLoads, activeLoads);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      activeLoads -= 1;
+      return {
+        asset: { assetId, workspaceId: artifact.workspaceId, sha256: 'b'.repeat(64), mediaType: 'image/png', sizeBytes: 4, relativePath: `assets/${assetId}.png`, width: 1, height: 1, originalName: `${assetId}.png`, dataClass: 'internal', createdById: 'user-1', createdAtUtc: '2026-07-16T08:00:00Z' },
+        contentBase64: 'iVBORw0KGgo=',
+      };
+    });
+    const assetIds = Array.from({ length: 40 }, (_, index) => `asset-${index + 1}`);
+    const imageContent = {
+      ...content,
+      snapshot: { objects: assetIds.map((assetId, index) => ({
+        id: `image-${index + 1}`, type: 'image' as const, x: 10, y: 10,
+        width: 40, height: 30, assetId,
+      })) },
+      assetIds,
+    };
+    const view = render(<CanvasArtifactEditor
+      artifact={artifact} revision={revision} mode="view" saveState="idle" content={imageContent}
+      onChange={vi.fn()} onSelectionChange={vi.fn()} onRequestExport={vi.fn()} onResolveAsset={onResolveAsset}
+    />);
+
+    expect(await screen.findByText('8 visible image(s) were deferred to keep local display memory bounded.')).toBeVisible();
+    await waitFor(() => expect(onResolveAsset).toHaveBeenCalledTimes(32));
+    expect(maximumActiveLoads).toBeLessThanOrEqual(4);
+
+    view.rerender(<CanvasArtifactEditor
+      artifact={artifact} revision={revision} mode="view" saveState="idle"
+      content={{ ...imageContent, snapshot: { objects: imageContent.snapshot.objects.map((object) => ({ ...object, width: 41 })) } }}
+      onChange={vi.fn()} onSelectionChange={vi.fn()} onRequestExport={vi.fn()} onResolveAsset={onResolveAsset}
+    />);
+    await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(32));
+    expect(onResolveAsset).toHaveBeenCalledTimes(32);
   });
 });

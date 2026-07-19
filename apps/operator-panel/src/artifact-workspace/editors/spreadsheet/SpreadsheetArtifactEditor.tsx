@@ -11,6 +11,7 @@ const DEFAULT_ROWS = 30;
 const MAX_ROWS = 1_048_576;
 const VISIBLE_ROW_COUNT = 40;
 const ROW_HEIGHT_PX = 32;
+const MAX_SELECTION_OPERATION_CELLS = 10_000;
 
 function columnLabel(index: number): string {
   let value = index;
@@ -62,17 +63,11 @@ function rangeBetween(start: string, end: string): string {
   return first === last ? first : `${first}:${last}`;
 }
 
-function rangeAddresses(range: string): string[] {
+function rangeBounds(range: string): { first: { column: number; row: number }; last: { column: number; row: number } } {
   const [start, end = start] = range.split(':');
   const first = addressParts(start);
   const last = addressParts(end);
-  const addresses: string[] = [];
-  for (let row = first.row; row <= last.row; row += 1) {
-    for (let column = first.column; column <= last.column; column += 1) {
-      addresses.push(`${columnLabel(column)}${row}`);
-    }
-  }
-  return addresses;
+  return { first, last };
 }
 
 export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
@@ -89,6 +84,10 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
   const columns = Math.min(100, bounds.columns + extraColumns);
   const editable = props.mode !== 'view' && props.artifact.status !== 'archived';
   const selectedRange = rangeBetween(selectionAnchor, selectedAddress);
+  const selectedBounds = rangeBounds(selectedRange);
+  const selectedCellCount = (selectedBounds.last.row - selectedBounds.first.row + 1)
+    * (selectedBounds.last.column - selectedBounds.first.column + 1);
+  const selectionOperationBlocked = selectedCellCount > MAX_SELECTION_OPERATION_CELLS;
   const visibleRows = Array.from(
     { length: Math.min(VISIBLE_ROW_COUNT, rows - visibleRowStart + 1) },
     (_, index) => visibleRowStart + index,
@@ -105,13 +104,10 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
     props.onSelectionChange({ kind: 'spreadsheet', sheetId: activeSheet.id, ranges: [rangeBetween(anchor, address)] });
   };
   const copySelection = async () => {
-    if (!navigator.clipboard?.writeText) return;
-    const [start, end = start] = selectedRange.split(':');
-    const first = addressParts(start);
-    const last = addressParts(end);
-    const text = Array.from({ length: last.row - first.row + 1 }, (_, rowOffset) =>
-      Array.from({ length: last.column - first.column + 1 }, (_, columnOffset) => {
-        const address = `${columnLabel(first.column + columnOffset)}${first.row + rowOffset}`;
+    if (selectionOperationBlocked || !navigator.clipboard?.writeText) return;
+    const text = Array.from({ length: selectedBounds.last.row - selectedBounds.first.row + 1 }, (_, rowOffset) =>
+      Array.from({ length: selectedBounds.last.column - selectedBounds.first.column + 1 }, (_, columnOffset) => {
+        const address = `${columnLabel(selectedBounds.first.column + columnOffset)}${selectedBounds.first.row + rowOffset}`;
         const value = activeSheet.cells[address]?.value;
         return value === undefined || value === null ? '' : String(value);
       }).join('\t'),
@@ -119,9 +115,12 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
     await navigator.clipboard.writeText(text);
   };
   const clearSelection = () => {
-    if (!editable) return;
-    const selected = new Set(rangeAddresses(selectedRange));
-    const cells = Object.fromEntries(Object.entries(activeSheet.cells).filter(([address]) => !selected.has(address)));
+    if (!editable || selectionOperationBlocked) return;
+    const cells = Object.fromEntries(Object.entries(activeSheet.cells).filter(([address]) => {
+      const cell = addressParts(address);
+      return cell.row < selectedBounds.first.row || cell.row > selectedBounds.last.row
+        || cell.column < selectedBounds.first.column || cell.column > selectedBounds.last.column;
+    }));
     update({ ...content, sheets: content.sheets.map((sheet, index) => index === activeSheetIndex ? { ...sheet, cells } : sheet) });
   };
   const updateCell = (address: string, raw: string) => {
@@ -177,9 +176,9 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
       <button type="button" disabled={!editable} onClick={addSheet}>Add sheet</button>
       <button type="button" disabled={!editable} onClick={renameSheet}>Rename sheet</button>
       <button type="button" disabled={!editable || !navigator.clipboard?.readText} data-disabled-reason={!editable ? 'Spreadsheet is read-only.' : !navigator.clipboard?.readText ? 'Clipboard access is unavailable.' : undefined} onClick={() => void pasteSelection()}>Paste cells</button>
-      <button type="button" disabled={!navigator.clipboard?.writeText} onClick={() => void copySelection()}>Copy cells</button>
-      <button type="button" disabled={!editable} onClick={clearSelection}>Clear cells</button>
-      <button type="button" onClick={() => props.onSelectionChange({ kind: 'spreadsheet', sheetId: activeSheet.id, ranges: [selectedRange] })}>Edit selected cells with AI</button>
+      <button type="button" disabled={selectionOperationBlocked || !navigator.clipboard?.writeText} onClick={() => void copySelection()}>Copy cells</button>
+      <button type="button" disabled={!editable || selectionOperationBlocked} onClick={clearSelection}>Clear cells</button>
+      <button type="button" disabled={selectionOperationBlocked} onClick={() => props.onSelectionChange({ kind: 'spreadsheet', sheetId: activeSheet.id, ranges: [selectedRange] })}>Edit selected cells with AI</button>
       <button type="button" disabled={!editable} onClick={() => setExtraRows((value) => value + 20)}>Add rows</button>
       <button type="button" disabled={!editable} onClick={() => setExtraColumns((value) => value + 4)}>Add columns</button>
       <button type="button" onClick={() => props.onRequestExport('csv')}>Export CSV</button>
@@ -204,6 +203,7 @@ export function SpreadsheetArtifactEditor(props: ArtifactEditorProps) {
       })}
       {visibleRowStart + visibleRows.length <= rows ? <div aria-hidden="true" style={{ height: (rows - visibleRowStart - visibleRows.length + 1) * ROW_HEIGHT_PX }} /> : null}
     </div>
+    {selectionOperationBlocked ? <p role="alert">Selection operations are limited to 10,000 cells. Select a smaller range.</p> : null}
     <footer>Sheet: {activeSheet.name} · Selection: {selectedRange} · {Object.keys(activeSheet.cells).length} filled cells · Revision {props.revision.revisionNumber} · {editable ? 'Edit' : 'Read-only'} · Formula disabled</footer>
   </section>;
 }

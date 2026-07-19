@@ -47,18 +47,14 @@ test('governed form stays CSP-safe, memory-only, explicit, and approval-bound', 
   await expect(openForm).toBeVisible();
   await page.keyboard.press('F8');
   await openForm.click();
-  const inlineForm = page.getByRole('region', { name: 'Inline form: Intake form' });
-  await expect(inlineForm).toBeVisible({ timeout: 30_000 });
-  await page.context().setOffline(true);
-  const inlineField = inlineForm.getByLabel('Name');
-  await expect(inlineField).toHaveAttribute('type', 'password');
-  await inlineField.fill(SENSITIVE_RESPONSE);
-  await inlineForm.getByRole('button', { name: 'Expand in Workbench' }).click();
   const workbench = page.getByRole('complementary', { name: 'Workbench' });
+  const form = workbench.getByRole('region', { name: 'Intake form' });
+  await expect(form).toBeVisible({ timeout: 30_000 });
+  await page.context().setOffline(true);
   const field = workbench.getByLabel('Name');
   await expect(field).toBeVisible({ timeout: 30_000 });
   await expect(field).toHaveAttribute('type', 'password');
-  await expect(field).toHaveValue(SENSITIVE_RESPONSE);
+  await field.fill(SENSITIVE_RESPONSE);
   await expect(workbench.getByRole('button', { name: 'Submit form' })).toBeVisible();
 
   const cdp = await page.context().newCDPSession(page);

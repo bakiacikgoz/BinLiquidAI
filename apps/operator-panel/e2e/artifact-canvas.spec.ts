@@ -16,6 +16,7 @@ test('canvas editor keeps local content safe, edits, and exports SVG offline', a
   const editor = workbench.getByRole('region', { name: 'Canvas editor: Board' });
   await expect(editor).toBeVisible();
   await expect(editor.getByRole('navigation', { name: 'Canvas outline' })).toContainText('asset-local-1');
+  await expect(editor.getByRole('img', { name: 'Local asset asset-local-1' })).toBeVisible();
   await expect(editor.getByText('<script>local text only</script>', { exact: true })).toBeVisible();
 
   await editor.getByRole('button', { name: 'Add rectangle' }).click();
@@ -32,7 +33,7 @@ test('canvas editor keeps local content safe, edits, and exports SVG offline', a
     await expect.poll(async () => (await structuredArtifactCommands(page)).filter((item) => item.includes('export')))
       .toEqual(['bridge_artifact_export_begin', 'bridge_artifact_export_commit']);
     const commands = await structuredArtifactCommands(page);
-    expect(commands).not.toContain('bridge_artifact_asset_get');
+    expect(commands).toContain('bridge_artifact_asset_get');
     expect(offlineRequests).toEqual([]);
     consoleHealth.assertNoCriticalErrors();
   } finally {

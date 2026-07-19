@@ -3,6 +3,7 @@ import { lazy, Suspense, useState } from 'react';
 import type {
   ArtifactContent,
   ArtifactAssetDescriptor,
+  ArtifactAssetReadResult,
   ArtifactDescriptor,
   ArtifactFormSubmissionRequest,
   ArtifactFormSubmissionResult,
@@ -28,6 +29,7 @@ export interface ArtifactEditorProps {
   onSelectionChange(selection: ArtifactSelection | null): void;
   onRequestExport(format: ArtifactExportFormat): void;
   onImportAsset?(): Promise<ArtifactAssetDescriptor | null>;
+  onResolveAsset?(assetId: string): Promise<ArtifactAssetReadResult | null>;
 }
 
 export interface ArtifactEditorHostProps extends ArtifactEditorProps {

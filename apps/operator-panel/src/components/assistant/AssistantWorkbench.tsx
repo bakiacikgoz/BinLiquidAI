@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
-import { SpreadsheetArtifactContentSchema, type ArtifactAssetDescriptor, type ArtifactDescriptor, type ArtifactRevision } from '../../artifact-workspace/artifactContracts';
+import { SpreadsheetArtifactContentSchema, type ArtifactAssetDescriptor, type ArtifactAssetReadResult, type ArtifactDescriptor, type ArtifactRevision } from '../../artifact-workspace/artifactContracts';
 import type { ArtifactFormSubmissionRequest, ArtifactFormSubmissionResult } from '../../artifact-workspace/artifactContracts';
 import type { FormSessionRuntime } from '../../artifact-workspace/editors/form/formSessionRuntime';
 import type { ArtifactWorkspaceState } from '../../artifact-workspace/workspaceController';
@@ -14,6 +14,8 @@ import type { ArtifactFeatureFlagState } from '../../artifact-workspace/artifact
 import { ArtifactDiffView } from '../../artifact-workspace/ui/ArtifactDiffView';
 import { ArtifactConflictPanel } from '../../artifact-workspace/ui/ArtifactConflictPanel';
 import { ArtifactExportDialog } from '../../artifact-workspace/ui/ArtifactExportDialog';
+import { ArtifactEditorErrorBoundary } from '../../artifact-workspace/ui/ArtifactWorkbenchShell';
+import { ArtifactReadOnlyContent } from '../../artifact-workspace/ui/ArtifactLicenseBlocked';
 import {
   ARTIFACT_EXPORT_FORMATS,
   suggestedArtifactExportFilename,
@@ -59,6 +61,7 @@ type WorkspaceProps = {
   onRestoreArtifact?: (artifactId: string, revisionId: string) => void;
   onExportArtifact?: (artifactId: string, format: ArtifactExportFormat, sheetId?: string) => void;
   onImportAsset?: (artifactId: string) => Promise<ArtifactAssetDescriptor | null>;
+  onResolveAsset?: (assetId: string) => Promise<ArtifactAssetReadResult | null>;
   formRuntime?: FormSessionRuntime;
   onSubmitForm?: (request: ArtifactFormSubmissionRequest) => Promise<ArtifactFormSubmissionResult>;
   workspaceError?: ArtifactWorkspaceUiError | null;
@@ -127,6 +130,7 @@ export function AssistantWorkbench({
   onRestoreArtifact,
   onExportArtifact,
   onImportAsset,
+  onResolveAsset,
   formRuntime,
   onSubmitForm,
   workspaceError = null,
@@ -367,32 +371,39 @@ export function AssistantWorkbench({
                 />
               ) : null}
               <div hidden={activeComparison?.status === 'ready'} aria-hidden={activeComparison?.status === 'ready' || undefined}>
-                <ArtifactEditorHost
-                  artifact={activeTab.artifact}
-                  revision={activeTab.revision}
-                  content={activeTab.draftContent}
-                  mode={activeTab.artifact.status === 'archived' ? 'view' : 'edit'}
-                  saveState={activeTab.saveState}
-                  onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
-                  onSelectionChange={(selection) => {
-                    onEditorSelectionChange?.(selection);
-                  }}
-                  onRequestExport={(format) => {
-                    setExportFormat(format as ArtifactExportFormat);
-                  }}
-                  onImportAsset={() => onImportAsset?.(activeTab.artifact.artifactId) ?? Promise.resolve(null)}
-                  formRuntime={formRuntime}
-                  onSubmitForm={onSubmitForm}
-                  locale={locale}
-                  workspaceEnabled={enabledFeatures.workspace}
-                  documentEnabled={enabledFeatures.document}
-                  formEnabled={enabledFeatures.form}
-                  codeEnabled={enabledFeatures.code}
-                  flowEnabled={enabledFeatures.flow}
-                  spreadsheetEnabled={enabledFeatures.spreadsheet}
-                  canvasEnabled={enabledFeatures.canvas}
-                  slidesEnabled={enabledFeatures.slides}
-                />
+                <ArtifactEditorErrorBoundary
+                  key={activeTab.artifact.artifactId}
+                  artifactKind={activeTab.artifact.kind}
+                  readOnlyFallback={<ArtifactReadOnlyContent artifact={activeTab.artifact} content={activeTab.draftContent} />}
+                >
+                  <ArtifactEditorHost
+                    artifact={activeTab.artifact}
+                    revision={activeTab.revision}
+                    content={activeTab.draftContent}
+                    mode={activeTab.artifact.status === 'archived' ? 'view' : 'edit'}
+                    saveState={activeTab.saveState}
+                    onChange={(next) => onEditArtifact?.(activeTab.artifact.artifactId, next)}
+                    onSelectionChange={(selection) => {
+                      onEditorSelectionChange?.(selection);
+                    }}
+                    onRequestExport={(format) => {
+                      setExportFormat(format as ArtifactExportFormat);
+                    }}
+                    onImportAsset={() => onImportAsset?.(activeTab.artifact.artifactId) ?? Promise.resolve(null)}
+                    onResolveAsset={onResolveAsset}
+                    formRuntime={formRuntime}
+                    onSubmitForm={onSubmitForm}
+                    locale={locale}
+                    workspaceEnabled={enabledFeatures.workspace}
+                    documentEnabled={enabledFeatures.document}
+                    formEnabled={enabledFeatures.form}
+                    codeEnabled={enabledFeatures.code}
+                    flowEnabled={enabledFeatures.flow}
+                    spreadsheetEnabled={enabledFeatures.spreadsheet}
+                    canvasEnabled={enabledFeatures.canvas}
+                    slidesEnabled={enabledFeatures.slides}
+                  />
+                </ArtifactEditorErrorBoundary>
               </div>
               {enabledFeatures.export && activeComparison?.status !== 'ready' ? (
                 <div className="artifact-workspace-export-actions" aria-label="Artifact export">

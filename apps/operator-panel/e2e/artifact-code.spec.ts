@@ -67,7 +67,8 @@ test('code artifact uses local Monaco workers, autosaves, reopens, and exports w
   await expect(workbench.getByLabel('Artifact status').getByText('Revision 2')).toBeVisible();
 
   await workbench.getByRole('button', { name: 'Close Safe code' }).dispatchEvent('click');
-  await page.getByRole('button', { name: 'Open Launch plan' }).dispatchEvent('click');
+  await workbench.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await workbench.getByLabel('Artifact navigator').getByRole('button', { name: /Safe code/ }).click();
   await expect(editor.locator('.view-lines')).toContainText("print('saved locally')");
   await workbench.getByRole('button', { name: 'Export', exact: true }).click();
   const exportDialog = workbench.getByRole('dialog', { name: 'Export Safe code' });

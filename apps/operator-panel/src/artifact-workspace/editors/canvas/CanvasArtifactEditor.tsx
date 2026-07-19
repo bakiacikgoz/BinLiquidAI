@@ -21,6 +21,13 @@ type PointerOperation =
   | { kind: 'pan'; clientX: number; clientY: number; panX: number; panY: number }
   | { kind: 'draw'; points: Array<{ x: number; y: number }> };
 
+type CanvasObject = CanvasArtifactContent['snapshot']['objects'][number];
+type CachedCanvasAsset = { source: string; encodedBytes: number; sha256: string };
+
+function isCanvasImage(object: CanvasObject): object is CanvasObject & { type: 'image'; assetId: string } {
+  return object.type === 'image' && typeof object.assetId === 'string';
+}
+
 const SHAPES: Array<{ type: CanvasShapeType; label: string }> = [
   { type: 'rectangle', label: 'Rectangle' },
   { type: 'ellipse', label: 'Ellipse' },
@@ -29,6 +36,11 @@ const SHAPES: Array<{ type: CanvasShapeType; label: string }> = [
   { type: 'arrow', label: 'Arrow' },
   { type: 'note', label: 'Note' },
 ];
+const CANVAS_STAGE_FALLBACK_WIDTH = 900;
+const CANVAS_STAGE_FALLBACK_HEIGHT = 420;
+const MAX_VISIBLE_IMAGE_ASSETS = 32;
+const MAX_DISPLAY_ASSET_ENCODED_BYTES = 32 * 1024 * 1024;
+const MAX_ASSET_LOAD_CONCURRENCY = 4;
 
 function contentKey(value: CanvasArtifactContent): string {
   return JSON.stringify(value);
@@ -45,11 +57,42 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [stageViewport, setStageViewport] = useState({
+    width: CANVAS_STAGE_FALLBACK_WIDTH,
+    height: CANVAS_STAGE_FALLBACK_HEIGHT,
+  });
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const operation = useRef<PointerOperation | null>(null);
   const [importing, setImporting] = useState(false);
+  const [assetSourceState, setAssetSourceState] = useState<{
+    workspaceId: string;
+    sources: Record<string, string>;
+  }>({ workspaceId: props.artifact.workspaceId, sources: {} });
+  const [assetLoadFailures, setAssetLoadFailures] = useState<string[]>([]);
+  const [deferredAssetCount, setDeferredAssetCount] = useState(0);
+  const assetCache = useRef(new Map<string, CachedCanvasAsset>());
+  const assetCacheWorkspaceId = useRef(props.artifact.workspaceId);
+  const assetLoadLanes = useRef(Array.from(
+    { length: MAX_ASSET_LOAD_CONCURRENCY },
+    () => Promise.resolve(),
+  ));
+  const nextAssetLoadLane = useRef(0);
+  const assetLoadGeneration = useRef(0);
   const [freeDraw, setFreeDraw] = useState(false);
   const editable = props.mode !== 'view' && props.artifact.status !== 'archived';
   const outline = useMemo(() => canvasOutline(canvas), [canvas]);
+  const visibleImageAssetIds = useMemo(() => {
+    const left = -pan.x / zoom;
+    const top = -pan.y / zoom;
+    const right = left + stageViewport.width / zoom;
+    const bottom = top + stageViewport.height / zoom;
+    return [...new Set(canvas.snapshot.objects
+      .filter(isCanvasImage)
+      .filter((object) => object.x < right && object.x + object.width > left
+        && object.y < bottom && object.y + object.height > top)
+      .map((object) => object.assetId))];
+  }, [canvas.snapshot.objects, pan.x, pan.y, stageViewport.height, stageViewport.width, zoom]);
+  const visibleImageAssetKey = visibleImageAssetIds.join('\u0000');
 
   useEffect(() => {
     if (incomingKey === emittedKey.current) return;
@@ -59,6 +102,101 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
     setHistoryIndex(0);
     setSelectedIds([]);
   }, [incoming, incomingKey]);
+
+  useEffect(() => {
+    const element = stageRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const updateViewport = () => {
+      const bounds = element.getBoundingClientRect();
+      if (bounds.width > 0 && bounds.height > 0) {
+        setStageViewport({ width: bounds.width, height: bounds.height });
+      }
+    };
+    updateViewport();
+    const observer = new ResizeObserver(updateViewport);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (assetCacheWorkspaceId.current !== props.artifact.workspaceId) {
+      assetCache.current.clear();
+      assetCacheWorkspaceId.current = props.artifact.workspaceId;
+    }
+    const generation = assetLoadGeneration.current + 1;
+    assetLoadGeneration.current = generation;
+    const allVisibleAssetIds = visibleImageAssetKey ? visibleImageAssetKey.split('\u0000') : [];
+    const assetIds = allVisibleAssetIds.slice(0, MAX_VISIBLE_IMAGE_ASSETS);
+    const overflowCount = Math.max(0, allVisibleAssetIds.length - assetIds.length);
+    if (!assetIds.length || !props.onResolveAsset) {
+      setAssetSourceState({ workspaceId: props.artifact.workspaceId, sources: {} });
+      setAssetLoadFailures([]);
+      setDeferredAssetCount(overflowCount);
+      return;
+    }
+    let cancelled = false;
+    const targetIds = new Set(assetIds);
+    const sources: Record<string, string> = {};
+    const failures: string[] = [];
+    let deferred = overflowCount;
+    let cachedEncodedBytes = Array.from(assetCache.current.values())
+      .reduce((total, entry) => total + entry.encodedBytes, 0);
+    for (const assetId of assetIds) {
+      const cached = assetCache.current.get(assetId);
+      if (cached) sources[assetId] = cached.source;
+    }
+    setAssetSourceState({ workspaceId: props.artifact.workspaceId, sources: { ...sources } });
+    const pendingIds = assetIds.filter((assetId) => !assetCache.current.has(assetId));
+    const resolveInBoundedLane = (assetId: string) => {
+      const laneIndex = nextAssetLoadLane.current % MAX_ASSET_LOAD_CONCURRENCY;
+      nextAssetLoadLane.current += 1;
+      const request = assetLoadLanes.current[laneIndex]
+        .then(() => generation === assetLoadGeneration.current
+          ? props.onResolveAsset?.(assetId) ?? null
+          : null);
+      assetLoadLanes.current[laneIndex] = request.then(() => undefined, () => undefined);
+      return request;
+    };
+    void Promise.all(pendingIds.map(async (assetId) => {
+      try {
+        const resolved = await resolveInBoundedLane(assetId);
+        if (!resolved || resolved.asset.assetId !== assetId || resolved.asset.workspaceId !== props.artifact.workspaceId) {
+          if (generation !== assetLoadGeneration.current) return;
+          throw new Error(`Canvas asset ${assetId} could not be resolved safely.`);
+        }
+        if (generation !== assetLoadGeneration.current
+          || assetCacheWorkspaceId.current !== props.artifact.workspaceId) return;
+        const source = `data:${resolved.asset.mediaType};base64,${resolved.contentBase64}`;
+        const encodedBytes = source.length;
+        for (const [cachedId, cached] of assetCache.current) {
+          if (cachedEncodedBytes + encodedBytes <= MAX_DISPLAY_ASSET_ENCODED_BYTES) break;
+          if (targetIds.has(cachedId)) continue;
+          assetCache.current.delete(cachedId);
+          cachedEncodedBytes -= cached.encodedBytes;
+        }
+        if (cachedEncodedBytes + encodedBytes > MAX_DISPLAY_ASSET_ENCODED_BYTES) {
+          deferred += 1;
+          return;
+        }
+        assetCache.current.set(assetId, {
+          source,
+          encodedBytes,
+          sha256: resolved.asset.sha256,
+        });
+        cachedEncodedBytes += encodedBytes;
+        sources[assetId] = source;
+      } catch {
+        failures.push(assetId);
+      }
+    })).then(() => {
+      if (!cancelled) {
+        setAssetSourceState({ workspaceId: props.artifact.workspaceId, sources: { ...sources } });
+        setAssetLoadFailures(failures);
+        setDeferredAssetCount(deferred);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [props.artifact.workspaceId, props.onResolveAsset, visibleImageAssetKey]);
 
   const select = useCallback((objectIds: string[]) => {
     const next = objectIds.length ? canvasSelection(objectIds).objectIds : [];
@@ -207,6 +345,7 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(180px, 260px)', gap: 12 }}>
         <div
+          ref={stageRef}
           aria-label="Canvas stage"
           onPointerDown={(event) => {
             if (!editable || event.target !== event.currentTarget) return;
@@ -228,6 +367,7 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
             {canvas.snapshot.objects.map((object) => {
               const selected = selectedIds.includes(object.id);
               const isLine = object.type === 'line' || object.type === 'arrow';
+              const imageAssetId = isCanvasImage(object) ? object.assetId : null;
               return (
                 <div
                   key={object.id}
@@ -249,7 +389,16 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
                   }}
                   style={{ position: 'absolute', left: object.x, top: object.y, width: object.width, height: object.height, boxSizing: 'border-box', cursor: editable ? 'move' : 'default', borderRadius: object.type === 'ellipse' ? '50%' : object.type === 'note' ? 8 : 0, display: 'grid', placeItems: 'center', padding: 8, textAlign: 'center', userSelect: 'none', ...(isLine ? { background: 'transparent', border: 'none', borderBottom: selected ? '3px solid #4f46e5' : '2px solid #334155', transform: 'skewY(24deg)' } : { background: object.type === 'note' ? '#fef3c7' : '#fff', border: selected ? '3px solid #4f46e5' : '2px solid #334155' }) }}
                 >
-                  <span>{object.type === 'image' ? `Local asset: ${object.assetId}` : object.text ?? object.type}</span>
+                  {imageAssetId
+                  && assetSourceState.workspaceId === props.artifact.workspaceId
+                  && assetSourceState.sources[imageAssetId] ? (
+                    <img
+                      src={assetSourceState.sources[imageAssetId]}
+                      alt={`Local asset ${imageAssetId}`}
+                      draggable={false}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }}
+                    />
+                  ) : <span>{imageAssetId ? `Local asset: ${imageAssetId}` : object.text ?? object.type}</span>}
                   {editable && selected && selectedIds.length === 1 ? <button type="button" aria-label={`Resize ${object.id}`} onPointerDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -287,6 +436,8 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
           </div>
         </aside>
       </div>
+      {assetLoadFailures.length ? <p role="alert">One or more governed local images could not be loaded.</p> : null}
+      {deferredAssetCount ? <p role="status">{deferredAssetCount} visible image(s) were deferred to keep local display memory bounded.</p> : null}
     </section>
   );
 }

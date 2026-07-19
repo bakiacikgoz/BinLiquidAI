@@ -7,7 +7,7 @@ type Props = {
   onExport?(format: 'json' | 'svg' | 'png' | 'csv' | 'xlsx'): void;
 };
 
-function boundedSummary(content: ArtifactContent): string {
+function boundedArtifactSummary(content: ArtifactContent): string {
   let remainingNodes = 256;
   const sample = (value: unknown, depth: number): unknown => {
     if (remainingNodes <= 0) return '[truncated]';
@@ -39,6 +39,13 @@ function boundedSummary(content: ArtifactContent): string {
   return encoded.length <= 8_192 ? encoded : `${encoded.slice(0, 8_192)}\n…`;
 }
 
+export function ArtifactReadOnlyContent({ artifact, content }: { artifact: ArtifactDescriptor; content: ArtifactContent }) {
+  return <section aria-label={`${artifact.kind} bounded read-only content`}>
+    <strong>{artifact.title}</strong>
+    <pre aria-label={`${artifact.kind} bounded content summary`}>{boundedArtifactSummary(content)}</pre>
+  </section>;
+}
+
 export function ArtifactLicenseBlocked({ artifact, content, capability, onExport }: Props) {
   return (
     <section className="artifact-license-blocked" aria-label={`${artifact.kind} read-only fallback`}>
@@ -50,7 +57,7 @@ export function ArtifactLicenseBlocked({ artifact, content, capability, onExport
         This artifact remains readable, archived history remains available, and only verified safe
         export actions are offered. Editing, paste, save, and AI apply are disabled.
       </p>
-      <pre aria-label={`${artifact.kind} bounded content summary`}>{boundedSummary(content)}</pre>
+      <pre aria-label={`${artifact.kind} bounded content summary`}>{boundedArtifactSummary(content)}</pre>
       {artifact.kind === 'canvas' && onExport ? (
         <div role="group" aria-label="Canvas safe exports">
           <button type="button" onClick={() => onExport('json')}>Export JSON</button>

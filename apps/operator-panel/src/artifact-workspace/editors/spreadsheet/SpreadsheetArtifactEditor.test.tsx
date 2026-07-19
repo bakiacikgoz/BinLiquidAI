@@ -51,5 +51,8 @@ describe('SpreadsheetArtifactEditor', () => {
     fireEvent.scroll(grid, { target: { scrollTop: 9_999 * 32 } });
     expect(screen.getByLabelText('A10000')).toHaveValue('10000');
     expect(screen.getAllByRole('gridcell')).toHaveLength(40 * 12);
+    fireEvent.click(screen.getByLabelText('L10000'), { shiftKey: true });
+    expect(screen.getByRole('button', { name: 'Clear cells' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('10,000 cells');
   });
 });

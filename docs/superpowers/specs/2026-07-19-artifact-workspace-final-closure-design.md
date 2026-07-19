@@ -1,9 +1,9 @@
 # Artifact Workspace Final Closure Design
 
-**Status:** Approved for implementation by the user-provided final completion plan  
-**Owner:** MAIN / Artifact Workspace  
-**Authoritative sources:** `IMPERAOS_ARTIFACT_WORKSPACE_FINAL_TAMLAMA_PLANI.md`; current branch source and contracts  
-**Last verified:** 2026-07-19 at `efa3157`  
+**Status:** Approved for implementation by the user-provided final completion plan
+**Owner:** MAIN / Artifact Workspace
+**Authoritative sources:** `IMPERAOS_ARTIFACT_WORKSPACE_FINAL_TAMLAMA_PLANI.md`; current branch source and contracts
+**Last verified:** 2026-07-19 at `efa3157`
 **Open decisions:** None
 
 ## Outcome

@@ -4,7 +4,7 @@ import type { AssistantSessionState } from '../assistant/assistantTypes';
 import { ArtifactAutosaveQueue } from './artifactAutosave';
 import { ArtifactBridgeError, artifactBridge as defaultBridge, type ArtifactBridge } from './artifactBridge';
 import { compareArtifactContent, type ArtifactDiffResult } from './artifactDiff';
-import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './artifactContracts';
+import type { ArtifactAssetReadResult, ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './artifactContracts';
 import type { ArtifactFormSubmissionRequest } from './artifactContracts';
 import { FormSessionRuntime } from './editors/form/formSessionRuntime';
 import { exportCodeArtifact, type CodeArtifactExportFormat } from './artifactCodeExport';
@@ -705,6 +705,19 @@ export function useAssistantArtifactWorkspaceController({
     }
   }, [bridge, controller]);
 
+  const resolveAsset = useCallback(async (assetId: string): Promise<ArtifactAssetReadResult | null> => {
+    try {
+      return await bridge.getAsset(assetId);
+    } catch (caught) {
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_ASSET_UNSAFE',
+        message: 'The governed local asset could not be loaded.',
+        retryable: true,
+      }));
+      return null;
+    }
+  }, [bridge]);
+
   const submitForm = useCallback(async (request: ArtifactFormSubmissionRequest) => {
     setError(null);
     setOperationNotice(null);
@@ -792,7 +805,8 @@ export function useAssistantArtifactWorkspaceController({
         exportSlides,
         exportStructured,
         importAsset,
-      submitForm,
+        resolveAsset,
+        submitForm,
       archive: (artifactId: string) => controller.archive(artifactId),
       clearError: () => setError(null),
       clearOperationNotice: () => setOperationNotice(null),
@@ -801,7 +815,7 @@ export function useAssistantArtifactWorkspaceController({
       loadHistory: (artifactId: string) => loadHistory(artifactId, false),
       loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [applyProposal, autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSlides, exportSpreadsheet, exportStructured, formRuntime, forkConflict, importAsset, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, restoreArtifact, submitForm, toggle],
+    [applyProposal, autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSlides, exportSpreadsheet, exportStructured, formRuntime, forkConflict, importAsset, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, resolveAsset, restoreArtifact, submitForm, toggle],
   );
 
   const activeTab =

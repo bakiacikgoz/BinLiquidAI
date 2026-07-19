@@ -21,6 +21,12 @@ export function serializeCanvasJson(content: unknown): Uint8Array {
 
 const PADDING = 32;
 const MAX_RASTER_DIMENSION = 4_096;
+type CanvasResolvedAssets = Record<string, { dataUrl: string; sha256: string }>;
+type CanvasObject = ReturnType<typeof CanvasArtifactContentSchema.parse>['snapshot']['objects'][number];
+
+function isCanvasImage(object: CanvasObject): object is CanvasObject & { type: 'image'; assetId: string } {
+  return object.type === 'image' && typeof object.assetId === 'string';
+}
 
 function escapeXml(value: string): string {
   return value
@@ -31,7 +37,7 @@ function escapeXml(value: string): string {
     .replaceAll("'", '&apos;');
 }
 
-export function serializeCanvasSvg(value: unknown): { text: string; width: number; height: number } {
+export function serializeCanvasSvg(value: unknown, assets: CanvasResolvedAssets = {}): { text: string; width: number; height: number } {
   const canvas = CanvasArtifactContentSchema.parse(value);
   const objects = canvas.snapshot.objects;
   const minimumX = Math.min(0, ...objects.map((item) => item.x)) - PADDING;
@@ -44,7 +50,12 @@ export function serializeCanvasSvg(value: unknown): { text: string; width: numbe
   const width = Math.max(1, Math.ceil(viewWidth * scale));
   const height = Math.max(1, Math.ceil(viewHeight * scale));
   const body = objects.map((item) => {
-    const label = escapeXml(item.text ?? (item.type === 'image' ? `Asset ${item.assetId}` : ''));
+    if (isCanvasImage(item)) {
+      const asset = assets[item.assetId];
+      if (!asset) throw new Error(`Canvas image asset ${item.assetId} is unavailable.`);
+      return `<g data-object-type="image" data-asset-sha256="${escapeXml(asset.sha256)}"><image x="${item.x}" y="${item.y}" width="${item.width}" height="${item.height}" href="${escapeXml(asset.dataUrl)}" preserveAspectRatio="xMidYMid meet"/></g>`;
+    }
+    const label = escapeXml(item.text ?? '');
     if (item.type === 'line' || item.type === 'arrow') {
       return `<line x1="${item.x}" y1="${item.y}" x2="${item.x + item.width}" y2="${item.y + item.height}"${item.type === 'arrow' ? ' marker-end="url(#arrow)"' : ''}/>`;
     }
@@ -98,7 +109,27 @@ export async function exportCanvasArtifact({
   if (!begin.ticket) throw new Error('Native export did not return a ticket.');
   let commitStarted = false;
   try {
-    const svg = format === 'json' ? null : serializeCanvasSvg(content);
+    const assets: CanvasResolvedAssets = {};
+    if (format !== 'json') {
+      const parsed = CanvasArtifactContentSchema.parse(content);
+      const referencedAssetIds = [...new Set(parsed.snapshot.objects
+        .filter(isCanvasImage)
+        .map((object) => object.assetId))];
+      let aggregateAssetBytes = 0;
+      for (const assetId of referencedAssetIds) {
+        const resolved = await bridge.getAsset(assetId);
+        if (resolved.asset.assetId !== assetId || resolved.asset.workspaceId !== artifact.workspaceId) {
+          throw new Error('Resolved canvas asset identity mismatch.');
+        }
+        aggregateAssetBytes += resolved.asset.sizeBytes;
+        if (aggregateAssetBytes > begin.maxBytes) throw new Error('Canvas assets exceed the native size limit.');
+        assets[assetId] = {
+          dataUrl: `data:${resolved.asset.mediaType};base64,${resolved.contentBase64}`,
+          sha256: resolved.asset.sha256,
+        };
+      }
+    }
+    const svg = format === 'json' ? null : serializeCanvasSvg(content, assets);
     if (format === 'png' && svg && svg.width * svg.height * 4 > begin.maxBytes) {
       throw new Error('Canvas export exceeds the native size limit.');
     }
