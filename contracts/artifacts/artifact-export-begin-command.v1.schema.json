@@ -27,8 +27,9 @@
     "format": {
       "enum": [
         "source",
-        "zip",
+        "txt",
         "json",
+        "submission-json",
         "markdown",
         "html",
         "svg",

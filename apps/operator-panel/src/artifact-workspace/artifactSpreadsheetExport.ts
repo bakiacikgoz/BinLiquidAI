@@ -4,7 +4,7 @@ import { SpreadsheetArtifactContentSchema, type ArtifactContent, type ArtifactDe
 import type { SpreadsheetSerializeRequest } from './spreadsheetSerializer';
 
 export type SpreadsheetExportFormat = 'csv' | 'xlsx';
-type Outcome = { status: 'cancelled' } | { status: 'exported'; basename: string; sha256: string; sizeBytes: number };
+type Outcome = { status: 'cancelled' } | { status: 'exported'; basename: string; sha256: string; sizeBytes: number; exportId?: string };
 
 export function serializeSpreadsheetInWorker(request: SpreadsheetSerializeRequest): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
@@ -53,5 +53,5 @@ export async function exportSpreadsheetArtifact({
     throw new Error('Spreadsheet export exceeds the native size limit.');
   }
   const result = await bridge.commitExport(begin.ticket, bytes);
-  return { status: 'exported', ...result };
+  return { status: 'exported', ...result, ...(begin.exportId ? { exportId: begin.exportId } : {}) };
 }

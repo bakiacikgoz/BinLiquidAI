@@ -13,6 +13,7 @@ from imperaos.artifacts.commands import (
     PreflightArtifactExportCommand,
 )
 from imperaos.artifacts.errors import ArtifactDomainError, ArtifactErrorCode
+from imperaos.artifacts.exports import ALLOWED_EXPORT_FORMATS
 from imperaos.artifacts.models import (
     ArtifactDataClass,
     ArtifactKind,
@@ -274,3 +275,14 @@ def test_export_rpc_dispatches_envelope_bound_begin_commit_cancel(tmp_path: Path
     assert denied.ok is False
     assert denied.error is not None
     assert denied.error.code == "ARTIFACT_RPC_PROTOCOL_MISMATCH"
+def test_export_format_matrix_covers_every_artifact_kind() -> None:
+    expected = {
+        ArtifactKind.DOCUMENT: frozenset({"json", "markdown", "html"}),
+        ArtifactKind.FORM: frozenset({"json", "submission-json", "csv"}),
+        ArtifactKind.CODE: frozenset({"source", "txt"}),
+        ArtifactKind.FLOW: frozenset({"json", "svg", "png"}),
+        ArtifactKind.SPREADSHEET: frozenset({"csv", "xlsx"}),
+        ArtifactKind.CANVAS: frozenset({"json", "svg", "png"}),
+        ArtifactKind.SLIDES: frozenset({"pptx", "json"}),
+    }
+    assert expected == ALLOWED_EXPORT_FORMATS

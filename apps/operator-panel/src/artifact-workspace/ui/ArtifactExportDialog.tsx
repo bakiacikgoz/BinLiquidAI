@@ -2,14 +2,33 @@ import { useEffect, useRef, useState } from 'react';
 
 export type ArtifactExportChoice = { value: string; label: string };
 
-export function ArtifactExportDialog({ artifactTitle, formats, busy = false, onCancel, onConfirm }: {
+function formatBytes(value: number): string {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function ArtifactExportDialog({
+  artifactTitle, formats, busy = false, suggestedFilename, revisionNumber,
+  dataClass, policyState, estimatedSizeBytes, securityWarning, initialFormat,
+  onCancel, onConfirm,
+}: {
   artifactTitle: string;
   formats: ArtifactExportChoice[];
   busy?: boolean;
+  suggestedFilename?: string;
+  revisionNumber?: number;
+  dataClass?: string;
+  policyState?: string;
+  estimatedSizeBytes?: number;
+  securityWarning?: string;
+  initialFormat?: string;
   onCancel: () => void;
   onConfirm: (format: string) => void;
 }) {
-  const [format, setFormat] = useState(formats[0]?.value ?? '');
+  const [format, setFormat] = useState(
+    formats.some((choice) => choice.value === initialFormat) ? initialFormat ?? '' : formats[0]?.value ?? '',
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -38,6 +57,14 @@ export function ArtifactExportDialog({ artifactTitle, formats, busy = false, onC
     }}>
       <h3>Export {artifactTitle}</h3>
       <p>Your operating system will ask where to save the export. No path is stored in the workspace.</p>
+      <dl className="artifact-export-dialog-summary">
+        {suggestedFilename ? <div><dt>Suggested filename</dt><dd>{suggestedFilename}</dd></div> : null}
+        {revisionNumber !== undefined ? <div><dt>Revision</dt><dd>Revision {revisionNumber}</dd></div> : null}
+        {dataClass ? <div><dt>Data class</dt><dd>{dataClass}</dd></div> : null}
+        {policyState ? <div><dt>Policy state</dt><dd>{policyState}</dd></div> : null}
+        {estimatedSizeBytes !== undefined ? <div><dt>Estimated size</dt><dd>{formatBytes(estimatedSizeBytes)}</dd></div> : null}
+      </dl>
+      {securityWarning ? <p role="alert" className="artifact-workspace-banner">{securityWarning}</p> : null}
       <label>Export format
         <select aria-label="Export format" value={format} disabled={busy} onChange={(event) => setFormat(event.target.value)}>
           {formats.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}

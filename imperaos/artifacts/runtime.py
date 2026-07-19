@@ -9,6 +9,7 @@ from imperaos.artifacts.feature_flags import (
     resolve_artifact_feature_flags,
 )
 from imperaos.artifacts.models import ArtifactKind, ArtifactModel
+from imperaos.artifacts.rollout import resolve_artifact_rollout_profile
 from imperaos.governance.approval_store import ApprovalStore
 from imperaos.runtime.config import resolve_runtime_config
 
@@ -25,6 +26,7 @@ ARTIFACT_FEATURE_FLAG_ENV = {
     "assistant_ui_runtime.enabled": "IMPERAOS_ASSISTANT_UI_RUNTIME_ENABLED",
     "ai_sdk_tauri_transport.enabled": "IMPERAOS_ASSISTANT_AI_SDK_RUNTIME_ENABLED",
 }
+ARTIFACT_ROLLOUT_PROFILE_ENV = "IMPERAOS_ARTIFACT_WORKSPACE_PROFILE"
 
 ARTIFACT_RUNTIME_CAPABILITY_SNAPSHOT_VERSION = (
     "artifact-runtime-capability-snapshot/v1"
@@ -38,6 +40,17 @@ _ARTIFACT_KIND_FEATURE_FLAGS = {
     ArtifactKind.CANVAS: "artifact_workspace.canvas.enabled",
     ArtifactKind.SLIDES: "artifact_workspace.slides.enabled",
 }
+
+
+class ArtifactKindRuntimeCapability(ArtifactModel):
+    """Effective per-kind capability state safe to expose to the renderer."""
+
+    enabled: bool
+    editable: bool
+    exportable: bool
+    reason_code: str | None = None
+    requires_license: bool
+    adapter: Literal["built_in", "bundled_fallback", "commercial", "unavailable"]
 
 
 class ArtifactRuntimeCapabilitySnapshot(ArtifactModel):
@@ -58,6 +71,7 @@ class ArtifactRuntimeCapabilitySnapshot(ArtifactModel):
     enabled_artifact_kinds: list[ArtifactKind]
     features: dict[str, bool]
     licenses: dict[Literal["spreadsheet", "canvas"], bool]
+    kind_capabilities: dict[str, ArtifactKindRuntimeCapability]
 
 if tuple(ARTIFACT_FEATURE_FLAG_ENV) != ARTIFACT_FEATURE_FLAG_NAMES:
     raise RuntimeError("artifact feature flag environment mapping drifted")
@@ -82,14 +96,28 @@ def resolve_runtime_artifact_feature_flags(
     """Resolve backend-owned rollout authority from trusted process configuration."""
 
     environment = os.environ if env is None else env
-    requested = {
-        name: _enabled(environment.get(env_name))
-        for name, env_name in ARTIFACT_FEATURE_FLAG_ENV.items()
+    fallback_capabilities = {"spreadsheet": True, "canvas": True}
+    effective_editor_capabilities = {
+        kind: (license_capabilities or {}).get(kind) is True
+        or fallback_capabilities[kind]
+        for kind in fallback_capabilities
     }
+    profile = environment.get(ARTIFACT_ROLLOUT_PROFILE_ENV)
+    requested = (
+        resolve_artifact_rollout_profile(
+            profile,
+            editor_capabilities=effective_editor_capabilities,
+        )
+        if profile is not None
+        else {name: False for name in ARTIFACT_FEATURE_FLAG_NAMES}
+    )
+    for name, env_name in ARTIFACT_FEATURE_FLAG_ENV.items():
+        if env_name in environment:
+            requested[name] = _enabled(environment[env_name])
     return resolve_artifact_feature_flags(
         requested,
         license_capabilities=license_capabilities,
-        fallback_capabilities={"spreadsheet": True, "canvas": True},
+        fallback_capabilities=fallback_capabilities,
     )
 
 
@@ -121,14 +149,50 @@ def build_runtime_artifact_capability_snapshot(
         for kind, flag_name in _ARTIFACT_KIND_FEATURE_FLAGS.items()
         if resolved[flag_name]
     )
+    kind_capabilities = {
+        kind.value: _kind_capability(kind, resolved, licenses)
+        for kind in _ARTIFACT_KIND_FEATURE_FLAGS
+    }
     snapshot = ArtifactRuntimeCapabilitySnapshot(
         rollout_stage=_rollout_stage(resolved),
         global_enabled=resolved["artifact_workspace.enabled"],
         enabled_artifact_kinds=list(enabled_kinds),
         features=resolved,
         licenses=licenses,
+        kind_capabilities=kind_capabilities,
     )
     return snapshot.model_dump(mode="json", by_alias=True)
+
+
+def _kind_capability(
+    kind: ArtifactKind,
+    feature_flags: Mapping[str, bool],
+    licenses: Mapping[str, bool],
+) -> ArtifactKindRuntimeCapability:
+    enabled = feature_flags[_ARTIFACT_KIND_FEATURE_FLAGS[kind]]
+    global_enabled = feature_flags["artifact_workspace.enabled"]
+    exportable = enabled and feature_flags["artifact_workspace.export.enabled"]
+    if not global_enabled:
+        reason_code = "ARTIFACT_WORKSPACE_FEATURE_DISABLED"
+    elif not enabled:
+        reason_code = "ARTIFACT_KIND_FEATURE_DISABLED"
+    elif not exportable:
+        reason_code = "ARTIFACT_EXPORT_FEATURE_DISABLED"
+    else:
+        reason_code = None
+
+    if kind in {ArtifactKind.SPREADSHEET, ArtifactKind.CANVAS}:
+        adapter = "commercial" if licenses[kind.value] else "bundled_fallback"
+    else:
+        adapter = "built_in"
+    return ArtifactKindRuntimeCapability(
+        enabled=enabled,
+        editable=enabled,
+        exportable=exportable,
+        reason_code=reason_code,
+        requires_license=False,
+        adapter=adapter,
+    )
 
 
 def _rollout_stage(feature_flags: Mapping[str, bool]) -> str:

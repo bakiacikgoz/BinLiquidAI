@@ -4,18 +4,10 @@ import type { ArtifactDescriptor, ArtifactRevision } from '../artifactContracts'
 import type { ArtifactWorkspaceState } from '../workspaceController';
 import { Badge } from '../../components/primitives/Badge';
 import { Button } from '../../components/primitives/Button';
-import { ArtifactExportDialog, type ArtifactExportChoice } from './ArtifactExportDialog';
+import { ArtifactExportDialog } from './ArtifactExportDialog';
+import { ARTIFACT_EXPORT_FORMATS, type ArtifactExportFormat } from '../artifactExportFormats';
 
-type ExportFormat = 'markdown' | 'html' | 'source' | 'json' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx';
-
-const formatsByKind: Record<ArtifactDescriptor['kind'], ArtifactExportChoice[]> = {
-  document: [{ value: 'markdown', label: 'Markdown' }, { value: 'html', label: 'HTML' }], form: [],
-  code: [{ value: 'source', label: 'Source file' }],
-  flow: [{ value: 'json', label: 'JSON' }, { value: 'svg', label: 'SVG' }, { value: 'png', label: 'PNG' }],
-  spreadsheet: [{ value: 'csv', label: 'CSV' }, { value: 'xlsx', label: 'Excel workbook' }],
-  canvas: [{ value: 'json', label: 'JSON' }, { value: 'svg', label: 'SVG' }, { value: 'png', label: 'PNG' }],
-  slides: [{ value: 'pptx', label: 'PowerPoint' }],
-};
+type ExportFormat = ArtifactExportFormat;
 
 function archiveLabel(artifact: ArtifactDescriptor): string | null {
   if (artifact.status !== 'archived') return null;
@@ -53,7 +45,7 @@ export function ArtifactWorkspacePanel({
     return catalog.filter((artifact) => (!needle || artifact.title.toLocaleLowerCase().includes(needle) || artifact.artifactId.toLowerCase().includes(needle))
       && (kindFilter === 'all' || artifact.kind === kindFilter) && (statusFilter === 'all' || artifact.status === statusFilter));
   }, [catalog, kindFilter, search, statusFilter]);
-  const exportFormats = activeTab ? formatsByKind[activeTab.artifact.kind] : [];
+  const exportFormats = activeTab ? ARTIFACT_EXPORT_FORMATS[activeTab.artifact.kind] : [];
   const exportDisabled = !activeTab || activeTab.artifact.status === 'archived' || activeTab.dirty || activeTab.saveState === 'saving' || activeTab.saveState === 'error' || Boolean(activeTab.conflict);
 
   return <section className="artifact-workspace-panel" aria-label="Artifact workspace">
@@ -62,7 +54,7 @@ export function ArtifactWorkspacePanel({
     {operationNotice ? <p className="artifact-workspace-banner" role="status">{operationNotice}</p> : null}
     <div className="artifact-workspace-filters">
       <input type="search" aria-label="Search artifacts" placeholder="Search title or ID" value={search} onChange={(event) => setSearch(event.target.value)} />
-      <select aria-label="Filter artifact kind" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">All kinds</option>{Object.keys(formatsByKind).map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select>
+      <select aria-label="Filter artifact kind" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}><option value="all">All kinds</option>{Object.keys(ARTIFACT_EXPORT_FORMATS).map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select>
       <select aria-label="Filter artifact status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All states</option>{['draft', 'active', 'archived', 'blocked', 'corrupt'].map((status) => <option key={status} value={status}>{status}</option>)}</select>
     </div>
     <div className="artifact-workspace-navigator" aria-label="Artifact navigator">
@@ -85,6 +77,6 @@ export function ArtifactWorkspacePanel({
         {onLoadMoreHistory ? <Button variant="ghost" disabled={historyLoading} onClick={() => onLoadMoreHistory(activeTab.artifact.artifactId)}>Load more history</Button> : null}
       </section>
     </div> : null}
-    {exportOpen && activeTab ? <ArtifactExportDialog artifactTitle={activeTab.artifact.title} formats={exportFormats} onCancel={() => setExportOpen(false)} onConfirm={(format) => { setExportOpen(false); onExportArtifact?.(activeTab.artifact.artifactId, format as ExportFormat); }} /> : null}
+    {exportOpen && activeTab ? <ArtifactExportDialog artifactTitle={activeTab.artifact.title} formats={exportFormats} revisionNumber={activeTab.revision.revisionNumber} dataClass={activeTab.artifact.dataClass} policyState={metadataLabel(activeTab.artifact, 'policyStatus', 'governed')} estimatedSizeBytes={new TextEncoder().encode(JSON.stringify(activeTab.draftContent)).byteLength} securityWarning="Exported files leave workspace governance. Verify the destination and sharing policy." onCancel={() => setExportOpen(false)} onConfirm={(format) => { setExportOpen(false); onExportArtifact?.(activeTab.artifact.artifactId, format as ExportFormat); }} /> : null}
   </section>;
 }

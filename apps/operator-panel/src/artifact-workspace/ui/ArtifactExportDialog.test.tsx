@@ -12,6 +12,12 @@ describe('ArtifactExportDialog', () => {
       <ArtifactExportDialog
         artifactTitle="Launch plan"
         formats={[{ value: 'markdown', label: 'Markdown' }, { value: 'html', label: 'HTML' }]}
+        suggestedFilename="launch-plan.md"
+        revisionNumber={7}
+        dataClass="confidential"
+        policyState="allowed"
+        estimatedSizeBytes={2048}
+        securityWarning="Exported files leave workspace governance."
         onCancel={vi.fn()}
         onConfirm={onConfirm}
       />,
@@ -19,6 +25,12 @@ describe('ArtifactExportDialog', () => {
 
     expect(screen.getByRole('dialog', { name: 'Export Launch plan' })).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/path/i)).not.toBeInTheDocument();
+    expect(screen.getByText('launch-plan.md')).toBeInTheDocument();
+    expect(screen.getByText('Revision 7')).toBeInTheDocument();
+    expect(screen.getByText('confidential')).toBeInTheDocument();
+    expect(screen.getByText('allowed')).toBeInTheDocument();
+    expect(screen.getByText('2 KB')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('leave workspace governance');
     await user.selectOptions(screen.getByLabelText('Export format'), 'html');
     await user.click(screen.getByRole('button', { name: 'Choose destination and export' }));
 

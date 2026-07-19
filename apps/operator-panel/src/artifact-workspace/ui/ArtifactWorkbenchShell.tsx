@@ -13,11 +13,11 @@ import { recordArtifactEditorLoadFailure } from '../artifactUiMetrics';
 
 type ErrorBoundaryProps = PropsWithChildren<{ artifactKind?: ArtifactKind }>;
 
-class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed: boolean }> {
-  state = { failed: false };
+class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed: boolean; readOnly: boolean }> {
+  state = { failed: false, readOnly: false };
 
-  static getDerivedStateFromError(): { failed: boolean } {
-    return { failed: true };
+  static getDerivedStateFromError(): { failed: boolean; readOnly: boolean } {
+    return { failed: true, readOnly: false };
   }
 
   componentDidCatch(_error: Error, _info: ErrorInfo): void {
@@ -26,6 +26,15 @@ class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed
   }
 
   render(): ReactNode {
+    const supportReference = `artifact-editor-${this.props.artifactKind ?? 'unknown'}-load-failure`;
+    if (this.state.readOnly) {
+      return <section className="artifact-workbench-error" aria-label="Read-only artifact fallback">
+        <strong>Artifact opened read-only.</strong>
+        <p>The editor is isolated. The assistant, navigator, revision history, and governed export remain available.</p>
+        <p>Support reference: <code>{supportReference}</code></p>
+        <button type="button" onClick={() => this.setState({ failed: false, readOnly: false })}>Retry editor</button>
+      </section>;
+    }
     if (this.state.failed) {
       return (
         <div className="artifact-workbench-error" role="alert">
@@ -34,6 +43,13 @@ class ArtifactEditorErrorBoundary extends Component<ErrorBoundaryProps, { failed
           <button type="button" onClick={() => this.setState({ failed: false })}>
             Retry editor
           </button>
+          <button type="button" onClick={() => this.setState({ readOnly: true })}>
+            Open artifact read-only
+          </button>
+          <button type="button" onClick={() => void navigator.clipboard?.writeText?.(supportReference)}>
+            Copy support reference
+          </button>
+          <p>Support reference: <code>{supportReference}</code></p>
         </div>
       );
     }

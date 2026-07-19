@@ -14,6 +14,7 @@ import {
   ArtifactMutationProposalResultSchema,
   ArtifactOperationResultSchema,
   ArtifactReadResultSchema,
+  ArtifactRpcHandshakeCapabilitySnapshotSchema,
   type ArtifactArchiveRequest,
   type ArtifactAssetImportRequest,
   type ArtifactAssetImportResult,
@@ -37,6 +38,7 @@ import {
   type ArtifactMutationRequest,
   type ArtifactOperationResult,
   type ArtifactReadResult,
+  type ArtifactRuntimeCapabilitySnapshot,
   type ArtifactRestoreRequest,
   type SpreadsheetCellPatchRequest,
   type SlidePatchRequest,
@@ -169,6 +171,14 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 }
 
 export const artifactBridge = {
+  getRuntimeCapabilitySnapshot(): Promise<ArtifactRuntimeCapabilitySnapshot> {
+    return callArtifact(
+      'bridge_artifact_handshake',
+      {},
+      ArtifactRpcHandshakeCapabilitySnapshotSchema,
+    );
+  },
+
   list(request: ArtifactListRequest = {}): Promise<ArtifactListResult> {
     return callArtifact('bridge_artifact_list', { ...request }, ArtifactListWireSchema);
   },

@@ -16,19 +16,29 @@ from imperaos.artifacts.models import (
 )
 
 ArtifactExportFormat = Literal[
-    "source", "zip", "json", "markdown", "html", "svg", "png", "csv", "xlsx", "pptx"
+    "source",
+    "txt",
+    "json",
+    "submission-json",
+    "markdown",
+    "html",
+    "svg",
+    "png",
+    "csv",
+    "xlsx",
+    "pptx",
 ]
 ArtifactExportStatus = Literal["pending", "completed", "cancelled", "failed"]
 DEFAULT_ARTIFACT_EXPORT_MAX_BYTES = 100 * 1024 * 1024
 
 ALLOWED_EXPORT_FORMATS: dict[ArtifactKind, frozenset[str]] = {
-    ArtifactKind.DOCUMENT: frozenset({"markdown", "html"}),
-    ArtifactKind.CODE: frozenset({"source", "zip"}),
+    ArtifactKind.DOCUMENT: frozenset({"json", "markdown", "html"}),
+    ArtifactKind.CODE: frozenset({"source", "txt"}),
     ArtifactKind.FLOW: frozenset({"json", "svg", "png"}),
     ArtifactKind.SPREADSHEET: frozenset({"csv", "xlsx"}),
     ArtifactKind.CANVAS: frozenset({"json", "svg", "png"}),
     ArtifactKind.SLIDES: frozenset({"json", "pptx"}),
-    ArtifactKind.FORM: frozenset(),
+    ArtifactKind.FORM: frozenset({"json", "submission-json", "csv"}),
 }
 
 
@@ -71,7 +81,12 @@ def canonical_export_basename(
             )
         return content.filename
     extension = {
-        "zip": "zip", "json": "json", "markdown": "md", "html": "html", "svg": "svg",
+        "txt": "txt",
+        "json": "json",
+        "submission-json": "submission.json",
+        "markdown": "md",
+        "html": "html",
+        "svg": "svg",
         "png": "png", "csv": "csv", "xlsx": "xlsx", "pptx": "pptx",
     }[format_name]
     base = re.sub(r"[^\w .-]+", "_", artifact.title, flags=re.UNICODE).strip(" .")[:120]

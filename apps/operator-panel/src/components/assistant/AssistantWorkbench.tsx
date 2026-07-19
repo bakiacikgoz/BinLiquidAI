@@ -13,6 +13,12 @@ import { ArtifactEditorHost, type ArtifactSelection } from '../../artifact-works
 import type { ArtifactFeatureFlagState } from '../../artifact-workspace/artifactFeatureFlags';
 import { ArtifactDiffView } from '../../artifact-workspace/ui/ArtifactDiffView';
 import { ArtifactConflictPanel } from '../../artifact-workspace/ui/ArtifactConflictPanel';
+import { ArtifactExportDialog } from '../../artifact-workspace/ui/ArtifactExportDialog';
+import {
+  ARTIFACT_EXPORT_FORMATS,
+  suggestedArtifactExportFilename,
+  type ArtifactExportFormat,
+} from '../../artifact-workspace/artifactExportFormats';
 import { translateAssistantText, type UiLocale } from '../../i18n';
 import { Badge } from '../primitives/Badge';
 import { Button } from '../primitives/Button';
@@ -51,7 +57,7 @@ type WorkspaceProps = {
   onEditArtifact?: (artifactId: string, content: ArtifactWorkspaceState['tabs'][number]['draftContent']) => void;
   onRetrySave?: (artifactId: string) => void;
   onRestoreArtifact?: (artifactId: string, revisionId: string) => void;
-  onExportArtifact?: (artifactId: string, format: 'markdown' | 'html' | 'source' | 'json' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx', sheetId?: string) => void;
+  onExportArtifact?: (artifactId: string, format: ArtifactExportFormat, sheetId?: string) => void;
   onImportAsset?: (artifactId: string) => Promise<ArtifactAssetDescriptor | null>;
   formRuntime?: FormSessionRuntime;
   onSubmitForm?: (request: ArtifactFormSubmissionRequest) => Promise<ArtifactFormSubmissionResult>;
@@ -151,6 +157,7 @@ export function AssistantWorkbench({
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [exportFormat, setExportFormat] = useState<ArtifactExportFormat | null>(null);
   const activeTabButtonRef = useRef<HTMLButtonElement>(null);
   const previousConflictArtifactId = useRef<string | null>(null);
   const previousSaveState = useRef<string | null>(null);
@@ -167,6 +174,7 @@ export function AssistantWorkbench({
 
   useEffect(() => {
     onEditorSelectionChange?.(null);
+    setExportFormat(null);
   }, [activeTab?.artifact.artifactId, onEditorSelectionChange]);
   const filteredCatalog = useMemo(() => {
     const localeCode = locale === 'tr' ? 'tr' : 'en';
@@ -370,9 +378,7 @@ export function AssistantWorkbench({
                     onEditorSelectionChange?.(selection);
                   }}
                   onRequestExport={(format) => {
-                    if (format === 'markdown' || format === 'html' || format === 'source' || format === 'json' || format === 'svg' || format === 'png' || format === 'pptx') {
-                      onExportArtifact?.(activeTab.artifact.artifactId, format);
-                    }
+                    setExportFormat(format as ArtifactExportFormat);
                   }}
                   onImportAsset={() => onImportAsset?.(activeTab.artifact.artifactId) ?? Promise.resolve(null)}
                   formRuntime={formRuntime}
@@ -388,80 +394,39 @@ export function AssistantWorkbench({
                   slidesEnabled={enabledFeatures.slides}
                 />
               </div>
-              {enabledFeatures.export && activeTab.artifact.kind === 'document' && activeComparison?.status !== 'ready' ? (
-                <div className="artifact-workspace-export-actions" aria-label="Document export">
+              {enabledFeatures.export && activeComparison?.status !== 'ready' ? (
+                <div className="artifact-workspace-export-actions" aria-label="Artifact export">
                   <Button
                     variant="ghost"
-                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
-                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'markdown')}
+                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || activeTab.saveState === 'error' || Boolean(activeTab.conflict)}
+                    onClick={() => setExportFormat(ARTIFACT_EXPORT_FORMATS[activeTab.artifact.kind][0]?.value as ArtifactExportFormat)}
                   >
-                    Export Markdown
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
-                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'html')}
-                  >
-                    Export HTML
+                    Export
                   </Button>
                 </div>
               ) : null}
-              {enabledFeatures.export && activeTab.artifact.kind === 'code' && activeComparison?.status !== 'ready' ? (
-                <div className="artifact-workspace-export-actions" aria-label="Code export">
-                  <Button
-                    variant="ghost"
-                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
-                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'source')}
-                  >
-                    Export source
-                  </Button>
-                </div>
-              ) : null}
-              {enabledFeatures.export && activeTab.artifact.kind === 'flow' && activeComparison?.status !== 'ready' ? (
-                <div className="artifact-workspace-export-actions" aria-label="Flow export">
-                  {(['json', 'svg', 'png'] as const).map((format) => (
-                    <Button
-                      key={format}
-                      variant="ghost"
-                      disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
-                      onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, format)}
-                    >
-                      Export {format.toUpperCase()}
-                    </Button>
-                  ))}
-                </div>
-              ) : null}
-              {enabledFeatures.export && activeTab.artifact.kind === 'spreadsheet' && activeSpreadsheet?.success && activeComparison?.status !== 'ready' ? (
-                <div className="artifact-workspace-export-actions" aria-label="Spreadsheet export">
-                  {activeSpreadsheet.data.sheets.map((sheet) => (
-                    <Button
-                      key={sheet.id}
-                      variant="ghost"
-                      disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
-                      onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'csv', sheet.id)}
-                    >
-                      Export {sheet.name} CSV
-                    </Button>
-                  ))}
-                  <Button
-                    variant="ghost"
-                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
-                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'xlsx')}
-                  >
-                    Export XLSX
-                  </Button>
-                </div>
-              ) : null}
-              {enabledFeatures.export && activeTab.artifact.kind === 'slides' && activeComparison?.status !== 'ready' ? (
-                <div className="artifact-workspace-export-actions" aria-label="Slides export">
-                  <Button
-                    variant="ghost"
-                    disabled={activeTab.dirty || activeTab.saveState === 'saving' || Boolean(activeTab.conflict)}
-                    onClick={() => onExportArtifact?.(activeTab.artifact.artifactId, 'pptx')}
-                  >
-                    Export PPTX
-                  </Button>
-                </div>
+              {exportFormat ? (
+                <ArtifactExportDialog
+                  artifactTitle={activeTab.artifact.title}
+                  formats={ARTIFACT_EXPORT_FORMATS[activeTab.artifact.kind]}
+                  initialFormat={exportFormat}
+                  suggestedFilename={suggestedArtifactExportFilename(activeTab.artifact.title, exportFormat)}
+                  revisionNumber={activeTab.revision.revisionNumber}
+                  dataClass={activeTab.artifact.dataClass}
+                  policyState={metadataLabel(activeTab.artifact, 'policyStatus', 'governed')}
+                  estimatedSizeBytes={new TextEncoder().encode(JSON.stringify(activeTab.draftContent)).byteLength}
+                  securityWarning="Exported files leave workspace governance. Verify the destination and sharing policy."
+                  onCancel={() => setExportFormat(null)}
+                  onConfirm={(format) => {
+                    const selected = format as ArtifactExportFormat;
+                    setExportFormat(null);
+                    const sheetId = selected === 'csv' && activeTab.artifact.kind === 'spreadsheet' && activeSpreadsheet?.success
+                      ? activeSpreadsheet.data.sheets[0]?.id
+                      : undefined;
+                    if (sheetId) onExportArtifact?.(activeTab.artifact.artifactId, selected, sheetId);
+                    else onExportArtifact?.(activeTab.artifact.artifactId, selected);
+                  }}
+                />
               ) : null}
               <div className="artifact-workspace-history" aria-label="Revision history">
                 <div className="assistant-workbench-panel-head">

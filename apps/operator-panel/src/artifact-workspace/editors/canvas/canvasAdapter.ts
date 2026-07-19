@@ -76,6 +76,44 @@ export function addCanvasShape(value: unknown, type: CanvasShapeType): CanvasArt
   });
 }
 
+export function addCanvasFreeDrawStroke(
+  value: unknown,
+  points: Array<{ x: number; y: number }>,
+): { content: CanvasArtifactContent; objectIds: string[] } {
+  const canvas = parseCanvasArtifactContent(value);
+  const bounded = points.slice(0, 500).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+  if (bounded.length < 2) return { content: canvas, objectIds: [] };
+  const objects = [...canvas.snapshot.objects];
+  const objectIds: string[] = [];
+  for (let index = 1; index < bounded.length; index += 1) {
+    const start = bounded[index - 1];
+    const end = bounded[index];
+    const id = nextId('draw', objects.map((item) => item.id));
+    objectIds.push(id);
+    objects.push({
+      id,
+      type: 'line',
+      x: clamp(Math.min(start.x, end.x), MIN_COORDINATE, MAX_COORDINATE),
+      y: clamp(Math.min(start.y, end.y), MIN_COORDINATE, MAX_COORDINATE),
+      width: clamp(Math.abs(end.x - start.x), MIN_SIZE, MAX_SIZE),
+      height: clamp(Math.abs(end.y - start.y), MIN_SIZE, MAX_SIZE),
+    });
+  }
+  return {
+    content: parseCanvasArtifactContent({ ...canvas, snapshot: { objects } }),
+    objectIds,
+  };
+}
+
+export function deleteCanvasObjects(value: unknown, objectIds: string[]): CanvasArtifactContent {
+  const canvas = parseCanvasArtifactContent(value);
+  const selected = new Set(canvasSelection(objectIds).objectIds);
+  return parseCanvasArtifactContent({
+    ...canvas,
+    snapshot: { objects: canvas.snapshot.objects.filter((object) => !selected.has(object.id)) },
+  });
+}
+
 export function withImportedCanvasAsset(value: unknown, assetId: string): CanvasArtifactContent {
   const canvas = parseCanvasArtifactContent(value);
   if (!BOUNDED_ID.test(assetId)) throw new Error('Canvas assets require a local bounded asset ID.');

@@ -4,8 +4,10 @@ import type { CanvasArtifactContent } from '../../artifactContracts';
 import type { ArtifactEditorProps } from '../ArtifactEditorHost';
 import {
   addCanvasShape,
+  addCanvasFreeDrawStroke,
   canvasOutline,
   canvasSelection,
+  deleteCanvasObjects,
   moveCanvasObjects,
   parseCanvasArtifactContent,
   resizeCanvasObject,
@@ -16,7 +18,8 @@ import {
 type PointerOperation =
   | { kind: 'move'; objectIds: string[]; clientX: number; clientY: number }
   | { kind: 'resize'; objectId: string; originX: number; originY: number; width: number; height: number }
-  | { kind: 'pan'; clientX: number; clientY: number; panX: number; panY: number };
+  | { kind: 'pan'; clientX: number; clientY: number; panX: number; panY: number }
+  | { kind: 'draw'; points: Array<{ x: number; y: number }> };
 
 const SHAPES: Array<{ type: CanvasShapeType; label: string }> = [
   { type: 'rectangle', label: 'Rectangle' },
@@ -44,6 +47,7 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const operation = useRef<PointerOperation | null>(null);
   const [importing, setImporting] = useState(false);
+  const [freeDraw, setFreeDraw] = useState(false);
   const editable = props.mode !== 'view' && props.artifact.status !== 'archived';
   const outline = useMemo(() => canvasOutline(canvas), [canvas]);
 
@@ -132,8 +136,10 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
       const nextWidth = active.width + (event.clientX - active.originX) / zoom;
       const nextHeight = active.height + (event.clientY - active.originY) / zoom;
       preview(resizeCanvasObject(canvasRef.current, active.objectId, nextWidth, nextHeight));
-    } else {
+    } else if (active.kind === 'pan') {
       setPan({ x: active.panX + event.clientX - active.clientX, y: active.panY + event.clientY - active.clientY });
+    } else {
+      active.points.push({ x: (event.clientX - pan.x) / zoom, y: (event.clientY - pan.y) / zoom });
     }
   };
 
@@ -141,6 +147,14 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
     const active = operation.current;
     operation.current = null;
     if (!active || active.kind === 'pan') return;
+    if (active.kind === 'draw') {
+      const stroke = addCanvasFreeDrawStroke(canvasRef.current, active.points);
+      if (stroke.objectIds.length) {
+        select(stroke.objectIds);
+        persist(stroke.content, stroke.objectIds);
+      }
+      return;
+    }
     persist(canvasRef.current, active.kind === 'move' ? active.objectIds : selectedIds);
   };
 
@@ -165,6 +179,11 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
             persist(next, nextSelection);
           }}>Add {shape.label.toLowerCase()}</button>
         ))}
+        <button type="button" disabled={!editable} aria-pressed={freeDraw} onClick={() => setFreeDraw((value) => !value)}>Free draw</button>
+        <button type="button" disabled={!editable || selectedIds.length === 0} onClick={() => {
+          persist(deleteCanvasObjects(canvasRef.current, selectedIds), []);
+          select([]);
+        }}>Delete selection</button>
         <button type="button" disabled={!editable || importing || !props.onImportAsset} onClick={async () => {
           if (!props.onImportAsset) return;
           setImporting(true);
@@ -191,7 +210,9 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
           aria-label="Canvas stage"
           onPointerDown={(event) => {
             if (!editable || event.target !== event.currentTarget) return;
-            operation.current = { kind: 'pan', clientX: event.clientX, clientY: event.clientY, panX: pan.x, panY: pan.y };
+            operation.current = freeDraw
+              ? { kind: 'draw', points: [{ x: (event.clientX - pan.x) / zoom, y: (event.clientY - pan.y) / zoom }] }
+              : { kind: 'pan', clientX: event.clientX, clientY: event.clientY, panX: pan.x, panY: pan.y };
           }}
           onPointerMove={onStagePointerMove}
           onPointerUp={onStagePointerUp}
@@ -226,7 +247,7 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
                       moveSelected(event.key === 'ArrowLeft' ? -delta : event.key === 'ArrowRight' ? delta : 0, event.key === 'ArrowUp' ? -delta : event.key === 'ArrowDown' ? delta : 0);
                     }
                   }}
-                  style={{ position: 'absolute', left: object.x, top: object.y, width: object.width, height: object.height, boxSizing: 'border-box', cursor: editable ? 'move' : 'default', border: selected ? '3px solid #4f46e5' : '2px solid #334155', borderRadius: object.type === 'ellipse' ? '50%' : object.type === 'note' ? 8 : 0, background: object.type === 'note' ? '#fef3c7' : '#fff', display: 'grid', placeItems: 'center', padding: 8, textAlign: 'center', userSelect: 'none', ...(isLine ? { background: 'transparent', borderWidth: '0 0 2px 0', transform: 'skewY(24deg)' } : {}) }}
+                  style={{ position: 'absolute', left: object.x, top: object.y, width: object.width, height: object.height, boxSizing: 'border-box', cursor: editable ? 'move' : 'default', borderRadius: object.type === 'ellipse' ? '50%' : object.type === 'note' ? 8 : 0, display: 'grid', placeItems: 'center', padding: 8, textAlign: 'center', userSelect: 'none', ...(isLine ? { background: 'transparent', border: 'none', borderBottom: selected ? '3px solid #4f46e5' : '2px solid #334155', transform: 'skewY(24deg)' } : { background: object.type === 'note' ? '#fef3c7' : '#fff', border: selected ? '3px solid #4f46e5' : '2px solid #334155' }) }}
                 >
                   <span>{object.type === 'image' ? `Local asset: ${object.assetId}` : object.text ?? object.type}</span>
                   {editable && selected && selectedIds.length === 1 ? <button type="button" aria-label={`Resize ${object.id}`} onPointerDown={(event) => {
@@ -252,7 +273,7 @@ export function CanvasArtifactEditor(props: ArtifactEditorProps) {
             <ol>
               {outline.map((item) => <li key={item.id}><button type="button" aria-label={`Select ${item.id} from outline`} aria-pressed={selectedIds.includes(item.id)} onClick={(event) => {
                 select(event.shiftKey ? [...selectedIds, item.id] : [item.id]);
-              }}>{item.label} <small>({item.type})</small></button></li>)}
+              }}>{item.label} <small>({item.type}; x {canvas.snapshot.objects.find((object) => object.id === item.id)?.x ?? 0}, y {canvas.snapshot.objects.find((object) => object.id === item.id)?.y ?? 0})</small></button></li>)}
             </ol>
           </nav>
           <div aria-label="Canvas inspector">

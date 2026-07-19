@@ -42,6 +42,14 @@ describe('CanvasArtifactEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
       snapshot: { objects: expect.arrayContaining([expect.objectContaining({ type: 'rectangle' })]) },
     }), expect.objectContaining({ kind: 'canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Free draw' }));
+    fireEvent.pointerDown(screen.getByLabelText('Canvas stage'), { clientX: 80, clientY: 90 });
+    fireEvent.pointerMove(screen.getByLabelText('Canvas stage'), { clientX: 100, clientY: 110 });
+    fireEvent.pointerMove(screen.getByLabelText('Canvas stage'), { clientX: 130, clientY: 125 });
+    fireEvent.pointerUp(screen.getByLabelText('Canvas stage'));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      snapshot: { objects: expect.arrayContaining([expect.objectContaining({ type: 'line' })]) },
+    }), expect.objectContaining({ kind: 'canvas' }));
     await user.click(screen.getByRole('button', { name: 'Import local image' }));
     expect(onImportAsset).toHaveBeenCalledOnce();
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -66,6 +74,10 @@ describe('CanvasArtifactEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
       snapshot: { objects: expect.arrayContaining([expect.objectContaining({ id: 'note-1', x: 40, y: 50 })]) },
     }), expect.anything());
+    await user.click(screen.getByRole('button', { name: 'Delete selection' }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      snapshot: { objects: expect.not.arrayContaining([expect.objectContaining({ id: 'note-1' })]) },
+    }), undefined);
   });
 
   it('disables mutations for view and archived artifacts while retaining outline and export access', () => {

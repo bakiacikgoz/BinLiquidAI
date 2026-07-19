@@ -12,7 +12,7 @@ export type CanvasArtifactExportFormat = 'json' | 'svg' | 'png';
 
 export type CanvasExportOutcome =
   | { status: 'cancelled' }
-  | { status: 'exported'; basename: string; sha256: string; sizeBytes: number };
+  | { status: 'exported'; basename: string; sha256: string; sizeBytes: number; exportId?: string };
 
 export function serializeCanvasJson(content: unknown): Uint8Array {
   const parsed = CanvasArtifactExportContentSchema.parse(content);
@@ -112,7 +112,7 @@ export async function exportCanvasArtifact({
     }
     commitStarted = true;
     const result = await bridge.commitExport(begin.ticket, bytes);
-    return { status: 'exported', ...result };
+    return { status: 'exported', ...result, ...(begin.exportId ? { exportId: begin.exportId } : {}) };
   } catch (error) {
     if (!commitStarted) await bridge.cancelExport(begin.ticket).catch(() => undefined);
     throw error;

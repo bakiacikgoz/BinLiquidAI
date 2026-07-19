@@ -575,6 +575,7 @@ export const ArtifactHistoryWireSchema = z
 export const ArtifactExportBeginResultSchema = z
   .object({
     cancelled: z.boolean(),
+    exportId: boundedId,
     ticket: z.string().min(1).nullable(),
     expiresInMs: z.number().int().positive().nullable(),
     maxBytes: z.number().int().positive(),
@@ -588,6 +589,29 @@ export const ArtifactExportResultSchema = z
     sizeBytes: z.number().int().min(0),
   })
   .strict();
+
+const ArtifactKindRuntimeCapabilitySchema = z.object({
+  enabled: z.boolean(),
+  editable: z.boolean(),
+  exportable: z.boolean(),
+  reasonCode: z.string().nullable(),
+  requiresLicense: z.boolean(),
+  adapter: z.enum(['built_in', 'bundled_fallback', 'commercial', 'unavailable']),
+}).strict();
+
+export const ArtifactRuntimeCapabilitySnapshotSchema = z.object({
+  contractVersion: z.literal('artifact-runtime-capability-snapshot/v1'),
+  rolloutStage: z.enum(['disabled', 'workspace_only', 'document', 'form_code', 'flow_slides', 'all_noncommercial']),
+  globalEnabled: z.boolean(),
+  enabledArtifactKinds: z.array(ArtifactKindSchema),
+  features: z.record(z.string(), z.boolean()),
+  licenses: z.object({ spreadsheet: z.boolean(), canvas: z.boolean() }).strict(),
+  kindCapabilities: z.record(ArtifactKindSchema, ArtifactKindRuntimeCapabilitySchema),
+}).strict();
+
+export const ArtifactRpcHandshakeCapabilitySnapshotSchema = z.object({
+  capabilitySnapshot: ArtifactRuntimeCapabilitySnapshotSchema,
+}).passthrough().transform(({ capabilitySnapshot }) => capabilitySnapshot);
 
 export const ArtifactExportCancelResultSchema = z.object({ cancelled: z.literal(true) }).strict();
 
@@ -620,6 +644,7 @@ export const ArtifactFormSubmissionResultSchema = z
   });
 
 export type ArtifactKind = z.infer<typeof ArtifactKindSchema>;
+export type ArtifactRuntimeCapabilitySnapshot = z.infer<typeof ArtifactRuntimeCapabilitySnapshotSchema>;
 export type ArtifactStatus = z.infer<typeof ArtifactStatusSchema>;
 export type ArtifactDataClass = z.infer<typeof ArtifactDataClassSchema>;
 export type ArtifactMutationType = z.infer<typeof ArtifactMutationTypeSchema>;
@@ -774,6 +799,6 @@ export interface ArtifactFormSubmissionRequest {
 export interface ArtifactExportBeginRequest {
   artifactId: string;
   revisionId: string;
-  format: 'source' | 'zip' | 'json' | 'markdown' | 'html' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx';
+  format: 'source' | 'txt' | 'json' | 'submission-json' | 'markdown' | 'html' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx';
   idempotencyKey: string;
 }

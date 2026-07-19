@@ -7,12 +7,14 @@ import { compareArtifactContent, type ArtifactDiffResult } from './artifactDiff'
 import type { ArtifactContent, ArtifactDescriptor, ArtifactRevision } from './artifactContracts';
 import type { ArtifactFormSubmissionRequest } from './artifactContracts';
 import { FormSessionRuntime } from './editors/form/formSessionRuntime';
-import { exportCodeArtifact } from './artifactCodeExport';
+import { exportCodeArtifact, type CodeArtifactExportFormat } from './artifactCodeExport';
 import { exportCanvasArtifact, type CanvasArtifactExportFormat } from './artifactCanvasExport';
 import { exportDocumentArtifact, type DocumentArtifactExportFormat } from './artifactDocumentExport';
 import { exportFlowArtifact, type FlowArtifactExportFormat } from './artifactFlowExport';
 import { exportSpreadsheetArtifact, type SpreadsheetExportFormat } from './artifactSpreadsheetExport';
 import { exportSlidesArtifact } from './artifactSlidesExport';
+import { exportStructuredArtifact, type StructuredArtifactExportFormat } from './artifactStructuredExport';
+import { formSessionKey } from './editors/form/formSessionRuntime';
 import { ArtifactWorkspaceController } from './workspaceController';
 
 export type LegacyWorkbenchArtifact = {
@@ -71,6 +73,14 @@ function normalizeWorkspaceError(
     };
   }
   return fallback;
+}
+
+function exportOperationNotice(
+  outcome: { status: 'cancelled' } | { status: 'exported'; basename: string; sha256: string; sizeBytes: number; exportId?: string },
+  format: string,
+): string {
+  if (outcome.status === 'cancelled') return 'Export cancelled.';
+  return `Exported ${outcome.basename} · ${format.toUpperCase()} · ${outcome.sizeBytes} bytes · SHA-256 ${outcome.sha256.slice(0, 12)} · record ${outcome.exportId ?? 'unavailable'}.`;
 }
 
 export function useAssistantArtifactWorkspaceController({
@@ -479,7 +489,7 @@ export function useAssistantArtifactWorkspaceController({
           format,
           bridge,
         });
-        setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+        setOperationNotice(exportOperationNotice(outcome, format));
         return outcome;
       } catch (caught) {
         setError(normalizeWorkspaceError(caught, {
@@ -493,7 +503,7 @@ export function useAssistantArtifactWorkspaceController({
     [autosave, bridge, controller],
   );
 
-  const exportCode = useCallback(async (artifactId: string) => {
+  const exportCode = useCallback(async (artifactId: string, format: CodeArtifactExportFormat) => {
     setError(null);
     setOperationNotice(null);
     try {
@@ -507,9 +517,9 @@ export function useAssistantArtifactWorkspaceController({
         artifact: tab.artifact,
         revision: tab.revision,
         content: tab.draftContent,
-        bridge,
+        bridge, format,
       });
-      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      setOperationNotice(exportOperationNotice(outcome, format));
       return outcome;
     } catch (caught) {
       setError(normalizeWorkspaceError(caught, {
@@ -538,7 +548,7 @@ export function useAssistantArtifactWorkspaceController({
         format,
         bridge,
       });
-      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      setOperationNotice(exportOperationNotice(outcome, format));
       return outcome;
     } catch (caught) {
       setError(normalizeWorkspaceError(caught, {
@@ -572,7 +582,7 @@ export function useAssistantArtifactWorkspaceController({
         sheetId,
         bridge,
       });
-      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      setOperationNotice(exportOperationNotice(outcome, format));
       return outcome;
     } catch (caught) {
       setError(normalizeWorkspaceError(caught, {
@@ -601,7 +611,7 @@ export function useAssistantArtifactWorkspaceController({
         format,
         bridge,
       });
-      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      setOperationNotice(exportOperationNotice(outcome, format));
       return outcome;
     } catch (caught) {
       setError(normalizeWorkspaceError(caught, {
@@ -626,7 +636,7 @@ export function useAssistantArtifactWorkspaceController({
       const outcome = await exportSlidesArtifact({
         artifact: tab.artifact, revision: tab.revision, content: tab.draftContent, bridge,
       });
-      setOperationNotice(outcome.status === 'cancelled' ? 'Export cancelled.' : `Exported ${outcome.basename}.`);
+      setOperationNotice(exportOperationNotice(outcome, 'pptx'));
       return outcome;
     } catch (caught) {
       setError(normalizeWorkspaceError(caught, {
@@ -635,6 +645,32 @@ export function useAssistantArtifactWorkspaceController({
       return null;
     }
   }, [autosave, bridge, controller]);
+
+  const exportStructured = useCallback(async (artifactId: string, format: StructuredArtifactExportFormat) => {
+    setError(null);
+    setOperationNotice(null);
+    try {
+      await autosave.flush(artifactId);
+      const tab = controller.getState().tabs.find((candidate) => candidate.artifact.artifactId === artifactId);
+      if (!tab) throw new Error('Artifact tab is not open.');
+      if (tab.dirty || tab.saveState === 'error' || tab.saveState === 'conflict') {
+        throw new Error('Artifact must be saved before export.');
+      }
+      const submission = tab.artifact.kind === 'form'
+        ? formRuntime.getSnapshot(formSessionKey(tab.artifact.artifactId, tab.revision.revisionId)).formData
+        : undefined;
+      const outcome = await exportStructuredArtifact({
+        artifact: tab.artifact, revision: tab.revision, content: tab.draftContent, format, submission, bridge,
+      });
+      setOperationNotice(exportOperationNotice(outcome, format));
+      return outcome;
+    } catch (caught) {
+      setError(normalizeWorkspaceError(caught, {
+        code: 'ARTIFACT_EXPORT_FAILED', message: 'The structured artifact could not be exported.', retryable: true,
+      }));
+      return null;
+    }
+  }, [autosave, bridge, controller, formRuntime]);
 
   const importAsset = useCallback(async (artifactId: string) => {
     setError(null);
@@ -754,6 +790,7 @@ export function useAssistantArtifactWorkspaceController({
         exportSpreadsheet,
         exportCanvas,
         exportSlides,
+        exportStructured,
         importAsset,
       submitForm,
       archive: (artifactId: string) => controller.archive(artifactId),
@@ -764,7 +801,7 @@ export function useAssistantArtifactWorkspaceController({
       loadHistory: (artifactId: string) => loadHistory(artifactId, false),
       loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [applyProposal, autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSlides, exportSpreadsheet, formRuntime, forkConflict, importAsset, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, restoreArtifact, submitForm, toggle],
+    [applyProposal, autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSlides, exportSpreadsheet, exportStructured, formRuntime, forkConflict, importAsset, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, restoreArtifact, submitForm, toggle],
   );
 
   const activeTab =

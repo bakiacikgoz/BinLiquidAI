@@ -116,6 +116,7 @@ class ArtifactService:
             _DEFAULT_CONTINUATION_GATEWAY
         ),
         license_capabilities: Mapping[ArtifactKind, ArtifactLicenseCapability] | None = None,
+        fallback_editor_capabilities: Mapping[ArtifactKind, bool] | None = None,
         evidence_resolver: ArtifactEvidenceResolver | None = None,
         approval_store: ApprovalStore | None = None,
         feature_flags: Mapping[str, bool] | None = None,
@@ -140,6 +141,10 @@ class ArtifactService:
                 enabled=False,
                 reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
             )
+            for kind in (ArtifactKind.SPREADSHEET, ArtifactKind.CANVAS)
+        }
+        self._fallback_editor_capabilities = {
+            kind: (fallback_editor_capabilities or {}).get(kind) is True
             for kind in (ArtifactKind.SPREADSHEET, ArtifactKind.CANVAS)
         }
         if any(
@@ -224,13 +229,18 @@ class ArtifactService:
         )
 
     def _require_licensed_editor(self, kind: ArtifactKind) -> None:
-        if kind in self._license_capabilities and not self._license_capabilities[kind].enabled:
+        if (
+            kind in self._license_capabilities
+            and not self._license_capabilities[kind].enabled
+            and not self._fallback_editor_capabilities[kind]
+        ):
             raise ArtifactDomainError(
                 ArtifactErrorCode.ARTIFACT_LICENSE_UNAVAILABLE,
-                "licensed artifact editing is unavailable",
+                "artifact editor adapter is unavailable",
                 details={
                     "kind": kind.value,
                     "reasonCode": self._license_capabilities[kind].reason_code,
+                    "fallbackAvailable": False,
                 },
             )
 

@@ -37,6 +37,25 @@ describe('artifact bridge', () => {
     vi.resetModules();
   });
 
+  it('loads the backend-owned artifact runtime capability snapshot', async () => {
+    const capabilitySnapshot = {
+      contractVersion: 'artifact-runtime-capability-snapshot/v1', rolloutStage: 'all_noncommercial',
+      globalEnabled: true, enabledArtifactKinds: ['document'], features: { 'artifact_workspace.enabled': true },
+      licenses: { spreadsheet: false, canvas: false },
+      kindCapabilities: Object.fromEntries(['document', 'form', 'code', 'flow', 'spreadsheet', 'canvas', 'slides'].map((kind) => [kind, {
+        enabled: kind === 'document', editable: kind === 'document', exportable: kind === 'document', reasonCode: null,
+        requiresLicense: false, adapter: kind === 'spreadsheet' || kind === 'canvas' ? 'bundled_fallback' : 'built_in',
+      }])),
+    };
+    const invoke = mockInvoke({ capabilitySnapshot });
+    const { artifactBridge } = await import('./artifactBridge');
+
+    await expect(artifactBridge.getRuntimeCapabilitySnapshot()).resolves.toEqual(capabilitySnapshot);
+    expect(invoke).toHaveBeenCalledWith('bridge_artifact_handshake', {
+      payload: { params: {}, idempotencyKey: null, timeoutMs: 15_000 },
+    });
+  });
+
   it('sends only versioned params through the governed Tauri command', async () => {
     const invoke = mockInvoke({ items: [descriptor], next_cursor: null });
     const { artifactBridge } = await import('./artifactBridge');

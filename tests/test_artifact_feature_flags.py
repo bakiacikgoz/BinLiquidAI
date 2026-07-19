@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 
@@ -40,6 +41,69 @@ def test_feature_flag_contract_has_the_exact_phase_24_names() -> None:
     )
     assert tuple(contract["flags"]) == ARTIFACT_FEATURE_FLAG_NAMES
     assert all(value is False for value in contract["defaults"].values())
+    assert set(contract["profiles"]) == {
+        "artifact_workspace_off",
+        "artifact_workspace_core",
+        "artifact_workspace_full",
+    }
+    assert all(
+        value is False
+        for value in contract["profiles"]["artifact_workspace_off"]["features"].values()
+    )
+    assert all(
+        value is True
+        for value in contract["profiles"]["artifact_workspace_core"]["features"].values()
+    )
+    assert set(
+        contract["profiles"]["artifact_workspace_full"]["features"]
+    ) == set(ARTIFACT_FEATURE_FLAG_NAMES)
+
+
+def test_named_rollout_profiles_are_exact_and_capability_aware() -> None:
+    resolve_artifact_rollout_profile = importlib.import_module(
+        "imperaos.artifacts.rollout"
+    ).resolve_artifact_rollout_profile
+    off = resolve_artifact_rollout_profile("artifact_workspace_off")
+    assert all(value is False for value in off.values())
+
+    core = resolve_artifact_rollout_profile(
+        "artifact_workspace_core",
+        editor_capabilities={"spreadsheet": True, "canvas": False},
+    )
+    assert core["artifact_workspace.enabled"] is True
+    assert core["artifact_workspace.document.enabled"] is True
+    assert core["artifact_workspace.form.enabled"] is True
+    assert core["artifact_workspace.code.enabled"] is True
+    assert core["artifact_workspace.flow.enabled"] is True
+    assert core["artifact_workspace.slides.enabled"] is True
+    assert core["artifact_workspace.export.enabled"] is True
+    assert core["assistant_ui_runtime.enabled"] is True
+    assert core["ai_sdk_tauri_transport.enabled"] is True
+    assert core["artifact_workspace.spreadsheet.enabled"] is True
+    assert core["artifact_workspace.canvas.enabled"] is False
+
+    full = resolve_artifact_rollout_profile(
+        "artifact_workspace_full",
+        editor_capabilities={"spreadsheet": True, "canvas": True},
+    )
+    assert all(value is True for value in full.values())
+
+    with pytest.raises(ValueError, match="unknown artifact workspace rollout profile"):
+        resolve_artifact_rollout_profile("untrusted_profile")
+
+
+def test_runtime_profile_can_be_narrowed_by_explicit_environment_flags() -> None:
+    resolved = resolve_runtime_artifact_feature_flags(
+        env={
+            "IMPERAOS_ARTIFACT_WORKSPACE_PROFILE": "artifact_workspace_core",
+            "IMPERAOS_ARTIFACT_FLOW_EDITOR_ENABLED": "false",
+        },
+    )
+    assert resolved["artifact_workspace.enabled"] is True
+    assert resolved["artifact_workspace.document.enabled"] is True
+    assert resolved["artifact_workspace.flow.enabled"] is False
+    assert resolved["artifact_workspace.spreadsheet.enabled"] is True
+    assert resolved["artifact_workspace.canvas.enabled"] is True
 
 
 def test_global_off_and_license_capabilities_are_authoritative() -> None:
@@ -134,6 +198,30 @@ def test_runtime_capability_snapshot_reports_effective_rollout_without_environme
     assert enabled["enabledArtifactKinds"] == ["document", "spreadsheet"]
     assert enabled["features"]["artifact_workspace.spreadsheet.enabled"] is True
     assert enabled["licenses"] == {"spreadsheet": True, "canvas": False}
+    assert enabled["kindCapabilities"]["document"] == {
+        "enabled": True,
+        "editable": True,
+        "exportable": False,
+        "reasonCode": "ARTIFACT_EXPORT_FEATURE_DISABLED",
+        "requiresLicense": False,
+        "adapter": "built_in",
+    }
+    assert enabled["kindCapabilities"]["spreadsheet"] == {
+        "enabled": True,
+        "editable": True,
+        "exportable": False,
+        "reasonCode": "ARTIFACT_EXPORT_FEATURE_DISABLED",
+        "requiresLicense": False,
+        "adapter": "commercial",
+    }
+    assert enabled["kindCapabilities"]["canvas"] == {
+        "enabled": False,
+        "editable": False,
+        "exportable": False,
+        "reasonCode": "ARTIFACT_KIND_FEATURE_DISABLED",
+        "requiresLicense": False,
+        "adapter": "bundled_fallback",
+    }
 
 
 def test_forced_off_editor_flag_preserves_read_archive_and_safe_export_fallback(

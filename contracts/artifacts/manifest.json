@@ -222,7 +222,7 @@
       "category": "contract",
       "file": "artifact-export-begin-command.v1.schema.json",
       "name": "artifact-export-begin-command.v1",
-      "sha256": "c996218ebadc0e2c0adea4876a377dcdccc1c15837e3b4e0463d291a54214307"
+      "sha256": "8700d6c2370dd6d350e1192d1ebf3b27495c14054e6934629fd12909adad5b62"
     },
     {
       "category": "contract",
@@ -246,13 +246,13 @@
       "category": "contract",
       "file": "artifact-export-begin-result.v1.schema.json",
       "name": "artifact-export-begin-result.v1",
-      "sha256": "149126818ca39470ee84932979b1062c3907a81c7c9b99fcf9626294a8abe23f"
+      "sha256": "b06e425bd0e42318f5fca732e60b7a7459c715f9f68be61ec65a2884ad12eedd"
     },
     {
       "category": "contract",
       "file": "artifact-export-result.v1.schema.json",
       "name": "artifact-export-result.v1",
-      "sha256": "23ee1b68d96197fb54c60fb64de31bce0d143f5391725c8d87813c3924f904a9"
+      "sha256": "4e521726afc4ce7036fb9112f07a85e89ed4b4fa633e9b371a2e578ee234a696"
     },
     {
       "category": "contract",
@@ -300,7 +300,7 @@
       "category": "contract",
       "file": "artifact-rpc-handshake.v1.schema.json",
       "name": "artifact-rpc-handshake.v1",
-      "sha256": "615d7d1524cdf8c1738ea9c34faf676879d0c3ef8db301384bbbd1dbf4f5c9e1"
+      "sha256": "0d9b4170d37f3a70f401977576961ea7f5da74b7d7756d8de2c1597a7a48da55"
     }
   ]
 }

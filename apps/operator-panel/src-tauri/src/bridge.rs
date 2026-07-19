@@ -209,6 +209,7 @@ macro_rules! artifact_bridge_command {
 }
 
 artifact_bridge_command!(bridge_artifact_list, "artifact.list");
+artifact_bridge_command!(bridge_artifact_handshake, "rpc.handshake");
 artifact_bridge_command!(bridge_artifact_get, "artifact.get");
 artifact_bridge_command!(bridge_artifact_create, "artifact.create");
 artifact_bridge_command!(bridge_artifact_mutate, "artifact.mutate");
@@ -491,6 +492,7 @@ struct AuthorizedExportBegin {
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactExportBeginResult {
     cancelled: bool,
+    export_id: String,
     ticket: Option<String>,
     expires_in_ms: Option<u64>,
     max_bytes: usize,
@@ -652,6 +654,7 @@ pub async fn bridge_artifact_export_begin(
         }
         return BridgeResult::ok(ArtifactExportBeginResult {
             cancelled: true,
+            export_id: authorized.export_id.clone(),
             ticket: None,
             expires_in_ms: None,
             max_bytes: configured_max_export_bytes(),
@@ -694,6 +697,7 @@ pub async fn bridge_artifact_export_begin(
     {
         Ok(issued) => BridgeResult::ok(ArtifactExportBeginResult {
             cancelled: false,
+            export_id: authorized.export_id.clone(),
             ticket: Some(issued.ticket),
             expires_in_ms: Some(issued.expires_in_ms),
             max_bytes: issued.max_bytes,
@@ -881,6 +885,7 @@ pub async fn bridge_artifact_export_cancel(
 fn export_format(format: &str) -> Result<(&'static str, Vec<&'static str>), BridgeError> {
     match format.trim().to_ascii_lowercase().as_str() {
         "json" => Ok(("JSON", vec!["json"])),
+        "submission-json" => Ok(("Submission JSON", vec!["submission.json"])),
         "markdown" | "md" => Ok(("Markdown", vec!["md"])),
         "html" => Ok(("HTML", vec!["html"])),
         "csv" => Ok(("CSV", vec!["csv"])),
@@ -888,8 +893,8 @@ fn export_format(format: &str) -> Result<(&'static str, Vec<&'static str>), Brid
         "png" => Ok(("PNG", vec!["png"])),
         "svg" => Ok(("SVG", vec!["svg"])),
         "pptx" => Ok(("PowerPoint", vec!["pptx"])),
-        "zip" => Ok(("ZIP", vec!["zip"])),
         "source" => Ok(("Source", vec!["txt"])),
+        "txt" => Ok(("Text", vec!["txt"])),
         _ => Err(BridgeError::new(
             "ARTIFACT_EXPORT_FAILED",
             "Artifact export format is unsupported.",

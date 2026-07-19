@@ -216,6 +216,49 @@ def test_forced_off_capability_denies_spreadsheet_mutation_without_a_revision(
     assert len(service.store.list_revisions("workspace-1", "sheet-artifact")) == 1
 
 
+def test_bundled_fallback_capability_allows_spreadsheet_mutation_without_license(
+    tmp_path: Path,
+) -> None:
+    service = ArtifactService(
+        tmp_path / "artifacts",
+        fallback_editor_capabilities={ArtifactKind.SPREADSHEET: True},
+    )
+    context = OperationContext(
+        workspace_id="workspace-1", principal_type=PrincipalType.USER,
+        principal_id="user-1", roles=("artifact_admin",), request_id="request-fallback",
+    )
+    content = {
+        "kind": "spreadsheet", "schemaVersion": 2, "calculationMode": "disabled",
+        "sheets": [{"id": "sheet-1", "name": "Sheet 1", "cells": {}, "columns": []}],
+    }
+    created = service.create(
+        CreateArtifactCommand(
+            artifact_id="sheet-fallback", kind=ArtifactKind.SPREADSHEET, title="Budget",
+            data_class=ArtifactDataClass.INTERNAL, content=content,
+            idempotency_key="create-fallback",
+        ),
+        context,
+    )
+    updated = service.mutate(
+        MutateArtifactCommand(
+            artifact_id=created.artifact.artifact_id,
+            expected_revision_number=1,
+            mutation_type=ArtifactMutationType.REPLACE_CONTENT,
+            content={
+                **content,
+                "sheets": [{
+                    "id": "sheet-1", "name": "Sheet 1",
+                    "cells": {"A1": {"value": "fallback"}}, "columns": [],
+                }],
+            },
+            idempotency_key="mutate-fallback",
+            change_summary="Fallback edit",
+        ),
+        context,
+    )
+    assert updated.revision.revision_number == 2
+
+
 def test_enabled_cell_patch_is_atomic_bounded_and_preserves_other_cells(tmp_path: Path) -> None:
     service = ArtifactService(
         tmp_path / "artifacts",

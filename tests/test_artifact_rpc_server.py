@@ -118,6 +118,29 @@ def test_handshake_exposes_only_redacted_backend_license_capabilities(tmp_path: 
             "ai_sdk_tauri_transport.enabled": False,
         },
         "licenses": {"spreadsheet": False, "canvas": False},
+        "kindCapabilities": {
+            kind: {
+                "enabled": False,
+                "editable": False,
+                "exportable": False,
+                "reasonCode": "ARTIFACT_WORKSPACE_FEATURE_DISABLED",
+                "requiresLicense": False,
+                "adapter": (
+                    "bundled_fallback"
+                    if kind in {"spreadsheet", "canvas"}
+                    else "built_in"
+                ),
+            }
+            for kind in (
+                "document",
+                "form",
+                "code",
+                "flow",
+                "spreadsheet",
+                "canvas",
+                "slides",
+            )
+        },
     }
     serialized = json.dumps(response.result)
     assert "secret" not in serialized.lower()

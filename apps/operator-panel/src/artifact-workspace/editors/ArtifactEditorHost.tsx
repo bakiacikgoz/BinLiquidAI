@@ -16,7 +16,7 @@ import { FormSessionRuntime } from './form/formSessionRuntime';
 import { ArtifactLicenseBlocked } from '../ui/ArtifactLicenseBlocked';
 
 export type ArtifactSelection = ArtifactContextSelection;
-export type ArtifactExportFormat = 'json' | 'markdown' | 'html' | 'txt' | 'source' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx';
+export type ArtifactExportFormat = 'json' | 'submission-json' | 'markdown' | 'html' | 'txt' | 'source' | 'svg' | 'png' | 'csv' | 'xlsx' | 'pptx';
 
 export interface ArtifactEditorProps {
   artifact: ArtifactDescriptor;

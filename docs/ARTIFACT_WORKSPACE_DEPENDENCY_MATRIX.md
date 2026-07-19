@@ -1,10 +1,10 @@
 # Artifact Workspace Dependency Matrix
 
-- Status: Accepted decision baseline; release NO-SHIP while blockers remain
+- Status: Accepted decision baseline; bundled fallback adapters accepted
 - Owner: MAIN / Artifact Workspace
 - Authoritative sources: approved artifact workspace plan Task 1.1; `contracts/artifact_workspace/dependency_matrix.json`; official package documentation linked below
 - Last verified: 2026-07-16 at Git commit `d79f5e4c40573ccd99dfd07eca4ca54c1b1f545c`
-- Open decisions: commercial Handsontable and tldraw entitlements; dynamic RJSF validator implementation
+- Open decisions: optional commercial Handsontable and tldraw entitlements
 
 ## Decision
 
@@ -21,19 +21,18 @@ The machine-readable source is `contracts/artifact_workspace/dependency_matrix.j
 | Flow | `@xyflow/react@12.11.2` | MIT | Local CSS only; textual outline fallback |
 | Code | `monaco-editor@0.55.1`, `@monaco-editor/react@4.7.0` | MIT | Local workers and local Monaco loader; CodeMirror fallback |
 | Slides/export | `pptxgenjs@4.0.1`, `exceljs@4.4.0` | MIT | ArrayBuffer to native export ticket; no renderer file download |
-| Forms | `react-hook-form@7.81.0`, `zod@4.4.3`, `@hookform/resolvers@5.4.0`, RJSF `6.6.2`, `ajv@8.20.0`, `ajv-formats@3.0.1` | MIT / Apache-2.0 | Form remains forced off until CSP-safe validator and backend parity pass |
+| Forms | `react-hook-form@7.81.0`, `zod@4.4.3`, `@hookform/resolvers@5.4.0`, RJSF `6.6.2`, `ajv@8.20.0`, `ajv-formats@3.0.1` | MIT / Apache-2.0 | CSP-safe allowlisted validator and backend parity are implemented |
+| Spreadsheet fallback | Repository-owned React grid over the strict spreadsheet contract | Project license | Formula evaluation disabled; bounded virtual row window; CSV/XLSX native export |
+| Canvas fallback | Repository-owned React canvas over `CanvasContentV2` | Project license | Local shapes/free draw/assets only; remote embeds denied; JSON/SVG/PNG native export |
 | UI/security/native | `lucide-react@1.24.0`, `react-resizable-panels@4.12.2`, `dompurify@3.4.12`, `@tauri-apps/plugin-dialog@2.7.1` | ISC / MIT / MPL-2.0-or-Apache-2.0 | Local assets, sanitized rendering, native dialog only |
 
 ## Deferred packages
 
-`handsontable@18.0.0`, `@handsontable/react-wrapper@18.0.0`, and `tldraw@5.2.5` are not installable or activatable for production until a commercial/offline-compatible entitlement is recorded. Their feature flags remain forced off. Fallback selection requires a separate accepted ADR; candidates are AG Grid Community or Univer for spreadsheet and Excalidraw for canvas.
+`handsontable@18.0.0`, `@handsontable/react-wrapper@18.0.0`, and `tldraw@5.2.5` are not installable or activatable for production until a commercial/offline-compatible entitlement is recorded. Their commercial adapter capabilities remain off. The accepted fallback is the repository-owned, contract-preserving spreadsheet and canvas implementation; it adds no unapproved dependency and is selected automatically when entitlement is absent.
 
 ## Compatibility result
 
-The Phase 2 dependency/CSP probe is valid but release readiness remains false because:
-
-- Commercial editor entitlements are not recorded.
-- RJSF runtime-dynamic validation has no proven no-eval renderer implementation.
+The dependency/CSP probe remains valid. Missing commercial entitlement is a documented adapter-selection result, not a release blocker, because both repository-owned fallback adapters are available. RJSF uses the bounded CSP-safe validator and requires no runtime code generation.
 
 All required Phase 2 packages are exact-pinned in the root workspace lockfile. The redundant app-local lockfile was removed. Tauri CSP is non-null, local-only, and contains no `unsafe-eval`; editor-specific production probes remain required before their feature flags can open.
 
@@ -44,7 +43,7 @@ Run:
 .\.venv\Scripts\python.exe scripts/check_artifact_workspace_compatibility.py --release
 ```
 
-The first command validates the decision artifact and reports blockers. The second returns non-zero until every release blocker is cleared.
+The first command validates the decision artifact and reports commercial-package blockers. The release adapter gate accepts those blockers only when the corresponding bundled fallback capability is present; any unrelated blocker or missing fallback remains fail-closed.
 
 ## Official sources
 

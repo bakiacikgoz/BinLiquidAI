@@ -13,6 +13,59 @@
       "title": "ArtifactKind",
       "type": "string"
     },
+    "ArtifactKindRuntimeCapability": {
+      "additionalProperties": false,
+      "description": "Effective per-kind capability state safe to expose to the renderer.",
+      "properties": {
+        "adapter": {
+          "enum": [
+            "built_in",
+            "bundled_fallback",
+            "commercial",
+            "unavailable"
+          ],
+          "title": "Adapter",
+          "type": "string"
+        },
+        "editable": {
+          "title": "Editable",
+          "type": "boolean"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "exportable": {
+          "title": "Exportable",
+          "type": "boolean"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoncode"
+        },
+        "requiresLicense": {
+          "title": "Requireslicense",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "editable",
+        "exportable",
+        "requiresLicense",
+        "adapter"
+      ],
+      "title": "ArtifactKindRuntimeCapability",
+      "type": "object"
+    },
     "ArtifactLicenseCapability": {
       "additionalProperties": false,
       "properties": {
@@ -117,6 +170,13 @@
           "title": "Globalenabled",
           "type": "boolean"
         },
+        "kindCapabilities": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ArtifactKindRuntimeCapability"
+          },
+          "title": "Kindcapabilities",
+          "type": "object"
+        },
         "licenses": {
           "additionalProperties": {
             "type": "boolean"
@@ -148,7 +208,8 @@
         "globalEnabled",
         "enabledArtifactKinds",
         "features",
-        "licenses"
+        "licenses",
+        "kindCapabilities"
       ],
       "title": "ArtifactRuntimeCapabilitySnapshot",
       "type": "object"

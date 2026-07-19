@@ -11,7 +11,7 @@ export type DocumentArtifactExportFormat = 'markdown' | 'html';
 
 export type DocumentArtifactExportOutcome =
   | { status: 'cancelled' }
-  | { status: 'exported'; basename: string; sha256: string; sizeBytes: number };
+  | { status: 'exported'; basename: string; sha256: string; sizeBytes: number; exportId?: string };
 
 export async function exportDocumentArtifact({
   artifact,
@@ -45,5 +45,5 @@ export async function exportDocumentArtifact({
     throw new Error('Document export exceeds the native size limit.');
   }
   const result = await bridge.commitExport(begin.ticket, bytes);
-  return { status: 'exported', ...result };
+  return { status: 'exported', ...result, ...(begin.exportId ? { exportId: begin.exportId } : {}) };
 }

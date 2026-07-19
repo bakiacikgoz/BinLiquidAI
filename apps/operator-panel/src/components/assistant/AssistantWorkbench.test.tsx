@@ -175,8 +175,12 @@ describe('AssistantWorkbench', () => {
     await user.click(screen.getByRole('button', { name: 'Load more history' }));
     expect(onLoadMoreHistory).toHaveBeenCalledWith('artifact-document');
 
-    await user.click(screen.getByRole('button', { name: 'Export Markdown' }));
-    await user.click(screen.getByRole('button', { name: 'Export HTML' }));
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    await user.selectOptions(screen.getByLabelText('Export format'), 'markdown');
+    await user.click(screen.getByRole('button', { name: 'Choose destination and export' }));
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    await user.selectOptions(screen.getByLabelText('Export format'), 'html');
+    await user.click(screen.getByRole('button', { name: 'Choose destination and export' }));
     expect(onExportArtifact).toHaveBeenNthCalledWith(1, 'artifact-document', 'markdown');
     expect(onExportArtifact).toHaveBeenNthCalledWith(2, 'artifact-document', 'html');
   });

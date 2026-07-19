@@ -51,6 +51,8 @@ export default defineConfig({
           VITE_ARTIFACT_FORM_EDITOR: '1',
           VITE_ARTIFACT_CODE_EDITOR: '1',
           VITE_ARTIFACT_FLOW_EDITOR: '1',
+          VITE_ARTIFACT_SPREADSHEET_EDITOR: '1',
+          VITE_ARTIFACT_CANVAS_EDITOR: '1',
           VITE_ARTIFACT_SLIDES_EDITOR: '1',
           VITE_ARTIFACT_EXPORT: '1',
           VITE_ASSISTANT_UI_RUNTIME: '1',

@@ -235,6 +235,10 @@ def workspace_rpc(
             root,
             approval_store=resolve_artifact_approval_store(profile),
             license_capabilities=capabilities,
+            fallback_editor_capabilities={
+                ArtifactKind.SPREADSHEET: True,
+                ArtifactKind.CANVAS: True,
+            },
             feature_flags=feature_flags,
             evidence_resolver=FileArtifactEvidenceResolver(
                 artifact_evidence_root or root / "evidence"

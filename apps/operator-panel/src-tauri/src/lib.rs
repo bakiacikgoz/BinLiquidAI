@@ -63,6 +63,7 @@ pub fn run() {
             bridge::bridge_assistant_start_turn,
             bridge::bridge_assistant_cancel_turn,
             bridge::bridge_artifact_list,
+            bridge::bridge_artifact_handshake,
             bridge::bridge_artifact_get,
             bridge::bridge_artifact_create,
             bridge::bridge_artifact_mutate,

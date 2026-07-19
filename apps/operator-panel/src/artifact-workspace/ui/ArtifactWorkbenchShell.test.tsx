@@ -100,6 +100,9 @@ describe('ArtifactWorkbenchShell', () => {
     expect(screen.getByText('Assistant chat remains available')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('The artifact editor could not be displayed.');
     expect(screen.getByRole('button', { name: 'Retry editor' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open artifact read-only' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy support reference' })).toBeInTheDocument();
+    expect(screen.getByText(/support reference:/i)).toBeInTheDocument();
     expect(artifactUiMetricSnapshot()).toContainEqual({
       name: 'imperaos_artifact_editor_load_failure_total',
       labels: { kind: 'document' },

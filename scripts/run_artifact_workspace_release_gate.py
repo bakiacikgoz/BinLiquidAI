@@ -131,6 +131,8 @@ def gate_commands(gate: str) -> list[list[str]]:
                 "src/artifact-workspace/artifactSpreadsheetExport.test.ts",
                 "src/artifact-workspace/artifactCanvasExport.test.ts",
                 "src/artifact-workspace/artifactSlidesExport.test.ts",
+                "src/artifact-workspace/artifactStructuredExport.test.ts",
+                "src/artifact-workspace/artifactExportFormats.test.ts",
             ),
         ],
         "license": [_python_tests(
@@ -209,10 +211,11 @@ def _run_command(command: list[str], repo_root: Path) -> dict[str, object]:
     }
 
 
-def evaluate_forced_off_license_gate(
+def evaluate_editor_adapter_gate(
     compatibility: dict[str, Any],
     *,
-    capabilities: dict[str, bool],
+    license_capabilities: dict[str, bool],
+    fallback_capabilities: dict[str, bool],
 ) -> dict[str, object]:
     if not compatibility.get("matrixValid"):
         raise ValueError("artifact dependency matrix is invalid")
@@ -223,15 +226,33 @@ def evaluate_forced_off_license_gate(
             or blocker.get("subject") not in allowed_subjects
         ):
             raise ValueError("unexpected license blocker")
-    if capabilities != {"spreadsheet": False, "canvas": False}:
-        raise ValueError("commercial editors must remain backend forced off")
+    if set(license_capabilities) != {"spreadsheet", "canvas"} or set(
+        fallback_capabilities
+    ) != {"spreadsheet", "canvas"}:
+        raise ValueError("editor capability set is incomplete")
+    if any(
+        not license_capabilities[kind] and not fallback_capabilities[kind]
+        for kind in ("spreadsheet", "canvas")
+    ):
+        raise ValueError("an enabled editor requires a trusted adapter")
+    adapters = {
+        kind: "commercial" if license_capabilities[kind] else "bundled_fallback"
+        for kind in ("spreadsheet", "canvas")
+    }
     return {
         "status": "pass",
-        "mode": "forced_off",
-        "capabilities": capabilities,
+        "mode": "adapter_resolved",
+        "commercialCapabilities": license_capabilities,
+        "fallbackCapabilities": fallback_capabilities,
+        "effectiveCapabilities": {kind: True for kind in adapters},
+        "adapters": adapters,
         "reasonCodes": {
-            "spreadsheet": "ARTIFACT_LICENSE_EVIDENCE_MISSING",
-            "canvas": "ARTIFACT_LICENSE_EVIDENCE_MISSING",
+            kind: (
+                None
+                if license_capabilities[kind]
+                else "ARTIFACT_BUNDLED_FALLBACK_ACTIVE"
+            )
+            for kind in adapters
         },
     }
 
@@ -265,9 +286,10 @@ def run_leaf_gate(
     extra: dict[str, object] = {}
     if gate == "license" and not blocking:
         try:
-            extra["licenseDecision"] = evaluate_forced_off_license_gate(
+            extra["licenseDecision"] = evaluate_editor_adapter_gate(
                 evaluate_dependency_matrix(repo_root),
-                capabilities={"spreadsheet": False, "canvas": False},
+                license_capabilities={"spreadsheet": False, "canvas": False},
+                fallback_capabilities={"spreadsheet": True, "canvas": True},
             )
         except ValueError as exc:
             blocking.append(f"LICENSE_POLICY_INVALID:{exc}")
@@ -322,7 +344,10 @@ def build_release_readiness(
         "generatedAtUtc": _now(),
         "status": "pass" if not blocking else "fail",
         "shipReady": not blocking,
-        "forcedOffCapabilities": ["spreadsheet", "canvas"],
+        "editorAdapters": {
+            "spreadsheet": "bundled_fallback",
+            "canvas": "bundled_fallback",
+        },
         "featureFlagDefaults": {
             name: False for name in ARTIFACT_FEATURE_FLAG_NAMES
         },
@@ -399,7 +424,8 @@ def _render_readiness(report: dict[str, object]) -> str:
         f"- Candidate: `{report['candidateSha']}`",
         f"- Status: `{report['status']}`",
         f"- Ship ready: `{str(report['shipReady']).lower()}`",
-        "- Licensed editors: `spreadsheet, canvas` forced off",
+        "- Optional editors: `spreadsheet, canvas` use trusted bundled fallback "
+        "adapters when commercial entitlement is absent",
         "",
         "## Gate statuses",
         "",

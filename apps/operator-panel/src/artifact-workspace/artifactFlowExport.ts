@@ -5,7 +5,7 @@ import { parseFlowArtifactContent } from './editors/flow/flowAdapter';
 export type FlowArtifactExportFormat = 'json' | 'svg' | 'png';
 export type FlowArtifactExportOutcome =
   | { status: 'cancelled' }
-  | { status: 'exported'; basename: string; sha256: string; sizeBytes: number };
+  | { status: 'exported'; basename: string; sha256: string; sizeBytes: number; exportId?: string };
 
 const NODE_WIDTH = 160;
 const NODE_HEIGHT = 56;
@@ -116,5 +116,5 @@ export async function exportFlowArtifact({
     throw new Error('Flow export exceeds the native size limit.');
   }
   const result = await bridge.commitExport(begin.ticket, bytes);
-  return { status: 'exported', ...result };
+  return { status: 'exported', ...result, ...(begin.exportId ? { exportId: begin.exportId } : {}) };
 }

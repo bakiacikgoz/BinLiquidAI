@@ -11,7 +11,7 @@ from scripts.run_artifact_workspace_release_gate import (
     _extract_performance_evidence,
     _run_command,
     build_release_readiness,
-    evaluate_forced_off_license_gate,
+    evaluate_editor_adapter_gate,
     gate_commands,
     run_leaf_gate,
 )
@@ -71,8 +71,8 @@ def test_release_readiness_requires_one_immutable_candidate_and_nonzero_tests() 
     )
 
 
-def test_license_gate_accepts_only_backend_forced_off_commercial_editors() -> None:
-    report = evaluate_forced_off_license_gate(
+def test_license_gate_resolves_trusted_bundled_fallback_adapters() -> None:
+    report = evaluate_editor_adapter_gate(
         {
             "blockers": [
                 {"code": "LICENSE_GATE_BLOCKED", "subject": "handsontable"},
@@ -81,18 +81,43 @@ def test_license_gate_accepts_only_backend_forced_off_commercial_editors() -> No
             ],
             "matrixValid": True,
         },
-        capabilities={"spreadsheet": False, "canvas": False},
+        license_capabilities={"spreadsheet": False, "canvas": False},
+        fallback_capabilities={"spreadsheet": True, "canvas": True},
     )
     assert report["status"] == "pass"
-    assert report["mode"] == "forced_off"
+    assert report["mode"] == "adapter_resolved"
+    assert report["commercialCapabilities"] == {
+        "spreadsheet": False,
+        "canvas": False,
+    }
+    assert report["fallbackCapabilities"] == {
+        "spreadsheet": True,
+        "canvas": True,
+    }
+    assert report["effectiveCapabilities"] == {
+        "spreadsheet": True,
+        "canvas": True,
+    }
+    assert report["adapters"] == {
+        "spreadsheet": "bundled_fallback",
+        "canvas": "bundled_fallback",
+    }
 
     with pytest.raises(ValueError, match="unexpected license blocker"):
-        evaluate_forced_off_license_gate(
+        evaluate_editor_adapter_gate(
             {
                 "blockers": [{"code": "CSP_DISABLED", "subject": "tauri.conf.json"}],
                 "matrixValid": True,
             },
-            capabilities={"spreadsheet": False, "canvas": False},
+            license_capabilities={"spreadsheet": False, "canvas": False},
+            fallback_capabilities={"spreadsheet": True, "canvas": True},
+        )
+
+    with pytest.raises(ValueError, match="requires a trusted adapter"):
+        evaluate_editor_adapter_gate(
+            {"blockers": [], "matrixValid": True},
+            license_capabilities={"spreadsheet": False, "canvas": False},
+            fallback_capabilities={"spreadsheet": False, "canvas": True},
         )
 
 

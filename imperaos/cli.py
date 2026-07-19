@@ -22,7 +22,12 @@ from imperaos.artifacts.assistant import (
     extract_artifact_context_request,
 )
 from imperaos.artifacts.cli import register_artifact_cli
-from imperaos.artifacts.models import ArtifactDataClass, OperationContext, PrincipalType
+from imperaos.artifacts.models import (
+    ArtifactDataClass,
+    ArtifactKind,
+    OperationContext,
+    PrincipalType,
+)
 from imperaos.artifacts.runtime import (
     resolve_artifact_approval_store,
     resolve_runtime_artifact_feature_flags,
@@ -1407,6 +1412,10 @@ def _assistant_turn_events(
                     ArtifactService(
                         artifact_root,
                         approval_store=resolve_artifact_approval_store(profile),
+                        fallback_editor_capabilities={
+                            ArtifactKind.SPREADSHEET: True,
+                            ArtifactKind.CANVAS: True,
+                        },
                         feature_flags=resolve_runtime_artifact_feature_flags(),
                     )
                 ),
