@@ -2,10 +2,11 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Default)]
 pub struct TerminalManager {
@@ -70,15 +71,24 @@ fn shell_command() -> Result<CommandBuilder, String> {
     }
 }
 
-fn safe_cwd(value: Option<String>) -> Result<Option<PathBuf>, String> {
-    let Some(value) = value else { return Ok(None) };
-    let path = PathBuf::from(value);
-    if !path.is_absolute() || !path.is_dir() {
+fn reject_renderer_cwd(value: Option<&str>) -> Result<(), String> {
+    if value.is_some() {
         return Err(terminal_error(
-            "working directory must be an existing absolute directory",
+            "renderer-supplied working directories are not trusted",
         ));
     }
-    Ok(Some(path))
+    Ok(())
+}
+
+fn verified_runtime_workspace_root(app: &AppHandle) -> Result<PathBuf, String> {
+    let root = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| terminal_error("could not resolve terminal runtime workspace"))?
+        .join("terminal-workspace");
+    fs::create_dir_all(&root)
+        .map_err(|_| terminal_error("could not initialize terminal runtime workspace"))?;
+    Ok(root)
 }
 
 #[tauri::command]
@@ -95,10 +105,9 @@ pub fn terminal_start(
     if request.cols == 0 || request.rows == 0 || request.cols > 500 || request.rows > 300 {
         return Err(terminal_error("terminal dimensions are outside policy"));
     }
+    reject_renderer_cwd(request.cwd.as_deref())?;
     let mut command = shell_command()?;
-    if let Some(cwd) = safe_cwd(request.cwd)? {
-        command.cwd(cwd);
-    }
+    command.cwd(verified_runtime_workspace_root(&app)?);
     let pair = native_pty_system()
         .openpty(PtySize {
             rows: request.rows,
@@ -214,4 +223,15 @@ pub fn terminal_kill(
         .child
         .kill()
         .map_err(|_| terminal_error("terminal kill failed"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reject_renderer_cwd;
+
+    #[test]
+    fn renderer_cwd_is_never_a_terminal_authority() {
+        assert!(reject_renderer_cwd(Some("/tmp/untrusted")).is_err());
+        assert!(reject_renderer_cwd(None).is_ok());
+    }
 }
