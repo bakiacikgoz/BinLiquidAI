@@ -2,6 +2,7 @@ pub mod artifact_asset;
 pub mod artifact_export;
 pub mod artifact_rpc;
 mod bridge;
+pub mod browser;
 pub mod terminal;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -9,6 +10,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(bridge::AssistantProcessRegistry::default())
         .manage(artifact_rpc::WorkspaceRpcRegistry::default())
+        .manage(browser::BrowserPolicyState::default())
         .manage(terminal::TerminalManager::default())
         .manage(artifact_asset::ArtifactAssetState::default())
         .manage(artifact_export::ArtifactExportState::new(
@@ -100,6 +102,8 @@ pub fn run() {
             terminal::terminal_write,
             terminal::terminal_resize,
             terminal::terminal_kill,
+            browser::browser_open,
+            browser::browser_register_preview_origin,
         ])
         .run(tauri::generate_context!())
         .expect("error while running operator panel");
