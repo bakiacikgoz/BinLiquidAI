@@ -28,6 +28,9 @@ switch and a decision in one mode never grants access in another mode.
 ## External effects
 
 - Redirects are rechecked under their session's mode policy.
+- `file`, `javascript`, `data`, `tauri`, and `asset` are content/internal
+  schemes, not external applications: they remain denied and no approval can
+  turn them into an executable route.
 - New windows are denied until the user explicitly approves reopening the URL
   in a governed browser session.
 - Downloads and external application schemes remain blocked after notifying

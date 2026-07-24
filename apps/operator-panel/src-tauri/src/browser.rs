@@ -92,11 +92,15 @@ fn normalize_agent_domain(value: &str) -> Result<String, String> {
     }
     let parsed = Url::parse(&format!("https://{candidate}"))
         .map_err(|_| "BROWSER_POLICY_DENIED: agent allowlist contains an invalid domain")?;
-    parsed
+    let host = parsed
         .host_str()
         .filter(|host| !host.is_empty())
         .map(|host| host.to_ascii_lowercase())
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: agent allowlist contains an invalid domain".into())
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: agent allowlist contains an invalid domain".to_owned())?;
+    if host == "localhost" || host.parse::<std::net::IpAddr>().is_ok() {
+        return Err("BROWSER_POLICY_DENIED: agent allowlist requires a DNS domain".into());
+    }
+    Ok(host)
 }
 
 impl BrowserPolicyState {
@@ -247,7 +251,13 @@ fn emit_approval_required(
 }
 
 fn is_external_application_scheme(url: &Url) -> bool {
-    !matches!(url.scheme(), "http" | "https")
+    // Content and application-internal schemes are always denied. They are
+    // not OS application launches, so an approval must never turn them into
+    // an executable route.
+    !matches!(
+        url.scheme(),
+        "http" | "https" | "file" | "javascript" | "data" | "tauri" | "asset"
+    )
 }
 
 fn open_browser_window(
@@ -444,7 +454,7 @@ pub fn browser_close(
 
 #[cfg(test)]
 mod tests {
-    use super::{allowed, BrowserMode, BrowserPolicyState};
+    use super::{allowed, is_external_application_scheme, BrowserMode, BrowserPolicyState};
     use tauri::Url;
 
     fn url(value: &str) -> Url {
@@ -537,5 +547,28 @@ mod tests {
             Some("task-1"),
             &url("https://www.example.com/v1")
         ));
+        assert!(state
+            .set_agent_domains_from_governed_policy("task-1", ["localhost"])
+            .is_err());
+        assert!(state
+            .set_agent_domains_from_governed_policy("task-1", ["127.0.0.1"])
+            .is_err());
+    }
+
+    #[test]
+    fn blocked_content_schemes_are_never_treated_as_external_applications() {
+        for value in [
+            "file:///tmp/secret",
+            "javascript:alert(1)",
+            "data:text/html,blocked",
+            "tauri://localhost/",
+            "asset://localhost/icon.svg",
+        ] {
+            assert!(
+                !is_external_application_scheme(&url(value)),
+                "{value} must stay blocked without an approval route"
+            );
+        }
+        assert!(is_external_application_scheme(&url("mailto:operator@example.com")));
     }
 }

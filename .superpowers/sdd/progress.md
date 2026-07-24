@@ -45,6 +45,9 @@
 
 - Complete: user PTY uses an application-owned verified root, resize, interrupt, kill and tab-scoped cleanup.
 - Complete: browser policy is mode-scoped; user HTTPS, registered preview origins, agent allowlists, redirect rechecks, isolated agent data stores and approval-gated external effects are enforced.
+- Complete: blocked content/internal schemes cannot be reclassified as
+  approval-gated external applications; agent allowlists reject localhost and
+  literal IP addresses.
 - Remaining: terminal attachment to the registered project root, browser bounds/overlay coordination, history controls where the Tauri runtime exposes them, and governed download save approval.
 
 ## Phase 10–12 — Product collections and settings
