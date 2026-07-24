@@ -29,7 +29,9 @@ The UI Lab source remains unchanged.
   does not widen the existing policy decision.
 - Existing Artifact Workspace controllers and all seven artifact editors remain
   canonical. Product-shell tabs host the Artifact Workspace, PTY terminals,
-  native browser and registered preview surfaces.
+  native browser and registered preview surfaces. Selecting an artifact card
+  passes its exact artifact ID into the canonical workspace, which opens and
+  focuses the persisted artifact rather than a mock copy.
 - Browser origin policy is documented in
   `docs/security/BROWSER_ORIGIN_POLICY.md` and enforced by the native runtime.
 

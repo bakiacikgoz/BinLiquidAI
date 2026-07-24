@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import { AssistantWorkbench } from '../../components/assistant/AssistantWorkbench';
@@ -8,14 +8,16 @@ import type { ArtifactExportFormat } from '../../artifact-workspace/artifactExpo
 type ProductArtifactWorkspaceProps = {
   state: AssistantSessionState;
   openRequest: number;
+  requestedArtifactId?: string;
 };
 
 /**
  * Product Shell deliberately reuses the governed artifact controller rather
  * than copying an editor or storing artifact state in the renderer.
  */
-export function ProductArtifactWorkspace({ state, openRequest }: ProductArtifactWorkspaceProps) {
+export function ProductArtifactWorkspace({ state, openRequest, requestedArtifactId }: ProductArtifactWorkspaceProps) {
   const [selectedLegacyArtifactName, setSelectedLegacyArtifactName] = useState('');
+  const lastRequestedArtifactId = useRef<string | null>(null);
   const legacyArtifacts = useMemo(
     () => state.referencedArtifacts.map((artifact) => ({
       name: artifact.name,
@@ -34,6 +36,12 @@ export function ProductArtifactWorkspace({ state, openRequest }: ProductArtifact
   useEffect(() => {
     if (openRequest > 0 && !workspace.open) workspace.actions.toggle();
   }, [openRequest, workspace.actions, workspace.open]);
+
+  useEffect(() => {
+    if (!requestedArtifactId || requestedArtifactId === lastRequestedArtifactId.current) return;
+    lastRequestedArtifactId.current = requestedArtifactId;
+    void workspace.actions.openArtifact(requestedArtifactId);
+  }, [requestedArtifactId, workspace.actions]);
 
   if (!workspace.open) return null;
 

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../terminal/TerminalSurface', () => ({ TerminalSurface: () => <div>Terminal surface</div> }));
 vi.mock('../browser/BrowserSurface', () => ({ BrowserSurface: () => <div>Browser surface</div> }));
 vi.mock('../browser/PreviewSurface', () => ({ PreviewSurface: () => <div>Preview surface</div> }));
-vi.mock('./ProductArtifactWorkspace', () => ({ ProductArtifactWorkspace: () => <div>Artifact surface</div> }));
+vi.mock('./ProductArtifactWorkspace', () => ({ ProductArtifactWorkspace: ({ requestedArtifactId }: { requestedArtifactId?: string }) => <div>Artifact surface {requestedArtifactId ?? 'catalog'}</div> }));
 
 import { getAssistantFixture } from '../../assistant/assistantFixtures';
 import { renderOperatorPanel } from '../../test/render';
@@ -27,5 +27,13 @@ describe('WorkspaceTabs', () => {
 
     expect(onActivate).toHaveBeenCalledWith(first.id);
     expect(onClose).toHaveBeenCalledWith(second.id);
+  });
+
+  it('hands an artifact-card selection to the canonical artifact workspace', () => {
+    const artifact = createWorkspaceTab('artifacts', 'artifact-release-plan');
+
+    renderOperatorPanel(<WorkspaceTabs tabs={[artifact]} activeTabId={artifact.id} assistantState={getAssistantFixture('running')} onActivate={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByText('Artifact surface artifact-release-plan')).toBeInTheDocument();
   });
 });

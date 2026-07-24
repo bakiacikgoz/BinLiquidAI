@@ -39,7 +39,9 @@
 
 - Complete: artifact, terminal, browser and preview surfaces use a governed workspace tab lifecycle; runtime tab IDs are unique.
 - Complete: existing Artifact Workspace controller/editor is reused rather than copying a mock editor.
-- Remaining: focus a specific committed artifact in its tab and add the minimal governed files/data surfaces.
+- Complete: an assistant artifact card transfers its exact artifact ID into the
+  canonical Artifact Workspace tab and focuses that persisted artifact.
+- Remaining: add the minimal governed files/data surfaces.
 
 ## Phase 8–9 — Native runtime surfaces
 

@@ -1,5 +1,5 @@
 export type WorkspaceTabKind = 'artifacts' | 'terminal' | 'browser' | 'preview';
-export type WorkspaceTab = { id: string; kind: WorkspaceTabKind; title: string };
+export type WorkspaceTab = { id: string; kind: WorkspaceTabKind; title: string; artifactId?: string };
 
 const labels: Record<WorkspaceTabKind, string> = {
   artifacts: 'Artifacts',
@@ -8,9 +8,9 @@ const labels: Record<WorkspaceTabKind, string> = {
   preview: 'Preview',
 };
 
-export function createWorkspaceTab(kind: WorkspaceTabKind): WorkspaceTab {
+export function createWorkspaceTab(kind: WorkspaceTabKind, artifactId?: string): WorkspaceTab {
   const id = kind === 'artifacts'
     ? 'artifacts'
     : `${kind}-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
-  return { id, kind, title: labels[kind] };
+  return { id, kind, title: labels[kind], ...(kind === 'artifacts' && artifactId ? { artifactId } : {}) };
 }

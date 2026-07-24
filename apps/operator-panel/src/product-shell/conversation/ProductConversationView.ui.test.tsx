@@ -22,6 +22,6 @@ describe('ProductConversationView artifacts', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Open in workspace' }));
 
-    expect(onOpenArtifacts).toHaveBeenCalledTimes(1);
+    expect(onOpenArtifacts).toHaveBeenCalledWith('artifact-release-plan');
   });
 });
