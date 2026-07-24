@@ -102,6 +102,7 @@ pub fn run() {
             terminal::terminal_start,
             terminal::terminal_write,
             terminal::terminal_resize,
+            terminal::terminal_interrupt,
             terminal::terminal_kill,
             browser::browser_open,
             browser::browser_list_preview_origins,

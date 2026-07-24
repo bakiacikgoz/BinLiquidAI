@@ -91,6 +91,10 @@ fn verified_runtime_workspace_root(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(root)
 }
 
+fn interrupt_sequence() -> &'static [u8] {
+    b"\x03"
+}
+
 #[tauri::command]
 pub fn terminal_start(
     app: AppHandle,
@@ -208,6 +212,24 @@ pub fn terminal_resize(
 }
 
 #[tauri::command]
+pub fn terminal_interrupt(
+    state: State<'_, TerminalManager>,
+    request: TerminalKillRequest,
+) -> Result<(), String> {
+    let mut sessions = state
+        .sessions
+        .lock()
+        .map_err(|_| terminal_error("terminal manager unavailable"))?;
+    let session = sessions
+        .get_mut(&request.session_id)
+        .ok_or_else(|| terminal_error("unknown terminal session"))?;
+    session
+        .writer
+        .write_all(interrupt_sequence())
+        .map_err(|_| terminal_error("terminal interrupt failed"))
+}
+
+#[tauri::command]
 pub fn terminal_kill(
     state: State<'_, TerminalManager>,
     request: TerminalKillRequest,
@@ -227,11 +249,16 @@ pub fn terminal_kill(
 
 #[cfg(test)]
 mod tests {
-    use super::reject_renderer_cwd;
+    use super::{interrupt_sequence, reject_renderer_cwd};
 
     #[test]
     fn renderer_cwd_is_never_a_terminal_authority() {
         assert!(reject_renderer_cwd(Some("/tmp/untrusted")).is_err());
         assert!(reject_renderer_cwd(None).is_ok());
+    }
+
+    #[test]
+    fn interrupt_uses_only_the_terminal_control_sequence() {
+        assert_eq!(interrupt_sequence(), b"\x03");
     }
 }

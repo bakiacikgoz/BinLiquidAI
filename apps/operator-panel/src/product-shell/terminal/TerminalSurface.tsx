@@ -39,5 +39,11 @@ export function TerminalSurface({ onClose }: { onClose: () => void }) {
     return () => { input.dispose(); resize.disconnect(); unlisten?.(); if (sessionRef.current) void invoke('terminal_kill', { request: { sessionId: sessionRef.current } }); terminal.dispose(); };
   }, []);
 
-  return <section className="ps-terminal" aria-label="Governed terminal"><header><strong>Terminal</strong><button type="button" onClick={onClose}>Close</button></header><p className="ps-muted">User PTY · verified runtime workspace root · agent input denied</p>{error ? <p role="alert">{error}</p> : null}<div ref={hostRef} /></section>;
+  const interrupt = () => {
+    if (!sessionRef.current) return;
+    void invoke('terminal_interrupt', { request: { sessionId: sessionRef.current } })
+      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Terminal interrupt failed.'));
+  };
+
+  return <section className="ps-terminal" aria-label="Governed terminal"><header><strong>Terminal</strong><button type="button" onClick={interrupt}>Interrupt</button><button type="button" onClick={onClose}>Close</button></header><p className="ps-muted">User PTY · verified runtime workspace root · agent input denied</p>{error ? <p role="alert">{error}</p> : null}<div ref={hostRef} /></section>;
 }
