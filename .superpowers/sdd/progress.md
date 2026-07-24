@@ -56,8 +56,11 @@
 - Complete: browser and preview back/forward controls operate on native
   ImperaOS-issued navigation history and every selected history target is
   revalidated under its session mode policy.
-- Remaining: browser bounds/overlay coordination and governed download save
-  approval.
+- Complete: a native browser/preview window is shown only while its workspace
+  tab is active and is hidden on tab deactivation, preventing an unmanaged
+  child-webview overlay while preserving its governed session.
+- Remaining: explicit native-window bounds coordination and governed download
+  save approval.
 
 ## Phase 10–12 — Product collections and settings
 

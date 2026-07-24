@@ -19,7 +19,7 @@ describe('WorkspaceTabs', () => {
     const onClose = vi.fn();
     expect(first.id).not.toBe(second.id);
 
-    const { user } = renderOperatorPanel(<WorkspaceTabs tabs={[first, second]} activeTabId={second.id} assistantState={getAssistantFixture('running')} onActivate={onActivate} onClose={onClose} />);
+    const { user } = renderOperatorPanel(<WorkspaceTabs tabs={[first, second]} activeTabId={second.id} assistantState={getAssistantFixture('running')} onActivate={onActivate} onClose={onClose} onUpdate={vi.fn()} />);
 
     expect(screen.getByText('Terminal surface runtime-root')).toBeInTheDocument();
     await user.click(screen.getAllByRole('tab', { name: 'Terminal' })[0]);
@@ -32,7 +32,7 @@ describe('WorkspaceTabs', () => {
   it('hands an artifact-card selection to the canonical artifact workspace', () => {
     const artifact = createWorkspaceTab('artifacts', 'artifact-release-plan');
 
-    renderOperatorPanel(<WorkspaceTabs tabs={[artifact]} activeTabId={artifact.id} assistantState={getAssistantFixture('running')} onActivate={vi.fn()} onClose={vi.fn()} />);
+    renderOperatorPanel(<WorkspaceTabs tabs={[artifact]} activeTabId={artifact.id} assistantState={getAssistantFixture('running')} onActivate={vi.fn()} onClose={vi.fn()} onUpdate={vi.fn()} />);
 
     expect(screen.getByText('Artifact surface artifact-release-plan')).toBeInTheDocument();
   });
@@ -40,7 +40,7 @@ describe('WorkspaceTabs', () => {
   it('passes only the opaque project-root reference to a user terminal', () => {
     const terminal = createWorkspaceTab('terminal');
 
-    renderOperatorPanel(<WorkspaceTabs tabs={[terminal]} activeTabId={terminal.id} assistantState={getAssistantFixture('running')} projectRootRef="root-release" projectRootDisplayName="Release workspace" onActivate={vi.fn()} onClose={vi.fn()} />);
+    renderOperatorPanel(<WorkspaceTabs tabs={[terminal]} activeTabId={terminal.id} assistantState={getAssistantFixture('running')} projectRootRef="root-release" projectRootDisplayName="Release workspace" onActivate={vi.fn()} onClose={vi.fn()} onUpdate={vi.fn()} />);
 
     expect(screen.getByText('Terminal surface root-release')).toBeInTheDocument();
   });

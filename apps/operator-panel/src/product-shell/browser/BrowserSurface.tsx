@@ -14,11 +14,16 @@ function normalizeHistory(value: unknown): BrowserHistoryState {
   };
 }
 
-export function BrowserSurface({ onClose }: { onClose: () => void }) {
+export function BrowserSurface({ onClose, sessionLabel: persistedSessionLabel, onSessionChange }: { onClose: () => void; sessionLabel?: string; onSessionChange?: (sessionLabel: string | null) => void }) {
   const [address, setAddress] = useState('https://');
-  const [sessionLabel, setSessionLabel] = useState<string | null>(null);
+  const [ownedSessionLabel, setOwnedSessionLabel] = useState<string | null>(null);
   const [history, setHistory] = useState<BrowserHistoryState>(emptyHistory);
   const [status, setStatus] = useState('');
+  const sessionLabel = persistedSessionLabel ?? ownedSessionLabel;
+  const setSessionLabel = (next: string | null) => {
+    setOwnedSessionLabel(next);
+    onSessionChange?.(next);
+  };
 
   const refreshHistory = async (label = sessionLabel) => {
     if (!label) { setHistory(emptyHistory); return; }
@@ -49,6 +54,7 @@ export function BrowserSurface({ onClose }: { onClose: () => void }) {
   };
   const close = () => {
     if (sessionLabel) void invoke('browser_close', { request: { label: sessionLabel } });
+    setSessionLabel(null);
     onClose();
   };
   const reload = () => {
@@ -60,6 +66,13 @@ export function BrowserSurface({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!sessionLabel) return;
     void refreshHistory(sessionLabel).catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Browser history is unavailable.'));
+  }, [sessionLabel]);
+
+  useEffect(() => {
+    if (!sessionLabel) return;
+    void invoke('browser_show', { request: { label: sessionLabel } })
+      .catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Browser could not become visible.'));
+    return () => { void invoke('browser_hide', { request: { label: sessionLabel } }); };
   }, [sessionLabel]);
 
   return <section className="ps-browser" aria-label="Native browser"><header><strong>Browser</strong><button type="button" onClick={close}>Close</button></header><form onSubmit={(event) => { event.preventDefault(); void open(); }}><input aria-label="Browser address" value={address} onChange={(event) => setAddress(event.target.value)} inputMode="url" /><button type="submit">{sessionLabel ? 'Navigate HTTPS' : 'Open HTTPS'}</button></form><div><button type="button" disabled={!sessionLabel || !history.canBack} onClick={() => void move('back')}>Back</button><button type="button" disabled={!sessionLabel || !history.canForward} onClick={() => void move('forward')}>Forward</button><button type="button" disabled={!sessionLabel} onClick={reload}>Reload</button></div>{status && <p role="status">{status}</p>}<p>User mode opens only explicitly entered HTTPS URLs. Each explicit history target and every redirect is revalidated by native policy.</p></section>;

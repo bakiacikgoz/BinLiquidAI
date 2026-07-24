@@ -14,12 +14,17 @@ function normalizeHistory(value: unknown): BrowserHistoryState {
   };
 }
 
-export function PreviewSurface({ onClose }: { onClose: () => void }) {
+export function PreviewSurface({ onClose, sessionLabel: persistedSessionLabel, onSessionChange }: { onClose: () => void; sessionLabel?: string; onSessionChange?: (sessionLabel: string | null) => void }) {
   const [origins, setOrigins] = useState<string[]>([]);
   const [selected, setSelected] = useState('');
-  const [sessionLabel, setSessionLabel] = useState<string | null>(null);
+  const [ownedSessionLabel, setOwnedSessionLabel] = useState<string | null>(null);
   const [history, setHistory] = useState<BrowserHistoryState>(emptyHistory);
   const [status, setStatus] = useState('');
+  const sessionLabel = persistedSessionLabel ?? ownedSessionLabel;
+  const setSessionLabel = (next: string | null) => {
+    setOwnedSessionLabel(next);
+    onSessionChange?.(next);
+  };
   const refreshHistory = async (label = sessionLabel) => {
     if (!label) { setHistory(emptyHistory); return; }
     setHistory(normalizeHistory(await invoke<unknown>('browser_history_state', { request: { label } })));
@@ -34,6 +39,12 @@ export function PreviewSurface({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!sessionLabel) return;
     void refreshHistory(sessionLabel).catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Preview history is unavailable.'));
+  }, [sessionLabel]);
+  useEffect(() => {
+    if (!sessionLabel) return;
+    void invoke('browser_show', { request: { label: sessionLabel } })
+      .catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Preview could not become visible.'));
+    return () => { void invoke('browser_hide', { request: { label: sessionLabel } }); };
   }, [sessionLabel]);
 
   const open = async () => {
@@ -60,6 +71,7 @@ export function PreviewSurface({ onClose }: { onClose: () => void }) {
   };
   const close = () => {
     if (sessionLabel) void invoke('browser_close', { request: { label: sessionLabel } });
+    setSessionLabel(null);
     onClose();
   };
   const reload = () => {

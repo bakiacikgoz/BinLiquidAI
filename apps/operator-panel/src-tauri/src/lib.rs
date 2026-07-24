@@ -117,6 +117,8 @@ pub fn run() {
             browser::browser_forward,
             browser::browser_history_state,
             browser::browser_reload,
+            browser::browser_show,
+            browser::browser_hide,
             browser::browser_close,
         ])
         .run(tauri::generate_context!())

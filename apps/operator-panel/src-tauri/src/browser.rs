@@ -574,6 +574,46 @@ pub fn browser_reload(
 }
 
 #[tauri::command]
+pub fn browser_show(
+    app: AppHandle,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserSessionRequest,
+) -> Result<(), String> {
+    if !sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?
+        .contains_key(&request.label)
+    {
+        return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
+    }
+    app.get_webview_window(&request.label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .show()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser could not show".to_owned())
+}
+
+#[tauri::command]
+pub fn browser_hide(
+    app: AppHandle,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserSessionRequest,
+) -> Result<(), String> {
+    if !sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?
+        .contains_key(&request.label)
+    {
+        return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
+    }
+    app.get_webview_window(&request.label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .hide()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser could not hide".to_owned())
+}
+
+#[tauri::command]
 pub fn browser_close(
     app: AppHandle,
     sessions: tauri::State<'_, BrowserSessionRegistry>,

@@ -1,5 +1,11 @@
 export type WorkspaceTabKind = 'artifacts' | 'terminal' | 'browser' | 'preview';
-export type WorkspaceTab = { id: string; kind: WorkspaceTabKind; title: string; artifactId?: string };
+export type WorkspaceTab = {
+  id: string;
+  kind: WorkspaceTabKind;
+  title: string;
+  artifactId?: string;
+  nativeSessionLabel?: string;
+};
 
 const labels: Record<WorkspaceTabKind, string> = {
   artifacts: 'Artifacts',
