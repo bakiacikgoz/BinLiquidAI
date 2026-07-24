@@ -49,6 +49,7 @@ from imperaos.artifacts.rpc_protocol import (
 from imperaos.artifacts.runtime import build_runtime_artifact_capability_snapshot
 from imperaos.artifacts.service import ArtifactService
 from imperaos.artifacts.store import StorageReconciliationReport
+from imperaos.product_workspace import ProductWorkspaceService, ProductWorkspaceStore
 
 _READ_CHUNK_BYTES = 64 * 1024
 _MAX_DEDUP_RESPONSES = 1024
@@ -73,8 +74,14 @@ _MUTATION_METHODS_WITH_KEYS = {
 class ArtifactRpcServer:
     """Single-process, protocol-only stdio adapter over the canonical service."""
 
-    def __init__(self, service: ArtifactService) -> None:
+    def __init__(self, service: ArtifactService, product_workspace_root: str | None = None) -> None:
         self.service = service
+        self.product_workspace = ProductWorkspaceService(
+            ProductWorkspaceStore(
+                product_workspace_root
+                or str(service.store.filesystem.metadata_root / "product-workspace.sqlite3")
+            )
+        )
         self._server_sequence = 0
         self._shutdown_requested = False
         self._responses: OrderedDict[str, tuple[str, RpcResponse]] = OrderedDict()
@@ -203,8 +210,7 @@ class ArtifactRpcServer:
                 capability_snapshot=build_runtime_artifact_capability_snapshot(
                     self.service.feature_flags(),
                     license_capabilities={
-                        capability.kind: capability.enabled
-                        for capability in license_capabilities
+                        capability.kind: capability.enabled for capability in license_capabilities
                     },
                 ),
             ).model_dump(mode="json", by_alias=True)
@@ -221,9 +227,7 @@ class ArtifactRpcServer:
             )
             return {
                 "status": (
-                    "ready"
-                    if integrity["status"] == "pass" and not recovered
-                    else "degraded"
+                    "ready" if integrity["status"] == "pass" and not recovered else "degraded"
                 ),
                 "contractVersion": ARTIFACT_RPC_CONTRACT_VERSION,
                 "accepting": not self._shutdown_requested,
@@ -238,6 +242,9 @@ class ArtifactRpcServer:
         if request.method is ArtifactRpcMethod.RPC_SHUTDOWN:
             self.shutdown()
             return {"drained": True}
+
+        if request.method.value.startswith(("project.", "task.", "preferences.")):
+            return self._dispatch_product_workspace(request)
 
         self._validate_idempotency_binding(request)
         context = OperationContext(
@@ -326,6 +333,65 @@ class ArtifactRpcServer:
         model, handler = route
         command = model.model_validate(request.params)
         return _json_mapping(handler(command, context))
+
+    def _dispatch_product_workspace(self, request: RpcRequest) -> dict[str, Any]:
+        params = request.params
+        workspace_id = request.workspace_id
+        if request.method is ArtifactRpcMethod.PROJECT_LIST:
+            return {"projects": _json_value(self.product_workspace.list_projects(workspace_id))}
+        if request.method is ArtifactRpcMethod.PROJECT_CREATE:
+            return _json_mapping(
+                self.product_workspace.create_project(workspace_id, str(params["title"]))
+            )
+        if request.method is ArtifactRpcMethod.TASK_LIST:
+            return {
+                "tasks": _json_value(
+                    self.product_workspace.list_tasks(workspace_id, str(params["projectId"]))
+                )
+            }
+        if request.method is ArtifactRpcMethod.TASK_CREATE:
+            return _json_mapping(
+                self.product_workspace.create_task(
+                    workspace_id,
+                    str(params["projectId"]),
+                    str(params["title"]),
+                    params.get("assistantSessionId")
+                    if isinstance(params.get("assistantSessionId"), str)
+                    else None,
+                )
+            )
+        if request.method is ArtifactRpcMethod.TASK_MESSAGE_ADD:
+            return _json_mapping(
+                self.product_workspace.add_message(
+                    workspace_id, str(params["taskId"]), str(params["role"]), str(params["body"])
+                )
+            )
+        if request.method is ArtifactRpcMethod.TASK_LINK_ADD:
+            return _json_mapping(
+                self.product_workspace.add_link(
+                    workspace_id,
+                    str(params["taskId"]),
+                    str(params["targetType"]),
+                    str(params["targetId"]),
+                )
+            )
+        if request.method is ArtifactRpcMethod.PREFERENCES_GET:
+            preference = self.product_workspace.get_preference(
+                workspace_id, request.principal.principal_id, str(params["preferenceKey"])
+            )
+            return {"preference": _json_value(preference) if preference else None}
+        if request.method is ArtifactRpcMethod.PREFERENCES_SET:
+            return _json_mapping(
+                self.product_workspace.set_preference(
+                    workspace_id,
+                    request.principal.principal_id,
+                    str(params["preferenceKey"]),
+                    str(params["valueJson"]),
+                )
+            )
+        raise ArtifactDomainError(
+            ArtifactErrorCode.ARTIFACT_RPC_UNAVAILABLE, "product workspace method is not enabled"
+        )
 
     @staticmethod
     def _validate_idempotency_binding(request: RpcRequest) -> None:

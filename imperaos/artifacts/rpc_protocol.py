@@ -28,6 +28,14 @@ class ArtifactRpcMethod(StrEnum):
     RPC_HANDSHAKE = "rpc.handshake"
     RPC_HEALTH = "rpc.health"
     RPC_SHUTDOWN = "rpc.shutdown"
+    PROJECT_LIST = "project.list"
+    PROJECT_CREATE = "project.create"
+    TASK_LIST = "task.list"
+    TASK_CREATE = "task.create"
+    TASK_MESSAGE_ADD = "task.message.add"
+    TASK_LINK_ADD = "task.link.add"
+    PREFERENCES_GET = "preferences.get"
+    PREFERENCES_SET = "preferences.set"
     ARTIFACT_LIST = "artifact.list"
     ARTIFACT_GET = "artifact.get"
     ARTIFACT_CREATE = "artifact.create"
@@ -110,11 +118,13 @@ class RpcHandshake(ArtifactModel):
     ) -> RpcHandshake:
         resolved_licenses = license_capabilities or (
             ArtifactLicenseCapability(
-                kind="spreadsheet", enabled=False,
+                kind="spreadsheet",
+                enabled=False,
                 reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
             ),
             ArtifactLicenseCapability(
-                kind="canvas", enabled=False,
+                kind="canvas",
+                enabled=False,
                 reason_code="ARTIFACT_LICENSE_EVIDENCE_MISSING",
             ),
         )
@@ -131,8 +141,7 @@ class RpcHandshake(ArtifactModel):
             or build_runtime_artifact_capability_snapshot(
                 None,
                 license_capabilities={
-                    capability.kind: capability.enabled
-                    for capability in resolved_licenses
+                    capability.kind: capability.enabled for capability in resolved_licenses
                 },
             ),
         )

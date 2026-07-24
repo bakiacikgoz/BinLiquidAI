@@ -17,6 +17,14 @@ const RPC_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 const RPC_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_RESTART_ATTEMPTS: u8 = 3;
 const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
+    "project.list",
+    "project.create",
+    "task.list",
+    "task.create",
+    "task.message.add",
+    "task.link.add",
+    "preferences.get",
+    "preferences.set",
     "artifact.list",
     "artifact.get",
     "artifact.create",
