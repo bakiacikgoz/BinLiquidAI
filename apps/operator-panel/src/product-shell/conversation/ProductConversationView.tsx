@@ -3,7 +3,7 @@ import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import { productWorkspaceClient } from '../adapters/productWorkspaceClient';
 import { transientConversationTurns, type StoredMessage } from './conversationState';
 
-export function ProductConversationView({ state, taskId, refreshToken = 0 }: { state: AssistantSessionState; taskId: string; refreshToken?: number }) {
+export function ProductConversationView({ state, taskId, refreshToken = 0, onOpenArtifacts }: { state: AssistantSessionState; taskId: string; refreshToken?: number; onOpenArtifacts?: () => void }) {
   const [stored, setStored] = useState<StoredMessage[]>([]);
   useEffect(() => { void productWorkspaceClient.listMessages(taskId).then(({ messages }) => setStored(messages)).catch(() => undefined); }, [refreshToken, taskId]);
   const transient = transientConversationTurns(state, stored);
@@ -15,5 +15,6 @@ export function ProductConversationView({ state, taskId, refreshToken = 0 }: { s
       {turn.status && <p className="ps-turn-status">{turn.status}</p>}
       {turn.assistant && <p>{turn.assistant}</p>}
     </article>)}
+    {state.referencedArtifacts.filter((artifact) => artifact.openable && artifact.artifactId).map((artifact) => <article className="ps-artifact-card" key={`${artifact.artifactId}:${artifact.revisionId ?? ''}`}><strong>{artifact.name}</strong><span>{artifact.kind ?? 'artifact'} · {artifact.summary ?? 'Governed artifact available'}</span><button type="button" onClick={onOpenArtifacts}>Open in workspace</button></article>)}
   </section>;
 }
