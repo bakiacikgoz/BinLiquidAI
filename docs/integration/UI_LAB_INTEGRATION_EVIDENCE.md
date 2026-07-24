@@ -35,6 +35,9 @@ The UI Lab source remains unchanged.
   native browser and registered preview surfaces. Selecting an artifact card
   passes its exact artifact ID into the canonical workspace, which opens and
   focuses the persisted artifact rather than a mock copy.
+- Project files and data explorer controls are visibly disabled with explicit
+  capability reason codes. This runtime has no governed project-files or data
+  query API, so the shell does not fabricate either surface.
 - Browser origin policy is documented in
   `docs/security/BROWSER_ORIGIN_POLICY.md` and enforced by the native runtime.
 - Browser and preview tabs retain their native session label while inactive;
@@ -46,6 +49,14 @@ The UI Lab source remains unchanged.
 - The task context rail and activity dock render real assistant session run,
   approval, artifact, safe-prompt-control and timeline references; unavailable
   Git branch context stays visibly disabled rather than being synthesized.
+- Library, approvals and agents select canonical backend detail from their
+  own lists or Global Search routes; approval decisions retain the existing
+  identity/approval bridge. Product-wide keyboard commands are registered
+  centrally, and `Cmd/Ctrl+K` only focuses Global Search.
+- Conversation actions open governed artifacts and approvals, copy, cancel or
+  regenerate through their existing boundaries. Feedback remains visibly
+  disabled with `ASSISTANT_FEEDBACK_CAPABILITY_UNAVAILABLE` because this
+  runtime provides no governed feedback sink.
 
 ## Mock/static guards
 
@@ -58,7 +69,7 @@ The UI Lab source remains unchanged.
 
 ## Recent verification
 
-- Operator Panel: 126 test files / 454 tests passed.
+- Operator Panel: 132 test files / 470 tests passed.
 - Operator Panel lint and production build passed.
 - Native browser policy and native-history unit tests: 5 passed.
 - Native terminal policy/control tests: 2 passed; `cargo check` passed.
@@ -66,10 +77,12 @@ The UI Lab source remains unchanged.
   passed; Ruff passed.
 - Targeted Product Shell task/runtime tests: 16 passed; lint and production
   build passed.
-- Native library tests: 60 passed, including the opaque folder-ticket test.
+- Native library tests: 62 passed, including browser policy/native-history and
+  opaque folder-ticket coverage.
 
-## Explicitly open before V2 plan completion
+## Capability boundaries retained by design
 
-- The remaining message action set beyond copy, cancel and regenerate.
-- Browser bounds/download-save coordination.
-- Data/files surfaces and fuller collection-detail navigation.
+- Project files, data explorer, agent-browser qualification and assistant
+  feedback are not supplied by this desktop runtime. Their controls are either
+  not exposed or are disabled with an explicit reason code; no mock fallback
+  is presented as a working product surface.

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { artifactBridge } from '../../artifact-workspace/artifactBridge';
 import { asControlPlaneAgentList } from '../../controlPlaneMappers';
 import { fetchApprovals, listControlPlaneAgents } from '../../bridge';
 import { loadSettings } from '../../settings';
+import { PRODUCT_SHELL_SHORTCUTS } from '../shortcuts/shortcutRegistry';
+import { useGlobalShortcut } from '../shortcuts/useGlobalShortcut';
 import {
   productWorkspaceClient,
   type ProductWorkspaceProject,
@@ -111,6 +113,10 @@ export function GlobalSearch() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [data, setData] = useState<SearchData>(EMPTY_DATA);
   const [status, setStatus] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const focusSearch = useCallback(() => inputRef.current?.focus(), []);
+  useGlobalShortcut('global-search', focusSearch);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim().toLowerCase()), 180);
@@ -130,5 +136,5 @@ export function GlobalSearch() {
   }, []);
 
   const results = useMemo(() => matchingResults(data, debouncedQuery), [data, debouncedQuery]);
-  return <section className="ps-global-search" aria-label="Global search"><label><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search work, artifacts, approvals…" /></label>{status ? <p className="ps-muted" role="status">{status}</p> : null}<ul>{results.map((result) => <li key={result.id}><button type="button" onClick={() => navigate(result.path)}><strong>{result.title}</strong><span>{result.kind} · {result.detail}</span></button></li>)}{!status && !results.length ? <li className="ps-muted">No governed results.</li> : null}</ul></section>;
+  return <section className="ps-global-search" aria-label="Global search"><label><span>Search</span><input ref={inputRef} aria-keyshortcuts={PRODUCT_SHELL_SHORTCUTS['global-search'].ariaKeyShortcuts} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search work, artifacts, approvals…" /></label>{status ? <p className="ps-muted" role="status">{status}</p> : null}<ul>{results.map((result) => <li key={result.id}><button type="button" onClick={() => navigate(result.path)}><strong>{result.title}</strong><span>{result.kind} · {result.detail}</span></button></li>)}{!status && !results.length ? <li className="ps-muted">No governed results.</li> : null}</ul></section>;
 }

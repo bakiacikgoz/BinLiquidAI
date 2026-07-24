@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,5 +42,14 @@ describe('GlobalSearch', () => {
     await user.click(result);
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/task/task-1'));
+  });
+
+  it('focuses global search through the centralized platform shortcut', () => {
+    renderOperatorPanel(<MemoryRouter><GlobalSearch /></MemoryRouter>);
+    const search = screen.getByRole('textbox', { name: 'Search' });
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+
+    expect(search).toHaveFocus();
   });
 });

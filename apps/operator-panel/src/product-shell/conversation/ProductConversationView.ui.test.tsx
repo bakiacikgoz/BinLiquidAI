@@ -24,4 +24,22 @@ describe('ProductConversationView artifacts', () => {
 
     expect(onOpenArtifacts).toHaveBeenCalledWith('artifact-release-plan');
   });
+
+  it('routes a governed assistant approval to its canonical detail', async () => {
+    workspace.listMessages.mockResolvedValue({ messages: [] });
+    const state = getAssistantFixture('running');
+    state.turns[0].assistantMessage.approval = {
+      approvalId: 'approval-release', title: 'Release', status: 'pending', risk: 'medium', detailLoaded: false,
+    };
+    const onOpenApproval = vi.fn();
+    const { user } = renderOperatorPanel(<ProductConversationView state={state} taskId="task-1" onOpenApproval={onOpenApproval} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Open approval' }));
+
+    expect(onOpenApproval).toHaveBeenCalledWith('approval-release');
+    expect(screen.getByRole('button', { name: 'Feedback unavailable' })).toHaveAttribute(
+      'data-disabled-reason',
+      'ASSISTANT_FEEDBACK_CAPABILITY_UNAVAILABLE',
+    );
+  });
 });

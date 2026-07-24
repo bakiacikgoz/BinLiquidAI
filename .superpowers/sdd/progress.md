@@ -35,8 +35,9 @@
   with an explicit disabled reason and cannot widen policy authority.
 - Complete: persisted transcript projection avoids duplicate runtime turns; assistant artifacts open the governed workspace tab.
 - Complete: sidebar project pages use bounded cursor pagination, durable pin/archive/manual ordering and native folder registration through opaque tickets; no renderer or sidecar response carries the local path.
-- Complete: conversation copy, cancel and regenerate actions are wired to the native clipboard, assistant cancellation and governed runtime respectively.
-- Remaining: the complete message action set beyond these core actions.
+- Complete: conversation copy, cancel, regenerate, artifact open and approval
+  open are wired to their canonical boundaries. Feedback has no governed sink
+  in this runtime and stays disabled with an explicit reason code.
 
 ## Phase 7 — Workspace and artifacts
 
@@ -44,7 +45,10 @@
 - Complete: existing Artifact Workspace controller/editor is reused rather than copying a mock editor.
 - Complete: an assistant artifact card transfers its exact artifact ID into the
   canonical Artifact Workspace tab and focuses that persisted artifact.
-- Remaining: add the minimal governed files/data surfaces.
+- Complete: files and data explorer are capability-gated with explicit reason
+  codes because this desktop runtime has neither a governed project-files API
+  nor a governed data-query engine; no placeholder file tree or query result
+  is rendered.
 
 ## Phase 8–9 — Native runtime surfaces
 
@@ -70,10 +74,13 @@
 
 ## Phase 10–12 — Product collections and settings
 
-- Complete: real artifact, approval and agent collections use their existing bridges; automation remains honestly unavailable in this desktop runtime.
+- Complete: real artifact, approval and agent collections use their existing
+  bridges, support canonical detail selection from Global Search routes, and
+  automation remains honestly unavailable in this desktop runtime.
 - Complete: product settings writes the existing operator profile and preserves a direct legacy-system route.
 - Complete: the task context rail and activity dock project real assistant run,
   approval, artifact, prompt-control and timeline references. Branch context is
   explicitly disabled until a governed Git-context capability exists.
-- Remaining: fuller collection detail navigation and centralized
-  shortcuts/profile controls.
+- Complete: shortcut definitions are centralized and the Cmd/Ctrl+K search
+  command only focuses the Global Search input; profile remains owned by the
+  existing governed settings adapter.
