@@ -48,4 +48,9 @@ class ProductWorkspaceStore:
               workspace_id TEXT NOT NULL, principal_id TEXT NOT NULL, preference_key TEXT NOT NULL,
               value_json TEXT NOT NULL, updated_at_utc TEXT NOT NULL,
               PRIMARY KEY(workspace_id, principal_id, preference_key));
+            CREATE TABLE IF NOT EXISTS product_mutation_dedup (
+              workspace_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, method TEXT NOT NULL,
+              payload_json TEXT NOT NULL, response_json TEXT NOT NULL, created_at_utc TEXT NOT NULL,
+              PRIMARY KEY(workspace_id, idempotency_key));
+            INSERT OR IGNORE INTO product_schema_migrations(version) VALUES (2);
             """)

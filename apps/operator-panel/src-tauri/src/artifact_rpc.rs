@@ -47,6 +47,11 @@ const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
     "artifact.import_evidence",
 ];
 const MUTATION_METHODS_WITH_KEYS: &[&str] = &[
+    "project.create",
+    "task.create",
+    "task.message.add",
+    "task.link.add",
+    "preferences.set",
     "artifact.create",
     "artifact.mutate",
     "artifact.slides.patch",
@@ -959,6 +964,22 @@ mod tests {
             json!({"artifactId": "slides-1", "idempotencyKey": "params-key"}),
             &identity,
             Some("envelope-key".to_string()),
+            5000,
+        )
+        .is_err());
+        assert!(build_trusted_request(
+            "project.create",
+            json!({"title": "Launch", "idempotencyKey": "project-create-1"}),
+            &identity,
+            Some("project-create-1".to_string()),
+            5000,
+        )
+        .is_ok());
+        assert!(build_trusted_request(
+            "project.create",
+            json!({"title": "Launch"}),
+            &identity,
+            Some("project-create-1".to_string()),
             5000,
         )
         .is_err());

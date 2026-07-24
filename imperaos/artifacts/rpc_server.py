@@ -54,6 +54,11 @@ from imperaos.product_workspace import ProductWorkspaceService, ProductWorkspace
 _READ_CHUNK_BYTES = 64 * 1024
 _MAX_DEDUP_RESPONSES = 1024
 _MUTATION_METHODS_WITH_KEYS = {
+    ArtifactRpcMethod.PROJECT_CREATE,
+    ArtifactRpcMethod.TASK_CREATE,
+    ArtifactRpcMethod.TASK_MESSAGE_ADD,
+    ArtifactRpcMethod.TASK_LINK_ADD,
+    ArtifactRpcMethod.PREFERENCES_SET,
     ArtifactRpcMethod.ARTIFACT_CREATE,
     ArtifactRpcMethod.ARTIFACT_MUTATE,
     ArtifactRpcMethod.ARTIFACT_SPREADSHEET_PATCH,
@@ -335,13 +340,16 @@ class ArtifactRpcServer:
         return _json_mapping(handler(command, context))
 
     def _dispatch_product_workspace(self, request: RpcRequest) -> dict[str, Any]:
+        self._validate_idempotency_binding(request)
         params = request.params
         workspace_id = request.workspace_id
         if request.method is ArtifactRpcMethod.PROJECT_LIST:
             return {"projects": _json_value(self.product_workspace.list_projects(workspace_id))}
         if request.method is ArtifactRpcMethod.PROJECT_CREATE:
             return _json_mapping(
-                self.product_workspace.create_project(workspace_id, str(params["title"]))
+                self.product_workspace.create_project(
+                    workspace_id, str(params["title"]), request.idempotency_key
+                )
             )
         if request.method is ArtifactRpcMethod.TASK_LIST:
             return {
@@ -358,12 +366,17 @@ class ArtifactRpcServer:
                     params.get("assistantSessionId")
                     if isinstance(params.get("assistantSessionId"), str)
                     else None,
+                    request.idempotency_key,
                 )
             )
         if request.method is ArtifactRpcMethod.TASK_MESSAGE_ADD:
             return _json_mapping(
                 self.product_workspace.add_message(
-                    workspace_id, str(params["taskId"]), str(params["role"]), str(params["body"])
+                    workspace_id,
+                    str(params["taskId"]),
+                    str(params["role"]),
+                    str(params["body"]),
+                    request.idempotency_key,
                 )
             )
         if request.method is ArtifactRpcMethod.TASK_MESSAGE_LIST:
@@ -379,6 +392,7 @@ class ArtifactRpcServer:
                     str(params["taskId"]),
                     str(params["targetType"]),
                     str(params["targetId"]),
+                    request.idempotency_key,
                 )
             )
         if request.method is ArtifactRpcMethod.PREFERENCES_GET:
@@ -393,6 +407,7 @@ class ArtifactRpcServer:
                     request.principal.principal_id,
                     str(params["preferenceKey"]),
                     str(params["valueJson"]),
+                    request.idempotency_key,
                 )
             )
         raise ArtifactDomainError(

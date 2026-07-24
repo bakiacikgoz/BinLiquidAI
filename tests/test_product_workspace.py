@@ -38,7 +38,8 @@ def test_product_workspace_rpc_reuses_the_artifact_sidecar(tmp_path):
             method=ArtifactRpcMethod.PROJECT_CREATE,
             workspaceId="workspace-a",
             principal=RpcPrincipal(principalId="operator-a", principalType="user"),
-            params={"title": "Launch"},
+            idempotencyKey="project-create-1",
+            params={"title": "Launch", "idempotencyKey": "project-create-1"},
         )
     )
     assert response.ok
@@ -54,3 +55,45 @@ def test_product_workspace_rpc_reuses_the_artifact_sidecar(tmp_path):
         )
     )
     assert listed.result["projects"][0]["projectId"] == project_id
+
+
+def test_product_workspace_mutations_require_bound_keys_and_replay_retries(tmp_path):
+    server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
+    missing_key = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="project-create-missing-key",
+            method=ArtifactRpcMethod.PROJECT_CREATE,
+            workspaceId="workspace-a",
+            principal=RpcPrincipal(principalId="operator-a", principalType="user"),
+            params={"title": "Launch"},
+        )
+    )
+    assert not missing_key.ok
+    assert missing_key.error.code == "ARTIFACT_RPC_PROTOCOL_MISMATCH"
+
+    first = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="project-create-retry-1",
+            method=ArtifactRpcMethod.PROJECT_CREATE,
+            workspaceId="workspace-a",
+            principal=RpcPrincipal(principalId="operator-a", principalType="user"),
+            idempotencyKey="project-create-retry",
+            params={"title": "Launch", "idempotencyKey": "project-create-retry"},
+        )
+    )
+    replay = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="project-create-retry-2",
+            method=ArtifactRpcMethod.PROJECT_CREATE,
+            workspaceId="workspace-a",
+            principal=RpcPrincipal(principalId="operator-a", principalType="user"),
+            idempotencyKey="project-create-retry",
+            params={"title": "Launch", "idempotencyKey": "project-create-retry"},
+        )
+    )
+    assert first.ok and replay.ok
+    assert first.result["projectId"] == replay.result["projectId"]
+    assert len(server.product_workspace.list_projects("workspace-a")) == 1

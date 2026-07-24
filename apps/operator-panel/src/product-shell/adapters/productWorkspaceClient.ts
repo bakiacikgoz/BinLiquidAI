@@ -12,7 +12,8 @@ export type ProductWorkspaceTask = z.infer<typeof task>;
 
 export class ProductWorkspaceClient {
   private async call<T>(command: string, params: Record<string, unknown>, schema: z.ZodType<T>, idempotencyKey: string | null = null): Promise<T> {
-    const raw = await invoke<unknown>(command, { payload: { params, idempotencyKey, timeoutMs: 15_000 } });
+    const boundParams = idempotencyKey ? { ...params, idempotencyKey } : params;
+    const raw = await invoke<unknown>(command, { payload: { params: boundParams, idempotencyKey, timeoutMs: 15_000 } });
     const parsed = envelope.parse(raw);
     if (!parsed.ok) throw new Error(parsed.error.message);
     return schema.parse(parsed.data);

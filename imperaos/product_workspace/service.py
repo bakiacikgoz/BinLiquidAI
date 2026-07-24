@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from .models import Preference, ProductLink, ProductMessage, ProductTask, Project
@@ -19,8 +21,62 @@ class ProductWorkspaceService:
     def __init__(self, store: ProductWorkspaceStore) -> None:
         self.store = store
 
-    def create_project(self, workspace_id: str, title: str) -> Project:
+    @staticmethod
+    def _payload_json(payload: dict[str, Any]) -> str:
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+    def _replay_mutation(
+        self,
+        db: Any,
+        workspace_id: str,
+        method: str,
+        payload: dict[str, Any],
+        idempotency_key: str | None,
+    ) -> dict[str, Any] | None:
+        if idempotency_key is None:
+            return None
+        payload_json = self._payload_json(payload)
+        row = db.execute(
+            """SELECT method, payload_json, response_json FROM product_mutation_dedup
+            WHERE workspace_id=? AND idempotency_key=?""",
+            (workspace_id, idempotency_key),
+        ).fetchone()
+        if row is None:
+            return None
+        if row["method"] != method or row["payload_json"] != payload_json:
+            raise ValueError("idempotency key was reused with a different product mutation")
+        return json.loads(row["response_json"])
+
+    @staticmethod
+    def _remember_mutation(
+        db: Any,
+        workspace_id: str,
+        method: str,
+        payload: dict[str, Any],
+        idempotency_key: str | None,
+        response: Project | ProductTask | ProductMessage | ProductLink | Preference,
+    ) -> None:
+        if idempotency_key is None:
+            return
+        db.execute(
+            """INSERT INTO product_mutation_dedup
+            (workspace_id,idempotency_key,method,payload_json,response_json,created_at_utc)
+            VALUES (?,?,?,?,?,?)""",
+            (
+                workspace_id,
+                idempotency_key,
+                method,
+                json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
+                response.model_dump_json(by_alias=True),
+                _now().isoformat(),
+            ),
+        )
+
+    def create_project(
+        self, workspace_id: str, title: str, idempotency_key: str | None = None
+    ) -> Project:
         now = _now()
+        payload = {"title": title}
         project = Project(
             projectId=_id("project"),
             workspaceId=workspace_id,
@@ -29,6 +85,11 @@ class ProductWorkspaceService:
             updatedAtUtc=now,
         )
         with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "project.create", payload, idempotency_key
+            )
+            if replay is not None:
+                return Project.model_validate(replay)
             db.execute(
                 "INSERT INTO product_projects VALUES (?,?,?,?,?,?)",
                 (
@@ -39,6 +100,9 @@ class ProductWorkspaceService:
                     project.created_at_utc.isoformat(),
                     project.updated_at_utc.isoformat(),
                 ),
+            )
+            self._remember_mutation(
+                db, workspace_id, "project.create", payload, idempotency_key, project
             )
         return project
 
@@ -66,9 +130,20 @@ class ProductWorkspaceService:
         project_id: str,
         title: str,
         assistant_session_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> ProductTask:
         now = _now()
+        payload = {
+            "projectId": project_id,
+            "title": title,
+            "assistantSessionId": assistant_session_id,
+        }
         with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "task.create", payload, idempotency_key
+            )
+            if replay is not None:
+                return ProductTask.model_validate(replay)
             if (
                 db.execute(
                     "SELECT 1 FROM product_projects WHERE project_id=? AND workspace_id=?",
@@ -101,6 +176,9 @@ class ProductWorkspaceService:
                     task.updated_at_utc.isoformat(),
                 ),
             )
+            self._remember_mutation(
+                db, workspace_id, "task.create", payload, idempotency_key, task
+            )
         return task
 
     def list_tasks(self, workspace_id: str, project_id: str) -> list[ProductTask]:
@@ -126,9 +204,22 @@ class ProductWorkspaceService:
             for r in rows
         ]
 
-    def add_message(self, workspace_id: str, task_id: str, role: str, body: str) -> ProductMessage:
+    def add_message(
+        self,
+        workspace_id: str,
+        task_id: str,
+        role: str,
+        body: str,
+        idempotency_key: str | None = None,
+    ) -> ProductMessage:
         now = _now()
+        payload = {"taskId": task_id, "role": role, "body": body}
         with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "task.message.add", payload, idempotency_key
+            )
+            if replay is not None:
+                return ProductMessage.model_validate(replay)
             if (
                 db.execute(
                     "SELECT 1 FROM product_tasks WHERE task_id=? AND workspace_id=?",
@@ -156,6 +247,9 @@ class ProductWorkspaceService:
                     message.created_at_utc.isoformat(),
                 ),
             )
+            self._remember_mutation(
+                db, workspace_id, "task.message.add", payload, idempotency_key, message
+            )
         return message
 
     def list_messages(self, workspace_id: str, task_id: str) -> list[ProductMessage]:
@@ -178,10 +272,21 @@ class ProductWorkspaceService:
         ]
 
     def add_link(
-        self, workspace_id: str, task_id: str, target_type: str, target_id: str
+        self,
+        workspace_id: str,
+        task_id: str,
+        target_type: str,
+        target_id: str,
+        idempotency_key: str | None = None,
     ) -> ProductLink:
         now = _now()
+        payload = {"taskId": task_id, "targetType": target_type, "targetId": target_id}
         with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "task.link.add", payload, idempotency_key
+            )
+            if replay is not None:
+                return ProductLink.model_validate(replay)
             if (
                 db.execute(
                     "SELECT 1 FROM product_tasks WHERE task_id=? AND workspace_id=?",
@@ -209,11 +314,35 @@ class ProductWorkspaceService:
                     link.created_at_utc.isoformat(),
                 ),
             )
+            existing = db.execute(
+                """SELECT * FROM product_links WHERE workspace_id=? AND task_id=?
+                AND target_type=? AND target_id=?""",
+                (workspace_id, task_id, target_type, target_id),
+            ).fetchone()
+            if existing is not None:
+                link = ProductLink(
+                    linkId=existing["link_id"], workspaceId=existing["workspace_id"],
+                    taskId=existing["task_id"], targetType=existing["target_type"],
+                    targetId=existing["target_id"], createdAtUtc=existing["created_at_utc"],
+                )
+            self._remember_mutation(
+                db, workspace_id, "task.link.add", payload, idempotency_key, link
+            )
         return link
 
     def set_preference(
-        self, workspace_id: str, principal_id: str, preference_key: str, value_json: str
+        self,
+        workspace_id: str,
+        principal_id: str,
+        preference_key: str,
+        value_json: str,
+        idempotency_key: str | None = None,
     ) -> Preference:
+        payload = {
+            "principalId": principal_id,
+            "preferenceKey": preference_key,
+            "valueJson": value_json,
+        }
         preference = Preference(
             workspaceId=workspace_id,
             principalId=principal_id,
@@ -222,6 +351,11 @@ class ProductWorkspaceService:
             updatedAtUtc=_now(),
         )
         with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "preferences.set", payload, idempotency_key
+            )
+            if replay is not None:
+                return Preference.model_validate(replay)
             db.execute(
                 """INSERT INTO product_preferences VALUES (?,?,?,?,?)
                 ON CONFLICT(workspace_id,principal_id,preference_key) DO UPDATE SET
@@ -233,6 +367,9 @@ class ProductWorkspaceService:
                     preference.value_json,
                     preference.updated_at_utc.isoformat(),
                 ),
+            )
+            self._remember_mutation(
+                db, workspace_id, "preferences.set", payload, idempotency_key, preference
             )
         return preference
 
