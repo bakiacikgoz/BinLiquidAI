@@ -113,6 +113,9 @@ pub fn run() {
             browser::browser_open,
             browser::browser_list_preview_origins,
             browser::browser_navigate,
+            browser::browser_back,
+            browser::browser_forward,
+            browser::browser_history_state,
             browser::browser_reload,
             browser::browser_close,
         ])

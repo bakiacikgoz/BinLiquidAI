@@ -28,6 +28,9 @@ switch and a decision in one mode never grants access in another mode.
 ## External effects
 
 - Redirects are rechecked under their session's mode policy.
+- Back/forward is a native record of ImperaOS-issued navigations, not a
+  remote-page JavaScript integration. Each selected history URL is checked
+  again before navigation.
 - `file`, `javascript`, `data`, `tauri`, and `asset` are content/internal
   schemes, not external applications: they remain denied and no approval can
   turn them into an executable route.

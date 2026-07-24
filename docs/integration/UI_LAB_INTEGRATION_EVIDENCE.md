@@ -51,7 +51,7 @@ The UI Lab source remains unchanged.
 
 - Operator Panel: 126 test files / 454 tests passed.
 - Operator Panel lint and production build passed.
-- Native browser policy unit tests: 4 passed.
+- Native browser policy and native-history unit tests: 5 passed.
 - Native terminal policy/control tests: 2 passed; `cargo check` passed.
 - Targeted Product Workspace, Artifact RPC and assistant CLI Python tests: 13
   passed; Ruff passed.

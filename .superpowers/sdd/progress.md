@@ -53,8 +53,11 @@
 - Complete: blocked content/internal schemes cannot be reclassified as
   approval-gated external applications; agent allowlists reject localhost and
   literal IP addresses.
-- Remaining: browser bounds/overlay coordination, history controls where the
-  Tauri runtime exposes them, and governed download save approval.
+- Complete: browser and preview back/forward controls operate on native
+  ImperaOS-issued navigation history and every selected history target is
+  revalidated under its session mode policy.
+- Remaining: browser bounds/overlay coordination and governed download save
+  approval.
 
 ## Phase 10–12 — Product collections and settings
 

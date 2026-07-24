@@ -13,6 +13,7 @@ describe('PreviewSurface', () => {
     invoke.mockImplementation(async (command: string) => {
       if (command === 'browser_list_preview_origins') return ['http://localhost:5173'];
       if (command === 'browser_open') return 'imperaos-browser-preview';
+      if (command === 'browser_history_state') return { canBack: false, canForward: false };
       return undefined;
     });
     const onClose = vi.fn();

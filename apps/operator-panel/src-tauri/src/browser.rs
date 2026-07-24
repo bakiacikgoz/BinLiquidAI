@@ -27,6 +27,11 @@ pub struct BrowserPolicyState {
 struct BrowserSession {
     mode: BrowserMode,
     task_id: Option<String>,
+    // Tauri/Wry does not expose a safe native history API for remote pages.
+    // This records only addresses navigated through ImperaOS commands; it
+    // never evaluates page script or trusts a remote page to report history.
+    history: Vec<String>,
+    history_index: usize,
 }
 
 #[derive(Default)]
@@ -53,6 +58,13 @@ pub struct BrowserNavigateRequest {
 #[serde(rename_all = "camelCase")]
 pub struct BrowserSessionRequest {
     pub label: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserHistoryState {
+    pub can_back: bool,
+    pub can_forward: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -260,6 +272,47 @@ fn is_external_application_scheme(url: &Url) -> bool {
     )
 }
 
+fn record_history_navigation(session: &mut BrowserSession, url: &str) {
+    if session
+        .history
+        .get(session.history_index)
+        .is_some_and(|current| current == url)
+    {
+        return;
+    }
+    if !session.history.is_empty() {
+        session.history.truncate(session.history_index.saturating_add(1));
+    }
+    session.history.push(url.to_owned());
+    session.history_index = session.history.len().saturating_sub(1);
+}
+
+fn history_target(session: &BrowserSession, direction: i8) -> Option<String> {
+    let index = match direction {
+        -1 => session.history_index.checked_sub(1)?,
+        1 if session.history_index + 1 < session.history.len() => session.history_index + 1,
+        _ => return None,
+    };
+    session.history.get(index).cloned()
+}
+
+fn move_history(session: &mut BrowserSession, direction: i8) -> Option<String> {
+    let target = history_target(session, direction)?;
+    session.history_index = match direction {
+        -1 => session.history_index.checked_sub(1)?,
+        1 => session.history_index + 1,
+        _ => return None,
+    };
+    Some(target)
+}
+
+fn history_state(session: &BrowserSession) -> BrowserHistoryState {
+    BrowserHistoryState {
+        can_back: session.history_index > 0,
+        can_forward: session.history_index + 1 < session.history.len(),
+    }
+}
+
 fn open_browser_window(
     app: AppHandle,
     policy: BrowserPolicyState,
@@ -372,9 +425,12 @@ pub fn browser_open(
     sessions: tauri::State<'_, BrowserSessionRegistry>,
     request: BrowserOpenRequest,
 ) -> Result<String, String> {
+    let initial_url = Url::parse(&request.url).map_err(|_| "BROWSER_POLICY_DENIED: invalid URL")?;
     let session = BrowserSession {
         mode: request.mode.clone(),
         task_id: request.task_id.clone(),
+        history: vec![initial_url.as_str().to_owned()],
+        history_index: 0,
     };
     let label = open_browser_window(app, state.inner().clone(), request)?;
     sessions
@@ -405,8 +461,96 @@ pub fn browser_navigate(
     }
     app.get_webview_window(&request.label)
         .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
-        .navigate(url)
-        .map_err(|_| "BROWSER_POLICY_DENIED: browser could not navigate".to_owned())
+        .navigate(url.clone())
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser could not navigate".to_owned())?;
+    let mut sessions = sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?;
+    let session = sessions
+        .get_mut(&request.label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+    record_history_navigation(session, url.as_str());
+    Ok(())
+}
+
+fn browser_move_history(
+    app: &AppHandle,
+    policy: &BrowserPolicyState,
+    sessions: &BrowserSessionRegistry,
+    label: &str,
+    direction: i8,
+) -> Result<(), String> {
+    let (mode, task_id, target) = {
+        let sessions = sessions
+            .sessions
+            .lock()
+            .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?;
+        let session = sessions
+            .get(label)
+            .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+        (
+            session.mode.clone(),
+            session.task_id.clone(),
+            history_target(session, direction)
+                .ok_or_else(|| "BROWSER_POLICY_DENIED: browser history is unavailable")?,
+        )
+    };
+    let target_url = Url::parse(&target).map_err(|_| "BROWSER_POLICY_DENIED: invalid browser history URL")?;
+    if !allowed(policy, &mode, task_id.as_deref(), &target_url) {
+        return Err("BROWSER_POLICY_DENIED: browser history target is not allowed for this mode".into());
+    }
+    app.get_webview_window(label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .navigate(target_url)
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser could not navigate history".to_owned())?;
+    let mut sessions = sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?;
+    let session = sessions
+        .get_mut(label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+    let moved = move_history(session, direction);
+    if moved.as_deref() != Some(target.as_str()) {
+        return Err("BROWSER_POLICY_DENIED: browser history changed during navigation".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn browser_back(
+    app: AppHandle,
+    state: tauri::State<'_, BrowserPolicyState>,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserSessionRequest,
+) -> Result<(), String> {
+    browser_move_history(&app, state.inner(), sessions.inner(), &request.label, -1)
+}
+
+#[tauri::command]
+pub fn browser_forward(
+    app: AppHandle,
+    state: tauri::State<'_, BrowserPolicyState>,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserSessionRequest,
+) -> Result<(), String> {
+    browser_move_history(&app, state.inner(), sessions.inner(), &request.label, 1)
+}
+
+#[tauri::command]
+pub fn browser_history_state(
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserSessionRequest,
+) -> Result<BrowserHistoryState, String> {
+    let sessions = sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?;
+    let session = sessions
+        .get(&request.label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+    Ok(history_state(session))
 }
 
 #[tauri::command]
@@ -454,7 +598,10 @@ pub fn browser_close(
 
 #[cfg(test)]
 mod tests {
-    use super::{allowed, is_external_application_scheme, BrowserMode, BrowserPolicyState};
+    use super::{
+        allowed, is_external_application_scheme, move_history, record_history_navigation,
+        BrowserMode, BrowserPolicyState, BrowserSession,
+    };
     use tauri::Url;
 
     fn url(value: &str) -> Url {
@@ -570,5 +717,26 @@ mod tests {
             );
         }
         assert!(is_external_application_scheme(&url("mailto:operator@example.com")));
+    }
+
+    #[test]
+    fn history_tracks_only_explicit_native_navigations() {
+        let mut session = BrowserSession {
+            mode: BrowserMode::User,
+            task_id: None,
+            history: Vec::new(),
+            history_index: 0,
+        };
+        record_history_navigation(&mut session, "https://imperaos.dev/");
+        record_history_navigation(&mut session, "https://imperaos.dev/docs");
+        record_history_navigation(&mut session, "https://imperaos.dev/releases");
+
+        assert_eq!(move_history(&mut session, -1), Some("https://imperaos.dev/docs".to_string()));
+        assert_eq!(move_history(&mut session, -1), Some("https://imperaos.dev/".to_string()));
+        assert_eq!(move_history(&mut session, -1), None);
+        assert_eq!(move_history(&mut session, 1), Some("https://imperaos.dev/docs".to_string()));
+
+        record_history_navigation(&mut session, "https://imperaos.dev/security");
+        assert_eq!(move_history(&mut session, 1), None);
     }
 }
