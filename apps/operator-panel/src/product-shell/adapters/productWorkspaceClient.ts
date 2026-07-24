@@ -9,6 +9,7 @@ const project = z.object({ projectId: z.string(), workspaceId: z.string(), title
 const task = z.object({ taskId: z.string(), workspaceId: z.string(), projectId: z.string(), title: z.string(), status: z.string(), assistantSessionId: z.string().nullable(), assistantTurnId: z.string().nullable(), teamJobId: z.string().nullable(), createdAtUtc: z.string(), updatedAtUtc: z.string() }).strict();
 
 export type ProductWorkspaceTask = z.infer<typeof task>;
+export type ProductWorkspaceProject = z.infer<typeof project>;
 
 export class ProductWorkspaceClient {
   private async call<T>(command: string, params: Record<string, unknown>, schema: z.ZodType<T>, idempotencyKey: string | null = null): Promise<T> {
