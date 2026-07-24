@@ -103,7 +103,6 @@ pub fn run() {
             terminal::terminal_resize,
             terminal::terminal_kill,
             browser::browser_open,
-            browser::browser_register_preview_origin,
         ])
         .run(tauri::generate_context!())
         .expect("error while running operator panel");

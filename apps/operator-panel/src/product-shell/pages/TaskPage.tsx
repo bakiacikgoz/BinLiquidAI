@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 
 import { BottomDock } from '../bottom-dock/BottomDock';
@@ -8,6 +8,7 @@ import { ProductConversationView } from '../conversation/ProductConversationView
 import { useProductAssistant } from '../adapters/useProductAssistant';
 import { useProductShellStore } from '../state/productShellStore';
 import { WorkSurface } from '../workspace/WorkSurface';
+import { ProductArtifactWorkspace } from '../workspace/ProductArtifactWorkspace';
 import { productWorkspaceClient } from '../adapters/productWorkspaceClient';
 
 export function TaskPage() {
@@ -17,6 +18,7 @@ export function TaskPage() {
   const contextRailOpen = useProductShellStore((state) => state.contextRailOpen);
   const setContextRailOpen = useProductShellStore((state) => state.setContextRailOpen);
   const assistant = useProductAssistant(task);
+  const [artifactOpenRequest, setArtifactOpenRequest] = useState(0);
   useEffect(() => { if (taskId) selectTask(taskId); }, [selectTask, taskId]);
   if (!task) return <Navigate to="/" replace />;
   const running = assistant.state.status === 'starting' || assistant.state.status === 'streaming';
@@ -25,6 +27,6 @@ export function TaskPage() {
     await assistant.actions.send(message);
   };
   return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">ACTIVE TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
-    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} taskId={task.id} /><Composer disabled={running} onSend={(message) => void send(message)} /><WorkSurface taskTitle={task.title} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
+    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} taskId={task.id} /><Composer disabled={running} onSend={(message) => void send(message)} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => setArtifactOpenRequest((current) => current + 1)} /><ProductArtifactWorkspace key={task.id} state={assistant.state} openRequest={artifactOpenRequest} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
   </section>;
 }
