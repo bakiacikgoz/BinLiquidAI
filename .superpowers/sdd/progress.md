@@ -18,3 +18,9 @@
 - Complete: persistent Product Shell-only preferences use `imperaos-product-shell-preferences-v2`.
 - Complete: scoped dark/light visual tokens, sidebar width/collapse, rail and dock preferences are isolated from legacy settings.
 - Verified: Operator Panel lint and production build passed.
+
+## Phase 3 — Product Workspace domain
+
+- In progress: workspace-scoped SQLite schema, project/task/message records, and service layer exist.
+- Verified: unit test proves durable project/task/message creation and cross-workspace denial.
+- Remaining: links/preferences service methods plus sidecar RPC, typed Tauri bridge, and frontend clients.

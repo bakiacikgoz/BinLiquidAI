@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal
+
+from pydantic import Field, field_validator
+
+from imperaos.control_plane.enterprise_workspace import StrictModel, _validate_safe_id
+
+
+class Project(StrictModel):
+    project_id: str = Field(alias="projectId")
+    workspace_id: str = Field(alias="workspaceId")
+    title: str = Field(min_length=1, max_length=160)
+    status: Literal["active", "archived"] = "active"
+    created_at_utc: datetime = Field(alias="createdAtUtc")
+    updated_at_utc: datetime = Field(alias="updatedAtUtc")
+
+    @field_validator("project_id", "workspace_id")
+    @classmethod
+    def _safe(cls, value: str, info: object) -> str:
+        return _validate_safe_id(value, str(getattr(info, "field_name", "id")))
+
+
+class ProductTask(StrictModel):
+    task_id: str = Field(alias="taskId")
+    workspace_id: str = Field(alias="workspaceId")
+    project_id: str = Field(alias="projectId")
+    title: str = Field(min_length=1, max_length=500)
+    status: Literal["active", "completed", "archived"] = "active"
+    assistant_session_id: str | None = Field(default=None, alias="assistantSessionId")
+    assistant_turn_id: str | None = Field(default=None, alias="assistantTurnId")
+    team_job_id: str | None = Field(default=None, alias="teamJobId")
+    created_at_utc: datetime = Field(alias="createdAtUtc")
+    updated_at_utc: datetime = Field(alias="updatedAtUtc")
+
+    @field_validator(
+        "task_id",
+        "workspace_id",
+        "project_id",
+        "assistant_session_id",
+        "assistant_turn_id",
+        "team_job_id",
+    )
+    @classmethod
+    def _safe(cls, value: str | None, info: object) -> str | None:
+        return (
+            None
+            if value is None
+            else _validate_safe_id(value, str(getattr(info, "field_name", "id")))
+        )
+
+
+class ProductMessage(StrictModel):
+    message_id: str = Field(alias="messageId")
+    workspace_id: str = Field(alias="workspaceId")
+    task_id: str = Field(alias="taskId")
+    role: Literal["user", "assistant", "system"]
+    body: str = Field(min_length=1, max_length=100_000)
+    created_at_utc: datetime = Field(alias="createdAtUtc")
+
+
+class ProductLink(StrictModel):
+    link_id: str = Field(alias="linkId")
+    workspace_id: str = Field(alias="workspaceId")
+    task_id: str = Field(alias="taskId")
+    target_type: Literal["artifact", "approval", "team_job", "run"] = Field(alias="targetType")
+    target_id: str = Field(alias="targetId")
+    created_at_utc: datetime = Field(alias="createdAtUtc")
+
+
+class Preference(StrictModel):
+    workspace_id: str = Field(alias="workspaceId")
+    principal_id: str = Field(alias="principalId")
+    preference_key: str = Field(alias="preferenceKey", min_length=1, max_length=128)
+    value_json: str = Field(alias="valueJson", min_length=1, max_length=100_000)
+    updated_at_utc: datetime = Field(alias="updatedAtUtc")
