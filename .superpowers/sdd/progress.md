@@ -62,8 +62,11 @@
 - Complete: a native browser/preview window is shown only while its workspace
   tab is active and is hidden on tab deactivation, preventing an unmanaged
   child-webview overlay while preserving its governed session.
-- Remaining: explicit native-window bounds coordination and governed download
-  save approval.
+- Complete: child-window bounds remain native/OS-owned (the renderer has no
+  arbitrary geometry authority), and downloads/external applications are
+  explicitly blocked after a required approval notification until a future
+  governed save/open executor exists. No acknowledgement can execute either
+  effect.
 
 ## Phase 10–12 — Product collections and settings
 

@@ -39,6 +39,9 @@ switch and a decision in one mode never grants access in another mode.
 - Downloads and external application schemes remain blocked after notifying
   the user. They require a future governed save/approval workflow; an
   acknowledgement is not an approval to execute.
+- Native child-window bounds are owned by the operating system; the renderer
+  has no arbitrary `setBounds` authority. Inactive workspace tabs hide their
+  matching child window so it cannot remain as an unmanaged overlay.
 
 ## Enforcement
 
