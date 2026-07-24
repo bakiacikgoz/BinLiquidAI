@@ -268,7 +268,7 @@ impl ProductFolderTicketState {
         Ok((ticket, display_name))
     }
 
-    async fn bind(&self, folder_ticket: &str, root_ref: &str) -> Result<(), String> {
+    async fn bind_in_memory(&self, folder_ticket: &str, root_ref: &str) -> Result<(), String> {
         let path = self
             .tickets
             .lock()
@@ -280,6 +280,107 @@ impl ProductFolderTicketState {
         }
         self.roots.lock().await.insert(root_ref.to_string(), path);
         Ok(())
+    }
+
+    async fn bind(
+        &self,
+        app: &tauri::AppHandle,
+        folder_ticket: &str,
+        root_ref: &str,
+    ) -> Result<(), String> {
+        self.bind_in_memory(folder_ticket, root_ref).await?;
+        let roots = self.roots.lock().await;
+        if let Err(error) = persist_native_project_roots(app, &roots) {
+            drop(roots);
+            self.roots.lock().await.remove(root_ref);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Resolves an opaque product root only inside the native process. A
+    /// renderer-provided root reference can select a registered root, but can
+    /// never supply or learn a filesystem path.
+    pub async fn resolve_registered_root(&self, root_ref: &str) -> Result<PathBuf, String> {
+        if root_ref.trim().is_empty() || root_ref.len() > 256 || root_ref.contains('\0') {
+            return Err("Registered project root is invalid.".to_string());
+        }
+        let path = self
+            .roots
+            .lock()
+            .await
+            .get(root_ref)
+            .cloned()
+            .ok_or_else(|| "Registered project root is unavailable.".to_string())?;
+        let canonical = path
+            .canonicalize()
+            .map_err(|_| "Registered project root is unavailable.".to_string())?;
+        if !canonical.is_dir() {
+            return Err("Registered project root is unavailable.".to_string());
+        }
+        Ok(canonical)
+    }
+
+    pub async fn resolve_registered_root_from_native_store(
+        &self,
+        app: &tauri::AppHandle,
+        root_ref: &str,
+    ) -> Result<PathBuf, String> {
+        if root_ref.trim().is_empty() || root_ref.len() > 256 || root_ref.contains('\0') {
+            return Err("Registered project root is invalid.".to_string());
+        }
+        if let Ok(path) = self.resolve_registered_root(root_ref).await {
+            return Ok(path);
+        }
+        let recovered = load_native_project_roots(app)?
+            .remove(root_ref)
+            .ok_or_else(|| "Registered project root is unavailable.".to_string())?;
+        self.roots
+            .lock()
+            .await
+            .insert(root_ref.to_string(), recovered);
+        self.resolve_registered_root(root_ref).await
+    }
+}
+
+fn native_project_roots_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| "Native project-root storage is unavailable.".to_string())?
+        .join("product-workspace");
+    fs::create_dir_all(&directory)
+        .map_err(|_| "Native project-root storage is unavailable.".to_string())?;
+    Ok(directory.join("registered-project-roots.json"))
+}
+
+fn persist_native_project_roots(
+    app: &tauri::AppHandle,
+    roots: &HashMap<String, PathBuf>,
+) -> Result<(), String> {
+    let destination = native_project_roots_path(app)?;
+    let temporary = destination.with_extension("json.tmp");
+    let encoded = serde_json::to_vec(roots)
+        .map_err(|_| "Native project-root storage is unavailable.".to_string())?;
+    fs::write(&temporary, encoded)
+        .map_err(|_| "Native project-root storage is unavailable.".to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))
+            .map_err(|_| "Native project-root storage is unavailable.".to_string())?;
+    }
+    fs::rename(&temporary, &destination)
+        .map_err(|_| "Native project-root storage is unavailable.".to_string())
+}
+
+fn load_native_project_roots(app: &tauri::AppHandle) -> Result<HashMap<String, PathBuf>, String> {
+    let path = native_project_roots_path(app)?;
+    match fs::read(path) {
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map_err(|_| "Native project-root storage is unavailable.".to_string()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(HashMap::new()),
+        Err(_) => Err("Native project-root storage is unavailable.".to_string()),
     }
 }
 
@@ -423,7 +524,7 @@ pub async fn bridge_product_project_register(
     };
     if let Err(message) = app
         .state::<ProductFolderTicketState>()
-        .bind(&request.folder_ticket, root_ref)
+        .bind(&app, &request.folder_ticket, root_ref)
         .await
     {
         return BridgeResult::err(BridgeError::new(
@@ -4898,13 +4999,20 @@ mod tests {
         assert!(!ticket.contains(&selected_path.display().to_string()));
         assert!(!display_name.is_empty());
 
-        tauri::async_runtime::block_on(state.bind(&ticket, "root-release"))
+        tauri::async_runtime::block_on(state.bind_in_memory(&ticket, "root-release"))
             .expect("bind ticket to durable root ref");
         assert!(!tauri::async_runtime::block_on(state.tickets.lock()).contains_key(&ticket));
         assert_eq!(
             tauri::async_runtime::block_on(state.roots.lock()).get("root-release"),
             Some(&selected_path)
         );
+        assert_eq!(
+            tauri::async_runtime::block_on(state.resolve_registered_root("root-release"))
+                .expect("registered root resolves natively"),
+            selected_path
+        );
+        assert!(tauri::async_runtime::block_on(state.resolve_registered_root("root-missing"))
+            .is_err());
     }
 
     #[test]

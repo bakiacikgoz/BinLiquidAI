@@ -34,6 +34,9 @@ The UI Lab source remains unchanged.
   focuses the persisted artifact rather than a mock copy.
 - Browser origin policy is documented in
   `docs/security/BROWSER_ORIGIN_POLICY.md` and enforced by the native runtime.
+- A user PTY receives only a durable, opaque project `rootRef`; native code
+  resolves its local path from protected native storage and fails closed when
+  the project root is no longer available.
 
 ## Mock/static guards
 
@@ -59,7 +62,6 @@ The UI Lab source remains unchanged.
 ## Explicitly open before V2 plan completion
 
 - The remaining message action set beyond copy, cancel and regenerate.
-- Terminal attachment to the registered project root and browser
-  bounds/overlay/download-save coordination.
+- Browser bounds/overlay/download-save coordination.
 - Full branch/run/evidence context, data/files surfaces and collection-detail
   navigation.

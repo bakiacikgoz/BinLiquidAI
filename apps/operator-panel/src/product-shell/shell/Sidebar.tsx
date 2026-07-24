@@ -14,6 +14,7 @@ export function Sidebar() {
   const collapsed = useProductShellStore((state) => state.sidebarCollapsed);
   const setCollapsed = useProductShellStore((state) => state.setSidebarCollapsed);
   const upsertTasks = useProductShellStore((state) => state.upsertTasks);
+  const upsertProjects = useProductShellStore((state) => state.upsertProjects);
   const [projects, setProjects] = useState<ProductWorkspaceProject[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [sort, setSort] = useState<ProjectSort>('manual');
@@ -25,10 +26,16 @@ export function Sidebar() {
       setError('');
       const page = await productWorkspaceClient.listProjects({ cursor, limit: 25, status: 'active', sort });
       setProjects((current) => append ? [...current, ...page.projects] : page.projects);
+      upsertProjects(page.projects.map((project) => ({
+        projectId: project.projectId,
+        rootRef: project.rootRef,
+        rootDisplayName: project.rootDisplayName,
+      })));
       setNextCursor(page.nextCursor);
       const groups = await Promise.all(page.projects.map((project) => productWorkspaceClient.listTasks(project.projectId)));
       upsertTasks(groups.flatMap((group) => group.tasks.map((task) => ({
         id: task.taskId,
+        projectId: task.projectId,
         title: task.title,
         createdAt: task.createdAtUtc,
         status: task.status,
@@ -40,7 +47,7 @@ export function Sidebar() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load governed projects.');
     }
-  }, [sort, upsertTasks]);
+  }, [sort, upsertProjects, upsertTasks]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 

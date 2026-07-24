@@ -18,6 +18,7 @@ import { productWorkspaceClient, type ProductWorkspaceProject } from '../adapter
 
 export function NewWorkPage() {
   const upsertTasks = useProductShellStore((state) => state.upsertTasks);
+  const upsertProjects = useProductShellStore((state) => state.upsertProjects);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
@@ -38,6 +39,11 @@ export function NewWorkPage() {
       if (!active) return;
       const activeProjects = projects.filter((project) => project.status !== 'archived');
       setProjects(activeProjects);
+      upsertProjects(activeProjects.map((project) => ({
+        projectId: project.projectId,
+        rootRef: project.rootRef,
+        rootDisplayName: project.rootDisplayName,
+      })));
       const requestedProjectId = searchParams.get('project');
       if (requestedProjectId && activeProjects.some((project) => project.projectId === requestedProjectId)) {
         setProjectId(requestedProjectId);
@@ -46,7 +52,7 @@ export function NewWorkPage() {
       if (active) setError(cause instanceof Error ? cause.message : 'Could not load governed projects.');
     });
     return () => { active = false; };
-  }, [searchParams]);
+  }, [searchParams, upsertProjects]);
   const updateRuntimeSettings = (next: Partial<AssistantRuntimeSettings>) => {
     setSettings((current) => {
       const updated = { ...current, ...next };
@@ -69,7 +75,7 @@ export function NewWorkPage() {
         approvalProfile: runtimeSettings.approvalProfile ?? 'risk_based',
       });
       await productWorkspaceClient.addMessage(task.taskId, 'user', message);
-      upsertTasks([{ id: task.taskId, title: task.title, createdAt: task.createdAtUtc, status: task.status, assistantSessionId: task.assistantSessionId ?? undefined, reasoningEffort: task.reasoningEffort, speedProfile: task.speedProfile, approvalProfile: task.approvalProfile }]);
+      upsertTasks([{ id: task.taskId, projectId: task.projectId, title: task.title, createdAt: task.createdAtUtc, status: task.status, assistantSessionId: task.assistantSessionId ?? undefined, reasoningEffort: task.reasoningEffort, speedProfile: task.speedProfile, approvalProfile: task.approvalProfile }]);
       navigate(`/task/${task.taskId}`, { state: { initialMessage: message, runtimeSettings, controls } });
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create governed work.'); }
   };

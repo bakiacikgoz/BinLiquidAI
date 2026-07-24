@@ -1,3 +1,4 @@
+use crate::bridge::ProductFolderTicketState;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,7 @@ struct TerminalSession {
 pub struct TerminalStartRequest {
     pub mode: String,
     pub cwd: Option<String>,
+    pub root_ref: Option<String>,
     pub cols: u16,
     pub rows: u16,
 }
@@ -91,14 +93,29 @@ fn verified_runtime_workspace_root(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(root)
 }
 
+async fn terminal_root(
+    app: &AppHandle,
+    roots: &ProductFolderTicketState,
+    root_ref: Option<&str>,
+) -> Result<PathBuf, String> {
+    match root_ref {
+        Some(root_ref) => roots
+            .resolve_registered_root_from_native_store(app, root_ref)
+            .await
+            .map_err(|_| terminal_error("registered project root is unavailable")),
+        None => verified_runtime_workspace_root(app),
+    }
+}
+
 fn interrupt_sequence() -> &'static [u8] {
     b"\x03"
 }
 
 #[tauri::command]
-pub fn terminal_start(
+pub async fn terminal_start(
     app: AppHandle,
     state: State<'_, TerminalManager>,
+    roots: State<'_, ProductFolderTicketState>,
     request: TerminalStartRequest,
 ) -> Result<TerminalStartResponse, String> {
     if request.mode != "user" {
@@ -111,7 +128,7 @@ pub fn terminal_start(
     }
     reject_renderer_cwd(request.cwd.as_deref())?;
     let mut command = shell_command()?;
-    command.cwd(verified_runtime_workspace_root(&app)?);
+    command.cwd(terminal_root(&app, roots.inner(), request.root_ref.as_deref()).await?);
     let pair = native_pty_system()
         .openpty(PtySize {
             rows: request.rows,

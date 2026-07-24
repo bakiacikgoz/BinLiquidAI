@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type ProductTask = {
   id: string;
+  projectId?: string;
   title: string;
   createdAt: string;
   status: 'draft' | 'active' | 'awaiting_approval' | 'completed' | 'failed' | 'cancelled' | 'archived';
@@ -12,8 +13,15 @@ export type ProductTask = {
   approvalProfile?: 'always_ask' | 'risk_based' | 'policy_automatic';
 };
 
+export type ProductProjectRoot = {
+  projectId: string;
+  rootRef: string;
+  rootDisplayName: string;
+};
+
 type ProductShellState = {
   tasks: ProductTask[];
+  projects: ProductProjectRoot[];
   selectedTaskId: string | null;
   contextRailOpen: boolean;
   dockOpen: boolean;
@@ -21,6 +29,7 @@ type ProductShellState = {
   sidebarWidth: number;
   theme: 'dark' | 'light';
   upsertTasks: (tasks: ProductTask[]) => void;
+  upsertProjects: (projects: ProductProjectRoot[]) => void;
   selectTask: (taskId: string | null) => void;
   setContextRailOpen: (open: boolean) => void;
   setDockOpen: (open: boolean) => void;
@@ -32,6 +41,7 @@ type ProductShellState = {
 /** UI-only navigation state. Product records are deliberately not fabricated here. */
 export const useProductShellStore = create<ProductShellState>()(persist((set) => ({
   tasks: [],
+  projects: [],
   selectedTaskId: null,
   contextRailOpen: true,
   dockOpen: false,
@@ -42,6 +52,11 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
     const next = new Map(state.tasks.map((task) => [task.id, task]));
     tasks.forEach((task) => next.set(task.id, task));
     return { tasks: [...next.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt)) };
+  }),
+  upsertProjects: (projects) => set((state) => {
+    const next = new Map(state.projects.map((project) => [project.projectId, project]));
+    projects.forEach((project) => next.set(project.projectId, project));
+    return { projects: [...next.values()] };
   }),
   selectTask: (selectedTaskId) => set({ selectedTaskId }),
   setContextRailOpen: (contextRailOpen) => set({ contextRailOpen }),

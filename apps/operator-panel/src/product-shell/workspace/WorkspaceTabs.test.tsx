@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../terminal/TerminalSurface', () => ({ TerminalSurface: () => <div>Terminal surface</div> }));
+vi.mock('../terminal/TerminalSurface', () => ({ TerminalSurface: ({ projectRootRef }: { projectRootRef?: string }) => <div>Terminal surface {projectRootRef ?? 'runtime-root'}</div> }));
 vi.mock('../browser/BrowserSurface', () => ({ BrowserSurface: () => <div>Browser surface</div> }));
 vi.mock('../browser/PreviewSurface', () => ({ PreviewSurface: () => <div>Preview surface</div> }));
 vi.mock('./ProductArtifactWorkspace', () => ({ ProductArtifactWorkspace: ({ requestedArtifactId }: { requestedArtifactId?: string }) => <div>Artifact surface {requestedArtifactId ?? 'catalog'}</div> }));
@@ -21,7 +21,7 @@ describe('WorkspaceTabs', () => {
 
     const { user } = renderOperatorPanel(<WorkspaceTabs tabs={[first, second]} activeTabId={second.id} assistantState={getAssistantFixture('running')} onActivate={onActivate} onClose={onClose} />);
 
-    expect(screen.getByText('Terminal surface')).toBeInTheDocument();
+    expect(screen.getByText('Terminal surface runtime-root')).toBeInTheDocument();
     await user.click(screen.getAllByRole('tab', { name: 'Terminal' })[0]);
     await user.click(screen.getAllByRole('button', { name: 'Close Terminal' })[1]);
 
@@ -35,5 +35,13 @@ describe('WorkspaceTabs', () => {
     renderOperatorPanel(<WorkspaceTabs tabs={[artifact]} activeTabId={artifact.id} assistantState={getAssistantFixture('running')} onActivate={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByText('Artifact surface artifact-release-plan')).toBeInTheDocument();
+  });
+
+  it('passes only the opaque project-root reference to a user terminal', () => {
+    const terminal = createWorkspaceTab('terminal');
+
+    renderOperatorPanel(<WorkspaceTabs tabs={[terminal]} activeTabId={terminal.id} assistantState={getAssistantFixture('running')} projectRootRef="root-release" projectRootDisplayName="Release workspace" onActivate={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByText('Terminal surface root-release')).toBeInTheDocument();
   });
 });

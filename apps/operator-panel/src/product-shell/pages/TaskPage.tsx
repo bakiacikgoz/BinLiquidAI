@@ -53,6 +53,7 @@ function runtimeSettingsFromNavigation(value: unknown): AssistantRuntimeSettings
 function shellTask(task: ProductWorkspaceTask): ProductTask {
   return {
     id: task.taskId,
+    projectId: task.projectId,
     title: task.title,
     createdAt: task.createdAtUtc,
     status: task.status,
@@ -92,6 +93,7 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const contextRailOpen = useProductShellStore((state) => state.contextRailOpen);
   const setContextRailOpen = useProductShellStore((state) => state.setContextRailOpen);
   const upsertTasks = useProductShellStore((state) => state.upsertTasks);
+  const projects = useProductShellStore((state) => state.projects);
   const assistant = useProductAssistant(task);
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>([]);
   const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(null);
@@ -113,6 +115,9 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     speedProfile: task.speedProfile ?? 'standard',
     approvalProfile: task.approvalProfile ?? 'risk_based',
   };
+  const projectRoot = task.projectId
+    ? projects.find((project) => project.projectId === task.projectId)
+    : undefined;
 
   useEffect(() => {
     const state = location.state as InitialTaskNavigationState;
@@ -185,6 +190,6 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   };
   const readOnly = task.status === 'archived';
   return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">{task.status.toUpperCase()} TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
-    <div className="ps-task-grid"><div className="ps-task-center">{readOnly && <p className="ps-archive-banner" role="status">This task is archived and read-only.</p>}<ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} onOpenArtifacts={(artifactId) => openWorkspaceTab('artifacts', artifactId)} onRegenerate={(turnId) => void assistant.actions.regenerate(turnId, taskRuntimeSettings)} /><AssistantComposer label="Governed assistant" placeholder="Describe the next outcome…" sendLabel="Send" disabled={running || readOnly} statusLabel={assistant.state.status} runtimeSettings={taskRuntimeSettings} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)} onCancel={() => void (async () => { await assistant.actions.cancel(); const updated = await productWorkspaceClient.updateTask(task.id, { status: 'cancelled' }); upsertTasks([shellTask(updated)]); })()} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => openWorkspaceTab('artifacts')} onOpenTerminal={() => openWorkspaceTab('terminal')} onOpenBrowser={() => openWorkspaceTab('browser')} onOpenPreview={() => openWorkspaceTab('preview')} /><WorkspaceTabs tabs={workspaceTabs} activeTabId={activeWorkspaceTabId} assistantState={assistant.state} onActivate={setActiveWorkspaceTabId} onClose={closeWorkspaceTab} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} state={assistant.state} />}</div>
+    <div className="ps-task-grid"><div className="ps-task-center">{readOnly && <p className="ps-archive-banner" role="status">This task is archived and read-only.</p>}<ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} onOpenArtifacts={(artifactId) => openWorkspaceTab('artifacts', artifactId)} onRegenerate={(turnId) => void assistant.actions.regenerate(turnId, taskRuntimeSettings)} /><AssistantComposer label="Governed assistant" placeholder="Describe the next outcome…" sendLabel="Send" disabled={running || readOnly} statusLabel={assistant.state.status} runtimeSettings={taskRuntimeSettings} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)} onCancel={() => void (async () => { await assistant.actions.cancel(); const updated = await productWorkspaceClient.updateTask(task.id, { status: 'cancelled' }); upsertTasks([shellTask(updated)]); })()} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => openWorkspaceTab('artifacts')} onOpenTerminal={() => openWorkspaceTab('terminal')} onOpenBrowser={() => openWorkspaceTab('browser')} onOpenPreview={() => openWorkspaceTab('preview')} /><WorkspaceTabs tabs={workspaceTabs} activeTabId={activeWorkspaceTabId} assistantState={assistant.state} projectRootRef={projectRoot?.rootRef} projectRootDisplayName={projectRoot?.rootDisplayName} onActivate={setActiveWorkspaceTabId} onClose={closeWorkspaceTab} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} state={assistant.state} />}</div>
   </section>;
 }
