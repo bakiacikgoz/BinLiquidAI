@@ -8,6 +8,7 @@ import { ProductConversationView } from '../conversation/ProductConversationView
 import { useProductAssistant } from '../adapters/useProductAssistant';
 import { useProductShellStore } from '../state/productShellStore';
 import { WorkSurface } from '../workspace/WorkSurface';
+import { productWorkspaceClient } from '../adapters/productWorkspaceClient';
 
 export function TaskPage() {
   const { taskId } = useParams();
@@ -19,7 +20,11 @@ export function TaskPage() {
   useEffect(() => { if (taskId) selectTask(taskId); }, [selectTask, taskId]);
   if (!task) return <Navigate to="/" replace />;
   const running = assistant.state.status === 'starting' || assistant.state.status === 'streaming';
+  const send = async (message: string) => {
+    await productWorkspaceClient.addMessage(task.id, 'user', message);
+    await assistant.actions.send(message);
+  };
   return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">ACTIVE TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
-    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} /><Composer disabled={running} onSend={(message) => void assistant.actions.send(message)} /><WorkSurface taskTitle={task.title} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
+    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} /><Composer disabled={running} onSend={(message) => void send(message)} /><WorkSurface taskTitle={task.title} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
   </section>;
 }

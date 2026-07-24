@@ -47,6 +47,7 @@ type ApprovalOverride = {
 
 type RuntimeSessionOptions = {
   enabled?: boolean;
+  initialSessionId?: string;
 };
 
 class PendingAssistantTurnContext {
@@ -261,7 +262,9 @@ export function useAssistantRuntimeSession(
 ): { state: AssistantSessionState; actions: AssistantSessionActions } {
   const enabled = options.enabled ?? isAiSdkAssistantRuntimeEnabled(import.meta.env.VITE_ASSISTANT_AI_SDK_RUNTIME);
   const legacy = useAssistantSession(settings, getContext, { enabled: !enabled });
-  const [chatId, setChatId] = useState(() => createAssistantSession().sessionId);
+  const [chatId, setChatId] = useState(
+    () => options.initialSessionId ?? createAssistantSession().sessionId,
+  );
   const [approvalOverrides, setApprovalOverrides] = useState<Record<string, ApprovalOverride>>({});
   const [systemMessages, setSystemMessages] = useState<
     Array<{ turnId: string; message: string; timestampUtc: string }>

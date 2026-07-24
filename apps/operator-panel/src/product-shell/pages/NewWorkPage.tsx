@@ -13,7 +13,8 @@ export function NewWorkPage() {
     try {
       setError('');
       const project = await productWorkspaceClient.createProject('Operator work');
-      const task = await productWorkspaceClient.createTask(project.projectId, message);
+      const assistantSessionId = `product-session-${crypto.randomUUID()}`;
+      const task = await productWorkspaceClient.createTask(project.projectId, message, assistantSessionId);
       upsertTasks([{ id: task.taskId, title: task.title, createdAt: task.createdAtUtc, status: task.status === 'completed' ? 'completed' : 'active', assistantSessionId: task.assistantSessionId ?? undefined }]);
       navigate(`/task/${task.taskId}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create governed work.'); }

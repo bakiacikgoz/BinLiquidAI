@@ -22,6 +22,9 @@ export class ProductWorkspaceClient {
   createProject(title: string) { return this.call('bridge_product_project_create', { title }, project, `project-${crypto.randomUUID()}`); }
   listTasks(projectId: string) { return this.call('bridge_product_task_list', { projectId }, z.object({ tasks: z.array(task) }).strict()); }
   createTask(projectId: string, title: string, assistantSessionId?: string) { return this.call('bridge_product_task_create', { projectId, title, assistantSessionId }, task, `task-${crypto.randomUUID()}`); }
+  addMessage(taskId: string, role: 'user' | 'assistant' | 'system', body: string) {
+    return this.call('bridge_product_task_message_add', { taskId, role, body }, z.object({ messageId: z.string(), workspaceId: z.string(), taskId: z.string(), role: z.string(), body: z.string(), createdAtUtc: z.string() }).strict(), `message-${crypto.randomUUID()}`);
+  }
 }
 
 export const productWorkspaceClient = new ProductWorkspaceClient();

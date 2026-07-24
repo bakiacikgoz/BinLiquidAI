@@ -16,5 +16,7 @@ export function useProductAssistant(task: ProductTask | undefined) {
     pendingApproval: null,
     systemHealth: null,
   }), [task]);
-  return useAssistantRuntimeSession(settings, getContext);
+  return useAssistantRuntimeSession(settings, getContext, {
+    initialSessionId: task?.assistantSessionId,
+  });
 }
