@@ -10,6 +10,11 @@ import type {
   AssistantContextAttachmentKind,
   AssistantSafeToolIntent,
 } from '../../assistant/assistantTypes';
+import {
+  assistantSlashCommands,
+  hasAssistantSlashPrefix,
+  resolveAssistantSlashCommand,
+} from '../../assistant/assistantSlashCommands';
 import { assistantUiText, translateAssistantText, type UiLocale } from '../../i18n';
 import { Button } from '../primitives/Button';
 import { Icon } from '../primitives/Icon';
@@ -93,20 +98,37 @@ export function AssistantComposer({
   }, [draft, resizeDraft]);
 
   const validationMessage = validateAssistantRuntimeSettings(runtimeSettings);
-  const canSend = draft.trim().length > 0 && !disabled && !validationMessage;
+  const slashCommand = resolveAssistantSlashCommand(draft);
+  const unsupportedSlashCommand = hasAssistantSlashPrefix(draft) && !slashCommand;
+  const slashValidationMessage = unsupportedSlashCommand
+    ? 'This slash command is not available in the governed assistant.'
+    : slashCommand && !slashCommand.message
+      ? 'Add a request after the slash command.'
+      : undefined;
+  const messageToSend = slashCommand ? slashCommand.message : draft;
+  const mergedContextAttachmentKinds = Array.from(new Set([
+    ...contextAttachmentKinds,
+    ...(slashCommand?.contextAttachmentKinds ?? []),
+  ]));
+  const mergedToolIntents = Array.from(new Set([
+    ...toolIntents,
+    ...(slashCommand?.toolIntents ?? []),
+  ]));
+  const canSend = messageToSend.trim().length > 0 && !disabled && !validationMessage && !slashValidationMessage;
   const canCancel = disabled && Boolean(onCancel);
   const cancelLabel = locale === 'tr' ? 'Durdur' : 'Stop';
   const visibleStatusLabel = statusLabel && statusLabel !== 'idle' ? statusLabel : '';
   const selectedRuntimeLabel = runtimeDisplayLabel(runtimeSettings, locale);
   const controls: AssistantComposerControls = {
-    contextAttachmentKinds,
-    toolIntents,
+    contextAttachmentKinds: mergedContextAttachmentKinds,
+    toolIntents: mergedToolIntents,
   };
   const sendDisabledReason =
     translateAssistantText(validationMessage, locale) ||
+    slashValidationMessage ||
     (disabled
       ? translateAssistantText('Assistant is currently processing a turn.', locale)
-      : draft.trim().length === 0
+        : messageToSend.trim().length === 0
         ? translateAssistantText('Enter a message to send.', locale)
         : undefined);
   const composerDisabledReason = disabled
@@ -127,7 +149,7 @@ export function AssistantComposer({
     if (!canSend) {
       return;
     }
-    onSend(draft, runtimeSettings, controls);
+    onSend(messageToSend, runtimeSettings, controls);
     setDraft('');
   };
 
@@ -199,6 +221,16 @@ export function AssistantComposer({
                   />
                   <span>{option.label}</span>
                 </label>
+              ))}
+            </div>
+          </details>
+          <details className="assistant-composer-menu">
+            <summary>Slash commands</summary>
+            <div className="assistant-composer-menu-panel" role="group" aria-label="Governed slash commands">
+              {assistantSlashCommands.map((command) => (
+                <button key={command.command} type="button" onClick={() => setDraft(`${command.command} `)} title={command.description}>
+                  <code>{command.command}</code><span>{command.description}</span>
+                </button>
               ))}
             </div>
           </details>

@@ -149,6 +149,30 @@ describe('AssistantComposer runtime controls', () => {
     );
   });
 
+  it('maps a registered slash command to safe controls and rejects unknown commands', async () => {
+    const onSend = vi.fn();
+    const { user } = renderOperatorPanel(<ComposerHarness onSend={onSend} />);
+
+    await user.type(screen.getByLabelText('Message'), '/inspect-run summarize the active deployment');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(onSend).toHaveBeenCalledWith(
+      'summarize the active deployment',
+      expect.any(Object),
+      expect.objectContaining({
+        contextAttachmentKinds: expect.arrayContaining(['active_run']),
+        toolIntents: expect.arrayContaining(['inspect_run']),
+      }),
+    );
+
+    await user.type(screen.getByLabelText('Message'), '/full-access deploy now');
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send' })).toHaveAttribute(
+      'data-disabled-reason',
+      'This slash command is not available in the governed assistant.',
+    );
+  });
+
   it('keeps the stop action available while a turn is running', async () => {
     const onSend = vi.fn();
     const onCancel = vi.fn();

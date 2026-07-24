@@ -27,6 +27,9 @@ The UI Lab source remains unchanged.
   workspace. Fast selects the CLI fast-chat router path; always-ask requires a
   governance ticket and fails closed if one cannot be issued; policy-automatic
   does not widen the existing policy decision.
+- The product composer has a registry of safe slash commands. Each command
+  resolves to the same bounded prompt controls as the visible safe-intent UI;
+  unsupported commands are disabled rather than interpreted as capabilities.
 - Existing Artifact Workspace controllers and all seven artifact editors remain
   canonical. Product-shell tabs host the Artifact Workspace, PTY terminals,
   native browser and registered preview surfaces. Selecting an artifact card
