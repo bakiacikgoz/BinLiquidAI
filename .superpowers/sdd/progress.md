@@ -72,4 +72,8 @@
 
 - Complete: real artifact, approval and agent collections use their existing bridges; automation remains honestly unavailable in this desktop runtime.
 - Complete: product settings writes the existing operator profile and preserves a direct legacy-system route.
-- Remaining: richer task evidence/run/branch context, full collection detail navigation and centralized shortcuts/profile controls.
+- Complete: the task context rail and activity dock project real assistant run,
+  approval, artifact, prompt-control and timeline references. Branch context is
+  explicitly disabled until a governed Git-context capability exists.
+- Remaining: fuller collection detail navigation and centralized
+  shortcuts/profile controls.

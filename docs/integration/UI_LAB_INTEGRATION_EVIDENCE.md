@@ -43,6 +43,9 @@ The UI Lab source remains unchanged.
 - A user PTY receives only a durable, opaque project `rootRef`; native code
   resolves its local path from protected native storage and fails closed when
   the project root is no longer available.
+- The task context rail and activity dock render real assistant session run,
+  approval, artifact, safe-prompt-control and timeline references; unavailable
+  Git branch context stays visibly disabled rather than being synthesized.
 
 ## Mock/static guards
 
@@ -69,5 +72,4 @@ The UI Lab source remains unchanged.
 
 - The remaining message action set beyond copy, cancel and regenerate.
 - Browser bounds/download-save coordination.
-- Full branch/run/evidence context, data/files surfaces and collection-detail
-  navigation.
+- Data/files surfaces and fuller collection-detail navigation.
