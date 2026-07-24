@@ -151,4 +151,19 @@ describe('AI SDK assistant runtime cutover', () => {
     });
     expect(unlisten).toHaveBeenCalledTimes(1);
   });
+
+  it('moves to the task-bound session when a task route changes', async () => {
+    const { result, rerender } = renderHook(
+      ({ sessionId }) => useAssistantRuntimeSession(DEFAULT_SETTINGS, () => emptyContext, {
+        enabled: true,
+        initialSessionId: sessionId,
+      }),
+      { initialProps: { sessionId: 'task-session-a' } },
+    );
+
+    expect(result.current.state.sessionId).toBe('task-session-a');
+    rerender({ sessionId: 'task-session-b' });
+
+    await waitFor(() => expect(result.current.state.sessionId).toBe('task-session-b'));
+  });
 });

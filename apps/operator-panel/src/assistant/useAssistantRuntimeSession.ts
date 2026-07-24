@@ -1,5 +1,5 @@
 import { useChat } from '@ai-sdk/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   cancelAssistantTurn,
@@ -271,6 +271,15 @@ export function useAssistantRuntimeSession(
   >([]);
   const [manualEvents, setManualEvents] = useState<AssistantStreamEvent[]>([]);
   const [pendingTurn] = useState(() => new PendingAssistantTurnContext());
+
+  useEffect(() => {
+    const taskSessionId = options.initialSessionId;
+    if (!taskSessionId || taskSessionId === chatId) return;
+    setApprovalOverrides({});
+    setSystemMessages([]);
+    setManualEvents([]);
+    setChatId(taskSessionId);
+  }, [chatId, options.initialSessionId]);
 
   const listen = useCallback<ImperaTauriTransportAdapter['listen']>(async (handler) => {
     pendingTurn.attachPreviewHandler(handler);
