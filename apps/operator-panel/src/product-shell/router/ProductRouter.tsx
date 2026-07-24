@@ -2,8 +2,15 @@ import { HashRouter, Route, Routes } from 'react-router-dom';
 
 import { AppShell } from '../shell/AppShell';
 import { CollectionPage } from '../pages/CollectionPage';
+import { AgentsPage, ApprovalsPage, LibraryPage } from '../pages/GovernedCollections';
 import { NewWorkPage } from '../pages/NewWorkPage';
 import { TaskPage } from '../pages/TaskPage';
 import { SettingsShell } from '../settings/SettingsShell';
+import { LegacyOperatorApp } from '../legacy/LegacyOperatorApp';
 
-export function ProductRouter() { return <HashRouter><AppShell><Routes><Route path="/" element={<NewWorkPage />} /><Route path="/task/:taskId" element={<TaskPage />} /><Route path="/task/:taskId/workspace" element={<TaskPage />} /><Route path="/library" element={<CollectionPage title="Library" body="Governed artifacts, evidence and exports." />} /><Route path="/approvals" element={<CollectionPage title="Approvals" body="Review approval work in the established governance surface." />} /><Route path="/agents" element={<CollectionPage title="Agents" body="Registered operators and governed agent activity." />} /><Route path="/automations" element={<CollectionPage title="Automations" body="Automation status and evidence." />} /><Route path="/settings" element={<SettingsShell />} /><Route path="/settings/:section" element={<SettingsShell />} /><Route path="/system/*" element={<CollectionPage title="System" body="System operations remain on the governed legacy surface." />} /><Route path="*" element={<NewWorkPage />} /></Routes></AppShell></HashRouter>; }
+function ProductShellRoutes() {
+  return <AppShell><Routes><Route path="/" element={<NewWorkPage />} /><Route path="/task/:taskId" element={<TaskPage />} /><Route path="/task/:taskId/workspace" element={<TaskPage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/approvals" element={<ApprovalsPage />} /><Route path="/agents" element={<AgentsPage />} /><Route path="/automations" element={<CollectionPage title="Automations" body="Automation capabilities are not registered for this desktop runtime." />} /><Route path="/settings" element={<SettingsShell />} /><Route path="/settings/:section" element={<SettingsShell />} /><Route path="*" element={<NewWorkPage />} /></Routes></AppShell>;
+}
+
+/** The former panel stays directly reachable for advanced/system workflows. */
+export function ProductRouter() { return <HashRouter><Routes><Route path="/system/*" element={<LegacyOperatorApp />} /><Route path="*" element={<ProductShellRoutes />} /></Routes></HashRouter>; }
