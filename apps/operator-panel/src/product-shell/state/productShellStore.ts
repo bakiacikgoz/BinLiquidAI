@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export type ProductTask = {
   id: string;
@@ -13,10 +14,16 @@ type ProductShellState = {
   selectedTaskId: string | null;
   contextRailOpen: boolean;
   dockOpen: boolean;
+  sidebarCollapsed: boolean;
+  sidebarWidth: number;
+  theme: 'dark' | 'light';
   createTask: (title: string) => ProductTask;
   selectTask: (taskId: string | null) => void;
   setContextRailOpen: (open: boolean) => void;
   setDockOpen: (open: boolean) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  setSidebarWidth: (width: number) => void;
+  setTheme: (theme: 'dark' | 'light') => void;
 };
 
 function taskId(): string {
@@ -24,11 +31,14 @@ function taskId(): string {
 }
 
 /** UI-only navigation state. Product records are deliberately not fabricated here. */
-export const useProductShellStore = create<ProductShellState>((set) => ({
+export const useProductShellStore = create<ProductShellState>()(persist((set) => ({
   tasks: [],
   selectedTaskId: null,
   contextRailOpen: true,
   dockOpen: false,
+  sidebarCollapsed: false,
+  sidebarWidth: 260,
+  theme: 'dark',
   createTask: (title) => {
     const task: ProductTask = {
       id: taskId(),
@@ -42,4 +52,18 @@ export const useProductShellStore = create<ProductShellState>((set) => ({
   selectTask: (selectedTaskId) => set({ selectedTaskId }),
   setContextRailOpen: (contextRailOpen) => set({ contextRailOpen }),
   setDockOpen: (dockOpen) => set({ dockOpen }),
+  setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+  setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: Math.min(420, Math.max(220, sidebarWidth)) }),
+  setTheme: (theme) => set({ theme }),
+}), {
+  name: 'imperaos-product-shell-preferences-v2',
+  // Tasks and conversations remain owned by the future Product Workspace domain,
+  // never by this UI preference store.
+  partialize: (state) => ({
+    contextRailOpen: state.contextRailOpen,
+    dockOpen: state.dockOpen,
+    sidebarCollapsed: state.sidebarCollapsed,
+    sidebarWidth: state.sidebarWidth,
+    theme: state.theme,
+  }),
 }));

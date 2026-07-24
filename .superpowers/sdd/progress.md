@@ -11,3 +11,10 @@
 - Complete: source Node tests (39), lint and production build passed.
 - Complete: product-shell scaffold uses no UI Lab mock or demo-store imports.
 - Verified: Operator Panel unit suite (441), lint and production build passed.
+
+## Phase 2 — shell routing and design system
+
+- Complete: desktop-safe HashRouter covers Product Shell task, collection, settings and system routes.
+- Complete: persistent Product Shell-only preferences use `imperaos-product-shell-preferences-v2`.
+- Complete: scoped dark/light visual tokens, sidebar width/collapse, rail and dock preferences are isolated from legacy settings.
+- Verified: Operator Panel lint and production build passed.
