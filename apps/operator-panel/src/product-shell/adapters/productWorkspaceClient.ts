@@ -25,6 +25,10 @@ export class ProductWorkspaceClient {
   addMessage(taskId: string, role: 'user' | 'assistant' | 'system', body: string) {
     return this.call('bridge_product_task_message_add', { taskId, role, body }, z.object({ messageId: z.string(), workspaceId: z.string(), taskId: z.string(), role: z.string(), body: z.string(), createdAtUtc: z.string() }).strict(), `message-${crypto.randomUUID()}`);
   }
+  listMessages(taskId: string) {
+    const message = z.object({ messageId: z.string(), workspaceId: z.string(), taskId: z.string(), role: z.enum(['user', 'assistant', 'system']), body: z.string(), createdAtUtc: z.string() }).strict();
+    return this.call('bridge_product_task_message_list', { taskId }, z.object({ messages: z.array(message) }).strict());
+  }
 }
 
 export const productWorkspaceClient = new ProductWorkspaceClient();

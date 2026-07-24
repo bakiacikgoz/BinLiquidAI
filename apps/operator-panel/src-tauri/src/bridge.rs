@@ -235,6 +235,7 @@ artifact_bridge_command!(bridge_product_project_create, "project.create");
 artifact_bridge_command!(bridge_product_task_list, "task.list");
 artifact_bridge_command!(bridge_product_task_create, "task.create");
 artifact_bridge_command!(bridge_product_task_message_add, "task.message.add");
+artifact_bridge_command!(bridge_product_task_message_list, "task.message.list");
 artifact_bridge_command!(bridge_product_task_link_add, "task.link.add");
 artifact_bridge_command!(bridge_product_preferences_get, "preferences.get");
 artifact_bridge_command!(bridge_product_preferences_set, "preferences.set");

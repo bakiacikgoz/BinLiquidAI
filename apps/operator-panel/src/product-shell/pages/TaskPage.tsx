@@ -25,6 +25,6 @@ export function TaskPage() {
     await assistant.actions.send(message);
   };
   return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">ACTIVE TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
-    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} /><Composer disabled={running} onSend={(message) => void send(message)} /><WorkSurface taskTitle={task.title} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
+    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} taskId={task.id} /><Composer disabled={running} onSend={(message) => void send(message)} /><WorkSurface taskTitle={task.title} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
   </section>;
 }

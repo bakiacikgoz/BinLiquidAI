@@ -366,6 +366,12 @@ class ArtifactRpcServer:
                     workspace_id, str(params["taskId"]), str(params["role"]), str(params["body"])
                 )
             )
+        if request.method is ArtifactRpcMethod.TASK_MESSAGE_LIST:
+            return {
+                "messages": _json_value(
+                    self.product_workspace.list_messages(workspace_id, str(params["taskId"]))
+                )
+            }
         if request.method is ArtifactRpcMethod.TASK_LINK_ADD:
             return _json_mapping(
                 self.product_workspace.add_link(

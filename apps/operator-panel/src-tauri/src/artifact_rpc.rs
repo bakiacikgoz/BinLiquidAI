@@ -22,6 +22,7 @@ const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
     "task.list",
     "task.create",
     "task.message.add",
+    "task.message.list",
     "task.link.add",
     "preferences.get",
     "preferences.set",

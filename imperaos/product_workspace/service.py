@@ -158,6 +158,25 @@ class ProductWorkspaceService:
             )
         return message
 
+    def list_messages(self, workspace_id: str, task_id: str) -> list[ProductMessage]:
+        with self.store.connect() as db:
+            rows = db.execute(
+                """SELECT * FROM product_messages WHERE workspace_id=? AND task_id=?
+                ORDER BY created_at_utc ASC""",
+                (workspace_id, task_id),
+            ).fetchall()
+        return [
+            ProductMessage(
+                messageId=row["message_id"],
+                workspaceId=row["workspace_id"],
+                taskId=row["task_id"],
+                role=row["role"],
+                body=row["body"],
+                createdAtUtc=row["created_at_utc"],
+            )
+            for row in rows
+        ]
+
     def add_link(
         self, workspace_id: str, task_id: str, target_type: str, target_id: str
     ) -> ProductLink:
