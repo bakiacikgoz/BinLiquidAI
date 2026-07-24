@@ -6,6 +6,7 @@ const workspace = vi.hoisted(() => ({
   listProjects: vi.fn(),
   getOrCreateProject: vi.fn(),
   createTask: vi.fn(),
+  addMessage: vi.fn(),
 }));
 const navigate = vi.hoisted(() => vi.fn());
 
@@ -31,6 +32,7 @@ describe('NewWorkPage', () => {
       taskId: 'task-1', title: 'Prepare a release', status: 'active', assistantSessionId: 'session-1',
       createdAtUtc: '2026-07-24T12:01:00Z', updatedAtUtc: '2026-07-24T12:01:00Z',
     });
+    workspace.addMessage.mockResolvedValue({ messageId: 'message-1' });
   });
 
   it('creates work in the project the user selected', async () => {
@@ -42,7 +44,8 @@ describe('NewWorkPage', () => {
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
     expect(workspace.createTask).toHaveBeenCalledWith('project-existing', 'Prepare a release', expect.stringMatching(/^product-session-/));
+    expect(workspace.addMessage).toHaveBeenCalledWith('task-1', 'user', 'Prepare a release');
     expect(workspace.getOrCreateProject).not.toHaveBeenCalled();
-    expect(navigate).toHaveBeenCalledWith('/task/task-1');
+    expect(navigate).toHaveBeenCalledWith('/task/task-1', { state: { initialMessage: 'Prepare a release' } });
   });
 });

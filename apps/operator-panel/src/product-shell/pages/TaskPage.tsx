@@ -1,29 +1,48 @@
 import { useEffect, useRef, useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { BottomDock } from '../bottom-dock/BottomDock';
 import { Composer } from '../composer/Composer';
 import { ContextRail } from '../context-rail/ContextRail';
 import { ProductConversationView } from '../conversation/ProductConversationView';
 import { useProductAssistant } from '../adapters/useProductAssistant';
-import { useProductShellStore } from '../state/productShellStore';
+import { productWorkspaceClient } from '../adapters/productWorkspaceClient';
+import { useProductShellStore, type ProductTask } from '../state/productShellStore';
 import { WorkSurface } from '../workspace/WorkSurface';
 import { ProductArtifactWorkspace } from '../workspace/ProductArtifactWorkspace';
-import { productWorkspaceClient } from '../adapters/productWorkspaceClient';
+
+type InitialTaskNavigationState = { initialMessage?: unknown } | null;
 
 export function TaskPage() {
   const { taskId } = useParams();
   const task = useProductShellStore((state) => state.tasks.find((item) => item.id === taskId));
   const selectTask = useProductShellStore((state) => state.selectTask);
+  useEffect(() => { if (taskId) selectTask(taskId); }, [selectTask, taskId]);
+  if (!task) return <Navigate to="/" replace />;
+  return <TaskWorkspace key={task.id} task={task} />;
+}
+
+function TaskWorkspace({ task }: { task: ProductTask }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const contextRailOpen = useProductShellStore((state) => state.contextRailOpen);
   const setContextRailOpen = useProductShellStore((state) => state.setContextRailOpen);
   const assistant = useProductAssistant(task);
   const [artifactOpenRequest, setArtifactOpenRequest] = useState(0);
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
   const persistedAssistantTurns = useRef(new Set<string>());
-  useEffect(() => { if (taskId) selectTask(taskId); }, [selectTask, taskId]);
+  const initialTurnStarted = useRef(false);
+
   useEffect(() => {
-    if (!task) return;
+    const state = location.state as InitialTaskNavigationState;
+    const initialMessage = typeof state?.initialMessage === 'string' ? state.initialMessage.trim() : '';
+    if (!initialMessage || initialTurnStarted.current) return;
+    initialTurnStarted.current = true;
+    navigate(location.pathname, { replace: true, state: null });
+    void assistant.actions.send(initialMessage);
+  }, [assistant.actions, location.pathname, location.state, navigate]);
+
+  useEffect(() => {
     assistant.state.turns.forEach((turn) => {
       const body = turn.assistantMessage.text.trim();
       const persistenceKey = `${task.id}:${turn.id}:${body}`;
@@ -33,8 +52,8 @@ export function TaskPage() {
         .then(() => setMessageRefreshToken((current) => current + 1))
         .catch(() => persistedAssistantTurns.current.delete(persistenceKey));
     });
-  }, [assistant.state.turns, task]);
-  if (!task) return <Navigate to="/" replace />;
+  }, [assistant.state.turns, task.id]);
+
   const running = assistant.state.status === 'starting' || assistant.state.status === 'streaming';
   const send = async (message: string) => {
     await productWorkspaceClient.addMessage(task.id, 'user', message);
@@ -42,6 +61,6 @@ export function TaskPage() {
     await assistant.actions.send(message);
   };
   return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">ACTIVE TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
-    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} /><Composer disabled={running} onSend={(message) => void send(message)} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => setArtifactOpenRequest((current) => current + 1)} /><ProductArtifactWorkspace key={task.id} state={assistant.state} openRequest={artifactOpenRequest} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
+    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} /><Composer disabled={running} onSend={(message) => void send(message)} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => setArtifactOpenRequest((current) => current + 1)} /><ProductArtifactWorkspace state={assistant.state} openRequest={artifactOpenRequest} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
   </section>;
 }
