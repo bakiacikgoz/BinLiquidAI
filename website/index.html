@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="ImperaOS, yönetişimli yapay zekâ ajanları için self-hosted Agent Control Plane’dir — politika, onay, kimlik, denetim ve kanıt; ajanlar üretim benzeri iş akışlarına güvenmeden önce."
+    />
+    <meta name="theme-color" content="#0B1F3A" />
+    <meta property="og:title" content="ImperaOS — Agent Control Plane" />
+    <meta
+      property="og:description"
+      content="Yönetişimli yapay zekâ ajan üretim hazırlığı. Yerel öncelikli. Fail-closed. Denetim kalitesinde."
+    />
+    <meta property="og:type" content="website" />
+    <title>ImperaOS — Self-Hosted Agent Control Plane</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230B1F3A'/%3E%3Cpath d='M8 16h16M16 8v16' stroke='%23C47A1A' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='5.5' fill='none' stroke='%23E8EEF6' stroke-width='1.5'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">İçeriğe atla</a>
+
+    <header class="site-header" data-header>
+      <div class="container header-inner">
+        <a class="brand" href="#top" aria-label="ImperaOS ana sayfa">
+          <span class="brand-mark" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+              <rect width="32" height="32" rx="7" fill="currentColor" class="brand-mark-bg" />
+              <path d="M8 16h16M16 8v16" stroke="#C47A1A" stroke-width="2.2" stroke-linecap="round" />
+              <circle cx="16" cy="16" r="5.5" stroke="#E8EEF6" stroke-width="1.4" fill="none" />
+            </svg>
+          </span>
+          <span class="brand-text">ImperaOS</span>
+        </a>
+
+        <nav class="nav-desktop" aria-label="Ana menü">
+          <a href="#platform">Platform</a>
+          <a href="#surfaces">Yüzeyler</a>
+          <a href="#governance">Yönetişim</a>
+          <a href="#principles">İlkeler</a>
+          <a href="#readiness">Hazırlık</a>
+        </nav>
+
+        <div class="header-actions">
+          <a class="btn btn-ghost" href="https://github.com/bakiacikgoz/ImperaOS" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="btn btn-primary" href="#contact">Pilot talep et</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" data-nav-toggle>
+            <span class="sr-only">Menü</span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="nav-mobile" id="mobile-nav" data-mobile-nav hidden>
+        <nav aria-label="Mobil menü">
+          <a href="#platform">Platform</a>
+          <a href="#surfaces">Yüzeyler</a>
+          <a href="#governance">Yönetişim</a>
+          <a href="#principles">İlkeler</a>
+          <a href="#readiness">Hazırlık</a>
+          <a href="#contact">Pilot talep et</a>
+          <a href="https://github.com/bakiacikgoz/ImperaOS" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- HERO -->
+      <section class="hero" id="top">
+        <div class="hero-grid" aria-hidden="true"></div>
+        <div class="container hero-layout">
+          <div class="hero-copy">
+            <p class="eyebrow">
+              <span class="status-dot" aria-hidden="true"></span>
+              Self-hosted · Yerel öncelikli · Fail-closed
+            </p>
+            <h1>
+              Yapay zekâ ajanlarını üretim güveni kazanmadan yönetin.
+            </h1>
+            <p class="hero-lead">
+              ImperaOS, üretim hazırlığı için bir <strong>Agent Control Plane</strong>’dir:
+              ajanları kaydedin, politikayı simüle edin, onayları zorunlu kılın, kimliği bağlayın,
+              denetim ve yeniden oynatma artefaktlarını koruyun; desteklenmeyen yayın iddialarını engelleyin.
+            </p>
+            <div class="hero-cta">
+              <a class="btn btn-primary btn-lg" href="#contact">Tasarım ortağı pilotu talep et</a>
+              <a class="btn btn-secondary btn-lg" href="#platform">Platformu keşfet</a>
+            </div>
+            <dl class="hero-meta">
+              <div>
+                <dt>Kurulum</dt>
+                <dd>Self-hosted tek kiracı</dd>
+              </div>
+              <div>
+                <dt>Varsayılan duruş</dt>
+                <dd>Varsayılan olarak gizli</dd>
+              </div>
+              <div>
+                <dt>Yürütme</dt>
+                <dd>Yeterlilik kapılı</dd>
+              </div>
+            </dl>
+          </div>
+
+          <aside class="hero-panel" aria-label="Kontrol düzlemi özeti">
+            <div class="panel-chrome">
+              <span class="panel-dots" aria-hidden="true"></span>
+              <span class="panel-title">control-plane · enterprise</span>
+              <span class="panel-badge">FAIL-CLOSED</span>
+            </div>
+            <div class="panel-body">
+              <div class="panel-row">
+                <span class="label">Ajan</span>
+                <span class="value mono">governed-ops</span>
+                <span class="chip chip-ok">kayıtlı</span>
+              </div>
+              <div class="panel-row">
+                <span class="label">Politika sim.</span>
+                <span class="value mono">allow · onay ile</span>
+                <span class="chip chip-warn">kapılı</span>
+              </div>
+              <div class="panel-row">
+                <span class="label">Onay</span>
+                <span class="value mono">pending → approved</span>
+                <span class="chip chip-info">yaşam döngüsü</span>
+              </div>
+              <div class="panel-row">
+                <span class="label">Kanıt paketi</span>
+                <span class="value mono">imzalı · doğrulanabilir</span>
+                <span class="chip chip-ok">dışa aktarılabilir</span>
+              </div>
+              <div class="panel-row">
+                <span class="label">İddia koruması</span>
+                <span class="value mono">desteklenmeyen engelli</span>
+                <span class="chip chip-ok">zorunlu</span>
+              </div>
+
+              <div class="gate-rail" aria-hidden="true">
+                <div class="gate-step is-done">
+                  <span class="gate-n">01</span>
+                  <span>Kimlik</span>
+                </div>
+                <div class="gate-step is-done">
+                  <span class="gate-n">02</span>
+                  <span>Politika</span>
+                </div>
+                <div class="gate-step is-active">
+                  <span class="gate-n">03</span>
+                  <span>Onay</span>
+                </div>
+                <div class="gate-step">
+                  <span class="gate-n">04</span>
+                  <span>Yürüt</span>
+                </div>
+                <div class="gate-step">
+                  <span class="gate-n">05</span>
+                  <span>Kanıt</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- TRUST STRIP -->
+      <section class="trust-strip" aria-label="Temel güvenceler">
+        <div class="container trust-grid">
+          <div class="trust-item">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z" stroke="currentColor" stroke-width="1.6"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div>
+              <strong>Yerel öncelikli ve gizli</strong>
+              <span>Web erişimi ve kalıcı izler, siz açmadıkça kapalı kalır.</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="18" cy="15" r="3.2" stroke="currentColor" stroke-width="1.6"/></svg>
+            <div>
+              <strong>Fail-closed yönetişim</strong>
+              <span>Bilinmeyen, bayat veya yetersiz yollar durur — asla tahmin etmez.</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 9h8M8 12h8M8 15h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <div>
+              <strong>Denetim kalitesinde yeniden oynatma</strong>
+              <span>Çalışma yolları, dışa aktarabileceğiniz izler ve doğrulama artefaktları üretir.</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v16M7 8l5-4 5 4M7 16l5 4 5-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div>
+              <strong>İddiadan önce yeterlilik</strong>
+              <span>Yalnızca uygulama yetmez — destek, yürütülmüş kanıt gerektirir.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PLATFORM -->
+      <section class="section" id="platform">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">Platform</p>
+            <h2>Ajan üretim hazırlığı için bir kontrol düzlemi</h2>
+            <p class="section-lead">
+              ImperaOS, sınırsız çok ajanlı bir serbest alan değildir.
+              Operatörlerin, ajanlar üretim benzeri iş akışlarına güvenmeden önce
+              ihtiyaç duyduğu yönetişimli zarftır.
+            </p>
+          </div>
+
+          <div class="split">
+            <div class="split-copy">
+              <h3>Neyi kontrol edersiniz</h3>
+              <ul class="check-list">
+                <li>Ajan kaydı ve doğrulanmış kimlik bağlama</li>
+                <li>Yürütmeden önce politika simülasyonu</li>
+                <li>Tüketim disipliniyle onay yaşam döngüsü</li>
+                <li>Dışa aktarma ve doğrulama için imzalı kanıt paketleri</li>
+                <li>Desteklenmeyen yayın ifadelerini engelleyen iddia koruması</li>
+                <li>Kurumsal profiller için hazırlık ve doctor kontrolleri</li>
+              </ul>
+            </div>
+            <div class="split-card">
+              <p class="mono card-kicker">// ürün sınırı</p>
+              <h3>ImperaOS olarak pazarlanmayanlar</h3>
+              <ul class="plain-list">
+                <li>Sınırsız kurumsal çok ajanlı orkestrasyon</li>
+                <li>Evrensel olarak üretime hazır yüksek eşzamanlılık platformu</li>
+                <li>Tüm işletim sistemlerinde tam nitelikli canlı masaüstü otomasyonu</li>
+                <li>Açık onay kanıtı olmadan güvenli geri alınamaz eylemler</li>
+                <li>Bulut çok kiracılı SaaS kontrol düzlemi</li>
+              </ul>
+              <p class="card-note">
+                Net sınırlar operatörleri, denetçileri ve ürünün kendisini korur.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SURFACES -->
+      <section class="section section-alt" id="surfaces">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">Dört yüzey</p>
+            <h2>Tek düzlem. Dört disiplinli kontrol yüzeyi.</h2>
+            <p class="section-lead">
+              Her yüzeyin tanımlı bir görevi vardır. Birlikte kayıttan kanıta
+              fail-closed bir yol oluştururlar.
+            </p>
+          </div>
+
+          <div class="bento">
+            <article class="bento-card bento-lg">
+              <div class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" stroke="currentColor" stroke-width="1.5"/><path d="M8 11h8M8 14h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </div>
+              <p class="card-index mono">01</p>
+              <h3>Control Plane Core</h3>
+              <p>
+                Ajan kaydı, çalıştırma koordinasyonu, politika simülasyonu, kanıt paketi
+                dışa aktarma ve doğrulama, hazırlık kontrolleri ve iddia koruması.
+              </p>
+              <ul class="mini-tags">
+                <li>Kayıt</li>
+                <li>Politika sim.</li>
+                <li>Kanıt</li>
+                <li>İddia koruması</li>
+              </ul>
+            </article>
+
+            <article class="bento-card">
+              <div class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </div>
+              <p class="card-index mono">02</p>
+              <h3>Governed Runtime</h3>
+              <p>
+                Planlama, yönlendirme, kapsamlı bellek, politika kararları, onaylar,
+                kontrol noktası ve yeniden oynatılabilir denetim izleriyle çekirdek ve ekip yürütme arka uçları.
+              </p>
+            </article>
+
+            <article class="bento-card">
+              <div class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 9h18" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="7" r="0.8" fill="currentColor"/><circle cx="10" cy="7" r="0.8" fill="currentColor"/></svg>
+              </div>
+              <p class="card-index mono">03</p>
+              <h3>Operator Console</h3>
+              <p>
+                Gösterge paneli, ajanlar, çalıştırmalar, onaylar, kanıt, politika,
+                sistem durumu ve yürütme yüzeyleri için Tauri tabanlı kontrol yüzeyi.
+              </p>
+            </article>
+
+            <article class="bento-card bento-wide">
+              <div class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M5 8h14v10H5z" stroke="currentColor" stroke-width="1.5"/><path d="M8 8V6a4 4 0 018 0v2" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="13" r="1.5" fill="currentColor"/></svg>
+              </div>
+              <div>
+                <p class="card-index mono">04</p>
+                <h3>Qualified Execution Surfaces</h3>
+                <p>
+                  Fail-closed yürütme bağdaştırıcıları. Computer-use yalnızca denetimli,
+                  isteğe bağlı ve yeterlilik kapılı bir yüzey olarak tutulur; canlı masaüstü işlemi varsayılan olarak kapalıdır.
+                </p>
+              </div>
+              <div class="callout">
+                <strong>Varsayılan: canlı otomasyon kapalı.</strong>
+                Canlı masaüstü yolları platform yeterlilik kanıtı gerektirir — o zamana kadar engelli kalır.
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- GOVERNANCE LIFECYCLE -->
+      <section class="section" id="governance">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">Yönetişim yaşam döngüsü</p>
+            <h2>Onay, yürütme izni demek değildir.</h2>
+            <p class="section-lead">
+              ImperaOS yönetişimi bir onay kutusu değil, bir yaşam döngüsü olarak ele alır.
+              Her aşama açık, denetlenebilir ve bir kez tüketilebilir.
+            </p>
+          </div>
+
+          <ol class="lifecycle">
+            <li class="lifecycle-step" data-reveal>
+              <span class="lifecycle-num mono">01</span>
+              <div>
+                <h3>Kaydet</h3>
+                <p>Ajanları tipli spesifikasyonlarla kaydedin. Herhangi bir ayrıcalıklı yol açılmadan önce kimliği bağlayın.</p>
+              </div>
+            </li>
+            <li class="lifecycle-step" data-reveal>
+              <span class="lifecycle-num mono">02</span>
+              <div>
+                <h3>Politikayı simüle et</h3>
+                <p>Kararları dry-run değerlendirin. İzin, red ve onay gerektiren sonuçları erken görün.</p>
+              </div>
+            </li>
+            <li class="lifecycle-step" data-reveal>
+              <span class="lifecycle-num mono">03</span>
+              <div>
+                <h3>Disiplinle onayla</h3>
+                <p>
+                  Yaşam döngüsü: <code>pending → approved → executed → consumed</code>.
+                  Onay tek başına asla yürütmeyi yetkilendirmez.
+                </p>
+              </div>
+            </li>
+            <li class="lifecycle-step" data-reveal>
+              <span class="lifecycle-num mono">04</span>
+              <div>
+                <h3>Kapılar altında yürüt</h3>
+                <p>Çalıştırmalar politika, bütçe ve yeterlilik kapılarının arkasında kalır. Güvensiz yollar fail-closed kapanır.</p>
+              </div>
+            </li>
+            <li class="lifecycle-step" data-reveal>
+              <span class="lifecycle-num mono">05</span>
+              <div>
+                <h3>Kanıtı dışa aktar</h3>
+                <p>İmzalı, doğrulanabilir kanıt paketleri üretin. Hazırlık iddiasından önce yeniden oynatın ve doğrulayın.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- PRINCIPLES -->
+      <section class="section section-dark" id="principles">
+        <div class="container">
+          <div class="section-head section-head-light">
+            <p class="eyebrow">Tasarım ilkeleri</p>
+            <h2>Sonuçlardan hesap vermesi gereken operatörler için.</h2>
+          </div>
+
+          <div class="principles-grid">
+            <article class="principle" data-reveal>
+              <h3>Yerel öncelikli ve varsayılan gizli</h3>
+              <p>Ortamda gizli bulut bağımlılığı yok. Hassas izler operatör kontrolünde kalır.</p>
+            </article>
+            <article class="principle" data-reveal>
+              <h3>Fail-closed yönetişim</h3>
+              <p>Belirsizlik bir durdurma koşuludur — doğaçlama daveti değil.</p>
+            </article>
+            <article class="principle" data-reveal>
+              <h3>Tipli sözleşmeler</h3>
+              <p>Planlayıcı çıktıları, uzman yükleri, şemalar ve yeterlilik raporları doğrulanır.</p>
+            </article>
+            <article class="principle" data-reveal>
+              <h3>Yeniden oynatılabilir işlemler</h3>
+              <p>Kritik yollar denetim kalitesinde izler ve yeniden oynatma doğrulama artefaktları bırakır.</p>
+            </article>
+            <article class="principle" data-reveal>
+              <h3>İddiadan önce yeterlilik</h3>
+              <p>Pazarlama dili, yürütülmüş kanıt ve iddia korumasıyla sınırlandırılır.</p>
+            </article>
+            <article class="principle" data-reveal>
+              <h3>Sağlayıcı yönetişimi</h3>
+              <p>Uzak ve bulut sağlayıcıları varsayılan olarak kapalıdır. Gizler ortam değişkeni referansıdır; asla saklanan değer değildir.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- READINESS -->
+      <section class="section" id="readiness">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">Platform hazırlığı</p>
+            <h2>Dürüst durum. Şişirilmiş iddia yok.</h2>
+            <p class="section-lead">
+              Kurumsal hazırlık, sınırlı bir self-hosted zarftır.
+              Daha geniş iddialar imzalı yeterlilik ve GA hazırlık kanıtı gerektirir.
+            </p>
+          </div>
+
+          <div class="table-wrap" role="region" aria-label="Platform durum matrisi" tabindex="0">
+            <table class="status-table">
+              <thead>
+                <tr>
+                  <th scope="col">Alan</th>
+                  <th scope="col">Durum</th>
+                  <th scope="col">Notlar</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Linux x64 çekirdek çalışma zamanı</td>
+                  <td><span class="chip chip-ok">Destekleniyor</span></td>
+                  <td>Birincil çalışma zamanı ve sunucu tarafı doğrulama hedefi</td>
+                </tr>
+                <tr>
+                  <td>macOS araçları</td>
+                  <td><span class="chip chip-ok">Destekleniyor</span></td>
+                  <td>Operatör araçları, Tauri yayın kanıtı, yerel doğrulama</td>
+                </tr>
+                <tr>
+                  <td>Windows x64 araçları</td>
+                  <td><span class="chip chip-ok">Destekleniyor</span></td>
+                  <td>CLI, operatör paneli, paketli çalışma zamanı, RC doğrulama</td>
+                </tr>
+                <tr>
+                  <td>Team Runtime</td>
+                  <td><span class="chip chip-info">Pilotot güçlendirilmiş</span></td>
+                  <td>Kontrollü/kısıtlı profiller; sınırlı eşzamanlılık</td>
+                </tr>
+                <tr>
+                  <td>Kurumsal profil</td>
+                  <td><span class="chip chip-warn">Sınırlı hazırlık</span></td>
+                  <td>Kimlik, imzalama, metriklerle self-hosted tek kiracı</td>
+                </tr>
+                <tr>
+                  <td>Model sağlayıcı yönetişimi</td>
+                  <td><span class="chip chip-info">Deneysel / kapılı</span></td>
+                  <td>Uzak/bulut sağlayıcılar varsayılan olarak kapalı</td>
+                </tr>
+                <tr>
+                  <td>Canlı computer-use (macOS / Windows / Linux)</td>
+                  <td><span class="chip chip-muted">Yeterli değil</span></td>
+                  <td>Yeterlilik kanıtı oluşana kadar devre dışı</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- CLI / QUICKSTART TEASER -->
+      <section class="section section-alt" id="operators">
+        <div class="container operators-grid">
+          <div>
+            <p class="eyebrow">Operatörler için</p>
+            <h2>CLI öncelikli kontrol; konsol gerektiğinde Operator Panel.</h2>
+            <p class="section-lead">
+              Ajan kaydedin, politikayı simüle edin, çalıştırma gönderin, iddiaları doğrulayın
+              ve sağlayıcı yönetişimini uygulayın — açık profiller ve JSON uyumlu çıktılarla.
+            </p>
+            <div class="hero-cta">
+              <a class="btn btn-primary" href="https://github.com/bakiacikgoz/ImperaOS" target="_blank" rel="noopener noreferrer">Depoyu görüntüle</a>
+              <a class="btn btn-secondary" href="#contact">Pilot hakkında konuşalım</a>
+            </div>
+          </div>
+          <div class="terminal" aria-label="Örnek kontrol düzlemi komutları">
+            <div class="terminal-bar">
+              <span class="panel-dots" aria-hidden="true"></span>
+              <span class="mono">imperaos · control-plane</span>
+            </div>
+            <pre class="terminal-body"><code><span class="t-prompt">$</span> uv run imperaos control-plane doctor --profile enterprise --json
+<span class="t-ok"># hazırlık sözleşmeleri · kimlik · imzalama temeli</span>
+
+<span class="t-prompt">$</span> uv run imperaos control-plane agent register \
+    --spec examples/control_plane/agent_governed_ops.yaml \
+    --profile enterprise --json
+
+<span class="t-prompt">$</span> uv run imperaos control-plane policy simulate \
+    --agent-id governed-ops --profile enterprise --json
+
+<span class="t-prompt">$</span> uv run imperaos control-plane claims verify --profile enterprise --json
+<span class="t-ok"># desteklenmeyen yayın iddiaları engellendi</span></code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- CTA / CONTACT -->
+      <section class="section cta-section" id="contact">
+        <div class="container cta-card">
+          <div class="cta-copy">
+            <p class="eyebrow">Tasarım ortağı pilotu</p>
+            <h2>Yönetişimli ajan operasyonlarını kontrollü bir pilota taşıyın.</h2>
+            <p>
+              Ajanlar üretim benzeri iş akışlarına yaklaşmadan önce politika, onay ve kanıt
+              ihtiyacı duyan güvenlik, platform ve yapay zekâ operasyon ekipleri için idealdir.
+              Net iddia sınırlarıyla self-hosted, tek kiracılı kurulumları önceliklendiririz.
+            </p>
+            <ul class="check-list light">
+              <li>Sınırlı kurumsal profil değerlendirmesi</li>
+              <li>Operator Panel + CLI control-plane iş akışları</li>
+              <li>Kanıt paketi ve hazırlık kapısı incelemesi</li>
+            </ul>
+          </div>
+          <form class="cta-form" id="pilot-form" novalidate>
+            <div class="form-row">
+              <label for="name">Ad soyad</label>
+              <input id="name" name="name" type="text" autocomplete="name" required placeholder="Ayşe Yılmaz" />
+            </div>
+            <div class="form-row">
+              <label for="email">İş e-postası</label>
+              <input id="email" name="email" type="email" autocomplete="email" required placeholder="ayse@sirket.com" />
+            </div>
+            <div class="form-row">
+              <label for="org">Kurum</label>
+              <input id="org" name="org" type="text" autocomplete="organization" required placeholder="Kurum adı" />
+            </div>
+            <div class="form-row">
+              <label for="role">Rol</label>
+              <select id="role" name="role" required>
+                <option value="" disabled selected>Rolünüzü seçin</option>
+                <option>Güvenlik / GRC</option>
+                <option>Platform / SRE</option>
+                <option>Yapay zekâ / ML Mühendisliği</option>
+                <option>Mühendislik yönetimi</option>
+                <option>Diğer</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="message">Neyi yönetmek istiyorsunuz?</label>
+              <textarea id="message" name="message" rows="3" placeholder="Ajan türleri, ortam, uyumluluk kısıtları…"></textarea>
+            </div>
+            <button class="btn btn-primary btn-lg btn-block" type="submit">Pilot görüşmesi talep et</button>
+            <p class="form-note" data-form-status role="status" aria-live="polite">
+              Spam yok. Yalnızca pilot uygunluğu ve kurulum sınırları hakkında dönüş yaparız.
+            </p>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div class="footer-brand">
+          <a class="brand" href="#top">
+            <span class="brand-mark" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="7" fill="#0B1F3A" />
+                <path d="M8 16h16M16 8v16" stroke="#C47A1A" stroke-width="2.2" stroke-linecap="round" />
+                <circle cx="16" cy="16" r="5.5" stroke="#E8EEF6" stroke-width="1.4" fill="none" />
+              </svg>
+            </span>
+            <span class="brand-text">ImperaOS</span>
+          </a>
+          <p>Yönetişimli yapay zekâ ajan üretim hazırlığı için self-hosted Agent Control Plane.</p>
+        </div>
+        <div>
+          <h3>Ürün</h3>
+          <ul>
+            <li><a href="#platform">Platform</a></li>
+            <li><a href="#surfaces">Yüzeyler</a></li>
+            <li><a href="#governance">Yönetişim</a></li>
+            <li><a href="#readiness">Hazırlık</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Kaynaklar</h3>
+          <ul>
+            <li><a href="https://github.com/bakiacikgoz/ImperaOS" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            <li><a href="https://github.com/bakiacikgoz/ImperaOS" target="_blank" rel="noopener noreferrer">Dokümantasyon</a></li>
+            <li><a href="#contact">Tasarım ortağı pilotu</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Sınır</h3>
+          <p class="footer-boundary">
+            Computer-use fail-closed ve yeterlilik kapılıdır.
+            Canlı masaüstü otomasyonu varsayılan olarak kapalıdır ve platformlar genelinde genel kullanıma sunulmuş değildir.
+          </p>
+        </div>
+      </div>
+      <div class="container footer-bottom">
+        <p>© <span data-year></span> ImperaOS. Tüm hakları saklıdır.</p>
+        <p class="mono footer-domain">imperaos.com</p>
+      </div>
+    </footer>
+
+    <script src="js/main.js" defer></script>
+  </body>
+</html>
