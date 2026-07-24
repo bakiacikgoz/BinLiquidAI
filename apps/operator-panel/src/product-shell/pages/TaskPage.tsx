@@ -11,7 +11,8 @@ import { useProductAssistant } from '../adapters/useProductAssistant';
 import { productWorkspaceClient } from '../adapters/productWorkspaceClient';
 import { useProductShellStore, type ProductTask } from '../state/productShellStore';
 import { WorkSurface } from '../workspace/WorkSurface';
-import { ProductArtifactWorkspace } from '../workspace/ProductArtifactWorkspace';
+import { WorkspaceTabs } from '../workspace/WorkspaceTabs';
+import { createWorkspaceTab, type WorkspaceTab, type WorkspaceTabKind } from '../workspace/workspaceTabState';
 import { AssistantComposer } from '../../components/assistant/AssistantComposer';
 import {
   getAssistantRuntimeSettings,
@@ -72,7 +73,8 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const contextRailOpen = useProductShellStore((state) => state.contextRailOpen);
   const setContextRailOpen = useProductShellStore((state) => state.setContextRailOpen);
   const assistant = useProductAssistant(task);
-  const [artifactOpenRequest, setArtifactOpenRequest] = useState(0);
+  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>([]);
+  const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(null);
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
   const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
   const persistedAssistantTurns = useRef(new Set<string>());
@@ -128,7 +130,22 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     setMessageRefreshToken((current) => current + 1);
     await assistant.actions.send(message, runtimeSettings, controls);
   };
+  const openWorkspaceTab = (kind: WorkspaceTabKind) => {
+    setWorkspaceTabs((current) => {
+      const existing = kind === 'artifacts' ? current.find((tab) => tab.kind === 'artifacts') : undefined;
+      const next = existing ?? createWorkspaceTab(kind);
+      setActiveWorkspaceTabId(next.id);
+      return existing ? current : [...current, next];
+    });
+  };
+  const closeWorkspaceTab = (tabId: string) => {
+    setWorkspaceTabs((current) => {
+      const next = current.filter((tab) => tab.id !== tabId);
+      setActiveWorkspaceTabId((active) => active === tabId ? (next.at(-1)?.id ?? null) : active);
+      return next;
+    });
+  };
   return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">ACTIVE TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
-    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} /><AssistantComposer label="Governed assistant" placeholder="Describe the next outcome…" sendLabel="Send" disabled={running} statusLabel={assistant.state.status} runtimeSettings={getAssistantRuntimeSettings(settings)} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)} onCancel={() => void assistant.actions.cancel()} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => setArtifactOpenRequest((current) => current + 1)} /><ProductArtifactWorkspace state={assistant.state} openRequest={artifactOpenRequest} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
+    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} /><AssistantComposer label="Governed assistant" placeholder="Describe the next outcome…" sendLabel="Send" disabled={running} statusLabel={assistant.state.status} runtimeSettings={getAssistantRuntimeSettings(settings)} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)} onCancel={() => void assistant.actions.cancel()} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => openWorkspaceTab('artifacts')} onOpenTerminal={() => openWorkspaceTab('terminal')} onOpenBrowser={() => openWorkspaceTab('browser')} onOpenPreview={() => openWorkspaceTab('preview')} /><WorkspaceTabs tabs={workspaceTabs} activeTabId={activeWorkspaceTabId} assistantState={assistant.state} onActivate={setActiveWorkspaceTabId} onClose={closeWorkspaceTab} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} />}</div>
   </section>;
 }
