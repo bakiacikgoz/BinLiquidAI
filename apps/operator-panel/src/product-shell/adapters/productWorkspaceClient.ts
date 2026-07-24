@@ -17,7 +17,8 @@ const taskRuntime = z.object({
   speedProfile: z.enum(['standard', 'fast']).default('standard'),
   approvalProfile: z.enum(['always_ask', 'risk_based', 'policy_automatic']).default('risk_based'),
 }).strict();
-const task = z.object({ taskId: z.string(), workspaceId: z.string(), projectId: z.string(), title: z.string(), status: z.enum(['draft', 'active', 'awaiting_approval', 'completed', 'failed', 'cancelled', 'archived']), ...taskRuntime.shape, assistantSessionId: z.string().nullable(), assistantTurnId: z.string().nullable(), teamJobId: z.string().nullable(), createdAtUtc: z.string(), updatedAtUtc: z.string() }).strict();
+const task = z.object({ taskId: z.string(), workspaceId: z.string(), projectId: z.string(), title: z.string(), status: z.enum(['draft', 'active', 'awaiting_approval', 'completed', 'failed', 'cancelled', 'archived']), priority: z.number().int().nonnegative().default(0), pinned: z.boolean().default(false), manualOrder: z.number().int().nonnegative().default(0), ...taskRuntime.shape, assistantSessionId: z.string().nullable(), assistantTurnId: z.string().nullable(), teamJobId: z.string().nullable(), createdAtUtc: z.string(), updatedAtUtc: z.string(), archivedAtUtc: z.string().nullable().default(null) }).strict();
+const taskLink = z.object({ linkId: z.string(), workspaceId: z.string(), taskId: z.string(), targetType: z.enum(['artifact', 'approval', 'team_job', 'run']), targetId: z.string(), createdAtUtc: z.string() }).strict();
 const folderSelection = z.object({
   cancelled: z.boolean(), folderTicket: z.string().nullable(), displayName: z.string().nullable(),
 }).strict();
@@ -25,6 +26,7 @@ const folderSelection = z.object({
 export type ProductWorkspaceTask = z.infer<typeof task>;
 export type ProductWorkspaceProject = z.infer<typeof project>;
 export type ProductTaskRuntimeOptions = z.infer<typeof taskRuntime>;
+export type ProductTaskLink = z.infer<typeof taskLink>;
 
 export class ProductWorkspaceClient {
   private async call<T>(command: string, params: Record<string, unknown>, schema: z.ZodType<T>, idempotencyKey: string | null = null): Promise<T> {
@@ -72,13 +74,23 @@ export class ProductWorkspaceClient {
     return projects.find((project) => project.title === title && project.status !== 'archived')
       ?? this.createProject(title);
   }
+  getTask(taskId: string) { return this.call('bridge_product_task_get', { taskId }, task); }
   listTasks(projectId: string) { return this.call('bridge_product_task_list', { projectId }, z.object({ tasks: z.array(task) }).strict()); }
   createTask(projectId: string, title: string, assistantSessionId?: string, runtime?: ProductTaskRuntimeOptions) { return this.call('bridge_product_task_create', { projectId, title, assistantSessionId, runtime }, task, `task-${crypto.randomUUID()}`); }
-  updateTask(taskId: string, changes: { status?: ProductWorkspaceTask['status']; runtime?: Partial<ProductTaskRuntimeOptions> }) {
+  updateTask(taskId: string, changes: { status?: ProductWorkspaceTask['status']; priority?: number; pinned?: boolean; manualOrder?: number; runtime?: Partial<ProductTaskRuntimeOptions> }) {
     return this.call('bridge_product_task_update', { taskId, ...changes }, task, `task-update-${crypto.randomUUID()}`);
+  }
+  archiveTask(taskId: string, reason: string) {
+    return this.call('bridge_product_task_archive', { taskId, reason }, task, `task-archive-${crypto.randomUUID()}`);
   }
   addMessage(taskId: string, role: 'user' | 'assistant' | 'system', body: string) {
     return this.call('bridge_product_task_message_add', { taskId, role, body }, z.object({ messageId: z.string(), workspaceId: z.string(), taskId: z.string(), role: z.string(), body: z.string(), createdAtUtc: z.string() }).strict(), `message-${crypto.randomUUID()}`);
+  }
+  addLink(taskId: string, targetType: ProductTaskLink['targetType'], targetId: string) {
+    return this.call('bridge_product_task_link_add', { taskId, targetType, targetId }, taskLink, `task-link-${crypto.randomUUID()}`);
+  }
+  listLinks(taskId: string) {
+    return this.call('bridge_product_task_link_list', { taskId }, z.object({ links: z.array(taskLink) }).strict());
   }
   listMessages(taskId: string) {
     const message = z.object({ messageId: z.string(), workspaceId: z.string(), taskId: z.string(), role: z.enum(['user', 'assistant', 'system']), body: z.string(), createdAtUtc: z.string() }).strict();

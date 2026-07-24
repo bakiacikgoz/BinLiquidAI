@@ -71,4 +71,40 @@ describe('ProductWorkspaceClient default projects', () => {
       request: expect.objectContaining({ folderTicket: 'folder-opaque-1', name: 'Release workspace', idempotencyKey: expect.stringMatching(/^project-register-/) }),
     });
   });
+
+  it('loads one durable task through the governed task-get bridge', async () => {
+    const task = {
+      taskId: 'task-release', workspaceId: 'workspace-1', projectId: 'project-operator', title: 'Prepare release',
+      status: 'active', reasoningEffort: 'high', speedProfile: 'standard', approvalProfile: 'risk_based',
+      assistantSessionId: 'session-release', assistantTurnId: null, teamJobId: null,
+      createdAtUtc: '2026-07-24T12:00:00Z', updatedAtUtc: '2026-07-24T12:00:00Z',
+    };
+    invoke.mockResolvedValueOnce(success(task));
+
+    await expect(new ProductWorkspaceClient().getTask('task-release')).resolves.toMatchObject(task);
+
+    expect(invoke).toHaveBeenCalledWith('bridge_product_task_get', expect.objectContaining({
+      payload: expect.objectContaining({ params: { taskId: 'task-release' } }),
+    }));
+  });
+
+  it('archives a task through the governed archive bridge rather than local UI state', async () => {
+    const task = {
+      taskId: 'task-release', workspaceId: 'workspace-1', projectId: 'project-operator', title: 'Prepare release',
+      status: 'archived', priority: 0, pinned: false, manualOrder: 0,
+      reasoningEffort: 'medium', speedProfile: 'standard', approvalProfile: 'risk_based',
+      assistantSessionId: 'session-release', assistantTurnId: null, teamJobId: null,
+      createdAtUtc: '2026-07-24T12:00:00Z', updatedAtUtc: '2026-07-24T12:00:01Z', archivedAtUtc: '2026-07-24T12:00:01Z',
+    };
+    invoke.mockResolvedValueOnce(success(task));
+
+    await expect(new ProductWorkspaceClient().archiveTask('task-release', 'Completed in sidebar')).resolves.toMatchObject(task);
+
+    expect(invoke).toHaveBeenCalledWith('bridge_product_task_archive', expect.objectContaining({
+      payload: expect.objectContaining({
+        params: expect.objectContaining({ taskId: 'task-release', reason: 'Completed in sidebar' }),
+        idempotencyKey: expect.stringMatching(/^task-archive-/),
+      }),
+    }));
+  });
 });

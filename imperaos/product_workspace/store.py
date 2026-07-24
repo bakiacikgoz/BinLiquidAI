@@ -34,6 +34,8 @@ class ProductWorkspaceStore:
             CREATE TABLE IF NOT EXISTS product_tasks (
               task_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL,
               title TEXT NOT NULL, status TEXT NOT NULL,
+              priority INTEGER NOT NULL DEFAULT 0, pinned INTEGER NOT NULL DEFAULT 0,
+              manual_order INTEGER NOT NULL DEFAULT 0, archived_at_utc TEXT, archive_reason TEXT,
               reasoning_effort TEXT NOT NULL DEFAULT 'medium',
               speed_profile TEXT NOT NULL DEFAULT 'standard',
               approval_profile TEXT NOT NULL DEFAULT 'risk_based', assistant_session_id TEXT,
@@ -104,3 +106,22 @@ class ProductWorkspaceStore:
                 if name not in task_columns:
                     db.execute(f"ALTER TABLE product_tasks ADD COLUMN {name} {definition}")
             db.execute("INSERT OR IGNORE INTO product_schema_migrations(version) VALUES (4)")
+            task_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(product_tasks)").fetchall()
+            }
+            task_additions = {
+                "priority": "INTEGER NOT NULL DEFAULT 0",
+                "pinned": "INTEGER NOT NULL DEFAULT 0",
+                "manual_order": "INTEGER NOT NULL DEFAULT 0",
+                "archived_at_utc": "TEXT",
+                "archive_reason": "TEXT",
+            }
+            for name, definition in task_additions.items():
+                if name not in task_columns:
+                    db.execute(f"ALTER TABLE product_tasks ADD COLUMN {name} {definition}")
+            db.execute(
+                """CREATE INDEX IF NOT EXISTS product_tasks_sidebar
+                ON product_tasks(workspace_id, project_id, status, pinned DESC, manual_order ASC,
+                updated_at_utc DESC)"""
+            )
+            db.execute("INSERT OR IGNORE INTO product_schema_migrations(version) VALUES (5)")

@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
-import { productWorkspaceClient } from '../adapters/productWorkspaceClient';
+import { productWorkspaceClient, type ProductTaskLink } from '../adapters/productWorkspaceClient';
 import { transientConversationTurns, type StoredMessage } from './conversationState';
 
 export function ProductConversationView({ state, taskId, refreshToken = 0, onOpenArtifacts, onOpenApproval, onRegenerate }: { state: AssistantSessionState; taskId: string; refreshToken?: number; onOpenArtifacts?: (artifactId?: string) => void; onOpenApproval?: (approvalId: string) => void; onRegenerate?: (turnId: string) => void }) {
   const [stored, setStored] = useState<StoredMessage[]>([]);
-  useEffect(() => { void productWorkspaceClient.listMessages(taskId).then(({ messages }) => setStored(messages)).catch(() => undefined); }, [refreshToken, taskId]);
+  const [links, setLinks] = useState<ProductTaskLink[]>([]);
+  useEffect(() => {
+    void Promise.all([productWorkspaceClient.listMessages(taskId), productWorkspaceClient.listLinks(taskId)])
+      .then(([{ messages }, { links: nextLinks }]) => { setStored(messages); setLinks(nextLinks); })
+      .catch(() => undefined);
+  }, [refreshToken, taskId]);
   const transient = transientConversationTurns(state, stored);
   if (!state.turns.length && !stored.length) return <section className="ps-empty"><h2>Start governed work</h2><p>ImperaOS will plan, enforce policy, and keep a trace of the run.</p></section>;
   return <section className="ps-conversation" aria-label="Assistant conversation">
@@ -20,5 +25,6 @@ export function ProductConversationView({ state, taskId, refreshToken = 0, onOpe
     </article>;
     })}
     {state.referencedArtifacts.filter((artifact) => artifact.openable && artifact.artifactId).map((artifact) => <article className="ps-artifact-card" key={`${artifact.artifactId}:${artifact.revisionId ?? ''}`}><strong>{artifact.name}</strong><span>{artifact.kind ?? 'artifact'} · {artifact.summary ?? 'Governed artifact available'}</span><button type="button" onClick={() => onOpenArtifacts?.(artifact.artifactId)}>Open in workspace</button></article>)}
+    {links.length ? <section className="ps-durable-links" aria-label="Durable task links"><h3>Durable task links</h3>{links.map((link) => <div key={link.linkId}><code>{link.targetType}</code><span>{link.targetId}</span>{link.targetType === 'artifact' && <button type="button" onClick={() => onOpenArtifacts?.(link.targetId)}>Open artifact {link.targetId}</button>}{link.targetType === 'approval' && <button type="button" onClick={() => onOpenApproval?.(link.targetId)}>Open approval {link.targetId}</button>}{link.targetType === 'run' && <span className="ps-muted">Governed run reference</span>}{link.targetType === 'team_job' && <span className="ps-muted">Governed team job reference</span>}</div>)}</section> : null}
   </section>;
 }

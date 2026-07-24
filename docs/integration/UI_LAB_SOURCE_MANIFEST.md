@@ -3,7 +3,7 @@
 - Source path: `/Users/baki/Documents/ImperaOS-UI-Lab`
 - Frozen source SHA: `165208e90dd37376d5f0a21df22b7a1e7756aab5`
 - Target base SHA: `0a9c4ea5a6e26a3b32a9dd327ec1d7154ac39376`
-- Source validation: 39 Node tests passed; `pnpm lint` and `pnpm build` passed on 2026-07-24.
+- Source validation: 39 Node tests passed; `pnpm lint` and `pnpm build` passed on 2026-07-25.
 
 ## Imported design contract
 
@@ -34,8 +34,14 @@ user-started native PTY/xterm surface; and mode-scoped native browser/preview ch
 policy with redirect checks, isolated agent profiles, registered local preview origins and
 explicit approval prompts for popups, downloads and external applications.
 
-Still required before the V2 plan can be considered complete: unified governed Artifact
-Workspace/runtime tab hosting, terminal multi-session dock integration and project-root
-registration, complete assistant message action persistence, richer task context/dock data,
-collection/settings completion, and all end-to-end/release checks specified by the plan. This
-manifest deliberately records those as open rather than treating a scaffold as completion.
+The V2 implementation work is complete on this branch: governed Artifact
+Workspace/runtime tab hosting, multi-session terminal preservation and project-root
+registration, durable assistant-message action references, task context/activity data and
+the collections/settings surfaces are all connected to the product runtime rather than a
+demo store. Task pinning, ordering and archival, as well as direct durable task reload,
+are backed by the Product Workspace store.
+
+The automated release checks pass. The GUI launch probe verifies that the Tauri desktop
+process starts and remains alive; live bridge instrumentation and an assistant turn remain
+explicitly conditional on a desktop automation harness and a locally qualified assistant
+runtime. Those prerequisites are not represented as a mock or a successful response.

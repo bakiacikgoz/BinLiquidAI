@@ -234,12 +234,15 @@ artifact_bridge_command!(bridge_product_project_list, "project.list");
 artifact_bridge_command!(bridge_product_project_create, "project.create");
 artifact_bridge_command!(bridge_product_project_update, "project.update");
 artifact_bridge_command!(bridge_product_project_archive, "project.archive");
+artifact_bridge_command!(bridge_product_task_get, "task.get");
 artifact_bridge_command!(bridge_product_task_list, "task.list");
 artifact_bridge_command!(bridge_product_task_create, "task.create");
 artifact_bridge_command!(bridge_product_task_update, "task.update");
+artifact_bridge_command!(bridge_product_task_archive, "task.archive");
 artifact_bridge_command!(bridge_product_task_message_add, "task.message.add");
 artifact_bridge_command!(bridge_product_task_message_list, "task.message.list");
 artifact_bridge_command!(bridge_product_task_link_add, "task.link.add");
+artifact_bridge_command!(bridge_product_task_link_list, "task.link.list");
 artifact_bridge_command!(bridge_product_preferences_get, "preferences.get");
 artifact_bridge_command!(bridge_product_preferences_set, "preferences.set");
 
@@ -404,7 +407,9 @@ pub struct ProductProjectRegisterRequest {
 pub async fn bridge_product_project_folder_select(
     app: tauri::AppHandle,
 ) -> BridgeResult<ProductFolderSelectResult> {
-    if let Err(error) = resolve_trusted_artifact_identity(&trusted_artifact_bridge_config(), &app).await {
+    if let Err(error) =
+        resolve_trusted_artifact_identity(&trusted_artifact_bridge_config(), &app).await
+    {
         return BridgeResult::err(error);
     }
     let dialog_app = app.clone();
@@ -466,7 +471,12 @@ pub async fn bridge_product_project_register(
 ) -> BridgeResult<Value> {
     if normalize_required_text(&request.folder_ticket, "folder ticket", "project register").is_err()
         || normalize_required_text(&request.name, "project name", "project register").is_err()
-        || normalize_required_text(&request.idempotency_key, "idempotency key", "project register").is_err()
+        || normalize_required_text(
+            &request.idempotency_key,
+            "idempotency key",
+            "project register",
+        )
+        .is_err()
     {
         return BridgeResult::err(BridgeError::new(
             "INVALID_INPUT",
@@ -4990,11 +5000,15 @@ mod tests {
     #[test]
     fn project_folder_ticket_is_opaque_and_consumed_when_bound_to_a_root_ref() {
         let selected = tempfile::tempdir().expect("temporary folder");
-        let selected_path = selected.path().canonicalize().expect("canonical selected folder");
+        let selected_path = selected
+            .path()
+            .canonicalize()
+            .expect("canonical selected folder");
         let state = ProductFolderTicketState::default();
 
-        let (ticket, display_name) = tauri::async_runtime::block_on(state.issue(selected_path.clone()))
-            .expect("folder ticket");
+        let (ticket, display_name) =
+            tauri::async_runtime::block_on(state.issue(selected_path.clone()))
+                .expect("folder ticket");
         assert!(ticket.starts_with("folder-"));
         assert!(!ticket.contains(&selected_path.display().to_string()));
         assert!(!display_name.is_empty());
@@ -5011,8 +5025,9 @@ mod tests {
                 .expect("registered root resolves natively"),
             selected_path
         );
-        assert!(tauri::async_runtime::block_on(state.resolve_registered_root("root-missing"))
-            .is_err());
+        assert!(
+            tauri::async_runtime::block_on(state.resolve_registered_root("root-missing")).is_err()
+        );
     }
 
     #[test]

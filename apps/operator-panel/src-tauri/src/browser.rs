@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{
     webview::{DownloadEvent, NewWindowResponse},
-    AppHandle, Emitter, Manager, Url, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Url, WebviewBuilder, WebviewUrl,
 };
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -60,6 +60,16 @@ pub struct BrowserSessionRequest {
     pub label: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserBoundsRequest {
+    pub label: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserHistoryState {
@@ -82,6 +92,7 @@ struct BrowserApprovalRequest {
     url: String,
     mode: BrowserMode,
     task_id: Option<String>,
+    source_session_label: String,
 }
 
 fn origin(url: &Url) -> String {
@@ -108,7 +119,9 @@ fn normalize_agent_domain(value: &str) -> Result<String, String> {
         .host_str()
         .filter(|host| !host.is_empty())
         .map(|host| host.to_ascii_lowercase())
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: agent allowlist contains an invalid domain".to_owned())?;
+        .ok_or_else(|| {
+            "BROWSER_POLICY_DENIED: agent allowlist contains an invalid domain".to_owned()
+        })?;
     if host == "localhost" || host.parse::<std::net::IpAddr>().is_ok() {
         return Err("BROWSER_POLICY_DENIED: agent allowlist requires a DNS domain".into());
     }
@@ -250,6 +263,7 @@ fn emit_approval_required(
     url: &Url,
     mode: &BrowserMode,
     task_id: Option<&str>,
+    source_session_label: &str,
 ) {
     let _ = app.emit(
         "browser://approval-required",
@@ -258,6 +272,7 @@ fn emit_approval_required(
             url: url.as_str().to_owned(),
             mode: mode.clone(),
             task_id: task_id.map(ToOwned::to_owned),
+            source_session_label: source_session_label.to_owned(),
         },
     );
 }
@@ -272,6 +287,25 @@ fn is_external_application_scheme(url: &Url) -> bool {
     )
 }
 
+fn validate_bounds(x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
+    if !x.is_finite()
+        || !y.is_finite()
+        || !width.is_finite()
+        || !height.is_finite()
+        || x < 0.0
+        || y < 0.0
+        || width <= 0.0
+        || height <= 0.0
+        || x > 10_000.0
+        || y > 10_000.0
+        || width > 10_000.0
+        || height > 10_000.0
+    {
+        return Err("BROWSER_POLICY_DENIED: native browser bounds are invalid".into());
+    }
+    Ok(())
+}
+
 fn record_history_navigation(session: &mut BrowserSession, url: &str) {
     if session
         .history
@@ -281,7 +315,9 @@ fn record_history_navigation(session: &mut BrowserSession, url: &str) {
         return;
     }
     if !session.history.is_empty() {
-        session.history.truncate(session.history_index.saturating_add(1));
+        session
+            .history
+            .truncate(session.history_index.saturating_add(1));
     }
     session.history.push(url.to_owned());
     session.history_index = session.history.len().saturating_sub(1);
@@ -328,86 +364,108 @@ fn open_browser_window(
     let navigation_policy = policy.clone();
     let navigation_mode = mode.clone();
     let navigation_task_id = task_id.clone();
+    let navigation_label = label.clone();
     let navigation_app = app.clone();
     let popup_policy = policy.clone();
     let popup_mode = mode.clone();
     let popup_task_id = task_id.clone();
+    let popup_label = label.clone();
     let popup_app = app.clone();
     let download_policy = policy;
     let download_mode = mode.clone();
     let download_task_id = task_id.clone();
+    let download_label = label.clone();
     let download_app = app.clone();
-    WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url))
-        .data_directory(profile_directory(&app, &mode)?)
-        // Every redirect is checked against the live policy state.
-        .on_navigation(move |target| {
-            let permitted = allowed(
-                &navigation_policy,
-                &navigation_mode,
-                navigation_task_id.as_deref(),
-                target,
-            );
-            if !permitted && is_external_application_scheme(target) {
-                emit_approval_required(
-                    &navigation_app,
-                    BrowserApprovalKind::ExternalApplication,
-                    target,
-                    &navigation_mode,
-                    navigation_task_id.as_deref(),
-                );
-            }
-            permitted
-        })
-        // Popups never inherit an ambient approval. They are denied until the
-        // main product UI asks the user and opens a separately governed window.
-        .on_new_window(move |target, _features| {
-            if allowed(
-                &popup_policy,
-                &popup_mode,
-                popup_task_id.as_deref(),
-                &target,
-            ) {
-                emit_approval_required(
-                    &popup_app,
-                    BrowserApprovalKind::NewWindow,
-                    &target,
-                    &popup_mode,
-                    popup_task_id.as_deref(),
-                );
-            } else if is_external_application_scheme(&target) {
-                emit_approval_required(
-                    &popup_app,
-                    BrowserApprovalKind::ExternalApplication,
-                    &target,
-                    &popup_mode,
-                    popup_task_id.as_deref(),
-                );
-            }
-            NewWindowResponse::Deny
-        })
-        // A browser download is not an artifact export. It stays denied until
-        // a future governed save/approval workflow is supplied by the host.
-        .on_download(move |_webview, event| {
-            if let DownloadEvent::Requested { url, .. } = event {
-                if allowed(
-                    &download_policy,
-                    &download_mode,
-                    download_task_id.as_deref(),
-                    &url,
-                ) {
-                    emit_approval_required(
-                        &download_app,
-                        BrowserApprovalKind::Download,
-                        &url,
-                        &download_mode,
-                        download_task_id.as_deref(),
+    // This is deliberately a child of the product window, not a second
+    // top-level browser window. The React surface supplies its reserved
+    // viewport bounds through `browser_set_bounds`; the child is hidden until
+    // those bounds have been received.
+    let parent = app
+        .get_window("main")
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: product window is unavailable")?;
+    let webview = parent
+        .add_child(
+            WebviewBuilder::new(label.clone(), WebviewUrl::External(url))
+                .data_directory(profile_directory(&app, &mode)?)
+                .incognito(matches!(mode, BrowserMode::Agent))
+                // Every redirect is checked against the live policy state.
+                .on_navigation(move |target| {
+                    let permitted = allowed(
+                        &navigation_policy,
+                        &navigation_mode,
+                        navigation_task_id.as_deref(),
+                        target,
                     );
-                }
-            }
-            false
-        })
-        .build()
+                    if !permitted && is_external_application_scheme(target) {
+                        emit_approval_required(
+                            &navigation_app,
+                            BrowserApprovalKind::ExternalApplication,
+                            target,
+                            &navigation_mode,
+                            navigation_task_id.as_deref(),
+                            &navigation_label,
+                        );
+                    }
+                    permitted
+                })
+                // Popups never inherit an ambient approval. They are denied until the
+                // main product UI asks the user and opens a separately governed window.
+                .on_new_window(move |target, _features| {
+                    if allowed(
+                        &popup_policy,
+                        &popup_mode,
+                        popup_task_id.as_deref(),
+                        &target,
+                    ) {
+                        emit_approval_required(
+                            &popup_app,
+                            BrowserApprovalKind::NewWindow,
+                            &target,
+                            &popup_mode,
+                            popup_task_id.as_deref(),
+                            &popup_label,
+                        );
+                    } else if is_external_application_scheme(&target) {
+                        emit_approval_required(
+                            &popup_app,
+                            BrowserApprovalKind::ExternalApplication,
+                            &target,
+                            &popup_mode,
+                            popup_task_id.as_deref(),
+                            &popup_label,
+                        );
+                    }
+                    NewWindowResponse::Deny
+                })
+                // A browser download is not an artifact export. It stays denied until
+                // a future governed save/approval workflow is supplied by the host.
+                .on_download(move |_webview, event| {
+                    if let DownloadEvent::Requested { url, .. } = event {
+                        if allowed(
+                            &download_policy,
+                            &download_mode,
+                            download_task_id.as_deref(),
+                            &url,
+                        ) {
+                            emit_approval_required(
+                                &download_app,
+                                BrowserApprovalKind::Download,
+                                &url,
+                                &download_mode,
+                                download_task_id.as_deref(),
+                                &download_label,
+                            );
+                        }
+                    }
+                    false
+                }),
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(1.0, 1.0),
+        )
         .map_err(|_| "BROWSER_POLICY_DENIED: child webview could not open")?;
+    webview
+        .hide()
+        .map_err(|_| "BROWSER_POLICY_DENIED: child webview could not initialize")?;
     Ok(label)
 }
 
@@ -419,7 +477,7 @@ pub fn browser_list_preview_origins(
 }
 
 #[tauri::command]
-pub fn browser_open(
+pub async fn browser_open(
     app: AppHandle,
     state: tauri::State<'_, BrowserPolicyState>,
     sessions: tauri::State<'_, BrowserSessionRegistry>,
@@ -459,7 +517,7 @@ pub fn browser_navigate(
     if !allowed(&state, &session.mode, session.task_id.as_deref(), &url) {
         return Err("BROWSER_POLICY_DENIED: URL is not allowed for this browser mode".into());
     }
-    app.get_webview_window(&request.label)
+    app.get_webview(&request.label)
         .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
         .navigate(url.clone())
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not navigate".to_owned())?;
@@ -496,11 +554,14 @@ fn browser_move_history(
                 .ok_or_else(|| "BROWSER_POLICY_DENIED: browser history is unavailable")?,
         )
     };
-    let target_url = Url::parse(&target).map_err(|_| "BROWSER_POLICY_DENIED: invalid browser history URL")?;
+    let target_url =
+        Url::parse(&target).map_err(|_| "BROWSER_POLICY_DENIED: invalid browser history URL")?;
     if !allowed(policy, &mode, task_id.as_deref(), &target_url) {
-        return Err("BROWSER_POLICY_DENIED: browser history target is not allowed for this mode".into());
+        return Err(
+            "BROWSER_POLICY_DENIED: browser history target is not allowed for this mode".into(),
+        );
     }
-    app.get_webview_window(label)
+    app.get_webview(label)
         .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
         .navigate(target_url)
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not navigate history".to_owned())?;
@@ -554,11 +615,12 @@ pub fn browser_history_state(
 }
 
 #[tauri::command]
-pub fn browser_reload(
+pub fn browser_set_bounds(
     app: AppHandle,
     sessions: tauri::State<'_, BrowserSessionRegistry>,
-    request: BrowserSessionRequest,
+    request: BrowserBoundsRequest,
 ) -> Result<(), String> {
+    validate_bounds(request.x, request.y, request.width, request.height)?;
     if !sessions
         .sessions
         .lock()
@@ -567,8 +629,43 @@ pub fn browser_reload(
     {
         return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
     }
-    app.get_webview_window(&request.label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+    let webview = app
+        .get_webview(&request.label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?;
+    webview
+        .set_position(LogicalPosition::new(request.x, request.y))
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser bounds could not be synchronized")?;
+    webview
+        .set_size(LogicalSize::new(request.width, request.height))
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser bounds could not be synchronized".to_owned())
+}
+
+#[tauri::command]
+pub fn browser_reload(
+    app: AppHandle,
+    state: tauri::State<'_, BrowserPolicyState>,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserSessionRequest,
+) -> Result<(), String> {
+    let session = sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?
+        .get(&request.label)
+        .cloned()
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session".to_owned())?;
+    let webview = app
+        .get_webview(&request.label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?;
+    let current = webview
+        .url()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser URL is unavailable")?;
+    if !allowed(&state, &session.mode, session.task_id.as_deref(), &current) {
+        return Err(
+            "BROWSER_POLICY_DENIED: browser reload target is not allowed for this mode".into(),
+        );
+    }
+    webview
         .reload()
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not reload".to_owned())
 }
@@ -587,7 +684,7 @@ pub fn browser_show(
     {
         return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
     }
-    app.get_webview_window(&request.label)
+    app.get_webview(&request.label)
         .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
         .show()
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not show".to_owned())
@@ -607,7 +704,7 @@ pub fn browser_hide(
     {
         return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
     }
-    app.get_webview_window(&request.label)
+    app.get_webview(&request.label)
         .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
         .hide()
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not hide".to_owned())
@@ -628,8 +725,8 @@ pub fn browser_close(
     if !known {
         return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
     }
-    if let Some(window) = app.get_webview_window(&request.label) {
-        window
+    if let Some(webview) = app.get_webview(&request.label) {
+        webview
             .close()
             .map_err(|_| "BROWSER_POLICY_DENIED: browser could not close")?;
     }
@@ -640,7 +737,7 @@ pub fn browser_close(
 mod tests {
     use super::{
         allowed, is_external_application_scheme, move_history, record_history_navigation,
-        BrowserMode, BrowserPolicyState, BrowserSession,
+        validate_bounds, BrowserMode, BrowserPolicyState, BrowserSession,
     };
     use tauri::Url;
 
@@ -756,7 +853,9 @@ mod tests {
                 "{value} must stay blocked without an approval route"
             );
         }
-        assert!(is_external_application_scheme(&url("mailto:operator@example.com")));
+        assert!(is_external_application_scheme(&url(
+            "mailto:operator@example.com"
+        )));
     }
 
     #[test]
@@ -771,12 +870,36 @@ mod tests {
         record_history_navigation(&mut session, "https://imperaos.dev/docs");
         record_history_navigation(&mut session, "https://imperaos.dev/releases");
 
-        assert_eq!(move_history(&mut session, -1), Some("https://imperaos.dev/docs".to_string()));
-        assert_eq!(move_history(&mut session, -1), Some("https://imperaos.dev/".to_string()));
+        assert_eq!(
+            move_history(&mut session, -1),
+            Some("https://imperaos.dev/docs".to_string())
+        );
+        assert_eq!(
+            move_history(&mut session, -1),
+            Some("https://imperaos.dev/".to_string())
+        );
         assert_eq!(move_history(&mut session, -1), None);
-        assert_eq!(move_history(&mut session, 1), Some("https://imperaos.dev/docs".to_string()));
+        assert_eq!(
+            move_history(&mut session, 1),
+            Some("https://imperaos.dev/docs".to_string())
+        );
 
         record_history_navigation(&mut session, "https://imperaos.dev/security");
         assert_eq!(move_history(&mut session, 1), None);
+    }
+
+    #[test]
+    fn native_child_bounds_are_finite_and_nonzero() {
+        assert!(validate_bounds(0.0, 0.0, 1.0, 1.0).is_ok());
+        for (x, y, width, height) in [
+            (0.0, 0.0, 0.0, 1.0),
+            (0.0, 0.0, 1.0, 0.0),
+            (-1.0, 0.0, 1.0, 1.0),
+            (0.0, -1.0, 1.0, 1.0),
+            (0.0, 0.0, 10001.0, 1.0),
+            (f64::NAN, 0.0, 1.0, 1.0),
+        ] {
+            assert!(validate_bounds(x, y, width, height).is_err());
+        }
     }
 }

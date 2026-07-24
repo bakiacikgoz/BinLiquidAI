@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type BrowserHistoryState = { canBack: boolean; canForward: boolean };
 
@@ -14,12 +14,13 @@ function normalizeHistory(value: unknown): BrowserHistoryState {
   };
 }
 
-export function PreviewSurface({ onClose, sessionLabel: persistedSessionLabel, onSessionChange }: { onClose: () => void; sessionLabel?: string; onSessionChange?: (sessionLabel: string | null) => void }) {
+export function PreviewSurface({ active = true, onClose, sessionLabel: persistedSessionLabel, onSessionChange }: { active?: boolean; onClose: () => void; sessionLabel?: string; onSessionChange?: (sessionLabel: string | null) => void }) {
   const [origins, setOrigins] = useState<string[]>([]);
   const [selected, setSelected] = useState('');
   const [ownedSessionLabel, setOwnedSessionLabel] = useState<string | null>(null);
   const [history, setHistory] = useState<BrowserHistoryState>(emptyHistory);
   const [status, setStatus] = useState('');
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const sessionLabel = persistedSessionLabel ?? ownedSessionLabel;
   const setSessionLabel = (next: string | null) => {
     setOwnedSessionLabel(next);
@@ -41,11 +42,33 @@ export function PreviewSurface({ onClose, sessionLabel: persistedSessionLabel, o
     void refreshHistory(sessionLabel).catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Preview history is unavailable.'));
   }, [sessionLabel]);
   useEffect(() => {
-    if (!sessionLabel) return;
-    void invoke('browser_show', { request: { label: sessionLabel } })
-      .catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Preview could not become visible.'));
-    return () => { void invoke('browser_hide', { request: { label: sessionLabel } }); };
-  }, [sessionLabel]);
+    if (!sessionLabel || !active || !viewportRef.current) return;
+    let mounted = true;
+    const synchronize = () => {
+      const viewport = viewportRef.current;
+      if (!mounted || !viewport) return;
+      const bounds = viewport.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
+      const request = {
+        label: sessionLabel,
+        x: Math.round(bounds.x), y: Math.round(bounds.y),
+        width: Math.round(bounds.width), height: Math.round(bounds.height),
+      };
+      void invoke('browser_set_bounds', { request })
+        .then(() => invoke('browser_show', { request: { label: sessionLabel } }))
+        .catch((cause) => { if (mounted) setStatus(cause instanceof Error ? cause.message : 'Preview viewport could not be synchronized.'); });
+    };
+    synchronize();
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(synchronize);
+    observer?.observe(viewportRef.current);
+    window.addEventListener('resize', synchronize);
+    return () => {
+      mounted = false;
+      observer?.disconnect();
+      window.removeEventListener('resize', synchronize);
+      void invoke('browser_hide', { request: { label: sessionLabel } });
+    };
+  }, [active, sessionLabel]);
 
   const open = async () => {
     if (!selected) return;
@@ -80,5 +103,5 @@ export function PreviewSurface({ onClose, sessionLabel: persistedSessionLabel, o
       .catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Preview reload failed.'));
   };
 
-  return <section className="ps-browser" aria-label="Native preview"><header><strong>Preview</strong><button type="button" onClick={close}>Close</button></header><label>Registered local origin<select aria-label="Registered preview origin" value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">No verified origin</option>{origins.map((origin) => <option key={origin} value={origin}>{origin}</option>)}</select></label><div><button type="button" disabled={!selected} onClick={() => void open()}>{sessionLabel ? 'Navigate preview' : 'Open preview'}</button><button type="button" disabled={!sessionLabel || !history.canBack} onClick={() => void move('back')}>Back</button><button type="button" disabled={!sessionLabel || !history.canForward} onClick={() => void move('forward')}>Forward</button><button type="button" disabled={!sessionLabel} onClick={reload}>Reload</button></div>{status && <p role="status">{status}</p>}<p>Only ImperaOS runtime-registered localhost origins can be opened; arbitrary local ports and redirect targets outside the registry are denied.</p></section>;
+  return <section className="ps-browser" aria-label="Native preview"><header><strong>Preview</strong><button type="button" onClick={close}>Close</button></header><label>Registered local origin<select aria-label="Registered preview origin" value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">No verified origin</option>{origins.map((origin) => <option key={origin} value={origin}>{origin}</option>)}</select></label><div><button type="button" disabled={!selected} onClick={() => void open()}>{sessionLabel ? 'Navigate preview' : 'Open preview'}</button><button type="button" disabled={!sessionLabel || !history.canBack} onClick={() => void move('back')}>Back</button><button type="button" disabled={!sessionLabel || !history.canForward} onClick={() => void move('forward')}>Forward</button><button type="button" disabled={!sessionLabel} onClick={reload}>Reload</button></div><div ref={viewportRef} className="ps-browser-viewport" aria-label="Preview page viewport" />{status && <p role="status">{status}</p>}<p>Only ImperaOS runtime-registered localhost origins can be opened; arbitrary local ports and redirect targets outside the registry are denied.</p></section>;
 }

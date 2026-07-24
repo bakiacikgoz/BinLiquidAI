@@ -75,7 +75,7 @@ export function NewWorkPage() {
         approvalProfile: runtimeSettings.approvalProfile ?? 'risk_based',
       });
       await productWorkspaceClient.addMessage(task.taskId, 'user', message);
-      upsertTasks([{ id: task.taskId, projectId: task.projectId, title: task.title, createdAt: task.createdAtUtc, status: task.status, assistantSessionId: task.assistantSessionId ?? undefined, reasoningEffort: task.reasoningEffort, speedProfile: task.speedProfile, approvalProfile: task.approvalProfile }]);
+      upsertTasks([{ id: task.taskId, projectId: task.projectId, title: task.title, createdAt: task.createdAtUtc, updatedAt: task.updatedAtUtc, status: task.status, priority: task.priority, pinned: task.pinned, manualOrder: task.manualOrder, archivedAt: task.archivedAtUtc, assistantSessionId: task.assistantSessionId ?? undefined, reasoningEffort: task.reasoningEffort, speedProfile: task.speedProfile, approvalProfile: task.approvalProfile }]);
       navigate(`/task/${task.taskId}`, { state: { initialMessage: message, runtimeSettings, controls } });
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create governed work.'); }
   };

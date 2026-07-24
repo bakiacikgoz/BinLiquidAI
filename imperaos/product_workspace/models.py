@@ -50,11 +50,15 @@ class ProductTask(TaskRuntimeOptions):
     status: Literal[
         "draft", "active", "awaiting_approval", "completed", "failed", "cancelled", "archived"
     ] = "active"
+    priority: int = Field(default=0, ge=0, le=100)
+    pinned: bool = False
+    manual_order: int = Field(default=0, alias="manualOrder", ge=0)
     assistant_session_id: str | None = Field(default=None, alias="assistantSessionId")
     assistant_turn_id: str | None = Field(default=None, alias="assistantTurnId")
     team_job_id: str | None = Field(default=None, alias="teamJobId")
     created_at_utc: datetime = Field(alias="createdAtUtc")
     updated_at_utc: datetime = Field(alias="updatedAtUtc")
+    archived_at_utc: datetime | None = Field(default=None, alias="archivedAtUtc")
 
     @field_validator(
         "task_id",

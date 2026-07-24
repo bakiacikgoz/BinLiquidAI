@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useAssistantModels } from '../../assistant/useAssistantModels';
@@ -56,7 +56,12 @@ function shellTask(task: ProductWorkspaceTask): ProductTask {
     projectId: task.projectId,
     title: task.title,
     createdAt: task.createdAtUtc,
+    updatedAt: task.updatedAtUtc,
     status: task.status,
+    priority: task.priority,
+    pinned: task.pinned,
+    manualOrder: task.manualOrder,
+    archivedAt: task.archivedAtUtc,
     assistantSessionId: task.assistantSessionId ?? undefined,
     reasoningEffort: task.reasoningEffort,
     speedProfile: task.speedProfile,
@@ -82,8 +87,23 @@ export function TaskPage() {
   const { taskId } = useParams();
   const task = useProductShellStore((state) => state.tasks.find((item) => item.id === taskId));
   const selectTask = useProductShellStore((state) => state.selectTask);
+  const upsertTasks = useProductShellStore((state) => state.upsertTasks);
+  const [loadError, setLoadError] = useState('');
   useEffect(() => { if (taskId) selectTask(taskId); }, [selectTask, taskId]);
-  if (!task) return <Navigate to="/" replace />;
+  useEffect(() => {
+    if (!taskId || task) return;
+    let active = true;
+    setLoadError('');
+    void productWorkspaceClient.getTask(taskId).then((loaded) => {
+      if (!active) return;
+      upsertTasks([shellTask(loaded)]);
+    }).catch((cause) => {
+      if (active) setLoadError(cause instanceof Error ? cause.message : 'Task is unavailable.');
+    });
+    return () => { active = false; };
+  }, [task, taskId, upsertTasks]);
+  if (!taskId) return <Navigate to="/" replace />;
+  if (!task) return <section className="ps-empty" aria-live="polite"><h2>{loadError ? 'Task unavailable' : 'Loading governed task…'}</h2><p>{loadError || 'Restoring the durable task and its governed runtime context.'}</p>{loadError && <a href="#/">Return to new work</a>}</section>;
   return <TaskWorkspace key={task.id} task={task} />;
 }
 
@@ -100,6 +120,7 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
   const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
   const persistedAssistantTurns = useRef(new Set<string>());
+  const persistedTaskLinks = useRef(new Set<string>());
   const initialTurnStarted = useRef(false);
   const modelProvider = settings.assistantProvider.trim()
     ? settings.assistantProvider.trim() as AssistantProviderKind
@@ -136,11 +157,28 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     assistant.state.turns.forEach((turn) => {
       const body = turn.assistantMessage.text.trim();
       const persistenceKey = `${task.id}:${turn.id}:${body}`;
-      if (turn.status !== 'completed' || !body || persistedAssistantTurns.current.has(persistenceKey)) return;
-      persistedAssistantTurns.current.add(persistenceKey);
-      void productWorkspaceClient.addMessage(task.id, 'assistant', body)
-        .then(() => setMessageRefreshToken((current) => current + 1))
-        .catch(() => persistedAssistantTurns.current.delete(persistenceKey));
+      if (turn.status !== 'completed') return;
+      if (body && !persistedAssistantTurns.current.has(persistenceKey)) {
+        persistedAssistantTurns.current.add(persistenceKey);
+        void productWorkspaceClient.addMessage(task.id, 'assistant', body)
+          .then(() => setMessageRefreshToken((current) => current + 1))
+          .catch(() => persistedAssistantTurns.current.delete(persistenceKey));
+      }
+      const durableLinks: Array<{ targetType: 'artifact' | 'approval' | 'team_job' | 'run'; targetId: string }> = [
+        ...turn.assistantMessage.referencedArtifacts
+          .flatMap((artifact) => artifact.artifactId ? [{ targetType: 'artifact' as const, targetId: artifact.artifactId }] : []),
+        ...turn.assistantMessage.referencedRuns
+          .map((run) => ({ targetType: 'run' as const, targetId: run.id })),
+        ...(turn.assistantMessage.approval ? [{ targetType: 'approval' as const, targetId: turn.assistantMessage.approval.approvalId }] : []),
+      ];
+      durableLinks.forEach((link) => {
+        const linkKey = `${task.id}:${link.targetType}:${link.targetId}`;
+        if (persistedTaskLinks.current.has(linkKey)) return;
+        persistedTaskLinks.current.add(linkKey);
+        void productWorkspaceClient.addLink(task.id, link.targetType, link.targetId)
+          .then(() => setMessageRefreshToken((current) => current + 1))
+          .catch(() => persistedTaskLinks.current.delete(linkKey));
+      });
     });
   }, [assistant.state.turns, task.id]);
 
@@ -171,7 +209,7 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     setMessageRefreshToken((current) => current + 1);
     await assistant.actions.send(message, runtimeSettings, controls);
   };
-  const openWorkspaceTab = (kind: WorkspaceTabKind, artifactId?: string) => {
+  const openWorkspaceTab = useCallback((kind: WorkspaceTabKind, artifactId?: string) => {
     setWorkspaceTabs((current) => {
       const existing = kind === 'artifacts' ? current.find((tab) => tab.kind === 'artifacts') : undefined;
       const next = existing
@@ -180,7 +218,7 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
       setActiveWorkspaceTabId(next.id);
       return existing ? current.map((tab) => tab.id === existing.id ? next : tab) : [...current, next];
     });
-  };
+  }, []);
   const closeWorkspaceTab = (tabId: string) => {
     setWorkspaceTabs((current) => {
       const next = current.filter((tab) => tab.id !== tabId);
@@ -191,8 +229,11 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const updateWorkspaceTab = (tabId: string, changes: Partial<WorkspaceTab>) => {
     setWorkspaceTabs((current) => current.map((tab) => tab.id === tabId ? { ...tab, ...changes } : tab));
   };
+  useEffect(() => {
+    if (location.pathname.endsWith('/workspace')) openWorkspaceTab('artifacts');
+  }, [location.pathname, openWorkspaceTab]);
   const readOnly = task.status === 'archived';
-  return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">{task.status.toUpperCase()} TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
+  return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">{task.status.toUpperCase()} TASK</p><h1>{task.title}</h1></div><div><button type="button" onClick={() => navigate(`/task/${task.id}/workspace`)}>Open workspace</button><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></div></header>
     <div className="ps-task-grid"><div className="ps-task-center">{readOnly && <p className="ps-archive-banner" role="status">This task is archived and read-only.</p>}<ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} onOpenArtifacts={(artifactId) => openWorkspaceTab('artifacts', artifactId)} onOpenApproval={(approvalId) => navigate(`/approvals?approval=${encodeURIComponent(approvalId)}`)} onRegenerate={(turnId) => void assistant.actions.regenerate(turnId, taskRuntimeSettings)} /><AssistantComposer label="Governed assistant" placeholder="Describe the next outcome…" sendLabel="Send" disabled={running || readOnly} statusLabel={assistant.state.status} runtimeSettings={taskRuntimeSettings} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)} onCancel={() => void (async () => { await assistant.actions.cancel(); const updated = await productWorkspaceClient.updateTask(task.id, { status: 'cancelled' }); upsertTasks([shellTask(updated)]); })()} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => openWorkspaceTab('artifacts')} onOpenTerminal={() => openWorkspaceTab('terminal')} onOpenBrowser={() => openWorkspaceTab('browser')} onOpenPreview={() => openWorkspaceTab('preview')} /><WorkspaceTabs tabs={workspaceTabs} activeTabId={activeWorkspaceTabId} assistantState={assistant.state} projectRootRef={projectRoot?.rootRef} projectRootDisplayName={projectRoot?.rootDisplayName} onActivate={setActiveWorkspaceTabId} onClose={closeWorkspaceTab} onUpdate={updateWorkspaceTab} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} state={assistant.state} />}</div>
   </section>;
 }

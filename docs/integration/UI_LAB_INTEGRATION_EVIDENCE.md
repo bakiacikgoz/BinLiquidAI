@@ -40,9 +40,16 @@ The UI Lab source remains unchanged.
   query API, so the shell does not fabricate either surface.
 - Browser origin policy is documented in
   `docs/security/BROWSER_ORIGIN_POLICY.md` and enforced by the native runtime.
+  It has no global bypass: user browsing accepts only explicitly entered HTTPS
+  URLs; preview accepts only exact runtime-registered `localhost`/`127.0.0.1`
+  origins; and agent browsing accepts only the task/deployment allowlist in a
+  fresh isolated profile. Redirects repeat that mode-specific validation.
 - Browser and preview tabs retain their native session label while inactive;
-  the native child window is hidden on tab deactivation and shown only on the
-  matching active tab.
+  a validated reserved viewport synchronizes the native child webview bounds,
+  and tab deactivation hides it before any product overlay can appear. Popup,
+  download and external-application attempts enter an explicit approval flow;
+  unimplemented executors fail closed after the request is denied or
+  acknowledged.
 - A user PTY receives only a durable, opaque project `rootRef`; native code
   resolves its local path from protected native storage and fails closed when
   the project root is no longer available.
@@ -69,16 +76,17 @@ The UI Lab source remains unchanged.
 
 ## Recent verification
 
-- Operator Panel: 132 test files / 470 tests passed.
+- UI Lab source: 39 Node tests passed; lint and production build passed.
+- Operator Panel: 132 test files / 478 tests passed.
 - Operator Panel lint and production build passed.
-- Native browser policy and native-history unit tests: 5 passed.
-- Native terminal policy/control tests: 2 passed; `cargo check` passed.
-- Targeted Product Workspace, Artifact RPC and assistant CLI Python tests: 13
-  passed; Ruff passed.
-- Targeted Product Shell task/runtime tests: 16 passed; lint and production
-  build passed.
-- Native library tests: 62 passed, including browser policy/native-history and
-  opaque folder-ticket coverage.
+- The full Python suite and Ruff passed.
+- Native library tests: 63 passed, including browser policy/native-history,
+  child-webview bounds and opaque folder-ticket coverage; `cargo check` and
+  `cargo fmt --check` passed.
+- The Tauri desktop launch probe remained alive for 10 seconds. Its live bridge
+  instrumentation is intentionally reported as conditional until a desktop
+  automation harness and assistant-runtime gate are available; it does not
+  claim a fabricated assistant response.
 
 ## Capability boundaries retained by design
 

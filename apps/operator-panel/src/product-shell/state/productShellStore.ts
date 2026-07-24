@@ -6,7 +6,12 @@ export type ProductTask = {
   projectId?: string;
   title: string;
   createdAt: string;
+  updatedAt?: string;
   status: 'draft' | 'active' | 'awaiting_approval' | 'completed' | 'failed' | 'cancelled' | 'archived';
+  priority?: number;
+  pinned?: boolean;
+  manualOrder?: number;
+  archivedAt?: string | null;
   assistantSessionId?: string;
   reasoningEffort?: 'low' | 'medium' | 'high' | 'very_high';
   speedProfile?: 'standard' | 'fast';
@@ -51,7 +56,10 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
   upsertTasks: (tasks) => set((state) => {
     const next = new Map(state.tasks.map((task) => [task.id, task]));
     tasks.forEach((task) => next.set(task.id, task));
-    return { tasks: [...next.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt)) };
+    return { tasks: [...next.values()].sort((left, right) => Number(right.pinned) - Number(left.pinned)
+      || (left.manualOrder ?? 0) - (right.manualOrder ?? 0)
+      || (right.priority ?? 0) - (left.priority ?? 0)
+      || (right.updatedAt ?? right.createdAt).localeCompare(left.updatedAt ?? left.createdAt)) };
   }),
   upsertProjects: (projects) => set((state) => {
     const next = new Map(state.projects.map((project) => [project.projectId, project]));

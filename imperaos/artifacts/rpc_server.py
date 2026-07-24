@@ -402,6 +402,12 @@ class ArtifactRpcServer:
                     request.idempotency_key,
                 )
             )
+        if request.method is ArtifactRpcMethod.TASK_GET:
+            return _json_mapping(
+                self.product_workspace.get_task(
+                    workspace_id, _required_string(params, "taskId")
+                )
+            )
         if request.method is ArtifactRpcMethod.TASK_LIST:
             return {
                 "tasks": _json_value(
@@ -426,9 +432,22 @@ class ArtifactRpcServer:
             )
         if request.method is ArtifactRpcMethod.TASK_UPDATE:
             status = params.get("status")
+            priority = params.get("priority")
+            pinned = params.get("pinned")
+            manual_order = params.get("manualOrder")
             runtime = params.get("runtime")
             if status is not None and not isinstance(status, str):
                 raise ValueError("task status is invalid")
+            if priority is not None and (
+                not isinstance(priority, int) or isinstance(priority, bool)
+            ):
+                raise ValueError("task priority is invalid")
+            if pinned is not None and not isinstance(pinned, bool):
+                raise ValueError("task pinned flag is invalid")
+            if manual_order is not None and (
+                not isinstance(manual_order, int) or isinstance(manual_order, bool)
+            ):
+                raise ValueError("task manual order is invalid")
             if runtime is not None and not isinstance(runtime, dict):
                 raise ValueError("task runtime is invalid")
             return _json_mapping(
@@ -436,8 +455,20 @@ class ArtifactRpcServer:
                     workspace_id,
                     _required_string(params, "taskId"),
                     status=status,
+                    priority=priority,
+                    pinned=pinned,
+                    manual_order=manual_order,
                     runtime_options=runtime,
                     idempotency_key=request.idempotency_key,
+                )
+            )
+        if request.method is ArtifactRpcMethod.TASK_ARCHIVE:
+            return _json_mapping(
+                self.product_workspace.archive_task(
+                    workspace_id,
+                    _required_string(params, "taskId"),
+                    _required_string(params, "reason"),
+                    request.idempotency_key,
                 )
             )
         if request.method is ArtifactRpcMethod.TASK_MESSAGE_ADD:
@@ -466,6 +497,14 @@ class ArtifactRpcServer:
                     request.idempotency_key,
                 )
             )
+        if request.method is ArtifactRpcMethod.TASK_LINK_LIST:
+            return {
+                "links": _json_value(
+                    self.product_workspace.list_links(
+                        workspace_id, _required_string(params, "taskId")
+                    )
+                )
+            }
         if request.method is ArtifactRpcMethod.PREFERENCES_GET:
             preference = self.product_workspace.get_preference(
                 workspace_id, request.principal.principal_id, str(params["preferenceKey"])

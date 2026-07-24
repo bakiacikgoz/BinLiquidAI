@@ -282,7 +282,7 @@
       "category": "contract",
       "file": "artifact-rpc-request.v1.schema.json",
       "name": "artifact-rpc-request.v1",
-      "sha256": "62c3dddeddd86641b742a1ebc7b08477b439a4111b38ad9fa33eff192943169b"
+      "sha256": "86de78daa11b95adbcd840805103223f9f7536e51ff5f16000067e61e81596ff"
     },
     {
       "category": "contract",
@@ -300,7 +300,7 @@
       "category": "contract",
       "file": "artifact-rpc-handshake.v1.schema.json",
       "name": "artifact-rpc-handshake.v1",
-      "sha256": "0d9b4170d37f3a70f401977576961ea7f5da74b7d7756d8de2c1597a7a48da55"
+      "sha256": "8fa151c65b18f5b9786af0938fedf275e07b6915e5d8d56c9e5a9a0edf7310fe"
     }
   ]
 }

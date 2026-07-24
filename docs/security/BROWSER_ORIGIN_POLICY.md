@@ -35,18 +35,21 @@ switch and a decision in one mode never grants access in another mode.
   schemes, not external applications: they remain denied and no approval can
   turn them into an executable route.
 - New windows are denied until the user explicitly approves reopening the URL
-  in a governed browser session.
+  in the originating governed browser tab. A popup never creates an unmanaged
+  top-level window or inherits ambient approval.
 - Downloads and external application schemes remain blocked after notifying
   the user. They require a future governed save/approval workflow; an
   acknowledgement is not an approval to execute.
-- Native child-window bounds are owned by the operating system; the renderer
-  has no arbitrary `setBounds` authority. Inactive workspace tabs hide their
-  matching child window so it cannot remain as an unmanaged overlay.
+- The main renderer can report only the measured reserved viewport for a known
+  browser session. Native code rejects unknown sessions, non-finite, negative,
+  zero, or oversized bounds; geometry does not grant navigation or origin
+  authority. Inactive workspace tabs hide their matching child webview so it
+  cannot remain as an unmanaged overlay or cover an approval dialog.
 
 ## Enforcement
 
 The policy and its runtime registries live in
-`apps/operator-panel/src-tauri/src/browser.rs`. Browser windows have separate
+`apps/operator-panel/src-tauri/src/browser.rs`. Browser webviews have separate
 data directories by mode. The default Tauri capability applies only to the
-`main` window, so remote child webviews do not receive renderer IPC
+`main` webview, so remote child webviews do not receive renderer IPC
 permissions.

@@ -370,6 +370,9 @@ class ProductWorkspaceService:
             projectId=row["project_id"],
             title=row["title"],
             status=row["status"],
+            priority=row["priority"],
+            pinned=bool(row["pinned"]),
+            manualOrder=row["manual_order"],
             reasoningEffort=row["reasoning_effort"],
             speedProfile=row["speed_profile"],
             approvalProfile=row["approval_profile"],
@@ -378,6 +381,7 @@ class ProductWorkspaceService:
             teamJobId=row["team_job_id"],
             createdAtUtc=row["created_at_utc"],
             updatedAtUtc=row["updated_at_utc"],
+            archivedAtUtc=row["archived_at_utc"],
         )
 
     @staticmethod
@@ -445,15 +449,21 @@ class ProductWorkspaceService:
             )
             db.execute(
                 """INSERT INTO product_tasks
-                (task_id,workspace_id,project_id,title,status,reasoning_effort,speed_profile,
+                (task_id,workspace_id,project_id,title,status,priority,pinned,manual_order,
+                archived_at_utc,archive_reason,reasoning_effort,speed_profile,
                 approval_profile,assistant_session_id,assistant_turn_id,team_job_id,
-                created_at_utc,updated_at_utc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                created_at_utc,updated_at_utc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     task.task_id,
                     task.workspace_id,
                     task.project_id,
                     task.title,
                     task.status,
+                    task.priority,
+                    int(task.pinned),
+                    task.manual_order,
+                    None,
+                    None,
                     task.reasoning_effort,
                     task.speed_profile,
                     task.approval_profile,
@@ -475,12 +485,32 @@ class ProductWorkspaceService:
         task_id: str,
         *,
         status: str | None = None,
+        priority: int | None = None,
+        pinned: bool | None = None,
+        manual_order: int | None = None,
         runtime_options: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
     ) -> ProductTask:
-        if status is None and runtime_options is None:
+        if (
+            status is None
+            and priority is None
+            and pinned is None
+            and manual_order is None
+            and runtime_options is None
+        ):
             raise ValueError("task update has no changes")
-        payload = {"taskId": task_id, "status": status, "runtime": runtime_options}
+        if priority is not None and not 0 <= priority <= 100:
+            raise ValueError("task priority is invalid")
+        if manual_order is not None and manual_order < 0:
+            raise ValueError("task manual order is invalid")
+        payload = {
+            "taskId": task_id,
+            "status": status,
+            "priority": priority,
+            "pinned": pinned,
+            "manualOrder": manual_order,
+            "runtime": runtime_options,
+        }
         with self.store.connect() as db:
             replay = self._replay_mutation(
                 db, workspace_id, "task.update", payload, idempotency_key
@@ -501,6 +531,9 @@ class ProductWorkspaceService:
                 projectId=current.project_id,
                 title=current.title,
                 status=status if status is not None else current.status,
+                priority=current.priority if priority is None else priority,
+                pinned=current.pinned if pinned is None else pinned,
+                manualOrder=current.manual_order if manual_order is None else manual_order,
                 reasoningEffort=runtime.reasoning_effort,
                 speedProfile=runtime.speed_profile,
                 approvalProfile=runtime.approval_profile,
@@ -509,14 +542,20 @@ class ProductWorkspaceService:
                 teamJobId=current.team_job_id,
                 createdAtUtc=current.created_at_utc,
                 updatedAtUtc=_now(),
+                archivedAtUtc=current.archived_at_utc,
             )
             db.execute(
                 """UPDATE product_tasks
-                SET status=?, reasoning_effort=?, speed_profile=?, approval_profile=?,
+                SET status=?, priority=?, pinned=?, manual_order=?, reasoning_effort=?,
+                speed_profile=?,
+                approval_profile=?,
                 updated_at_utc=?
                 WHERE workspace_id=? AND task_id=?""",
                 (
                     updated.status,
+                    updated.priority,
+                    int(updated.pinned),
+                    updated.manual_order,
                     updated.reasoning_effort,
                     updated.speed_profile,
                     updated.approval_profile,
@@ -530,14 +569,78 @@ class ProductWorkspaceService:
             )
         return updated
 
+    def archive_task(
+        self,
+        workspace_id: str,
+        task_id: str,
+        reason: str,
+        idempotency_key: str | None = None,
+    ) -> ProductTask:
+        if not reason.strip() or len(reason) > 500:
+            raise ValueError("task archive reason is invalid")
+        payload = {"taskId": task_id, "reason": reason}
+        with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "task.archive", payload, idempotency_key
+            )
+            if replay is not None:
+                return ProductTask.model_validate(replay)
+            row = db.execute(
+                "SELECT * FROM product_tasks WHERE workspace_id=? AND task_id=?",
+                (workspace_id, task_id),
+            ).fetchone()
+            if row is None:
+                raise PermissionError("task is unavailable in this workspace")
+            current = self._task_from_row(row)
+            now = _now()
+            archived = ProductTask(
+                taskId=current.task_id,
+                workspaceId=current.workspace_id,
+                projectId=current.project_id,
+                title=current.title,
+                status="archived",
+                priority=current.priority,
+                pinned=current.pinned,
+                manualOrder=current.manual_order,
+                reasoningEffort=current.reasoning_effort,
+                speedProfile=current.speed_profile,
+                approvalProfile=current.approval_profile,
+                assistantSessionId=current.assistant_session_id,
+                assistantTurnId=current.assistant_turn_id,
+                teamJobId=current.team_job_id,
+                createdAtUtc=current.created_at_utc,
+                updatedAtUtc=now,
+                archivedAtUtc=now,
+            )
+            db.execute(
+                """UPDATE product_tasks
+                SET status='archived', archived_at_utc=?, archive_reason=?, updated_at_utc=?
+                WHERE workspace_id=? AND task_id=?""",
+                (now.isoformat(), reason, now.isoformat(), workspace_id, task_id),
+            )
+            self._remember_mutation(
+                db, workspace_id, "task.archive", payload, idempotency_key, archived
+            )
+        return archived
+
     def list_tasks(self, workspace_id: str, project_id: str) -> list[ProductTask]:
         with self.store.connect() as db:
             rows = db.execute(
                 "SELECT * FROM product_tasks WHERE workspace_id=? AND project_id=? "
-                "ORDER BY updated_at_utc DESC",
+                "ORDER BY pinned DESC, manual_order ASC, priority DESC, updated_at_utc DESC",
                 (workspace_id, project_id),
             ).fetchall()
         return [self._task_from_row(row) for row in rows]
+
+    def get_task(self, workspace_id: str, task_id: str) -> ProductTask:
+        with self.store.connect() as db:
+            row = db.execute(
+                "SELECT * FROM product_tasks WHERE workspace_id=? AND task_id=?",
+                (workspace_id, task_id),
+            ).fetchone()
+        if row is None:
+            raise PermissionError("task is unavailable in this workspace")
+        return self._task_from_row(row)
 
     def add_message(
         self,
@@ -664,6 +767,25 @@ class ProductWorkspaceService:
                 db, workspace_id, "task.link.add", payload, idempotency_key, link
             )
         return link
+
+    def list_links(self, workspace_id: str, task_id: str) -> list[ProductLink]:
+        with self.store.connect() as db:
+            rows = db.execute(
+                """SELECT * FROM product_links WHERE workspace_id=? AND task_id=?
+                ORDER BY created_at_utc ASC""",
+                (workspace_id, task_id),
+            ).fetchall()
+        return [
+            ProductLink(
+                linkId=row["link_id"],
+                workspaceId=row["workspace_id"],
+                taskId=row["task_id"],
+                targetType=row["target_type"],
+                targetId=row["target_id"],
+                createdAtUtc=row["created_at_utc"],
+            )
+            for row in rows
+        ]
 
     def set_preference(
         self,

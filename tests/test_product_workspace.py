@@ -109,6 +109,51 @@ def test_task_runtime_options_and_cancelled_status_survive_restart(tmp_path):
     assert restored.approval_profile == "always_ask"
 
 
+def test_task_get_is_workspace_scoped_for_durable_route_hydration(tmp_path):
+    service = ProductWorkspaceService(ProductWorkspaceStore(tmp_path / "product.sqlite3"))
+    project = service.create_project("workspace-a", "Release")
+    task = service.create_task("workspace-a", project.project_id, "Prepare release", "session-a")
+
+    restored = service.get_task("workspace-a", task.task_id)
+
+    assert restored.task_id == task.task_id
+    try:
+        service.get_task("workspace-b", task.task_id)
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError("task lookup must not cross a workspace boundary")
+
+
+def test_tasks_keep_pin_priority_order_and_archive_metadata_after_restart(tmp_path):
+    database = tmp_path / "product.sqlite3"
+    service = ProductWorkspaceService(ProductWorkspaceStore(database))
+    project = service.create_project("workspace-a", "Release")
+    first = service.create_task("workspace-a", project.project_id, "First", "session-a")
+    second = service.create_task("workspace-a", project.project_id, "Second", "session-b")
+
+    updated = service.update_task(
+        "workspace-a",
+        second.task_id,
+        pinned=True,
+        priority=7,
+        manual_order=1,
+    )
+    archived = service.archive_task("workspace-a", first.task_id, "completed from task list")
+
+    assert updated.pinned is True
+    assert updated.priority == 7
+    assert updated.manual_order == 1
+    assert archived.status == "archived"
+    assert archived.archived_at_utc is not None
+
+    reopened = ProductWorkspaceService(ProductWorkspaceStore(database))
+    restored = reopened.list_tasks("workspace-a", project.project_id)
+    assert [task.task_id for task in restored] == [second.task_id, first.task_id]
+    assert restored[0].pinned is True
+    assert restored[1].archived_at_utc is not None
+
+
 def test_project_list_rpc_respects_the_bounded_page_contract(tmp_path):
     server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
     server.product_workspace.create_project("workspace-a", "First")
@@ -238,6 +283,80 @@ def test_task_create_rpc_carries_typed_runtime_options(tmp_path):
     )
     assert cancelled.ok
     assert cancelled.result["status"] == "cancelled"
+
+
+def test_task_get_and_archive_rpc_keep_workspace_scope_and_archive_reason(tmp_path):
+    server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
+    principal = RpcPrincipal(principalId="operator-a", principalType="user")
+    project = server.product_workspace.create_project("workspace-a", "Release")
+    task = server.product_workspace.create_task(
+        "workspace-a", project.project_id, "Prepare release", "session-a"
+    )
+
+    fetched = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="task-get-1",
+            method=ArtifactRpcMethod.TASK_GET,
+            workspaceId="workspace-a",
+            principal=principal,
+            params={"taskId": task.task_id},
+        )
+    )
+    archived = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="task-archive-1",
+            method=ArtifactRpcMethod.TASK_ARCHIVE,
+            workspaceId="workspace-a",
+            principal=principal,
+            idempotencyKey="task-archive-1",
+            params={
+                "taskId": task.task_id,
+                "reason": "completed from task list",
+                "idempotencyKey": "task-archive-1",
+            },
+        )
+    )
+
+    assert fetched.ok
+    assert fetched.result["taskId"] == task.task_id
+    assert archived.ok
+    assert archived.result["status"] == "archived"
+    assert archived.result["archivedAtUtc"] is not None
+
+
+def test_task_links_are_listed_through_the_workspace_scoped_rpc(tmp_path):
+    server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
+    principal = RpcPrincipal(principalId="operator-a", principalType="user")
+    project = server.product_workspace.create_project("workspace-a", "Release")
+    task = server.product_workspace.create_task(
+        "workspace-a", project.project_id, "Prepare release", "session-a"
+    )
+    server.product_workspace.add_link("workspace-a", task.task_id, "artifact", "artifact-release")
+
+    listed = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="task-link-list-1",
+            method=ArtifactRpcMethod.TASK_LINK_LIST,
+            workspaceId="workspace-a",
+            principal=principal,
+            params={"taskId": task.task_id},
+        )
+    )
+
+    assert listed.ok
+    assert listed.result["links"] == [
+        {
+            "linkId": listed.result["links"][0]["linkId"],
+            "workspaceId": "workspace-a",
+            "taskId": task.task_id,
+            "targetType": "artifact",
+            "targetId": "artifact-release",
+            "createdAtUtc": listed.result["links"][0]["createdAtUtc"],
+        }
+    ]
 
 
 def test_product_workspace_rpc_reuses_the_artifact_sidecar(tmp_path):

@@ -7,6 +7,25 @@ import { GlobalSearch } from './GlobalSearch';
 
 type ProjectSort = 'updated_desc' | 'manual' | 'priority';
 
+function shellTask(task: Awaited<ReturnType<typeof productWorkspaceClient.getTask>>) {
+  return {
+    id: task.taskId,
+    projectId: task.projectId,
+    title: task.title,
+    createdAt: task.createdAtUtc,
+    updatedAt: task.updatedAtUtc,
+    status: task.status,
+    priority: task.priority,
+    pinned: task.pinned,
+    manualOrder: task.manualOrder,
+    archivedAt: task.archivedAtUtc,
+    assistantSessionId: task.assistantSessionId ?? undefined,
+    reasoningEffort: task.reasoningEffort,
+    speedProfile: task.speedProfile,
+    approvalProfile: task.approvalProfile,
+  };
+}
+
 export function Sidebar() {
   const tasks = useProductShellStore((state) => state.tasks);
   const selectedTaskId = useProductShellStore((state) => state.selectedTaskId);
@@ -33,17 +52,7 @@ export function Sidebar() {
       })));
       setNextCursor(page.nextCursor);
       const groups = await Promise.all(page.projects.map((project) => productWorkspaceClient.listTasks(project.projectId)));
-      upsertTasks(groups.flatMap((group) => group.tasks.map((task) => ({
-        id: task.taskId,
-        projectId: task.projectId,
-        title: task.title,
-        createdAt: task.createdAtUtc,
-        status: task.status,
-        assistantSessionId: task.assistantSessionId ?? undefined,
-        reasoningEffort: task.reasoningEffort,
-        speedProfile: task.speedProfile,
-        approvalProfile: task.approvalProfile,
-      }))));
+      upsertTasks(groups.flatMap((group) => group.tasks.map(shellTask)));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load governed projects.');
     }
@@ -58,7 +67,7 @@ export function Sidebar() {
       await action();
       await loadProjects();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not update governed project.');
+      setError(cause instanceof Error ? cause.message : 'Could not update governed workspace records.');
     } finally {
       setBusy(false);
     }
@@ -66,7 +75,7 @@ export function Sidebar() {
 
   return <aside className="ps-sidebar" aria-label="Product navigation">
     <div className="ps-brand-row"><NavLink to="/" className="ps-brand">IMPERAOS <small>PRODUCT</small></NavLink><button type="button" aria-label="Toggle sidebar" onClick={() => setCollapsed(!collapsed)}>☰</button></div>
-    <nav><NavLink to="/">New work</NavLink><NavLink to="/library">Library</NavLink><NavLink to="/approvals">Approvals</NavLink><NavLink to="/settings">Settings</NavLink></nav>
+    <nav><NavLink to="/">New work</NavLink><NavLink to="/library">Library</NavLink><NavLink to="/approvals">Approvals</NavLink><NavLink to="/agents">Agents</NavLink><NavLink to="/automations">Automations</NavLink><NavLink to="/settings">Settings</NavLink></nav>
     <GlobalSearch />
     <section className="ps-projects" aria-label="Projects">
       <div className="ps-sidebar-heading ps-project-heading">PROJECTS <button type="button" disabled={busy} onClick={() => void mutate(async () => { await productWorkspaceClient.registerProjectFromFolder(); })}>Add project</button></div>
@@ -83,6 +92,6 @@ export function Sidebar() {
       {nextCursor && <button type="button" className="ps-load-more" disabled={busy} onClick={() => void loadProjects(nextCursor, true)}>Load more projects</button>}
     </section>
     <div className="ps-sidebar-heading">RECENT TASKS</div>
-    <ul>{tasks.length ? tasks.map((task) => <li key={task.id}><NavLink onClick={() => selectTask(task.id)} className={selectedTaskId === task.id ? 'selected' : ''} to={`/task/${task.id}`}>{task.title}<small>{task.status}</small></NavLink></li>) : <li className="ps-muted">Tasks appear after you start work.</li>}</ul>
+    <ul>{tasks.filter((task) => task.status !== 'archived').length ? tasks.filter((task) => task.status !== 'archived').map((task) => <li key={task.id} className="ps-project-row"><NavLink onClick={() => selectTask(task.id)} className={selectedTaskId === task.id ? 'selected' : ''} to={`/task/${task.id}`}>{task.title}<small>{task.status}{task.priority ? ` · priority ${task.priority}` : ''}</small></NavLink><div className="ps-project-actions"><button type="button" disabled={busy} aria-label={`${task.pinned ? 'Unpin' : 'Pin'} ${task.title}`} onClick={() => void mutate(async () => { const changed = await productWorkspaceClient.updateTask(task.id, { pinned: !task.pinned }); upsertTasks([shellTask(changed)]); })}>{task.pinned ? 'Unpin' : 'Pin'}</button><button type="button" disabled={busy || (task.manualOrder ?? 0) === 0} aria-label={`Move ${task.title} up`} onClick={() => void mutate(async () => { const changed = await productWorkspaceClient.updateTask(task.id, { manualOrder: Math.max(0, (task.manualOrder ?? 0) - 1) }); upsertTasks([shellTask(changed)]); })}>↑</button><button type="button" disabled={busy} aria-label={`Archive ${task.title}`} onClick={() => void mutate(async () => { const changed = await productWorkspaceClient.archiveTask(task.id, 'Archived from sidebar'); upsertTasks([shellTask(changed)]); })}>Archive</button></div></li>) : <li className="ps-muted">Tasks appear after you start work.</li>}</ul>
   </aside>;
 }

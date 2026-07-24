@@ -8,6 +8,7 @@ type BrowserApprovalRequest = {
   url: string;
   mode: BrowserMode;
   taskId?: string | null;
+  sourceSessionLabel?: string | null;
 };
 
 export function BrowserApprovalInbox() {
@@ -19,6 +20,9 @@ export function BrowserApprovalInbox() {
     void listen<BrowserApprovalRequest>('browser://approval-required', (event) => {
       setStatus('');
       setRequest(event.payload);
+      if (event.payload.sourceSessionLabel) {
+        void invoke('browser_hide', { request: { label: event.payload.sourceSessionLabel } });
+      }
     }).then((dispose) => { unlisten = dispose; });
     return () => unlisten?.();
   }, []);
@@ -27,19 +31,23 @@ export function BrowserApprovalInbox() {
 
   const openApprovedWindow = async () => {
     try {
-      await invoke<string>('browser_open', {
-        request: {
-          mode: request.mode,
-          url: request.url,
-          taskId: request.taskId ?? undefined,
-        },
+      if (!request.sourceSessionLabel) throw new Error('The governed browser tab is no longer available.');
+      await invoke('browser_navigate', {
+        request: { label: request.sourceSessionLabel, url: request.url },
       });
-      setStatus('Approved browser window opened under the same mode policy.');
+      await invoke('browser_show', { request: { label: request.sourceSessionLabel } });
+      setStatus('Approved popup opened in the governed browser tab.');
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : 'Browser approval could not be completed.');
     } finally {
       setRequest(null);
     }
+  };
+  const dismiss = () => {
+    if (request.sourceSessionLabel) {
+      void invoke('browser_show', { request: { label: request.sourceSessionLabel } });
+    }
+    setRequest(null);
   };
 
   const isPopup = request.kind === 'new_window';
@@ -53,13 +61,13 @@ export function BrowserApprovalInbox() {
     <strong>{title}</strong>
     <code>{request.url}</code>
     <p>{isPopup
-      ? 'The popup was blocked until you explicitly approve opening it in a governed browser window.'
+      ? 'The popup was blocked until you explicitly approve opening it in the governed browser tab.'
       : request.kind === 'download'
         ? 'Browser downloads stay blocked until ImperaOS has a governed save-and-approval workflow.'
         : 'External applications stay blocked; no operating-system application will be opened from the browser.'}</p>
     <div>
       {isPopup ? <button type="button" onClick={() => void openApprovedWindow()}>Approve and open</button> : null}
-      <button type="button" onClick={() => setRequest(null)}>{isPopup ? 'Deny' : 'Acknowledge and keep blocked'}</button>
+      <button type="button" onClick={dismiss}>{isPopup ? 'Deny' : 'Acknowledge and keep blocked'}</button>
     </div>
   </section>;
 }

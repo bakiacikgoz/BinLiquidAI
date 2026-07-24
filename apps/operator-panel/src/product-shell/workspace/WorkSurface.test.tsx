@@ -27,6 +27,10 @@ describe('WorkSurface', () => {
     expect(onOpenTerminal).toHaveBeenCalledTimes(1);
     expect(onOpenBrowser).toHaveBeenCalledTimes(1);
     expect(onOpenPreview).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Agent browser unavailable' })).toHaveAttribute(
+      'data-disabled-reason',
+      'AGENT_BROWSER_CAPABILITY_UNQUALIFIED',
+    );
     expect(screen.getByRole('button', { name: 'Files unavailable' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Data explorer unavailable' })).toHaveAttribute(
       'data-disabled-reason',

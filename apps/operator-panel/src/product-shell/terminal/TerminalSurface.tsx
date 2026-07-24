@@ -14,17 +14,20 @@ function decodeBase64(value: string): Uint8Array {
   return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
 }
 
-export function TerminalSurface({ onClose, projectRootRef, projectRootDisplayName }: { onClose: () => void; projectRootRef?: string; projectRootDisplayName?: string }) {
+export function TerminalSurface({ active = true, onClose, projectRootRef, projectRootDisplayName }: { active?: boolean; onClose: () => void; projectRootRef?: string; projectRootDisplayName?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<string | null>(null);
+  const activeRef = useRef(active);
   const [error, setError] = useState('');
+
+  useEffect(() => { activeRef.current = active; }, [active]);
 
   useEffect(() => {
     if (!hostRef.current) return;
     const terminal = new Terminal({ cursorBlink: true, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', theme: { background: '#0b1016', foreground: '#e8eef7' } });
     const fit = new FitAddon(); const search = new SearchAddon();
     terminal.loadAddon(fit); terminal.loadAddon(search); terminal.open(hostRef.current); fit.fit();
-    const resize = new ResizeObserver(() => { fit.fit(); if (sessionRef.current) void invoke('terminal_resize', { request: { sessionId: sessionRef.current, cols: terminal.cols, rows: terminal.rows } }); });
+    const resize = new ResizeObserver(() => { if (!activeRef.current) return; fit.fit(); if (sessionRef.current && terminal.cols > 0 && terminal.rows > 0) void invoke('terminal_resize', { request: { sessionId: sessionRef.current, cols: terminal.cols, rows: terminal.rows } }); });
     resize.observe(hostRef.current);
     let unlisten: (() => void) | undefined;
     const start = async () => {

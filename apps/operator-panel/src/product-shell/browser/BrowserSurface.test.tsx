@@ -31,4 +31,19 @@ describe('BrowserSurface', () => {
       request: { label: 'imperaos-browser-user' },
     });
   });
+
+  it('synchronizes the native child webview to the reserved viewport', async () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 120, y: 180, width: 740, height: 420, top: 180, right: 860, bottom: 600, left: 120,
+      toJSON: () => ({}),
+    });
+    const { user } = renderOperatorPanel(<BrowserSurface onClose={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Open HTTPS' }));
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('browser_set_bounds', {
+      request: { label: 'imperaos-browser-user', x: 120, y: 180, width: 740, height: 420 },
+    }));
+    bounds.mockRestore();
+  });
 });
