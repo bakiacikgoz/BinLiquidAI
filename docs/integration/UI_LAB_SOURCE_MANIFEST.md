@@ -27,12 +27,15 @@ panel while preserving its information density and dark/light palette.
 ## Integration status
 
 Implemented on this branch: the Product Shell/router/preferences; workspace-scoped SQLite
-projects, tasks, messages, links and preferences; the existing sidecar/Tauri clients; real
-task search; governed assistant session correlation; durable user transcript reads; and a
-user-started native PTY/xterm surface.
+projects, tasks, messages, links and preferences; the existing sidecar/Tauri clients;
+governed project/task/artifact/approval/agent search; real first-turn task creation and
+session correlation; durable transcripts; governed model/context/tool composer controls; a
+user-started native PTY/xterm surface; and mode-scoped native browser/preview child-webview
+policy with redirect checks, isolated agent profiles, registered local preview origins and
+explicit approval prompts for popups, downloads and external applications.
 
-Still required before the V2 plan can be considered complete: full governed Artifact Workspace
-tab hosting, approved browser/preview child-webview isolation, collection/settings adapters,
-complete assistant message action persistence, and all end-to-end/release checks specified by
-the plan. This manifest deliberately records those as open rather than treating a scaffold as
-completion.
+Still required before the V2 plan can be considered complete: unified governed Artifact
+Workspace/runtime tab hosting, terminal multi-session dock integration and project-root
+registration, complete assistant message action persistence, richer task context/dock data,
+collection/settings completion, and all end-to-end/release checks specified by the plan. This
+manifest deliberately records those as open rather than treating a scaffold as completion.
