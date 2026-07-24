@@ -230,6 +230,14 @@ artifact_bridge_command!(bridge_artifact_duplicate, "artifact.duplicate");
 artifact_bridge_command!(bridge_artifact_asset_get, "artifact.asset.get");
 artifact_bridge_command!(bridge_artifact_form_submit, "artifact.form.submit");
 artifact_bridge_command!(bridge_artifact_import_evidence, "artifact.import_evidence");
+artifact_bridge_command!(bridge_product_project_list, "project.list");
+artifact_bridge_command!(bridge_product_project_create, "project.create");
+artifact_bridge_command!(bridge_product_task_list, "task.list");
+artifact_bridge_command!(bridge_product_task_create, "task.create");
+artifact_bridge_command!(bridge_product_task_message_add, "task.message.add");
+artifact_bridge_command!(bridge_product_task_link_add, "task.link.add");
+artifact_bridge_command!(bridge_product_preferences_get, "preferences.get");
+artifact_bridge_command!(bridge_product_preferences_set, "preferences.set");
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
