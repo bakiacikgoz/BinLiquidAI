@@ -2,12 +2,14 @@ pub mod artifact_asset;
 pub mod artifact_export;
 pub mod artifact_rpc;
 mod bridge;
+pub mod terminal;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(bridge::AssistantProcessRegistry::default())
         .manage(artifact_rpc::WorkspaceRpcRegistry::default())
+        .manage(terminal::TerminalManager::default())
         .manage(artifact_asset::ArtifactAssetState::default())
         .manage(artifact_export::ArtifactExportState::new(
             bridge::artifact_export_journal_root(),
@@ -93,6 +95,10 @@ pub fn run() {
             bridge::bridge_product_preferences_set,
             bridge::bridge_read_artifact,
             bridge::bridge_tail_events,
+            terminal::terminal_start,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_kill,
         ])
         .run(tauri::generate_context!())
         .expect("error while running operator panel");
