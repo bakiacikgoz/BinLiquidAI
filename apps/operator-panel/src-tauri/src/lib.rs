@@ -11,6 +11,7 @@ pub fn run() {
         .manage(bridge::AssistantProcessRegistry::default())
         .manage(artifact_rpc::WorkspaceRpcRegistry::default())
         .manage(browser::BrowserPolicyState::with_runtime_preview_origins())
+        .manage(browser::BrowserSessionRegistry::default())
         .manage(terminal::TerminalManager::default())
         .manage(artifact_asset::ArtifactAssetState::default())
         .manage(artifact_export::ArtifactExportState::new(
@@ -104,6 +105,9 @@ pub fn run() {
             terminal::terminal_kill,
             browser::browser_open,
             browser::browser_list_preview_origins,
+            browser::browser_navigate,
+            browser::browser_reload,
+            browser::browser_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running operator panel");

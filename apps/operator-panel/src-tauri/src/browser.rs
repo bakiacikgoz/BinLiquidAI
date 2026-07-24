@@ -23,12 +23,36 @@ pub struct BrowserPolicyState {
     agent_domains: Arc<Mutex<HashMap<String, HashSet<String>>>>,
 }
 
+#[derive(Clone)]
+struct BrowserSession {
+    mode: BrowserMode,
+    task_id: Option<String>,
+}
+
+#[derive(Default)]
+pub struct BrowserSessionRegistry {
+    sessions: Mutex<HashMap<String, BrowserSession>>,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserOpenRequest {
     pub mode: BrowserMode,
     pub url: String,
     pub task_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserNavigateRequest {
+    pub label: String,
+    pub url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserSessionRequest {
+    pub label: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -335,9 +359,87 @@ pub fn browser_list_preview_origins(
 pub fn browser_open(
     app: AppHandle,
     state: tauri::State<'_, BrowserPolicyState>,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
     request: BrowserOpenRequest,
 ) -> Result<String, String> {
-    open_browser_window(app, state.inner().clone(), request)
+    let session = BrowserSession {
+        mode: request.mode.clone(),
+        task_id: request.task_id.clone(),
+    };
+    let label = open_browser_window(app, state.inner().clone(), request)?;
+    sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?
+        .insert(label.clone(), session);
+    Ok(label)
+}
+
+#[tauri::command]
+pub fn browser_navigate(
+    app: AppHandle,
+    state: tauri::State<'_, BrowserPolicyState>,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserNavigateRequest,
+) -> Result<(), String> {
+    let session = sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?
+        .get(&request.label)
+        .cloned()
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+    let url = Url::parse(&request.url).map_err(|_| "BROWSER_POLICY_DENIED: invalid URL")?;
+    if !allowed(&state, &session.mode, session.task_id.as_deref(), &url) {
+        return Err("BROWSER_POLICY_DENIED: URL is not allowed for this browser mode".into());
+    }
+    app.get_webview_window(&request.label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .navigate(url)
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser could not navigate".to_owned())
+}
+
+#[tauri::command]
+pub fn browser_reload(
+    app: AppHandle,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserSessionRequest,
+) -> Result<(), String> {
+    if !sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?
+        .contains_key(&request.label)
+    {
+        return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
+    }
+    app.get_webview_window(&request.label)
+        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .reload()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser could not reload".to_owned())
+}
+
+#[tauri::command]
+pub fn browser_close(
+    app: AppHandle,
+    sessions: tauri::State<'_, BrowserSessionRegistry>,
+    request: BrowserSessionRequest,
+) -> Result<(), String> {
+    let known = sessions
+        .sessions
+        .lock()
+        .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?
+        .remove(&request.label)
+        .is_some();
+    if !known {
+        return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
+    }
+    if let Some(window) = app.get_webview_window(&request.label) {
+        window
+            .close()
+            .map_err(|_| "BROWSER_POLICY_DENIED: browser could not close")?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
