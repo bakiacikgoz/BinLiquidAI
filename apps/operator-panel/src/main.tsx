@@ -15,7 +15,7 @@ import './styles/premium-mission.css'
 import './styles/premium-assistant.css'
 import './artifact-workspace/artifact-workspace.css'
 
-import App from './App.tsx'
+import App from './ProductShellBootstrap.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

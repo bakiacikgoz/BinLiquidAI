@@ -1,0 +1,1 @@
+export function CollectionPage({ title, body }: { title: string; body: string }) { return <section className="ps-collection"><p className="ps-eyebrow">PRODUCT COLLECTION</p><h1>{title}</h1><p>{body}</p><p className="ps-muted">This view will be populated only from the existing governed services; no demo records are rendered.</p></section>; }
