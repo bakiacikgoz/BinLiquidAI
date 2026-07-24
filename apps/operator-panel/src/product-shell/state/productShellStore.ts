@@ -18,6 +18,7 @@ type ProductShellState = {
   sidebarWidth: number;
   theme: 'dark' | 'light';
   createTask: (title: string) => ProductTask;
+  upsertTasks: (tasks: ProductTask[]) => void;
   selectTask: (taskId: string | null) => void;
   setContextRailOpen: (open: boolean) => void;
   setDockOpen: (open: boolean) => void;
@@ -49,6 +50,11 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
     set((state) => ({ tasks: [task, ...state.tasks], selectedTaskId: task.id }));
     return task;
   },
+  upsertTasks: (tasks) => set((state) => {
+    const next = new Map(state.tasks.map((task) => [task.id, task]));
+    tasks.forEach((task) => next.set(task.id, task));
+    return { tasks: [...next.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt)) };
+  }),
   selectTask: (selectedTaskId) => set({ selectedTaskId }),
   setContextRailOpen: (contextRailOpen) => set({ contextRailOpen }),
   setDockOpen: (dockOpen) => set({ dockOpen }),

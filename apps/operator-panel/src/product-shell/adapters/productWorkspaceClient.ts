@@ -8,6 +8,8 @@ const envelope = z.discriminatedUnion('ok', [
 const project = z.object({ projectId: z.string(), workspaceId: z.string(), title: z.string(), status: z.string(), createdAtUtc: z.string(), updatedAtUtc: z.string() }).strict();
 const task = z.object({ taskId: z.string(), workspaceId: z.string(), projectId: z.string(), title: z.string(), status: z.string(), assistantSessionId: z.string().nullable(), assistantTurnId: z.string().nullable(), teamJobId: z.string().nullable(), createdAtUtc: z.string(), updatedAtUtc: z.string() }).strict();
 
+export type ProductWorkspaceTask = z.infer<typeof task>;
+
 export class ProductWorkspaceClient {
   private async call<T>(command: string, params: Record<string, unknown>, schema: z.ZodType<T>, idempotencyKey: string | null = null): Promise<T> {
     const raw = await invoke<unknown>(command, { payload: { params, idempotencyKey, timeoutMs: 15_000 } });
