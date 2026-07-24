@@ -232,6 +232,8 @@ artifact_bridge_command!(bridge_artifact_form_submit, "artifact.form.submit");
 artifact_bridge_command!(bridge_artifact_import_evidence, "artifact.import_evidence");
 artifact_bridge_command!(bridge_product_project_list, "project.list");
 artifact_bridge_command!(bridge_product_project_create, "project.create");
+artifact_bridge_command!(bridge_product_project_update, "project.update");
+artifact_bridge_command!(bridge_product_project_archive, "project.archive");
 artifact_bridge_command!(bridge_product_task_list, "task.list");
 artifact_bridge_command!(bridge_product_task_create, "task.create");
 artifact_bridge_command!(bridge_product_task_message_add, "task.message.add");
@@ -239,6 +241,200 @@ artifact_bridge_command!(bridge_product_task_message_list, "task.message.list");
 artifact_bridge_command!(bridge_product_task_link_add, "task.link.add");
 artifact_bridge_command!(bridge_product_preferences_get, "preferences.get");
 artifact_bridge_command!(bridge_product_preferences_set, "preferences.set");
+
+#[derive(Default)]
+pub struct ProductFolderTicketState {
+    tickets: Mutex<HashMap<String, PathBuf>>,
+    roots: Mutex<HashMap<String, PathBuf>>,
+}
+
+impl ProductFolderTicketState {
+    async fn issue(&self, selected_path: PathBuf) -> Result<(String, String), String> {
+        let canonical = selected_path
+            .canonicalize()
+            .map_err(|_| "Selected folder is unavailable.".to_string())?;
+        if !canonical.is_dir() {
+            return Err("Selected path is not a folder.".to_string());
+        }
+        let display_name = canonical
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or("Selected folder")
+            .to_string();
+        let ticket = format!("folder-{}", uuid::Uuid::new_v4());
+        self.tickets.lock().await.insert(ticket.clone(), canonical);
+        Ok((ticket, display_name))
+    }
+
+    async fn bind(&self, folder_ticket: &str, root_ref: &str) -> Result<(), String> {
+        let path = self
+            .tickets
+            .lock()
+            .await
+            .remove(folder_ticket)
+            .ok_or_else(|| "Folder selection ticket is unavailable.".to_string())?;
+        if !path.is_dir() || root_ref.trim().is_empty() || root_ref.contains('\0') {
+            return Err("Folder registration is invalid.".to_string());
+        }
+        self.roots.lock().await.insert(root_ref.to_string(), path);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductFolderSelectResult {
+    cancelled: bool,
+    folder_ticket: Option<String>,
+    display_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProductProjectRegisterRequest {
+    folder_ticket: String,
+    name: String,
+    idempotency_key: String,
+}
+
+#[tauri::command]
+pub async fn bridge_product_project_folder_select(
+    app: tauri::AppHandle,
+) -> BridgeResult<ProductFolderSelectResult> {
+    if let Err(error) = resolve_trusted_artifact_identity(&trusted_artifact_bridge_config(), &app).await {
+        return BridgeResult::err(error);
+    }
+    let dialog_app = app.clone();
+    let selection = match tokio::task::spawn_blocking(move || {
+        dialog_app.dialog().file().blocking_pick_folder()
+    })
+    .await
+    {
+        Ok(selection) => selection,
+        Err(_) => {
+            return BridgeResult::err(BridgeError::new(
+                "PRODUCT_FOLDER_UNAVAILABLE",
+                "Native folder dialog failed.",
+                "",
+                "product folder select",
+                true,
+            ))
+        }
+    };
+    let Some(selection) = selection else {
+        return BridgeResult::ok(ProductFolderSelectResult {
+            cancelled: true,
+            folder_ticket: None,
+            display_name: None,
+        });
+    };
+    let path = match selection.into_path() {
+        Ok(path) => path,
+        Err(_) => {
+            return BridgeResult::err(BridgeError::new(
+                "PRODUCT_FOLDER_UNAVAILABLE",
+                "Selected folder is not a local filesystem path.",
+                "",
+                "product folder select",
+                false,
+            ))
+        }
+    };
+    match app.state::<ProductFolderTicketState>().issue(path).await {
+        Ok((folder_ticket, display_name)) => BridgeResult::ok(ProductFolderSelectResult {
+            cancelled: false,
+            folder_ticket: Some(folder_ticket),
+            display_name: Some(display_name),
+        }),
+        Err(message) => BridgeResult::err(BridgeError::new(
+            "PRODUCT_FOLDER_UNAVAILABLE",
+            message,
+            "",
+            "product folder select",
+            false,
+        )),
+    }
+}
+
+#[tauri::command]
+pub async fn bridge_product_project_register(
+    app: tauri::AppHandle,
+    request: ProductProjectRegisterRequest,
+) -> BridgeResult<Value> {
+    if normalize_required_text(&request.folder_ticket, "folder ticket", "project register").is_err()
+        || normalize_required_text(&request.name, "project name", "project register").is_err()
+        || normalize_required_text(&request.idempotency_key, "idempotency key", "project register").is_err()
+    {
+        return BridgeResult::err(BridgeError::new(
+            "INVALID_INPUT",
+            "Project registration request is incomplete.",
+            "",
+            "project register",
+            false,
+        ));
+    }
+    if !app
+        .state::<ProductFolderTicketState>()
+        .tickets
+        .lock()
+        .await
+        .contains_key(&request.folder_ticket)
+    {
+        return BridgeResult::err(BridgeError::new(
+            "PRODUCT_FOLDER_UNAVAILABLE",
+            "Folder selection ticket is unavailable.",
+            "",
+            "project register",
+            false,
+        ));
+    }
+    let response = bridge_artifact_rpc_call(
+        app.clone(),
+        "project.register".to_string(),
+        ArtifactBridgePayload {
+            params: json!({
+                "folderTicket": request.folder_ticket,
+                "name": request.name,
+                "idempotencyKey": request.idempotency_key,
+            }),
+            idempotency_key: Some(request.idempotency_key),
+            timeout_ms: Some(DEFAULT_TIMEOUT_MS),
+        },
+    )
+    .await;
+    if !response.ok {
+        return response;
+    }
+    let Some(root_ref) = response
+        .data
+        .as_ref()
+        .and_then(|data| data.get("rootRef"))
+        .and_then(Value::as_str)
+    else {
+        return BridgeResult::err(BridgeError::new(
+            "PRODUCT_PROJECT_INVALID",
+            "Project registration did not return a root reference.",
+            "",
+            "project register",
+            false,
+        ));
+    };
+    if let Err(message) = app
+        .state::<ProductFolderTicketState>()
+        .bind(&request.folder_ticket, root_ref)
+        .await
+    {
+        return BridgeResult::err(BridgeError::new(
+            "PRODUCT_FOLDER_UNAVAILABLE",
+            message,
+            "",
+            "project register",
+            false,
+        ));
+    }
+    response
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -4629,6 +4825,27 @@ mod tests {
     #[test]
     fn operator_panel_contract_version_is_3_0() {
         assert_eq!(CONTRACT_VERSION, "3.0");
+    }
+
+    #[test]
+    fn project_folder_ticket_is_opaque_and_consumed_when_bound_to_a_root_ref() {
+        let selected = tempfile::tempdir().expect("temporary folder");
+        let selected_path = selected.path().canonicalize().expect("canonical selected folder");
+        let state = ProductFolderTicketState::default();
+
+        let (ticket, display_name) = tauri::async_runtime::block_on(state.issue(selected_path.clone()))
+            .expect("folder ticket");
+        assert!(ticket.starts_with("folder-"));
+        assert!(!ticket.contains(&selected_path.display().to_string()));
+        assert!(!display_name.is_empty());
+
+        tauri::async_runtime::block_on(state.bind(&ticket, "root-release"))
+            .expect("bind ticket to durable root ref");
+        assert!(!tauri::async_runtime::block_on(state.tickets.lock()).contains_key(&ticket));
+        assert_eq!(
+            tauri::async_runtime::block_on(state.roots.lock()).get("root-release"),
+            Some(&selected_path)
+        );
     }
 
     #[test]

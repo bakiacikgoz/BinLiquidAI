@@ -21,7 +21,7 @@
 
 ## Phase 3 — Product Workspace domain
 
-- Complete: workspace-scoped SQLite project/task/message/link/preference records, migrations and service layer exist.
+- Complete: workspace-scoped SQLite project/task/message/link/preference records, including durable project root references, pin state, manual order and archive metadata, exist.
 - Complete: existing sidecar RPC, typed Tauri bridge and frontend client use idempotency-bound mutations.
 - Verified: durable project/task/message creation, replay idempotency and cross-workspace denial tests pass.
 
@@ -30,7 +30,8 @@
 - Complete: sidebar loading, project selection, real first task/message persistence, task-session routing and global search use governed sources.
 - Complete: task composer uses the existing model inventory/runtime transport and carries validated context/tool controls into the first turn.
 - Complete: persisted transcript projection avoids duplicate runtime turns; assistant artifacts open the governed workspace tab.
-- Remaining: project pin/archive/sort/pagination/folder registration, effort/speed/approval-profile task options, and the complete message action set.
+- Complete: sidebar project pages use bounded cursor pagination, durable pin/archive/manual ordering and native folder registration through opaque tickets; no renderer or sidecar response carries the local path.
+- Remaining: effort/speed/approval-profile task options and the complete message action set.
 
 ## Phase 7 — Workspace and artifacts
 
@@ -42,7 +43,7 @@
 
 - Complete: user PTY uses an application-owned verified root, resize, interrupt, kill and tab-scoped cleanup.
 - Complete: browser policy is mode-scoped; user HTTPS, registered preview origins, agent allowlists, redirect rechecks, isolated agent data stores and approval-gated external effects are enforced.
-- Remaining: project-root registration, terminal dock attachment, browser bounds/overlay coordination, history controls where the Tauri runtime exposes them, and governed download save approval.
+- Remaining: terminal attachment to the registered project root, browser bounds/overlay coordination, history controls where the Tauri runtime exposes them, and governed download save approval.
 
 ## Phase 10–12 — Product collections and settings
 

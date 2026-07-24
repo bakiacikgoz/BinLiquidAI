@@ -10,6 +10,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(bridge::AssistantProcessRegistry::default())
         .manage(artifact_rpc::WorkspaceRpcRegistry::default())
+        .manage(bridge::ProductFolderTicketState::default())
         .manage(browser::BrowserPolicyState::with_runtime_preview_origins())
         .manage(browser::BrowserSessionRegistry::default())
         .manage(terminal::TerminalManager::default())
@@ -90,6 +91,10 @@ pub fn run() {
             bridge::bridge_artifact_import_evidence,
             bridge::bridge_product_project_list,
             bridge::bridge_product_project_create,
+            bridge::bridge_product_project_folder_select,
+            bridge::bridge_product_project_register,
+            bridge::bridge_product_project_update,
+            bridge::bridge_product_project_archive,
             bridge::bridge_product_task_list,
             bridge::bridge_product_task_create,
             bridge::bridge_product_task_message_add,

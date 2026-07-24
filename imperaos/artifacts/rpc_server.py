@@ -55,6 +55,9 @@ _READ_CHUNK_BYTES = 64 * 1024
 _MAX_DEDUP_RESPONSES = 1024
 _MUTATION_METHODS_WITH_KEYS = {
     ArtifactRpcMethod.PROJECT_CREATE,
+    ArtifactRpcMethod.PROJECT_REGISTER,
+    ArtifactRpcMethod.PROJECT_UPDATE,
+    ArtifactRpcMethod.PROJECT_ARCHIVE,
     ArtifactRpcMethod.TASK_CREATE,
     ArtifactRpcMethod.TASK_MESSAGE_ADD,
     ArtifactRpcMethod.TASK_LINK_ADD,
@@ -344,11 +347,58 @@ class ArtifactRpcServer:
         params = request.params
         workspace_id = request.workspace_id
         if request.method is ArtifactRpcMethod.PROJECT_LIST:
-            return {"projects": _json_value(self.product_workspace.list_projects(workspace_id))}
+            page = self.product_workspace.list_project_page(
+                workspace_id,
+                cursor=params.get("cursor") if isinstance(params.get("cursor"), str) else None,
+                limit=params.get("limit", 50),
+                status=params.get("status") if isinstance(params.get("status"), str) else None,
+                sort=params.get("sort", "updated_desc"),
+            )
+            return _json_mapping(page)
         if request.method is ArtifactRpcMethod.PROJECT_CREATE:
             return _json_mapping(
                 self.product_workspace.create_project(
                     workspace_id, str(params["title"]), request.idempotency_key
+                )
+            )
+        if request.method is ArtifactRpcMethod.PROJECT_REGISTER:
+            return _json_mapping(
+                self.product_workspace.register_project(
+                    workspace_id,
+                    _required_string(params, "folderTicket"),
+                    _required_string(params, "name"),
+                    request.idempotency_key,
+                )
+            )
+        if request.method is ArtifactRpcMethod.PROJECT_UPDATE:
+            pinned = params.get("pinned")
+            manual_order = params.get("manualOrder")
+            name = params.get("name")
+            if pinned is not None and not isinstance(pinned, bool):
+                raise ValueError("project pinned flag is invalid")
+            if manual_order is not None and (
+                not isinstance(manual_order, int) or isinstance(manual_order, bool)
+            ):
+                raise ValueError("project manual order is invalid")
+            if name is not None and not isinstance(name, str):
+                raise ValueError("project name is invalid")
+            return _json_mapping(
+                self.product_workspace.update_project(
+                    workspace_id,
+                    _required_string(params, "projectId"),
+                    pinned=pinned,
+                    manual_order=manual_order,
+                    title=name,
+                    idempotency_key=request.idempotency_key,
+                )
+            )
+        if request.method is ArtifactRpcMethod.PROJECT_ARCHIVE:
+            return _json_mapping(
+                self.product_workspace.archive_project(
+                    workspace_id,
+                    _required_string(params, "projectId"),
+                    _required_string(params, "reason"),
+                    request.idempotency_key,
                 )
             )
         if request.method is ArtifactRpcMethod.TASK_LIST:
@@ -476,6 +526,13 @@ def _json_mapping(value: object) -> dict[str, Any]:
     if not isinstance(converted, dict):
         raise TypeError("RPC result must serialize to an object")
     return converted
+
+
+def _required_string(params: dict[str, Any], field: str) -> str:
+    value = params.get(field)
+    if not isinstance(value, str):
+        raise ValueError(f"{field} is required")
+    return value
 
 
 def _json_value(value: object) -> Any:

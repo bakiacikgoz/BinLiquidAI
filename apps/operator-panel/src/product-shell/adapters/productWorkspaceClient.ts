@@ -5,8 +5,17 @@ const envelope = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), data: z.unknown(), error: z.null() }).strict(),
   z.object({ ok: z.literal(false), data: z.null(), error: z.object({ code: z.string(), message: z.string(), retryable: z.boolean() }).passthrough() }).strict(),
 ]);
-const project = z.object({ projectId: z.string(), workspaceId: z.string(), title: z.string(), status: z.string(), createdAtUtc: z.string(), updatedAtUtc: z.string() }).strict();
+const project = z.object({
+  projectId: z.string(), workspaceId: z.string(), title: z.string(),
+  rootRef: z.string().default(''), rootDisplayName: z.string().default(''),
+  status: z.enum(['active', 'archived']), pinned: z.boolean().default(false),
+  manualOrder: z.number().int().nonnegative().default(0),
+  createdAtUtc: z.string(), updatedAtUtc: z.string(), archivedAtUtc: z.string().nullable().default(null),
+}).strict();
 const task = z.object({ taskId: z.string(), workspaceId: z.string(), projectId: z.string(), title: z.string(), status: z.string(), assistantSessionId: z.string().nullable(), assistantTurnId: z.string().nullable(), teamJobId: z.string().nullable(), createdAtUtc: z.string(), updatedAtUtc: z.string() }).strict();
+const folderSelection = z.object({
+  cancelled: z.boolean(), folderTicket: z.string().nullable(), displayName: z.string().nullable(),
+}).strict();
 
 export type ProductWorkspaceTask = z.infer<typeof task>;
 export type ProductWorkspaceProject = z.infer<typeof project>;
@@ -20,8 +29,38 @@ export class ProductWorkspaceClient {
     return schema.parse(parsed.data);
   }
 
-  listProjects() { return this.call('bridge_product_project_list', {}, z.object({ projects: z.array(project) }).strict()); }
+  private async nativeCall<T>(command: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
+    const raw = await invoke<unknown>(command, args);
+    const parsed = envelope.parse(raw);
+    if (!parsed.ok) throw new Error(parsed.error.message);
+    return schema.parse(parsed.data);
+  }
+
+  listProjects(options: { cursor?: string; limit?: number; status?: 'active' | 'archived'; sort?: 'updated_desc' | 'manual' | 'priority' } = {}) {
+    return this.call('bridge_product_project_list', options, z.object({ projects: z.array(project), nextCursor: z.string().nullable().default(null) }).strict());
+  }
   createProject(title: string) { return this.call('bridge_product_project_create', { title }, project, `project-${crypto.randomUUID()}`); }
+  updateProject(projectId: string, changes: { pinned?: boolean; manualOrder?: number; name?: string }) {
+    return this.call('bridge_product_project_update', { projectId, ...changes }, project, `project-update-${crypto.randomUUID()}`);
+  }
+  archiveProject(projectId: string, reason: string) {
+    return this.call('bridge_product_project_archive', { projectId, reason }, project, `project-archive-${crypto.randomUUID()}`);
+  }
+  selectProjectFolder() {
+    return this.nativeCall('bridge_product_project_folder_select', {}, folderSelection);
+  }
+  async registerProjectFromFolder(name?: string) {
+    const selection = await this.selectProjectFolder();
+    if (selection.cancelled || !selection.folderTicket || !selection.displayName) return null;
+    const idempotencyKey = `project-register-${crypto.randomUUID()}`;
+    return this.nativeCall('bridge_product_project_register', {
+      request: {
+        folderTicket: selection.folderTicket,
+        name: name?.trim() || selection.displayName,
+        idempotencyKey,
+      },
+    }, project);
+  }
   async getOrCreateProject(title: string) {
     const { projects } = await this.listProjects();
     return projects.find((project) => project.title === title && project.status !== 'archived')

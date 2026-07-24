@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import Any
 from uuid import uuid4
 
-from .models import Preference, ProductLink, ProductMessage, ProductTask, Project
+from .models import Preference, ProductLink, ProductMessage, ProductTask, Project, ProjectPage
 from .store import ProductWorkspaceStore
 
 
@@ -72,6 +74,39 @@ class ProductWorkspaceService:
             ),
         )
 
+    @staticmethod
+    def _project_from_row(row: Any) -> Project:
+        return Project(
+            projectId=row["project_id"],
+            workspaceId=row["workspace_id"],
+            title=row["title"],
+            rootRef=row["root_ref"],
+            rootDisplayName=row["root_display_name"],
+            status=row["status"],
+            pinned=bool(row["pinned"]),
+            manualOrder=row["manual_order"],
+            createdAtUtc=row["created_at_utc"],
+            updatedAtUtc=row["updated_at_utc"],
+            archivedAtUtc=row["archived_at_utc"],
+        )
+
+    @staticmethod
+    def _encode_cursor(offset: int) -> str:
+        return urlsafe_b64encode(str(offset).encode("ascii")).decode("ascii")
+
+    @staticmethod
+    def _decode_cursor(cursor: str | None) -> int:
+        if cursor is None:
+            return 0
+        try:
+            decoded = urlsafe_b64decode(cursor.encode("ascii")).decode("ascii")
+            offset = int(decoded)
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ValueError("project cursor is invalid") from exc
+        if offset < 0:
+            raise ValueError("project cursor is invalid")
+        return offset
+
     def create_project(
         self, workspace_id: str, title: str, idempotency_key: str | None = None
     ) -> Project:
@@ -81,6 +116,8 @@ class ProductWorkspaceService:
             projectId=_id("project"),
             workspaceId=workspace_id,
             title=title,
+            rootRef=_id("root"),
+            rootDisplayName=title,
             createdAtUtc=now,
             updatedAtUtc=now,
         )
@@ -91,14 +128,23 @@ class ProductWorkspaceService:
             if replay is not None:
                 return Project.model_validate(replay)
             db.execute(
-                "INSERT INTO product_projects VALUES (?,?,?,?,?,?)",
+                """INSERT INTO product_projects
+                (project_id,workspace_id,title,root_ref,root_display_name,status,pinned,manual_order,
+                created_at_utc,updated_at_utc,archived_at_utc,archive_reason)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     project.project_id,
                     project.workspace_id,
                     project.title,
+                    project.root_ref,
+                    project.root_display_name,
                     project.status,
+                    int(project.pinned),
+                    project.manual_order,
                     project.created_at_utc.isoformat(),
                     project.updated_at_utc.isoformat(),
+                    None,
+                    None,
                 ),
             )
             self._remember_mutation(
@@ -106,23 +152,207 @@ class ProductWorkspaceService:
             )
         return project
 
+    def register_project(
+        self,
+        workspace_id: str,
+        folder_ticket: str,
+        title: str,
+        idempotency_key: str | None = None,
+    ) -> Project:
+        if not folder_ticket or len(folder_ticket) > 512 or "\x00" in folder_ticket:
+            raise ValueError("folder ticket is invalid")
+        now = _now()
+        payload = {
+            "folderTicketHash": sha256(folder_ticket.encode("utf-8")).hexdigest(),
+            "title": title,
+        }
+        project = Project(
+            projectId=_id("project"),
+            workspaceId=workspace_id,
+            title=title,
+            rootRef=_id("root"),
+            rootDisplayName=title,
+            createdAtUtc=now,
+            updatedAtUtc=now,
+        )
+        with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "project.register", payload, idempotency_key
+            )
+            if replay is not None:
+                return Project.model_validate(replay)
+            db.execute(
+                """INSERT INTO product_projects
+                (project_id,workspace_id,title,root_ref,root_display_name,status,pinned,manual_order,
+                created_at_utc,updated_at_utc,archived_at_utc,archive_reason)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    project.project_id,
+                    project.workspace_id,
+                    project.title,
+                    project.root_ref,
+                    project.root_display_name,
+                    project.status,
+                    int(project.pinned),
+                    project.manual_order,
+                    project.created_at_utc.isoformat(),
+                    project.updated_at_utc.isoformat(),
+                    None,
+                    None,
+                ),
+            )
+            self._remember_mutation(
+                db, workspace_id, "project.register", payload, idempotency_key, project
+            )
+        return project
+
     def list_projects(self, workspace_id: str) -> list[Project]:
+        return self.list_project_page(workspace_id, limit=500).projects
+
+    def list_project_page(
+        self,
+        workspace_id: str,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+        status: str | None = None,
+        sort: str = "updated_desc",
+    ) -> ProjectPage:
+        if not 1 <= limit <= 500:
+            raise ValueError("project limit is outside the allowed range")
+        if status not in (None, "active", "archived"):
+            raise ValueError("project status is invalid")
+        order_by = {
+            "updated_desc": "pinned DESC, updated_at_utc DESC, project_id DESC",
+            "manual": "pinned DESC, manual_order ASC, updated_at_utc DESC, project_id DESC",
+            "priority": "pinned DESC, manual_order ASC, updated_at_utc DESC, project_id DESC",
+        }.get(sort)
+        if order_by is None:
+            raise ValueError("project sort is invalid")
+        offset = self._decode_cursor(cursor)
+        clauses = ["workspace_id=?"]
+        params: list[Any] = [workspace_id]
+        if status is not None:
+            clauses.append("status=?")
+            params.append(status)
         with self.store.connect() as db:
             rows = db.execute(
-                "SELECT * FROM product_projects WHERE workspace_id=? ORDER BY updated_at_utc DESC",
-                (workspace_id,),
+                f"""SELECT * FROM product_projects WHERE {' AND '.join(clauses)}
+                ORDER BY {order_by} LIMIT ? OFFSET ?""",
+                (*params, limit + 1, offset),
             ).fetchall()
-        return [
-            Project(
-                projectId=r["project_id"],
-                workspaceId=r["workspace_id"],
-                title=r["title"],
-                status=r["status"],
-                createdAtUtc=r["created_at_utc"],
-                updatedAtUtc=r["updated_at_utc"],
+        has_next = len(rows) > limit
+        return ProjectPage(
+            projects=[self._project_from_row(row) for row in rows[:limit]],
+            nextCursor=self._encode_cursor(offset + limit) if has_next else None,
+        )
+
+    def _require_project(self, db: Any, workspace_id: str, project_id: str) -> Project:
+        row = db.execute(
+            "SELECT * FROM product_projects WHERE workspace_id=? AND project_id=?",
+            (workspace_id, project_id),
+        ).fetchone()
+        if row is None:
+            raise PermissionError("project is unavailable in this workspace")
+        return self._project_from_row(row)
+
+    def update_project(
+        self,
+        workspace_id: str,
+        project_id: str,
+        *,
+        pinned: bool | None = None,
+        manual_order: int | None = None,
+        title: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> Project:
+        if pinned is None and manual_order is None and title is None:
+            raise ValueError("project update has no changes")
+        payload = {
+            "projectId": project_id,
+            "pinned": pinned,
+            "manualOrder": manual_order,
+            "title": title,
+        }
+        with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "project.update", payload, idempotency_key
             )
-            for r in rows
-        ]
+            if replay is not None:
+                return Project.model_validate(replay)
+            current = self._require_project(db, workspace_id, project_id)
+            updated = Project(
+                projectId=current.project_id,
+                workspaceId=current.workspace_id,
+                title=title if title is not None else current.title,
+                rootRef=current.root_ref,
+                rootDisplayName=current.root_display_name,
+                status=current.status,
+                pinned=current.pinned if pinned is None else pinned,
+                manualOrder=current.manual_order if manual_order is None else manual_order,
+                createdAtUtc=current.created_at_utc,
+                updatedAtUtc=_now(),
+                archivedAtUtc=current.archived_at_utc,
+            )
+            db.execute(
+                """UPDATE product_projects
+                SET title=?, pinned=?, manual_order=?, updated_at_utc=?
+                WHERE workspace_id=? AND project_id=?""",
+                (
+                    updated.title,
+                    int(updated.pinned),
+                    updated.manual_order,
+                    updated.updated_at_utc.isoformat(),
+                    workspace_id,
+                    project_id,
+                ),
+            )
+            self._remember_mutation(
+                db, workspace_id, "project.update", payload, idempotency_key, updated
+            )
+        return updated
+
+    def archive_project(
+        self,
+        workspace_id: str,
+        project_id: str,
+        reason: str,
+        idempotency_key: str | None = None,
+    ) -> Project:
+        if not reason.strip() or len(reason) > 500:
+            raise ValueError("archive reason is invalid")
+        payload = {"projectId": project_id, "reason": reason}
+        with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "project.archive", payload, idempotency_key
+            )
+            if replay is not None:
+                return Project.model_validate(replay)
+            current = self._require_project(db, workspace_id, project_id)
+            now = _now()
+            archived = Project(
+                projectId=current.project_id,
+                workspaceId=current.workspace_id,
+                title=current.title,
+                rootRef=current.root_ref,
+                rootDisplayName=current.root_display_name,
+                status="archived",
+                pinned=current.pinned,
+                manualOrder=current.manual_order,
+                createdAtUtc=current.created_at_utc,
+                updatedAtUtc=now,
+                archivedAtUtc=now,
+            )
+            db.execute(
+                """UPDATE product_projects
+                SET status='archived', archived_at_utc=?, archive_reason=?, updated_at_utc=?
+                WHERE workspace_id=? AND project_id=?""",
+                (now.isoformat(), reason, now.isoformat(), workspace_id, project_id),
+            )
+            self._remember_mutation(
+                db, workspace_id, "project.archive", payload, idempotency_key, archived
+            )
+        return archived
 
     def create_task(
         self,

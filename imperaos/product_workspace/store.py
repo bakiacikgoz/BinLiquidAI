@@ -25,7 +25,10 @@ class ProductWorkspaceStore:
             INSERT OR IGNORE INTO product_schema_migrations(version) VALUES (1);
             CREATE TABLE IF NOT EXISTS product_projects (
               project_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, title TEXT NOT NULL,
-              status TEXT NOT NULL, created_at_utc TEXT NOT NULL, updated_at_utc TEXT NOT NULL);
+              root_ref TEXT NOT NULL, root_display_name TEXT NOT NULL,
+              status TEXT NOT NULL, pinned INTEGER NOT NULL DEFAULT 0,
+              manual_order INTEGER NOT NULL DEFAULT 0, created_at_utc TEXT NOT NULL,
+              updated_at_utc TEXT NOT NULL, archived_at_utc TEXT, archive_reason TEXT);
             CREATE INDEX IF NOT EXISTS product_projects_workspace
               ON product_projects(workspace_id, updated_at_utc DESC);
             CREATE TABLE IF NOT EXISTS product_tasks (
@@ -54,3 +57,34 @@ class ProductWorkspaceStore:
               PRIMARY KEY(workspace_id, idempotency_key));
             INSERT OR IGNORE INTO product_schema_migrations(version) VALUES (2);
             """)
+            project_columns = {
+                row["name"]
+                for row in db.execute("PRAGMA table_info(product_projects)").fetchall()
+            }
+            additions = {
+                "root_ref": "TEXT NOT NULL DEFAULT ''",
+                "root_display_name": "TEXT NOT NULL DEFAULT ''",
+                "pinned": "INTEGER NOT NULL DEFAULT 0",
+                "manual_order": "INTEGER NOT NULL DEFAULT 0",
+                "archived_at_utc": "TEXT",
+                "archive_reason": "TEXT",
+            }
+            for name, definition in additions.items():
+                if name not in project_columns:
+                    db.execute(f"ALTER TABLE product_projects ADD COLUMN {name} {definition}")
+            db.execute(
+                """UPDATE product_projects
+                SET root_ref='root-' || project_id
+                WHERE root_ref IS NULL OR root_ref=''"""
+            )
+            db.execute(
+                """UPDATE product_projects
+                SET root_display_name=title
+                WHERE root_display_name IS NULL OR root_display_name=''"""
+            )
+            db.execute(
+                """CREATE INDEX IF NOT EXISTS product_projects_sidebar
+                ON product_projects(workspace_id, status, pinned DESC, manual_order ASC,
+                updated_at_utc DESC)"""
+            )
+            db.execute("INSERT OR IGNORE INTO product_schema_migrations(version) VALUES (3)")

@@ -17,6 +17,10 @@ The UI Lab source remains unchanged.
   Operator Panel below `#/system/*`.
 - Projects, tasks, task messages, links and preferences are SQLite-backed and
   exposed through the existing sidecar/Tauri bridge with idempotency binding.
+  Project pin state, manual order, archives and cursor pages persist across
+  restarts. Native folder selection exposes only an opaque ticket; the raw
+  local path remains in the native bridge while the sidecar records a generated
+  `rootRef` and display name.
 - New work persists the initial user message, routes to the durable task ID,
   and starts the assistant session with the selected governed composer options.
 - Existing Artifact Workspace controllers and all seven artifact editors remain
@@ -40,14 +44,16 @@ The UI Lab source remains unchanged.
 - Operator Panel lint and production build passed.
 - Native browser policy unit tests: 3 passed.
 - Native terminal policy/control tests: 2 passed; `cargo check` passed.
-- Product workspace and Artifact RPC Python tests: 10 passed; Ruff passed.
+- Targeted Product Workspace and Artifact RPC Python tests: 7 passed; Ruff passed.
+- Targeted Product Shell client/sidebar tests: 5 passed; lint and production
+  build passed.
+- Native library tests: 60 passed, including the opaque folder-ticket test.
 
 ## Explicitly open before V2 plan completion
 
-- Project pin/archive/sort/pagination and native folder registration.
 - Durable effort/speed/approval-profile task options and the full message action
   set.
-- Project-root registration, terminal dock attachment and browser
+- Terminal attachment to the registered project root and browser
   bounds/overlay/download-save coordination.
 - Full branch/run/evidence context, data/files surfaces and collection-detail
   navigation.

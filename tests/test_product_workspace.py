@@ -29,6 +29,134 @@ def test_workspace_project_task_and_message_are_durable_and_scoped(tmp_path):
         raise AssertionError("cross-workspace project access must be denied")
 
 
+def test_projects_keep_pin_archive_order_and_pagination_after_restart(tmp_path):
+    database = tmp_path / "product.sqlite3"
+    service = ProductWorkspaceService(ProductWorkspaceStore(database))
+    first = service.create_project("workspace-a", "First")
+    second = service.create_project("workspace-a", "Second")
+    third = service.create_project("workspace-a", "Third")
+
+    service.update_project(
+        "workspace-a", second.project_id, pinned=True, manual_order=10
+    )
+    service.update_project(
+        "workspace-a", third.project_id, pinned=True, manual_order=1
+    )
+    service.archive_project("workspace-a", first.project_id, "completed")
+
+    reopened = ProductWorkspaceService(ProductWorkspaceStore(database))
+    active_page = reopened.list_project_page(
+        "workspace-a", limit=1, sort="manual", status="active"
+    )
+    assert [project.project_id for project in active_page.projects] == [third.project_id]
+    assert active_page.next_cursor is not None
+
+    second_page = reopened.list_project_page(
+        "workspace-a", cursor=active_page.next_cursor, limit=1, sort="manual", status="active"
+    )
+    assert [project.project_id for project in second_page.projects] == [second.project_id]
+    assert second_page.next_cursor is None
+    assert second_page.projects[0].pinned is True
+    assert second_page.projects[0].manual_order == 10
+    archived = reopened.list_project_page("workspace-a", status="archived")
+    assert archived.projects[0].project_id == first.project_id
+
+
+def test_project_registration_never_persists_or_returns_its_folder_ticket(tmp_path):
+    service = ProductWorkspaceService(ProductWorkspaceStore(tmp_path / "product.sqlite3"))
+
+    project = service.register_project(
+        "workspace-a", "folder-ticket-opaque-123", "Release workspace"
+    )
+
+    assert project.root_ref.startswith("root-")
+    assert project.root_display_name == "Release workspace"
+    assert "folder-ticket-opaque-123" not in project.model_dump_json(by_alias=True)
+
+
+def test_project_list_rpc_respects_the_bounded_page_contract(tmp_path):
+    server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
+    server.product_workspace.create_project("workspace-a", "First")
+    server.product_workspace.create_project("workspace-a", "Second")
+
+    response = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="project-page-1",
+            method=ArtifactRpcMethod.PROJECT_LIST,
+            workspaceId="workspace-a",
+            principal=RpcPrincipal(principalId="operator-a", principalType="user"),
+            params={"limit": 1, "status": "active", "sort": "manual"},
+        )
+    )
+
+    assert response.ok
+    assert len(response.result["projects"]) == 1
+    assert response.result["nextCursor"] is not None
+
+
+def test_project_register_update_and_archive_are_workspace_scoped_rpc_mutations(tmp_path):
+    server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
+    principal = RpcPrincipal(principalId="operator-a", principalType="user")
+    registered = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="project-register-1",
+            method=ArtifactRpcMethod.PROJECT_REGISTER,
+            workspaceId="workspace-a",
+            principal=principal,
+            idempotencyKey="project-register-1",
+            params={
+                "folderTicket": "folder-ticket-opaque-123",
+                "name": "Release workspace",
+                "idempotencyKey": "project-register-1",
+            },
+        )
+    )
+    assert registered.ok
+    assert registered.result["rootRef"].startswith("root-")
+    assert "folder-ticket-opaque-123" not in str(registered.result)
+
+    updated = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="project-update-1",
+            method=ArtifactRpcMethod.PROJECT_UPDATE,
+            workspaceId="workspace-a",
+            principal=principal,
+            idempotencyKey="project-update-1",
+            params={
+                "projectId": registered.result["projectId"],
+                "pinned": True,
+                "manualOrder": 4,
+                "idempotencyKey": "project-update-1",
+            },
+        )
+    )
+    assert updated.ok
+    assert updated.result["pinned"] is True
+    assert updated.result["manualOrder"] == 4
+
+    archived = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="project-archive-1",
+            method=ArtifactRpcMethod.PROJECT_ARCHIVE,
+            workspaceId="workspace-a",
+            principal=principal,
+            idempotencyKey="project-archive-1",
+            params={
+                "projectId": registered.result["projectId"],
+                "reason": "completed",
+                "idempotencyKey": "project-archive-1",
+            },
+        )
+    )
+    assert archived.ok
+    assert archived.result["status"] == "archived"
+    assert archived.result["archivedAtUtc"] is not None
+
+
 def test_product_workspace_rpc_reuses_the_artifact_sidecar(tmp_path):
     server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
     response = server.handle_request(

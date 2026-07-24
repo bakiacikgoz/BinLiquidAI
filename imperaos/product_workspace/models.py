@@ -12,14 +12,24 @@ class Project(StrictModel):
     project_id: str = Field(alias="projectId")
     workspace_id: str = Field(alias="workspaceId")
     title: str = Field(min_length=1, max_length=160)
+    root_ref: str = Field(alias="rootRef")
+    root_display_name: str = Field(alias="rootDisplayName", min_length=1, max_length=160)
     status: Literal["active", "archived"] = "active"
+    pinned: bool = False
+    manual_order: int = Field(default=0, alias="manualOrder", ge=0)
     created_at_utc: datetime = Field(alias="createdAtUtc")
     updated_at_utc: datetime = Field(alias="updatedAtUtc")
+    archived_at_utc: datetime | None = Field(default=None, alias="archivedAtUtc")
 
-    @field_validator("project_id", "workspace_id")
+    @field_validator("project_id", "workspace_id", "root_ref")
     @classmethod
     def _safe(cls, value: str, info: object) -> str:
         return _validate_safe_id(value, str(getattr(info, "field_name", "id")))
+
+
+class ProjectPage(StrictModel):
+    projects: list[Project]
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
 
 
 class ProductTask(StrictModel):
