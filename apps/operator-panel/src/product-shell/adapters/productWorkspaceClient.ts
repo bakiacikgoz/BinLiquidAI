@@ -21,6 +21,11 @@ export class ProductWorkspaceClient {
 
   listProjects() { return this.call('bridge_product_project_list', {}, z.object({ projects: z.array(project) }).strict()); }
   createProject(title: string) { return this.call('bridge_product_project_create', { title }, project, `project-${crypto.randomUUID()}`); }
+  async getOrCreateProject(title: string) {
+    const { projects } = await this.listProjects();
+    return projects.find((project) => project.title === title && project.status !== 'archived')
+      ?? this.createProject(title);
+  }
   listTasks(projectId: string) { return this.call('bridge_product_task_list', { projectId }, z.object({ tasks: z.array(task) }).strict()); }
   createTask(projectId: string, title: string, assistantSessionId?: string) { return this.call('bridge_product_task_create', { projectId, title, assistantSessionId }, task, `task-${crypto.randomUUID()}`); }
   addMessage(taskId: string, role: 'user' | 'assistant' | 'system', body: string) {

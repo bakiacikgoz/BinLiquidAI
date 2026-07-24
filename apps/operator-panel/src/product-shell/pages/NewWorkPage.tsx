@@ -12,7 +12,7 @@ export function NewWorkPage() {
   const start = async (message: string) => {
     try {
       setError('');
-      const project = await productWorkspaceClient.createProject('Operator work');
+      const project = await productWorkspaceClient.getOrCreateProject('Operator work');
       const assistantSessionId = `product-session-${crypto.randomUUID()}`;
       const task = await productWorkspaceClient.createTask(project.projectId, message, assistantSessionId);
       upsertTasks([{ id: task.taskId, title: task.title, createdAt: task.createdAtUtc, status: task.status === 'completed' ? 'completed' : 'active', assistantSessionId: task.assistantSessionId ?? undefined }]);

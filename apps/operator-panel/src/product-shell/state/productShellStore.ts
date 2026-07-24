@@ -17,7 +17,6 @@ type ProductShellState = {
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   theme: 'dark' | 'light';
-  createTask: (title: string) => ProductTask;
   upsertTasks: (tasks: ProductTask[]) => void;
   selectTask: (taskId: string | null) => void;
   setContextRailOpen: (open: boolean) => void;
@@ -26,10 +25,6 @@ type ProductShellState = {
   setSidebarWidth: (width: number) => void;
   setTheme: (theme: 'dark' | 'light') => void;
 };
-
-function taskId(): string {
-  return `task-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
-}
 
 /** UI-only navigation state. Product records are deliberately not fabricated here. */
 export const useProductShellStore = create<ProductShellState>()(persist((set) => ({
@@ -40,16 +35,6 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
   sidebarCollapsed: false,
   sidebarWidth: 260,
   theme: 'dark',
-  createTask: (title) => {
-    const task: ProductTask = {
-      id: taskId(),
-      title: title.trim() || 'Untitled work',
-      createdAt: new Date().toISOString(),
-      status: 'active',
-    };
-    set((state) => ({ tasks: [task, ...state.tasks], selectedTaskId: task.id }));
-    return task;
-  },
   upsertTasks: (tasks) => set((state) => {
     const next = new Map(state.tasks.map((task) => [task.id, task]));
     tasks.forEach((task) => next.set(task.id, task));
