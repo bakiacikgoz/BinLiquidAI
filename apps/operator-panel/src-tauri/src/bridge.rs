@@ -236,6 +236,7 @@ artifact_bridge_command!(bridge_product_project_update, "project.update");
 artifact_bridge_command!(bridge_product_project_archive, "project.archive");
 artifact_bridge_command!(bridge_product_task_list, "task.list");
 artifact_bridge_command!(bridge_product_task_create, "task.create");
+artifact_bridge_command!(bridge_product_task_update, "task.update");
 artifact_bridge_command!(bridge_product_task_message_add, "task.message.add");
 artifact_bridge_command!(bridge_product_task_message_list, "task.message.list");
 artifact_bridge_command!(bridge_product_task_link_add, "task.link.add");
@@ -2976,6 +2977,9 @@ pub async fn bridge_assistant_start_turn(
     fallback_provider_id: Option<String>,
     model: Option<String>,
     hf_model_id: Option<String>,
+    reasoning_effort: Option<String>,
+    speed_profile: Option<String>,
+    approval_profile: Option<String>,
 ) -> BridgeResult<AssistantStartTurnPayload> {
     let config = trusted_artifact_command_config(&config);
     let assistant_turn_id = match normalize_assistant_turn_id(&assistant_turn_id) {
@@ -3043,6 +3047,33 @@ pub async fn bridge_assistant_start_turn(
         Ok(value) => value,
         Err(error) => return BridgeResult::err(error),
     };
+    let reasoning_effort = match normalize_runtime_choice(
+        reasoning_effort.as_deref(),
+        "medium",
+        &["low", "medium", "high", "very_high"],
+        "reasoning_effort",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let speed_profile = match normalize_runtime_choice(
+        speed_profile.as_deref(),
+        "standard",
+        &["standard", "fast"],
+        "speed_profile",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
+    let approval_profile = match normalize_runtime_choice(
+        approval_profile.as_deref(),
+        "risk_based",
+        &["always_ask", "risk_based", "policy_automatic"],
+        "approval_profile",
+    ) {
+        Ok(value) => value,
+        Err(error) => return BridgeResult::err(error),
+    };
 
     let resource_dir = app_resource_dir(&app);
     let resolved = match resolve_cli_command(&config, resource_dir.as_deref()) {
@@ -3093,6 +3124,9 @@ pub async fn bridge_assistant_start_turn(
         fallback_provider_id.as_deref(),
         model.as_deref(),
         hf_model_id.as_deref(),
+        &reasoning_effort,
+        &speed_profile,
+        &approval_profile,
         &artifact_root,
         &identity,
     );
@@ -3425,6 +3459,25 @@ fn normalize_assistant_prompt(
     Ok(normalized.to_string())
 }
 
+fn normalize_runtime_choice(
+    value: Option<&str>,
+    default: &str,
+    allowed: &[&str],
+    field: &str,
+) -> Result<String, BridgeError> {
+    let normalized = value.unwrap_or(default).trim();
+    if allowed.contains(&normalized) {
+        return Ok(normalized.to_string());
+    }
+    Err(BridgeError::new(
+        "INVALID_INPUT",
+        format!("{field} is not supported"),
+        "",
+        "assistant start",
+        false,
+    ))
+}
+
 fn build_assistant_turn_args(
     config: &BridgeConfig,
     prompt_path: &Path,
@@ -3436,6 +3489,9 @@ fn build_assistant_turn_args(
     fallback_provider_id: Option<&str>,
     model: Option<&str>,
     hf_model_id: Option<&str>,
+    reasoning_effort: &str,
+    speed_profile: &str,
+    approval_profile: &str,
     artifact_root: &Path,
     identity: &TrustedArtifactIdentity,
 ) -> Vec<String> {
@@ -3470,6 +3526,9 @@ fn build_assistant_turn_args(
     push_optional_arg(&mut args, "--fallback-provider-id", fallback_provider_id);
     push_optional_arg(&mut args, "--model", model);
     push_optional_arg(&mut args, "--hf-model-id", hf_model_id);
+    push_optional_arg(&mut args, "--reasoning-effort", Some(reasoning_effort));
+    push_optional_arg(&mut args, "--speed-profile", Some(speed_profile));
+    push_optional_arg(&mut args, "--approval-profile", Some(approval_profile));
     args
 }
 
@@ -4986,6 +5045,9 @@ mod tests {
             None,
             None,
             None,
+            "high",
+            "fast",
+            "always_ask",
             Path::new("C:/tmp/artifacts"),
             &identity,
         );
@@ -5009,6 +5071,15 @@ mod tests {
         assert!(args
             .windows(2)
             .any(|pair| pair[0] == "--profile" && pair[1] == "enterprise"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--reasoning-effort" && pair[1] == "high"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--speed-profile" && pair[1] == "fast"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair[0] == "--approval-profile" && pair[1] == "always_ask"));
 
         let preview = format_assistant_command_preview("imperaos", &[], &args);
         assert!(preview.contains("[compiled_prompt_file]"));

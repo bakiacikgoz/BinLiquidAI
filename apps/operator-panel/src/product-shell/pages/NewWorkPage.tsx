@@ -63,9 +63,13 @@ export function NewWorkPage() {
       setError('');
       const selectedProjectId = projectId || (await productWorkspaceClient.getOrCreateProject('Operator work')).projectId;
       const assistantSessionId = `product-session-${crypto.randomUUID()}`;
-      const task = await productWorkspaceClient.createTask(selectedProjectId, message, assistantSessionId);
+      const task = await productWorkspaceClient.createTask(selectedProjectId, message, assistantSessionId, {
+        reasoningEffort: runtimeSettings.reasoningEffort ?? 'medium',
+        speedProfile: runtimeSettings.speedProfile ?? 'standard',
+        approvalProfile: runtimeSettings.approvalProfile ?? 'risk_based',
+      });
       await productWorkspaceClient.addMessage(task.taskId, 'user', message);
-      upsertTasks([{ id: task.taskId, title: task.title, createdAt: task.createdAtUtc, status: task.status === 'completed' ? 'completed' : 'active', assistantSessionId: task.assistantSessionId ?? undefined }]);
+      upsertTasks([{ id: task.taskId, title: task.title, createdAt: task.createdAtUtc, status: task.status, assistantSessionId: task.assistantSessionId ?? undefined, reasoningEffort: task.reasoningEffort, speedProfile: task.speedProfile, approvalProfile: task.approvalProfile }]);
       navigate(`/task/${task.taskId}`, { state: { initialMessage: message, runtimeSettings, controls } });
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create governed work.'); }
   };

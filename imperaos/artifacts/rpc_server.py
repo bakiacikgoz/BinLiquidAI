@@ -59,6 +59,7 @@ _MUTATION_METHODS_WITH_KEYS = {
     ArtifactRpcMethod.PROJECT_UPDATE,
     ArtifactRpcMethod.PROJECT_ARCHIVE,
     ArtifactRpcMethod.TASK_CREATE,
+    ArtifactRpcMethod.TASK_UPDATE,
     ArtifactRpcMethod.TASK_MESSAGE_ADD,
     ArtifactRpcMethod.TASK_LINK_ADD,
     ArtifactRpcMethod.PREFERENCES_SET,
@@ -408,6 +409,9 @@ class ArtifactRpcServer:
                 )
             }
         if request.method is ArtifactRpcMethod.TASK_CREATE:
+            runtime = params.get("runtime")
+            if runtime is not None and not isinstance(runtime, dict):
+                raise ValueError("task runtime is invalid")
             return _json_mapping(
                 self.product_workspace.create_task(
                     workspace_id,
@@ -417,6 +421,23 @@ class ArtifactRpcServer:
                     if isinstance(params.get("assistantSessionId"), str)
                     else None,
                     request.idempotency_key,
+                    runtime,
+                )
+            )
+        if request.method is ArtifactRpcMethod.TASK_UPDATE:
+            status = params.get("status")
+            runtime = params.get("runtime")
+            if status is not None and not isinstance(status, str):
+                raise ValueError("task status is invalid")
+            if runtime is not None and not isinstance(runtime, dict):
+                raise ValueError("task runtime is invalid")
+            return _json_mapping(
+                self.product_workspace.update_task(
+                    workspace_id,
+                    _required_string(params, "taskId"),
+                    status=status,
+                    runtime_options=runtime,
+                    idempotency_key=request.idempotency_key,
                 )
             )
         if request.method is ArtifactRpcMethod.TASK_MESSAGE_ADD:

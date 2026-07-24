@@ -8,7 +8,7 @@ import subprocess
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import typer
 
@@ -1331,6 +1331,9 @@ def _assistant_turn_events(
     fallback_provider_id: str | None,
     model: str | None,
     hf_model_id: str | None,
+    reasoning_effort: Literal["low", "medium", "high", "very_high"] = "medium",
+    speed_profile: Literal["standard", "fast"] = "standard",
+    approval_profile: Literal["always_ask", "risk_based", "policy_automatic"] = "risk_based",
     artifact_root: Path | None = None,
     artifact_workspace_id: str | None = None,
     artifact_principal_id: str | None = None,
@@ -1366,7 +1369,23 @@ def _assistant_turn_events(
                 },
             }
         ]
-    context = {"session_id": session_id}
+    effort_directives = {
+        "low": "Use concise reasoning and state only the key operational conclusions.",
+        "medium": "Use balanced reasoning with enough detail to support the conclusion.",
+        "high": "Reason carefully through the evidence before presenting a detailed answer.",
+        "very_high": (
+            "Perform a rigorous step-by-step analysis, surface uncertainty, "
+            "and verify conclusions before answering."
+        ),
+    }
+    directive = effort_directives[reasoning_effort]
+    prompt = f"[Trusted runtime reasoning directive: {directive}]\n\n{prompt}"
+    context = {
+        "session_id": session_id,
+        "reasoning_effort": reasoning_effort,
+        "speed_profile": speed_profile,
+        "approval_profile": approval_profile,
+    }
     context.update(_model_selection_context(config=config, source_map=source_map))
     artifact_request = extract_artifact_context_request(prompt)
     artifact_runtime_present = bool(
@@ -1385,6 +1404,62 @@ def _assistant_turn_events(
                     "message": "Governed artifact assistant context is unavailable.",
                 },
             }
+        ]
+    if speed_profile == "fast" and artifact_request is not None:
+        return [
+            {
+                "event": "error",
+                "data": {
+                    "code": "SPEED_PROFILE_UNSUPPORTED_FOR_ARTIFACT_TOOLS",
+                    "message": (
+                        "Fast routing is unavailable when governed artifact tools are requested."
+                    ),
+                },
+            }
+        ]
+    if approval_profile == "always_ask":
+        governance_runtime = getattr(orchestrator, "governance_runtime", None)
+        if governance_runtime is None:
+            return [
+                {
+                    "event": "error",
+                    "data": {
+                        "code": "APPROVAL_PROFILE_UNAVAILABLE",
+                        "message": "Always-ask approval requires the governed runtime.",
+                    },
+                }
+            ]
+        decision, ticket = governance_runtime.request_manual_task_approval(
+            run_id=turn_id,
+            task_type="chat",
+            user_input=prompt,
+            reason_code="ASSISTANT_APPROVAL_PROFILE_ALWAYS_ASK",
+            explain="The operator selected always-ask approval for this assistant task.",
+        )
+        if ticket is None:
+            return [
+                {
+                    "event": "error",
+                    "data": {
+                        "code": "APPROVAL_PROFILE_UNAVAILABLE",
+                        "message": "The governed runtime could not create the required approval.",
+                    },
+                }
+            ]
+        return [
+            {"event": "policy_decision", "data": decision.model_dump(mode="json")},
+            {
+                "event": "approval_pending",
+                "data": {
+                    "approvalId": ticket.approval_id,
+                    "title": "Assistant task approval required",
+                    "status": "pending",
+                    "risk": "medium",
+                    "summary": (
+                        "The selected approval profile requires review before the task runs."
+                    ),
+                },
+            },
         ]
     if artifact_runtime_present:
         if artifact_root is None or artifact_workspace_id is None or artifact_principal_id is None:
@@ -1453,7 +1528,11 @@ def _assistant_turn_events(
             }
         )
         return events
-    result = orchestrator.process(prompt, session_context=context, use_router=True)
+    result = (
+        orchestrator.process_fast_chat(prompt, session_context=context, stream=False)
+        if speed_profile == "fast"
+        else orchestrator.process(prompt, session_context=context, use_router=True)
+    )
     events: list[dict[str, object]] = []
     for trace_event in orchestrator.trace_events(result.trace_id):
         stage = str(trace_event.get("stage", "status"))
@@ -1761,6 +1840,15 @@ def assistant_turn(
     ),
     model: str | None = typer.Option(None, "--model", help="Model override"),
     hf_model_id: str | None = typer.Option(None, "--hf-model-id", help="HF model override"),
+    reasoning_effort: Literal["low", "medium", "high", "very_high"] = typer.Option(
+        "medium", "--reasoning-effort", help="Trusted reasoning budget"
+    ),
+    speed_profile: Literal["standard", "fast"] = typer.Option(
+        "standard", "--speed-profile", help="Router execution profile"
+    ),
+    approval_profile: Literal["always_ask", "risk_based", "policy_automatic"] = typer.Option(
+        "risk_based", "--approval-profile", help="Never broadens policy authority"
+    ),
     stream_json: bool = typer.Option(False, "--stream-json", help="Emit assistant JSONL events"),
     artifact_root: Annotated[
         Path | None, typer.Option("--artifact-root", help="Governed artifact root")
@@ -1795,6 +1883,9 @@ def assistant_turn(
         fallback_provider_id=fallback_provider_id,
         model=model,
         hf_model_id=hf_model_id,
+        reasoning_effort=reasoning_effort,
+        speed_profile=speed_profile,
+        approval_profile=approval_profile,
         artifact_root=artifact_root,
         artifact_workspace_id=artifact_workspace_id,
         artifact_principal_id=artifact_principal_id,
@@ -1816,7 +1907,7 @@ def assistant_turn(
             typer.echo(json.dumps(payload, ensure_ascii=False, sort_keys=True))
         else:
             _emit_payload(payload, json_output=True)
-    if not saw_final:
+    if not saw_final and not any(str(event.get("event")) == "approval_pending" for event in events):
         raise typer.Exit(code=1)
 
 

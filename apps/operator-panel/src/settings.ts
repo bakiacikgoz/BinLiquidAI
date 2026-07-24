@@ -10,6 +10,9 @@ export interface AssistantRuntimeSettings {
   assistantFallbackProvider: string;
   assistantModel: string;
   assistantHfModelId: string;
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'very_high';
+  speedProfile?: 'standard' | 'fast';
+  approvalProfile?: 'always_ask' | 'risk_based' | 'policy_automatic';
 }
 
 export interface PanelSettings {
@@ -28,6 +31,9 @@ export interface PanelSettings {
   assistantFallbackProvider: string;
   assistantModel: string;
   assistantHfModelId: string;
+  reasoningEffort: 'low' | 'medium' | 'high' | 'very_high';
+  speedProfile: 'standard' | 'fast';
+  approvalProfile: 'always_ask' | 'risk_based' | 'policy_automatic';
 }
 
 export const SETTINGS_KEY = `${PRODUCT_IDENTITY.slug}.operator.settings.v1`;
@@ -37,6 +43,9 @@ export const DEFAULT_ASSISTANT_RUNTIME_SETTINGS: AssistantRuntimeSettings = {
   assistantFallbackProvider: '',
   assistantModel: '',
   assistantHfModelId: '',
+  reasoningEffort: 'medium',
+  speedProfile: 'standard',
+  approvalProfile: 'risk_based',
 };
 
 export const DEFAULT_OPERATOR_ID = 'local-operator';
@@ -54,6 +63,9 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   debugRaw: false,
   theme: 'system',
   ...DEFAULT_ASSISTANT_RUNTIME_SETTINGS,
+  reasoningEffort: 'medium',
+  speedProfile: 'standard',
+  approvalProfile: 'risk_based',
 };
 
 const MODEL_TOKEN_PATTERN = /^[A-Za-z0-9._:/@+-]+$/;
@@ -77,6 +89,9 @@ export function getAssistantRuntimeSettings(settings: PanelSettings): AssistantR
     assistantFallbackProvider: settings.assistantFallbackProvider,
     assistantModel: settings.assistantModel,
     assistantHfModelId: settings.assistantHfModelId,
+    reasoningEffort: settings.reasoningEffort,
+    speedProfile: settings.speedProfile,
+    approvalProfile: settings.approvalProfile,
   };
 }
 
@@ -87,6 +102,9 @@ export function assistantRuntimeOptionsFromSettings(settings: PanelSettings): {
   fallbackProviderId?: string;
   model?: string;
   hfModelId?: string;
+  reasoningEffort: 'low' | 'medium' | 'high' | 'very_high';
+  speedProfile: 'standard' | 'fast';
+  approvalProfile: 'always_ask' | 'risk_based' | 'policy_automatic';
 } {
   const provider = cleanRuntimeValue(settings.assistantProvider);
   const legacyProviders = new Set(['auto', 'ollama', 'transformers']);
@@ -98,6 +116,9 @@ export function assistantRuntimeOptionsFromSettings(settings: PanelSettings): {
     fallbackProviderId: fallbackProvider && !legacyProviders.has(fallbackProvider) ? fallbackProvider : undefined,
     model: cleanRuntimeValue(settings.assistantModel) || undefined,
     hfModelId: cleanRuntimeValue(settings.assistantHfModelId) || undefined,
+    reasoningEffort: settings.reasoningEffort ?? 'medium',
+    speedProfile: settings.speedProfile ?? 'standard',
+    approvalProfile: settings.approvalProfile ?? 'risk_based',
   };
 }
 
@@ -141,6 +162,12 @@ export function loadSettings(): PanelSettings {
         typeof parsed.assistantFallbackProvider === 'string' ? parsed.assistantFallbackProvider : '',
       assistantModel: typeof parsed.assistantModel === 'string' ? parsed.assistantModel : '',
       assistantHfModelId: typeof parsed.assistantHfModelId === 'string' ? parsed.assistantHfModelId : '',
+      reasoningEffort: ['low', 'medium', 'high', 'very_high'].includes(String(parsed.reasoningEffort))
+        ? parsed.reasoningEffort as PanelSettings['reasoningEffort'] : 'medium',
+      speedProfile: ['standard', 'fast'].includes(String(parsed.speedProfile))
+        ? parsed.speedProfile as PanelSettings['speedProfile'] : 'standard',
+      approvalProfile: ['always_ask', 'risk_based', 'policy_automatic'].includes(String(parsed.approvalProfile))
+        ? parsed.approvalProfile as PanelSettings['approvalProfile'] : 'risk_based',
     };
     delete (loaded as PanelSettings & { assistantOpenAiApiKey?: unknown }).assistantOpenAiApiKey;
     delete (loaded as PanelSettings & { assistantDeepSeekApiKey?: unknown }).assistantDeepSeekApiKey;

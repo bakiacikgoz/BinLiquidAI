@@ -8,7 +8,7 @@ import { BottomDock } from '../bottom-dock/BottomDock';
 import { ContextRail } from '../context-rail/ContextRail';
 import { ProductConversationView } from '../conversation/ProductConversationView';
 import { useProductAssistant } from '../adapters/useProductAssistant';
-import { productWorkspaceClient } from '../adapters/productWorkspaceClient';
+import { productWorkspaceClient, type ProductWorkspaceTask } from '../adapters/productWorkspaceClient';
 import { useProductShellStore, type ProductTask } from '../state/productShellStore';
 import { WorkSurface } from '../workspace/WorkSurface';
 import { WorkspaceTabs } from '../workspace/WorkspaceTabs';
@@ -41,6 +41,25 @@ function runtimeSettingsFromNavigation(value: unknown): AssistantRuntimeSettings
     assistantFallbackProvider: source.assistantFallbackProvider as string,
     assistantModel: source.assistantModel as string,
     assistantHfModelId: source.assistantHfModelId as string,
+    reasoningEffort: ['low', 'medium', 'high', 'very_high'].includes(String(source.reasoningEffort))
+      ? source.reasoningEffort as AssistantRuntimeSettings['reasoningEffort'] : 'medium',
+    speedProfile: ['standard', 'fast'].includes(String(source.speedProfile))
+      ? source.speedProfile as AssistantRuntimeSettings['speedProfile'] : 'standard',
+    approvalProfile: ['always_ask', 'risk_based', 'policy_automatic'].includes(String(source.approvalProfile))
+      ? source.approvalProfile as AssistantRuntimeSettings['approvalProfile'] : 'risk_based',
+  };
+}
+
+function shellTask(task: ProductWorkspaceTask): ProductTask {
+  return {
+    id: task.taskId,
+    title: task.title,
+    createdAt: task.createdAtUtc,
+    status: task.status,
+    assistantSessionId: task.assistantSessionId ?? undefined,
+    reasoningEffort: task.reasoningEffort,
+    speedProfile: task.speedProfile,
+    approvalProfile: task.approvalProfile,
   };
 }
 
@@ -72,6 +91,7 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const navigate = useNavigate();
   const contextRailOpen = useProductShellStore((state) => state.contextRailOpen);
   const setContextRailOpen = useProductShellStore((state) => state.setContextRailOpen);
+  const upsertTasks = useProductShellStore((state) => state.upsertTasks);
   const assistant = useProductAssistant(task);
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>([]);
   const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(null);
@@ -87,6 +107,12 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     profile: settings.profile,
     provider: modelProvider,
   });
+  const taskRuntimeSettings: AssistantRuntimeSettings = {
+    ...getAssistantRuntimeSettings(settings),
+    reasoningEffort: task.reasoningEffort ?? 'medium',
+    speedProfile: task.speedProfile ?? 'standard',
+    approvalProfile: task.approvalProfile ?? 'risk_based',
+  };
 
   useEffect(() => {
     const state = location.state as InitialTaskNavigationState;
@@ -96,10 +122,10 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     navigate(location.pathname, { replace: true, state: null });
     void assistant.actions.send(
       initialMessage,
-      runtimeSettingsFromNavigation(state?.runtimeSettings),
+      runtimeSettingsFromNavigation(state?.runtimeSettings) ?? taskRuntimeSettings,
       controlsFromNavigation(state?.controls),
     );
-  }, [assistant.actions, location.pathname, location.state, navigate]);
+  }, [assistant.actions, location.pathname, location.state, navigate, taskRuntimeSettings]);
 
   useEffect(() => {
     assistant.state.turns.forEach((turn) => {
@@ -120,6 +146,16 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
       saveSettings(updated);
       return updated;
     });
+    const runtime = {
+      reasoningEffort: next.reasoningEffort ?? taskRuntimeSettings.reasoningEffort ?? 'medium',
+      speedProfile: next.speedProfile ?? taskRuntimeSettings.speedProfile ?? 'standard',
+      approvalProfile: next.approvalProfile ?? taskRuntimeSettings.approvalProfile ?? 'risk_based',
+    };
+    if (next.reasoningEffort || next.speedProfile || next.approvalProfile) {
+      void productWorkspaceClient.updateTask(task.id, { runtime })
+        .then((updated) => upsertTasks([shellTask(updated)]))
+        .catch(() => undefined);
+    }
   };
   const send = async (
     message: string,
@@ -145,7 +181,8 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
       return next;
     });
   };
-  return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">ACTIVE TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
-    <div className="ps-task-grid"><div className="ps-task-center"><ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} onOpenArtifacts={() => openWorkspaceTab('artifacts')} /><AssistantComposer label="Governed assistant" placeholder="Describe the next outcome…" sendLabel="Send" disabled={running} statusLabel={assistant.state.status} runtimeSettings={getAssistantRuntimeSettings(settings)} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)} onCancel={() => void assistant.actions.cancel()} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => openWorkspaceTab('artifacts')} onOpenTerminal={() => openWorkspaceTab('terminal')} onOpenBrowser={() => openWorkspaceTab('browser')} onOpenPreview={() => openWorkspaceTab('preview')} /><WorkspaceTabs tabs={workspaceTabs} activeTabId={activeWorkspaceTabId} assistantState={assistant.state} onActivate={setActiveWorkspaceTabId} onClose={closeWorkspaceTab} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} state={assistant.state} />}</div>
+  const readOnly = task.status === 'archived';
+  return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">{task.status.toUpperCase()} TASK</p><h1>{task.title}</h1></div><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></header>
+    <div className="ps-task-grid"><div className="ps-task-center">{readOnly && <p className="ps-archive-banner" role="status">This task is archived and read-only.</p>}<ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} onOpenArtifacts={() => openWorkspaceTab('artifacts')} onRegenerate={(turnId) => void assistant.actions.regenerate(turnId, taskRuntimeSettings)} /><AssistantComposer label="Governed assistant" placeholder="Describe the next outcome…" sendLabel="Send" disabled={running || readOnly} statusLabel={assistant.state.status} runtimeSettings={taskRuntimeSettings} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)} onCancel={() => void (async () => { await assistant.actions.cancel(); const updated = await productWorkspaceClient.updateTask(task.id, { status: 'cancelled' }); upsertTasks([shellTask(updated)]); })()} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => openWorkspaceTab('artifacts')} onOpenTerminal={() => openWorkspaceTab('terminal')} onOpenBrowser={() => openWorkspaceTab('browser')} onOpenPreview={() => openWorkspaceTab('preview')} /><WorkspaceTabs tabs={workspaceTabs} activeTabId={activeWorkspaceTabId} assistantState={assistant.state} onActivate={setActiveWorkspaceTabId} onClose={closeWorkspaceTab} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} state={assistant.state} />}</div>
   </section>;
 }

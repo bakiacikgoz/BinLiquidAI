@@ -32,12 +32,24 @@ class ProjectPage(StrictModel):
     next_cursor: str | None = Field(default=None, alias="nextCursor")
 
 
-class ProductTask(StrictModel):
+class TaskRuntimeOptions(StrictModel):
+    reasoning_effort: Literal["low", "medium", "high", "very_high"] = Field(
+        default="medium", alias="reasoningEffort"
+    )
+    speed_profile: Literal["standard", "fast"] = Field(default="standard", alias="speedProfile")
+    approval_profile: Literal["always_ask", "risk_based", "policy_automatic"] = Field(
+        default="risk_based", alias="approvalProfile"
+    )
+
+
+class ProductTask(TaskRuntimeOptions):
     task_id: str = Field(alias="taskId")
     workspace_id: str = Field(alias="workspaceId")
     project_id: str = Field(alias="projectId")
     title: str = Field(min_length=1, max_length=500)
-    status: Literal["active", "completed", "archived"] = "active"
+    status: Literal[
+        "draft", "active", "awaiting_approval", "completed", "failed", "cancelled", "archived"
+    ] = "active"
     assistant_session_id: str | None = Field(default=None, alias="assistantSessionId")
     assistant_turn_id: str | None = Field(default=None, alias="assistantTurnId")
     team_job_id: str | None = Field(default=None, alias="teamJobId")

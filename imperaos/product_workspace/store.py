@@ -33,7 +33,10 @@ class ProductWorkspaceStore:
               ON product_projects(workspace_id, updated_at_utc DESC);
             CREATE TABLE IF NOT EXISTS product_tasks (
               task_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL,
-              title TEXT NOT NULL, status TEXT NOT NULL, assistant_session_id TEXT,
+              title TEXT NOT NULL, status TEXT NOT NULL,
+              reasoning_effort TEXT NOT NULL DEFAULT 'medium',
+              speed_profile TEXT NOT NULL DEFAULT 'standard',
+              approval_profile TEXT NOT NULL DEFAULT 'risk_based', assistant_session_id TEXT,
               assistant_turn_id TEXT,
               team_job_id TEXT, created_at_utc TEXT NOT NULL, updated_at_utc TEXT NOT NULL,
               FOREIGN KEY(project_id) REFERENCES product_projects(project_id));
@@ -88,3 +91,16 @@ class ProductWorkspaceStore:
                 updated_at_utc DESC)"""
             )
             db.execute("INSERT OR IGNORE INTO product_schema_migrations(version) VALUES (3)")
+            task_columns = {
+                row["name"]
+                for row in db.execute("PRAGMA table_info(product_tasks)").fetchall()
+            }
+            task_additions = {
+                "reasoning_effort": "TEXT NOT NULL DEFAULT 'medium'",
+                "speed_profile": "TEXT NOT NULL DEFAULT 'standard'",
+                "approval_profile": "TEXT NOT NULL DEFAULT 'risk_based'",
+            }
+            for name, definition in task_additions.items():
+                if name not in task_columns:
+                    db.execute(f"ALTER TABLE product_tasks ADD COLUMN {name} {definition}")
+            db.execute("INSERT OR IGNORE INTO product_schema_migrations(version) VALUES (4)")

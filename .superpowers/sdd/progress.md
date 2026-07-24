@@ -29,9 +29,11 @@
 
 - Complete: sidebar loading, project selection, real first task/message persistence, task-session routing and global search use governed sources.
 - Complete: task composer uses the existing model inventory/runtime transport and carries validated context/tool controls into the first turn.
+- Complete: effort, speed and approval-profile choices persist with each task, traverse the governed bridge, and affect CLI execution. Fast selects the fast-chat router path; always-ask creates a governance approval or fails closed; automatic never broadens policy authority.
 - Complete: persisted transcript projection avoids duplicate runtime turns; assistant artifacts open the governed workspace tab.
 - Complete: sidebar project pages use bounded cursor pagination, durable pin/archive/manual ordering and native folder registration through opaque tickets; no renderer or sidecar response carries the local path.
-- Remaining: effort/speed/approval-profile task options and the complete message action set.
+- Complete: conversation copy, cancel and regenerate actions are wired to the native clipboard, assistant cancellation and governed runtime respectively.
+- Remaining: the complete message action set beyond these core actions.
 
 ## Phase 7 — Workspace and artifacts
 

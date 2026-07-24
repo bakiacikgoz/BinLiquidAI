@@ -137,6 +137,9 @@ describe('assistant runtime settings', () => {
       fallbackProviderId: undefined,
       model: undefined,
       hfModelId: undefined,
+      reasoningEffort: 'medium',
+      speedProfile: 'standard',
+      approvalProfile: 'risk_based',
     });
   });
 

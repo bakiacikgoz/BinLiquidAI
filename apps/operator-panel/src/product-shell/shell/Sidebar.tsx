@@ -31,8 +31,11 @@ export function Sidebar() {
         id: task.taskId,
         title: task.title,
         createdAt: task.createdAtUtc,
-        status: task.status === 'completed' ? 'completed' : 'active',
+        status: task.status,
         assistantSessionId: task.assistantSessionId ?? undefined,
+        reasoningEffort: task.reasoningEffort,
+        speedProfile: task.speedProfile,
+        approvalProfile: task.approvalProfile,
       }))));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load governed projects.');

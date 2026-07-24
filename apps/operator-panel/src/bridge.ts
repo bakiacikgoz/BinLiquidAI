@@ -963,6 +963,9 @@ export async function startAssistantTurn(
     fallbackProviderId: options.fallbackProviderId,
     model: options.model,
     hfModelId: options.hfModelId,
+    reasoningEffort: options.reasoningEffort,
+    speedProfile: options.speedProfile,
+    approvalProfile: options.approvalProfile,
   });
 }
 

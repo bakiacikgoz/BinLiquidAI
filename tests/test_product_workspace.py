@@ -74,6 +74,41 @@ def test_project_registration_never_persists_or_returns_its_folder_ticket(tmp_pa
     assert "folder-ticket-opaque-123" not in project.model_dump_json(by_alias=True)
 
 
+def test_task_runtime_options_and_cancelled_status_survive_restart(tmp_path):
+    database = tmp_path / "product.sqlite3"
+    service = ProductWorkspaceService(ProductWorkspaceStore(database))
+    project = service.create_project("workspace-a", "Release")
+    task = service.create_task(
+        "workspace-a",
+        project.project_id,
+        "Prepare release",
+        "session-a",
+        runtime_options={
+            "reasoningEffort": "high",
+            "speedProfile": "fast",
+            "approvalProfile": "always_ask",
+        },
+    )
+    assert task.reasoning_effort == "high"
+    assert task.speed_profile == "fast"
+    assert task.approval_profile == "always_ask"
+
+    updated = service.update_task(
+        "workspace-a",
+        task.task_id,
+        status="cancelled",
+        runtime_options={"reasoningEffort": "very_high"},
+    )
+    assert updated.status == "cancelled"
+    assert updated.reasoning_effort == "very_high"
+    assert updated.speed_profile == "fast"
+
+    reopened = ProductWorkspaceService(ProductWorkspaceStore(database))
+    restored = reopened.list_tasks("workspace-a", project.project_id)[0]
+    assert restored.status == "cancelled"
+    assert restored.approval_profile == "always_ask"
+
+
 def test_project_list_rpc_respects_the_bounded_page_contract(tmp_path):
     server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
     server.product_workspace.create_project("workspace-a", "First")
@@ -155,6 +190,54 @@ def test_project_register_update_and_archive_are_workspace_scoped_rpc_mutations(
     assert archived.ok
     assert archived.result["status"] == "archived"
     assert archived.result["archivedAtUtc"] is not None
+
+
+def test_task_create_rpc_carries_typed_runtime_options(tmp_path):
+    server = ArtifactRpcServer(ArtifactService(tmp_path / "artifacts"))
+    project = server.product_workspace.create_project("workspace-a", "Release")
+    response = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="task-create-runtime-1",
+            method=ArtifactRpcMethod.TASK_CREATE,
+            workspaceId="workspace-a",
+            principal=RpcPrincipal(principalId="operator-a", principalType="user"),
+            idempotencyKey="task-create-runtime-1",
+            params={
+                "projectId": project.project_id,
+                "title": "Prepare release",
+                "assistantSessionId": "session-a",
+                "runtime": {
+                    "reasoningEffort": "high",
+                    "speedProfile": "fast",
+                    "approvalProfile": "always_ask",
+                },
+                "idempotencyKey": "task-create-runtime-1",
+            },
+        )
+    )
+    assert response.ok
+    assert response.result["reasoningEffort"] == "high"
+    assert response.result["speedProfile"] == "fast"
+    assert response.result["approvalProfile"] == "always_ask"
+
+    cancelled = server.handle_request(
+        RpcRequest(
+            contractVersion="1.0",
+            requestId="task-update-runtime-1",
+            method=ArtifactRpcMethod.TASK_UPDATE,
+            workspaceId="workspace-a",
+            principal=RpcPrincipal(principalId="operator-a", principalType="user"),
+            idempotencyKey="task-update-runtime-1",
+            params={
+                "taskId": response.result["taskId"],
+                "status": "cancelled",
+                "idempotencyKey": "task-update-runtime-1",
+            },
+        )
+    )
+    assert cancelled.ok
+    assert cancelled.result["status"] == "cancelled"
 
 
 def test_product_workspace_rpc_reuses_the_artifact_sidecar(tmp_path):

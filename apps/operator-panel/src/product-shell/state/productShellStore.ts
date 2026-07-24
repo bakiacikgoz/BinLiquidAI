@@ -5,8 +5,11 @@ export type ProductTask = {
   id: string;
   title: string;
   createdAt: string;
-  status: 'active' | 'completed';
+  status: 'draft' | 'active' | 'awaiting_approval' | 'completed' | 'failed' | 'cancelled' | 'archived';
   assistantSessionId?: string;
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'very_high';
+  speedProfile?: 'standard' | 'fast';
+  approvalProfile?: 'always_ask' | 'risk_based' | 'policy_automatic';
 };
 
 type ProductShellState = {

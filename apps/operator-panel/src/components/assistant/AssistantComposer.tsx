@@ -172,6 +172,11 @@ export function AssistantComposer({
         locale={locale}
         onRuntimeSettingsChange={onRuntimeSettingsChange}
       />
+      <div className="assistant-runtime-profiles" aria-label="Assistant runtime profiles">
+        <label>Reasoning effort<select aria-label="Reasoning effort" value={runtimeSettings.reasoningEffort ?? 'medium'} onChange={(event) => onRuntimeSettingsChange({ reasoningEffort: event.target.value as NonNullable<AssistantRuntimeSettings['reasoningEffort']> })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="very_high">Very high</option></select></label>
+        <label>Speed<select aria-label="Speed profile" value={runtimeSettings.speedProfile ?? 'standard'} onChange={(event) => onRuntimeSettingsChange({ speedProfile: event.target.value as NonNullable<AssistantRuntimeSettings['speedProfile']> })}><option value="standard">Standard</option><option value="fast">Fast</option></select></label>
+        <label>Approval<select aria-label="Approval profile" value={runtimeSettings.approvalProfile ?? 'risk_based'} onChange={(event) => onRuntimeSettingsChange({ approvalProfile: event.target.value as NonNullable<AssistantRuntimeSettings['approvalProfile']> })}><option value="always_ask">Always ask</option><option value="risk_based">Risk based</option><option value="policy_automatic">Within policy boundaries</option></select></label>
+      </div>
       {validationMessage ? (
         <p className="assistant-runtime-validation" role="alert">
           {translateAssistantText(validationMessage, locale)}

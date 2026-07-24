@@ -7,7 +7,15 @@ from hashlib import sha256
 from typing import Any
 from uuid import uuid4
 
-from .models import Preference, ProductLink, ProductMessage, ProductTask, Project, ProjectPage
+from .models import (
+    Preference,
+    ProductLink,
+    ProductMessage,
+    ProductTask,
+    Project,
+    ProjectPage,
+    TaskRuntimeOptions,
+)
 from .store import ProductWorkspaceStore
 
 
@@ -354,6 +362,44 @@ class ProductWorkspaceService:
             )
         return archived
 
+    @staticmethod
+    def _task_from_row(row: Any) -> ProductTask:
+        return ProductTask(
+            taskId=row["task_id"],
+            workspaceId=row["workspace_id"],
+            projectId=row["project_id"],
+            title=row["title"],
+            status=row["status"],
+            reasoningEffort=row["reasoning_effort"],
+            speedProfile=row["speed_profile"],
+            approvalProfile=row["approval_profile"],
+            assistantSessionId=row["assistant_session_id"],
+            assistantTurnId=row["assistant_turn_id"],
+            teamJobId=row["team_job_id"],
+            createdAtUtc=row["created_at_utc"],
+            updatedAtUtc=row["updated_at_utc"],
+        )
+
+    @staticmethod
+    def _runtime_options(
+        runtime_options: dict[str, Any] | None,
+        current: TaskRuntimeOptions | None = None,
+    ) -> TaskRuntimeOptions:
+        values = (
+            {
+                "reasoningEffort": current.reasoning_effort,
+                "speedProfile": current.speed_profile,
+                "approvalProfile": current.approval_profile,
+            }
+            if current
+            else {}
+        )
+        if runtime_options is not None:
+            if not isinstance(runtime_options, dict):
+                raise ValueError("task runtime options are invalid")
+            values.update(runtime_options)
+        return TaskRuntimeOptions.model_validate(values)
+
     def create_task(
         self,
         workspace_id: str,
@@ -361,12 +407,15 @@ class ProductWorkspaceService:
         title: str,
         assistant_session_id: str | None = None,
         idempotency_key: str | None = None,
+        runtime_options: dict[str, Any] | None = None,
     ) -> ProductTask:
         now = _now()
+        runtime = self._runtime_options(runtime_options)
         payload = {
             "projectId": project_id,
             "title": title,
             "assistantSessionId": assistant_session_id,
+            "runtime": runtime.model_dump(mode="json", by_alias=True),
         }
         with self.store.connect() as db:
             replay = self._replay_mutation(
@@ -387,18 +436,27 @@ class ProductWorkspaceService:
                 workspaceId=workspace_id,
                 projectId=project_id,
                 title=title,
+                reasoningEffort=runtime.reasoning_effort,
+                speedProfile=runtime.speed_profile,
+                approvalProfile=runtime.approval_profile,
                 assistantSessionId=assistant_session_id,
                 createdAtUtc=now,
                 updatedAtUtc=now,
             )
             db.execute(
-                "INSERT INTO product_tasks VALUES (?,?,?,?,?,?,?,?,?,?)",
+                """INSERT INTO product_tasks
+                (task_id,workspace_id,project_id,title,status,reasoning_effort,speed_profile,
+                approval_profile,assistant_session_id,assistant_turn_id,team_job_id,
+                created_at_utc,updated_at_utc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     task.task_id,
                     task.workspace_id,
                     task.project_id,
                     task.title,
                     task.status,
+                    task.reasoning_effort,
+                    task.speed_profile,
+                    task.approval_profile,
                     task.assistant_session_id,
                     None,
                     None,
@@ -411,6 +469,67 @@ class ProductWorkspaceService:
             )
         return task
 
+    def update_task(
+        self,
+        workspace_id: str,
+        task_id: str,
+        *,
+        status: str | None = None,
+        runtime_options: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
+    ) -> ProductTask:
+        if status is None and runtime_options is None:
+            raise ValueError("task update has no changes")
+        payload = {"taskId": task_id, "status": status, "runtime": runtime_options}
+        with self.store.connect() as db:
+            replay = self._replay_mutation(
+                db, workspace_id, "task.update", payload, idempotency_key
+            )
+            if replay is not None:
+                return ProductTask.model_validate(replay)
+            row = db.execute(
+                "SELECT * FROM product_tasks WHERE workspace_id=? AND task_id=?",
+                (workspace_id, task_id),
+            ).fetchone()
+            if row is None:
+                raise PermissionError("task is unavailable in this workspace")
+            current = self._task_from_row(row)
+            runtime = self._runtime_options(runtime_options, current)
+            updated = ProductTask(
+                taskId=current.task_id,
+                workspaceId=current.workspace_id,
+                projectId=current.project_id,
+                title=current.title,
+                status=status if status is not None else current.status,
+                reasoningEffort=runtime.reasoning_effort,
+                speedProfile=runtime.speed_profile,
+                approvalProfile=runtime.approval_profile,
+                assistantSessionId=current.assistant_session_id,
+                assistantTurnId=current.assistant_turn_id,
+                teamJobId=current.team_job_id,
+                createdAtUtc=current.created_at_utc,
+                updatedAtUtc=_now(),
+            )
+            db.execute(
+                """UPDATE product_tasks
+                SET status=?, reasoning_effort=?, speed_profile=?, approval_profile=?,
+                updated_at_utc=?
+                WHERE workspace_id=? AND task_id=?""",
+                (
+                    updated.status,
+                    updated.reasoning_effort,
+                    updated.speed_profile,
+                    updated.approval_profile,
+                    updated.updated_at_utc.isoformat(),
+                    workspace_id,
+                    task_id,
+                ),
+            )
+            self._remember_mutation(
+                db, workspace_id, "task.update", payload, idempotency_key, updated
+            )
+        return updated
+
     def list_tasks(self, workspace_id: str, project_id: str) -> list[ProductTask]:
         with self.store.connect() as db:
             rows = db.execute(
@@ -418,21 +537,7 @@ class ProductWorkspaceService:
                 "ORDER BY updated_at_utc DESC",
                 (workspace_id, project_id),
             ).fetchall()
-        return [
-            ProductTask(
-                taskId=r["task_id"],
-                workspaceId=r["workspace_id"],
-                projectId=r["project_id"],
-                title=r["title"],
-                status=r["status"],
-                assistantSessionId=r["assistant_session_id"],
-                assistantTurnId=r["assistant_turn_id"],
-                teamJobId=r["team_job_id"],
-                createdAtUtc=r["created_at_utc"],
-                updatedAtUtc=r["updated_at_utc"],
-            )
-            for r in rows
-        ]
+        return [self._task_from_row(row) for row in rows]
 
     def add_message(
         self,

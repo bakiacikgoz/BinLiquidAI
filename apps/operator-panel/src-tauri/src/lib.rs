@@ -97,6 +97,7 @@ pub fn run() {
             bridge::bridge_product_project_archive,
             bridge::bridge_product_task_list,
             bridge::bridge_product_task_create,
+            bridge::bridge_product_task_update,
             bridge::bridge_product_task_message_add,
             bridge::bridge_product_task_message_list,
             bridge::bridge_product_task_link_add,

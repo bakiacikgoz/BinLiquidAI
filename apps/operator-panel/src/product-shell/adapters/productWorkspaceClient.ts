@@ -12,13 +12,19 @@ const project = z.object({
   manualOrder: z.number().int().nonnegative().default(0),
   createdAtUtc: z.string(), updatedAtUtc: z.string(), archivedAtUtc: z.string().nullable().default(null),
 }).strict();
-const task = z.object({ taskId: z.string(), workspaceId: z.string(), projectId: z.string(), title: z.string(), status: z.string(), assistantSessionId: z.string().nullable(), assistantTurnId: z.string().nullable(), teamJobId: z.string().nullable(), createdAtUtc: z.string(), updatedAtUtc: z.string() }).strict();
+const taskRuntime = z.object({
+  reasoningEffort: z.enum(['low', 'medium', 'high', 'very_high']).default('medium'),
+  speedProfile: z.enum(['standard', 'fast']).default('standard'),
+  approvalProfile: z.enum(['always_ask', 'risk_based', 'policy_automatic']).default('risk_based'),
+}).strict();
+const task = z.object({ taskId: z.string(), workspaceId: z.string(), projectId: z.string(), title: z.string(), status: z.enum(['draft', 'active', 'awaiting_approval', 'completed', 'failed', 'cancelled', 'archived']), ...taskRuntime.shape, assistantSessionId: z.string().nullable(), assistantTurnId: z.string().nullable(), teamJobId: z.string().nullable(), createdAtUtc: z.string(), updatedAtUtc: z.string() }).strict();
 const folderSelection = z.object({
   cancelled: z.boolean(), folderTicket: z.string().nullable(), displayName: z.string().nullable(),
 }).strict();
 
 export type ProductWorkspaceTask = z.infer<typeof task>;
 export type ProductWorkspaceProject = z.infer<typeof project>;
+export type ProductTaskRuntimeOptions = z.infer<typeof taskRuntime>;
 
 export class ProductWorkspaceClient {
   private async call<T>(command: string, params: Record<string, unknown>, schema: z.ZodType<T>, idempotencyKey: string | null = null): Promise<T> {
@@ -67,7 +73,10 @@ export class ProductWorkspaceClient {
       ?? this.createProject(title);
   }
   listTasks(projectId: string) { return this.call('bridge_product_task_list', { projectId }, z.object({ tasks: z.array(task) }).strict()); }
-  createTask(projectId: string, title: string, assistantSessionId?: string) { return this.call('bridge_product_task_create', { projectId, title, assistantSessionId }, task, `task-${crypto.randomUUID()}`); }
+  createTask(projectId: string, title: string, assistantSessionId?: string, runtime?: ProductTaskRuntimeOptions) { return this.call('bridge_product_task_create', { projectId, title, assistantSessionId, runtime }, task, `task-${crypto.randomUUID()}`); }
+  updateTask(taskId: string, changes: { status?: ProductWorkspaceTask['status']; runtime?: Partial<ProductTaskRuntimeOptions> }) {
+    return this.call('bridge_product_task_update', { taskId, ...changes }, task, `task-update-${crypto.randomUUID()}`);
+  }
   addMessage(taskId: string, role: 'user' | 'assistant' | 'system', body: string) {
     return this.call('bridge_product_task_message_add', { taskId, role, body }, z.object({ messageId: z.string(), workspaceId: z.string(), taskId: z.string(), role: z.string(), body: z.string(), createdAtUtc: z.string() }).strict(), `message-${crypto.randomUUID()}`);
   }

@@ -35,6 +35,7 @@ class ArtifactRpcMethod(StrEnum):
     PROJECT_ARCHIVE = "project.archive"
     TASK_LIST = "task.list"
     TASK_CREATE = "task.create"
+    TASK_UPDATE = "task.update"
     TASK_MESSAGE_ADD = "task.message.add"
     TASK_MESSAGE_LIST = "task.message.list"
     TASK_LINK_ADD = "task.link.add"

@@ -23,6 +23,10 @@ The UI Lab source remains unchanged.
   `rootRef` and display name.
 - New work persists the initial user message, routes to the durable task ID,
   and starts the assistant session with the selected governed composer options.
+- Task reasoning effort, speed and approval profile persist in the product
+  workspace. Fast selects the CLI fast-chat router path; always-ask requires a
+  governance ticket and fails closed if one cannot be issued; policy-automatic
+  does not widen the existing policy decision.
 - Existing Artifact Workspace controllers and all seven artifact editors remain
   canonical. Product-shell tabs host the Artifact Workspace, PTY terminals,
   native browser and registered preview surfaces.
@@ -44,15 +48,15 @@ The UI Lab source remains unchanged.
 - Operator Panel lint and production build passed.
 - Native browser policy unit tests: 3 passed.
 - Native terminal policy/control tests: 2 passed; `cargo check` passed.
-- Targeted Product Workspace and Artifact RPC Python tests: 7 passed; Ruff passed.
-- Targeted Product Shell client/sidebar tests: 5 passed; lint and production
+- Targeted Product Workspace, Artifact RPC and assistant CLI Python tests: 13
+  passed; Ruff passed.
+- Targeted Product Shell task/runtime tests: 16 passed; lint and production
   build passed.
 - Native library tests: 60 passed, including the opaque folder-ticket test.
 
 ## Explicitly open before V2 plan completion
 
-- Durable effort/speed/approval-profile task options and the full message action
-  set.
+- The remaining message action set beyond copy, cancel and regenerate.
 - Terminal attachment to the registered project root and browser
   bounds/overlay/download-save coordination.
 - Full branch/run/evidence context, data/files surfaces and collection-detail

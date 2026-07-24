@@ -42,6 +42,9 @@ export interface AssistantStartTurnOptions {
   fallbackProviderId?: string;
   model?: string;
   hfModelId?: string;
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'very_high';
+  speedProfile?: 'standard' | 'fast';
+  approvalProfile?: 'always_ask' | 'risk_based' | 'policy_automatic';
   dataClassHint?: 'public' | 'internal' | 'confidential' | 'regulated';
 }
 

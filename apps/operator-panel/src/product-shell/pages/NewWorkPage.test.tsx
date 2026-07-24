@@ -49,7 +49,9 @@ describe('NewWorkPage', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Project' }), 'project-existing');
     await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
 
-    expect(workspace.createTask).toHaveBeenCalledWith('project-existing', 'Prepare a release', expect.stringMatching(/^product-session-/));
+    expect(workspace.createTask).toHaveBeenCalledWith('project-existing', 'Prepare a release', expect.stringMatching(/^product-session-/), {
+      reasoningEffort: 'medium', speedProfile: 'standard', approvalProfile: 'risk_based',
+    });
     expect(workspace.addMessage).toHaveBeenCalledWith('task-1', 'user', 'Prepare a release');
     expect(workspace.getOrCreateProject).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith('/task/task-1', {

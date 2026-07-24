@@ -121,6 +121,9 @@ def test_assistant_turn_streams_contract_events(tmp_path: Path, monkeypatch) -> 
         assert kwargs["session_id"] == "session-1"
         assert kwargs["turn_id"] == "turn-1"
         assert kwargs["prompt"] == "Summarize the selected run."
+        assert kwargs["reasoning_effort"] == "high"
+        assert kwargs["speed_profile"] == "fast"
+        assert kwargs["approval_profile"] == "risk_based"
         return [
             {
                 "event": "delta",
@@ -148,6 +151,12 @@ def test_assistant_turn_streams_contract_events(tmp_path: Path, monkeypatch) -> 
             "--prompt-file",
             str(prompt_path),
             "--stream-json",
+            "--reasoning-effort",
+            "high",
+            "--speed-profile",
+            "fast",
+            "--approval-profile",
+            "risk_based",
         ],
     )
 
