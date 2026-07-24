@@ -23,3 +23,16 @@ existing Operator Panel bridge, assistant runtime and Artifact Workspace.
 The source's tokens and surface grammar are recreated in the scoped
 `.imperaos-product-shell-v2` namespace, preventing a global CSS collision with the legacy
 panel while preserving its information density and dark/light palette.
+
+## Integration status
+
+Implemented on this branch: the Product Shell/router/preferences; workspace-scoped SQLite
+projects, tasks, messages, links and preferences; the existing sidecar/Tauri clients; real
+task search; governed assistant session correlation; durable user transcript reads; and a
+user-started native PTY/xterm surface.
+
+Still required before the V2 plan can be considered complete: full governed Artifact Workspace
+tab hosting, approved browser/preview child-webview isolation, collection/settings adapters,
+complete assistant message action persistence, and all end-to-end/release checks specified by
+the plan. This manifest deliberately records those as open rather than treating a scaffold as
+completion.
