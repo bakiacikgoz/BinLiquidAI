@@ -76,6 +76,16 @@ fn normalize_agent_domain(value: &str) -> Result<String, String> {
 }
 
 impl BrowserPolicyState {
+    pub fn with_runtime_preview_origins() -> Self {
+        let state = Self::default();
+        // The desktop dev runtime owns this port through tauri.conf.json; no
+        // renderer input can extend the preview registry.
+        if cfg!(debug_assertions) {
+            let _ = state.register_preview_origin("http://localhost:5173");
+        }
+        state
+    }
+
     /// Called only by trusted runtime/deployment-policy code. This deliberately
     /// has no Tauri command so renderer code cannot forge a preview origin.
     pub fn register_preview_origin(&self, origin_value: &str) -> Result<(), String> {
@@ -123,6 +133,18 @@ impl BrowserPolicyState {
             .map_err(|_| "BROWSER_POLICY_DENIED: policy unavailable")?
             .insert(task_id.to_owned(), normalized);
         Ok(())
+    }
+
+    pub fn preview_origins(&self) -> Result<Vec<String>, String> {
+        let mut origins = self
+            .preview_origins
+            .lock()
+            .map_err(|_| "BROWSER_POLICY_DENIED: policy unavailable")?
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        origins.sort();
+        Ok(origins)
     }
 }
 
@@ -303,6 +325,13 @@ fn open_browser_window(
 }
 
 #[tauri::command]
+pub fn browser_list_preview_origins(
+    state: tauri::State<'_, BrowserPolicyState>,
+) -> Result<Vec<String>, String> {
+    state.preview_origins()
+}
+
+#[tauri::command]
 pub fn browser_open(
     app: AppHandle,
     state: tauri::State<'_, BrowserPolicyState>,
@@ -373,6 +402,7 @@ mod tests {
             &url("http://127.0.0.1:4173/path")
         ));
         assert!(state.register_preview_origin("http://localhost").is_err());
+        assert_eq!(state.preview_origins().unwrap(), ["http://localhost:4173"]);
     }
 
     #[test]
