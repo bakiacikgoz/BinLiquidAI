@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAssistantModels } from '../../assistant/useAssistantModels';
 import type { AssistantProviderKind } from '../../assistant/modelDiscovery';
@@ -19,6 +19,7 @@ import { productWorkspaceClient, type ProductWorkspaceProject } from '../adapter
 export function NewWorkPage() {
   const upsertTasks = useProductShellStore((state) => state.upsertTasks);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
   const [projects, setProjects] = useState<ProductWorkspaceProject[]>([]);
   const [projectId, setProjectId] = useState('');
@@ -35,12 +36,17 @@ export function NewWorkPage() {
     let active = true;
     void productWorkspaceClient.listProjects().then(({ projects }) => {
       if (!active) return;
-      setProjects(projects.filter((project) => project.status !== 'archived'));
+      const activeProjects = projects.filter((project) => project.status !== 'archived');
+      setProjects(activeProjects);
+      const requestedProjectId = searchParams.get('project');
+      if (requestedProjectId && activeProjects.some((project) => project.projectId === requestedProjectId)) {
+        setProjectId(requestedProjectId);
+      }
     }).catch((cause) => {
       if (active) setError(cause instanceof Error ? cause.message : 'Could not load governed projects.');
     });
     return () => { active = false; };
-  }, []);
+  }, [searchParams]);
   const updateRuntimeSettings = (next: Partial<AssistantRuntimeSettings>) => {
     setSettings((current) => {
       const updated = { ...current, ...next };
