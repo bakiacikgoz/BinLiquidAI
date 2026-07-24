@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Composer } from '../composer/Composer';
+import { useAssistantModels } from '../../assistant/useAssistantModels';
+import type { AssistantProviderKind } from '../../assistant/modelDiscovery';
+import type { AssistantComposerControls } from '../../assistant/assistantTypes';
+import { AssistantComposer } from '../../components/assistant/AssistantComposer';
+import {
+  getAssistantRuntimeSettings,
+  loadSettings,
+  resolveLocale,
+  saveSettings,
+  type AssistantRuntimeSettings,
+  type PanelSettings,
+} from '../../settings';
 import { useProductShellStore } from '../state/productShellStore';
 import { productWorkspaceClient, type ProductWorkspaceProject } from '../adapters/productWorkspaceClient';
 
@@ -11,6 +22,15 @@ export function NewWorkPage() {
   const [error, setError] = useState('');
   const [projects, setProjects] = useState<ProductWorkspaceProject[]>([]);
   const [projectId, setProjectId] = useState('');
+  const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
+  const modelProvider = settings.assistantProvider.trim()
+    ? settings.assistantProvider.trim() as AssistantProviderKind
+    : 'all';
+  const modelDiscovery = useAssistantModels({
+    settings,
+    profile: settings.profile,
+    provider: modelProvider,
+  });
   useEffect(() => {
     let active = true;
     void productWorkspaceClient.listProjects().then(({ projects }) => {
@@ -21,7 +41,18 @@ export function NewWorkPage() {
     });
     return () => { active = false; };
   }, []);
-  const start = async (message: string) => {
+  const updateRuntimeSettings = (next: Partial<AssistantRuntimeSettings>) => {
+    setSettings((current) => {
+      const updated = { ...current, ...next };
+      saveSettings(updated);
+      return updated;
+    });
+  };
+  const start = async (
+    message: string,
+    runtimeSettings: AssistantRuntimeSettings,
+    controls: AssistantComposerControls,
+  ) => {
     try {
       setError('');
       const selectedProjectId = projectId || (await productWorkspaceClient.getOrCreateProject('Operator work')).projectId;
@@ -29,8 +60,8 @@ export function NewWorkPage() {
       const task = await productWorkspaceClient.createTask(selectedProjectId, message, assistantSessionId);
       await productWorkspaceClient.addMessage(task.taskId, 'user', message);
       upsertTasks([{ id: task.taskId, title: task.title, createdAt: task.createdAtUtc, status: task.status === 'completed' ? 'completed' : 'active', assistantSessionId: task.assistantSessionId ?? undefined }]);
-      navigate(`/task/${task.taskId}`, { state: { initialMessage: message } });
+      navigate(`/task/${task.taskId}`, { state: { initialMessage: message, runtimeSettings, controls } });
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create governed work.'); }
   };
-  return <section className="ps-new-work"><div><p className="ps-eyebrow">GOVERNED OPERATOR WORKSPACE</p><h1>What should ImperaOS help you accomplish?</h1><p>Plan a task, inspect the evidence, and route changes through the existing approval and artifact controls.</p><label>Project<select aria-label="Project" value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Default governed project (create if needed)</option>{projects.map((project) => <option key={project.projectId} value={project.projectId}>{project.title}</option>)}</select></label>{error && <p role="alert">{error}</p>}</div><Composer onSend={(message) => void start(message)} /></section>;
+  return <section className="ps-new-work"><div><p className="ps-eyebrow">GOVERNED OPERATOR WORKSPACE</p><h1>What should ImperaOS help you accomplish?</h1><p>Plan a task, inspect the evidence, and route changes through the existing approval and artifact controls.</p><label>Project<select aria-label="Project" value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Default governed project (create if needed)</option>{projects.map((project) => <option key={project.projectId} value={project.projectId}>{project.title}</option>)}</select></label>{error && <p role="alert">{error}</p>}</div><AssistantComposer label="Governed assistant" placeholder="Describe the outcome you need…" sendLabel="Start work" disabled={false} runtimeSettings={getAssistantRuntimeSettings(settings)} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void start(message, runtimeSettings, controls)} /></section>;
 }

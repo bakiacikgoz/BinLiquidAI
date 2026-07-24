@@ -34,9 +34,13 @@ describe('TaskPage', () => {
   });
 
   it('sends the persisted first prompt exactly once after task navigation', async () => {
-    renderOperatorPanel(<MemoryRouter initialEntries={[{ pathname: '/task/task-1', state: { initialMessage: 'Prepare a release' } }]}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter>);
+    const runtimeSettings = {
+      assistantProvider: 'ollama', assistantFallbackProvider: '', assistantModel: 'qwen3.5:4b', assistantHfModelId: '',
+    };
+    const controls = { contextAttachmentKinds: ['artifact_summary'], toolIntents: ['inspect_run'] };
+    renderOperatorPanel(<MemoryRouter initialEntries={[{ pathname: '/task/task-1', state: { initialMessage: 'Prepare a release', runtimeSettings, controls } }]}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter>);
 
-    await waitFor(() => expect(assistant.actions.send).toHaveBeenCalledWith('Prepare a release'));
+    await waitFor(() => expect(assistant.actions.send).toHaveBeenCalledWith('Prepare a release', runtimeSettings, controls));
     expect(workspace.addMessage).not.toHaveBeenCalledWith('task-1', 'user', 'Prepare a release');
   });
 });

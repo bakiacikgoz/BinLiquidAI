@@ -22,7 +22,40 @@ import {
   type PanelSettings,
 } from '../../settings';
 
-type InitialTaskNavigationState = { initialMessage?: unknown } | null;
+type InitialTaskNavigationState = {
+  initialMessage?: unknown;
+  runtimeSettings?: unknown;
+  controls?: unknown;
+} | null;
+
+function runtimeSettingsFromNavigation(value: unknown): AssistantRuntimeSettings | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const source = value as Record<string, unknown>;
+  const keys: Array<keyof AssistantRuntimeSettings> = [
+    'assistantProvider', 'assistantFallbackProvider', 'assistantModel', 'assistantHfModelId',
+  ];
+  if (!keys.every((key) => typeof source[key] === 'string')) return undefined;
+  return {
+    assistantProvider: source.assistantProvider as string,
+    assistantFallbackProvider: source.assistantFallbackProvider as string,
+    assistantModel: source.assistantModel as string,
+    assistantHfModelId: source.assistantHfModelId as string,
+  };
+}
+
+function controlsFromNavigation(value: unknown): AssistantComposerControls | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const source = value as Record<string, unknown>;
+  const attachmentKinds = ['active_run', 'event_tail', 'approval_summary', 'artifact_summary', 'system_health'] as const;
+  const toolIntents = ['inspect_run', 'summarize_events', 'explain_policy_blocker', 'draft_remediation_plan', 'prepare_approval_review'] as const;
+  if (!Array.isArray(source.contextAttachmentKinds) || !Array.isArray(source.toolIntents)
+    || !source.contextAttachmentKinds.every((item) => attachmentKinds.includes(item as typeof attachmentKinds[number]))
+    || !source.toolIntents.every((item) => toolIntents.includes(item as typeof toolIntents[number]))) return undefined;
+  return {
+    contextAttachmentKinds: source.contextAttachmentKinds as AssistantComposerControls['contextAttachmentKinds'],
+    toolIntents: source.toolIntents as AssistantComposerControls['toolIntents'],
+  };
+}
 
 export function TaskPage() {
   const { taskId } = useParams();
@@ -59,7 +92,11 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     if (!initialMessage || initialTurnStarted.current) return;
     initialTurnStarted.current = true;
     navigate(location.pathname, { replace: true, state: null });
-    void assistant.actions.send(initialMessage);
+    void assistant.actions.send(
+      initialMessage,
+      runtimeSettingsFromNavigation(state?.runtimeSettings),
+      controlsFromNavigation(state?.controls),
+    );
   }, [assistant.actions, location.pathname, location.state, navigate]);
 
   useEffect(() => {
