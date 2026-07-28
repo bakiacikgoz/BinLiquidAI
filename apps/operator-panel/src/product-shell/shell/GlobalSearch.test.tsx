@@ -37,7 +37,9 @@ describe('GlobalSearch', () => {
   it('opens a matching durable task route', async () => {
     const { user } = renderOperatorPanel(<MemoryRouter><GlobalSearch /></MemoryRouter>);
 
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
     await user.type(screen.getByRole('textbox', { name: 'Search' }), 'quarterly');
+    expect(document.querySelector('.modal-backdrop .search-modal')).not.toBeNull();
     const result = await screen.findByRole('button', { name: /Quarterly release plan/ });
     await user.click(result);
 
@@ -46,10 +48,37 @@ describe('GlobalSearch', () => {
 
   it('focuses global search through the centralized platform shortcut', () => {
     renderOperatorPanel(<MemoryRouter><GlobalSearch /></MemoryRouter>);
-    const search = screen.getByRole('textbox', { name: 'Search' });
 
     fireEvent.keyDown(window, { key: 'k', metaKey: true });
 
+    const search = screen.getByRole('textbox', { name: 'Search' });
     expect(search).toHaveFocus();
+  });
+
+  it('reports an unavailable search instead of a normal empty result when every bridge fails', async () => {
+    workspace.listProjects.mockRejectedValue(new Error('workspace offline'));
+    artifactBridge.list.mockRejectedValue(new Error('artifact offline'));
+    bridge.fetchApprovals.mockRejectedValue(new Error('approvals offline'));
+    bridge.listControlPlaneAgents.mockRejectedValue(new Error('agents offline'));
+    renderOperatorPanel(<MemoryRouter><GlobalSearch /></MemoryRouter>);
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+
+    expect(await screen.findByText(/Arama kaynakları kullanılamıyor: çalışma alanı, artifact, onay, ajan/)).toBeInTheDocument();
+    expect(screen.queryByText('Yönetilen sonuç bulunamadı.')).not.toBeInTheDocument();
+  });
+
+  it('keeps available results and identifies missing sources during a partial bridge failure', async () => {
+    workspace.listProjects.mockRejectedValue(new Error('workspace offline'));
+    artifactBridge.list.mockResolvedValue({
+      items: [{ artifactId: 'artifact-design', title: 'Design system', kind: 'document', status: 'ready' }],
+      nextCursor: null,
+    });
+    const { user } = renderOperatorPanel(<MemoryRouter><GlobalSearch /></MemoryRouter>);
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    expect(await screen.findByText(/Kısmi arama · kullanılamayan kaynaklar: çalışma alanı/)).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), 'design');
+    expect(await screen.findByRole('button', { name: /Design system/ })).toBeInTheDocument();
   });
 });

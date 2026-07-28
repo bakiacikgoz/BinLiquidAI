@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { ArrowUpRight, Bot, FileText, RefreshCw, ShieldCheck } from 'lucide-react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { artifactBridge } from '../../artifact-workspace/artifactBridge';
@@ -24,6 +25,40 @@ function pendingApprovals(value: unknown): ApprovalRow[] {
       status: typeof row.status === 'string' ? row.status : 'pending',
     }] : [];
   });
+}
+
+function CollectionFrame({
+  icon: CollectionIcon,
+  eyebrow,
+  title,
+  description,
+  onRefresh,
+  error,
+  className = '',
+  children,
+}: {
+  icon: typeof FileText;
+  eyebrow: string;
+  title: string;
+  description: string;
+  onRefresh: () => void;
+  error: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <main className={`collection-page ${className}`.trim()}>
+      <header>
+        <span className="collection-icon"><CollectionIcon size={21} /></span>
+        <p>{eyebrow}</p>
+        <h1>{title}</h1>
+        <span>{description}</span>
+        <button type="button" className="collection-refresh" onClick={onRefresh}><RefreshCw size={15} />Refresh</button>
+        {error ? <p className="collection-error" role="alert">{error}</p> : null}
+      </header>
+      {children}
+    </main>
+  );
 }
 
 export function LibraryPage() {
@@ -54,7 +89,38 @@ export function LibraryPage() {
     void artifactBridge.get({ artifactId: selectedArtifactId }).then(setDetail)
       .catch((cause) => setError(cause instanceof Error ? cause.message : 'Artifact detail is unavailable.'));
   }, [selectedArtifactId]);
-  return <section className="ps-collection"><p className="ps-eyebrow">GOVERNED LIBRARY</p><h1>Library</h1><p>Artifacts are loaded from the existing governed Artifact Workspace, never from demo data.</p><button type="button" onClick={load}>Refresh</button>{error && <p role="alert">{error}</p>}<div className="ps-collection-grid"><div className="ps-collection-list">{items.map((item) => <button type="button" key={item.artifactId} className={selectedArtifactId === item.artifactId ? 'selected' : ''} onClick={() => setSelectedArtifactId(item.artifactId)}><strong>{item.title}</strong><span>{item.kind} · {item.status}</span></button>)}{!items.length && !error && <p className="ps-muted">No governed artifacts are available in this workspace.</p>}</div><article className="ps-collection-detail"><h2>{selectedArtifactId ?? 'No artifact selected'}</h2><pre>{detail ? JSON.stringify(detail, null, 2) : 'Select an artifact to inspect its canonical detail.'}</pre></article></div></section>;
+
+  return (
+    <CollectionFrame
+      icon={FileText}
+      eyebrow="ARTIFACT KÜTÜPHANESİ"
+      title="Çalışmaların, tek yerde."
+      description="Görevlerde üretilen belgeler, tablolar ve sunumlar."
+      onRefresh={load}
+      error={error}
+    >
+      <section className="collection-list">
+        {items.map((item) => (
+          <button
+            type="button"
+            key={item.artifactId}
+            className={selectedArtifactId === item.artifactId ? 'is-active' : ''}
+            onClick={() => setSelectedArtifactId(item.artifactId)}
+          >
+            <span className="collection-row-icon"><FileText size={18} /></span>
+            <div><strong>{item.title}</strong><small>{item.kind} · {item.status}</small></div>
+            <em>{item.status}</em>
+            <ArrowUpRight size={17} />
+          </button>
+        ))}
+        {!items.length && !error ? <p className="collection-empty">No governed artifacts are available in this workspace.</p> : null}
+      </section>
+      <article className="collection-detail-panel">
+        <h2>{selectedArtifactId ?? 'No artifact selected'}</h2>
+        <pre>{detail ? JSON.stringify(detail, null, 2) : 'Select an artifact to inspect its canonical detail.'}</pre>
+      </article>
+    </CollectionFrame>
+  );
 }
 
 export function ApprovalsPage() {
@@ -78,7 +144,8 @@ export function ApprovalsPage() {
   useEffect(load, [load]);
   useEffect(() => {
     if (!selected) { setDetail(null); return; }
-    void showApproval(settings, selected.approvalId).then(setDetail).catch((cause) => setError(cause instanceof Error ? cause.message : 'Approval detail is unavailable.'));
+    void showApproval(settings, selected.approvalId).then(setDetail)
+      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Approval detail is unavailable.'));
   }, [selected, settings]);
   const decide = async (approve: boolean) => {
     if (!selected || !settings.operatorId.trim()) return;
@@ -86,10 +153,43 @@ export function ApprovalsPage() {
     try {
       await decideApproval(settings, selected.approvalId, approve, settings.operatorId, 'product shell decision');
       load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Approval decision failed.'); }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Approval decision failed.');
+    }
   };
   const canDecide = Boolean(selected && settings.operatorId.trim());
-  return <section className="ps-collection"><p className="ps-eyebrow">GOVERNED APPROVALS</p><h1>Approvals</h1><p>Every approval decision uses the existing identity and approval bridge.</p><button type="button" onClick={load}>Refresh</button>{error && <p role="alert">{error}</p>}<div className="ps-collection-grid"><div className="ps-collection-list">{rows.map((row) => <button type="button" key={row.approvalId} className={selected?.approvalId === row.approvalId ? 'selected' : ''} onClick={() => setSelected(row)}><strong>{row.approvalId}</strong><span>{row.targetKind} · {row.status}</span></button>)}{!rows.length && !error && <p className="ps-muted">No pending approvals.</p>}</div><article className="ps-collection-detail"><h2>{selected?.approvalId ?? 'No approval selected'}</h2><pre>{detail ? JSON.stringify(detail, null, 2) : 'Select an approval to inspect its governed detail.'}</pre><div><button type="button" disabled={!canDecide} onClick={() => void decide(true)}>Approve</button><button type="button" disabled={!canDecide} onClick={() => void decide(false)}>Reject</button></div>{!settings.operatorId.trim() && <p className="ps-muted">Set an operator identity in Settings before deciding.</p>}</article></div></section>;
+
+  return (
+    <CollectionFrame
+      icon={ShieldCheck}
+      eyebrow="GOVERNANCE"
+      title="Onaylar"
+      description="İnsan kararı gerektiren işlemleri gözden geçirin."
+      onRefresh={load}
+      error={error}
+    >
+      <section className="collection-list">
+        {rows.map((row) => (
+          <button type="button" key={row.approvalId} className={selected?.approvalId === row.approvalId ? 'is-active' : ''} onClick={() => setSelected(row)}>
+            <span className="collection-row-icon"><ShieldCheck size={18} /></span>
+            <div><strong>{row.approvalId}</strong><small>{row.targetKind}</small></div>
+            <em>{row.status}</em>
+            <ArrowUpRight size={17} />
+          </button>
+        ))}
+        {!rows.length && !error ? <p className="collection-empty">No pending approvals.</p> : null}
+      </section>
+      <article className="collection-detail-panel">
+        <h2>{selected?.approvalId ?? 'No approval selected'}</h2>
+        <pre>{detail ? JSON.stringify(detail, null, 2) : 'Select an approval to inspect its governed detail.'}</pre>
+        <div className="collection-detail-actions">
+          <button type="button" disabled={!canDecide} onClick={() => void decide(true)}>Approve</button>
+          <button type="button" disabled={!canDecide} onClick={() => void decide(false)}>Reject</button>
+        </div>
+        {!settings.operatorId.trim() ? <p className="ps-muted">Set an operator identity in Settings before deciding.</p> : null}
+      </article>
+    </CollectionFrame>
+  );
 }
 
 export function AgentsPage() {
@@ -107,5 +207,20 @@ export function AgentsPage() {
   }, [settings]);
   useEffect(load, [load]);
   const requestedAgentId = searchParams.get('agent');
-  return <section className="ps-governed-agents"><div className="ps-collection"><p className="ps-eyebrow">GOVERNED AGENTS</p><button type="button" onClick={load}>Refresh registry</button>{error && <p role="alert">{error}</p>}</div><AgentRegistryView agents={agents} selectedAgentId={selectedAgentId ?? requestedAgentId} onSelectAgent={setSelectedAgentId} /></section>;
+
+  return (
+    <CollectionFrame
+      icon={Bot}
+      eyebrow="AJANLAR"
+      title="Çalışan ekip"
+      description="Uzman ajanlar ve görev durumları."
+      onRefresh={load}
+      error={error}
+      className="agents-collection-page"
+    >
+      <section className="collection-agent-registry">
+        <AgentRegistryView agents={agents} selectedAgentId={selectedAgentId ?? requestedAgentId} onSelectAgent={setSelectedAgentId} />
+      </section>
+    </CollectionFrame>
+  );
 }

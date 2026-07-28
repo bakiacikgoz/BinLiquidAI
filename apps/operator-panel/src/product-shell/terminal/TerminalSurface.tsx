@@ -48,5 +48,5 @@ export function TerminalSurface({ active = true, onClose, projectRootRef, projec
       .catch((cause) => setError(cause instanceof Error ? cause.message : 'Terminal interrupt failed.'));
   };
 
-  return <section className="ps-terminal" aria-label="Governed terminal"><header><strong>Terminal</strong><button type="button" onClick={interrupt}>Interrupt</button><button type="button" onClick={onClose}>Close</button></header><p className="ps-muted">User PTY · {projectRootRef ? `registered project root (${projectRootDisplayName || 'project'})` : 'verified ImperaOS runtime workspace'} · agent input denied</p>{error ? <p role="alert">{error}</p> : null}<div ref={hostRef} /></section>;
+  return <section className="terminal-view native-terminal-surface" aria-label="Governed terminal"><header><strong>Terminal</strong><button type="button" onClick={interrupt}>Interrupt</button><button type="button" onClick={onClose}>Close</button></header><p className="ps-muted">User PTY · {projectRootRef ? `registered project root (${projectRootDisplayName || 'project'})` : 'verified ImperaOS runtime workspace'} · agent input denied</p>{error ? <p role="alert">{error}</p> : null}<div className="terminal-host" ref={hostRef} /></section>;
 }

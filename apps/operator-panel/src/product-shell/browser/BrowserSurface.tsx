@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { ChevronLeft, ChevronRight, ExternalLink, RotateCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type BrowserHistoryState = { canBack: boolean; canForward: boolean };
@@ -98,5 +99,30 @@ export function BrowserSurface({ active = true, onClose, sessionLabel: persisted
     };
   }, [active, sessionLabel]);
 
-  return <section className="ps-browser" aria-label="Native browser"><header><strong>Browser</strong><button type="button" onClick={close}>Close</button></header><form onSubmit={(event) => { event.preventDefault(); void open(); }}><input aria-label="Browser address" value={address} onChange={(event) => setAddress(event.target.value)} inputMode="url" /><button type="submit">{sessionLabel ? 'Navigate HTTPS' : 'Open HTTPS'}</button></form><div><button type="button" disabled={!sessionLabel || !history.canBack} onClick={() => void move('back')}>Back</button><button type="button" disabled={!sessionLabel || !history.canForward} onClick={() => void move('forward')}>Forward</button><button type="button" disabled={!sessionLabel} onClick={reload}>Reload</button></div><div ref={viewportRef} className="ps-browser-viewport" aria-label="Browser page viewport" />{status && <p role="status">{status}</p>}<p>User mode opens only explicitly entered HTTPS URLs. Each explicit history target and every redirect is revalidated by native policy.</p></section>;
+  return (
+    <section className="browser-surface" aria-label="Native browser">
+      <div className="browser-toolbar">
+        <button type="button" aria-label="Back" disabled={!sessionLabel || !history.canBack} onClick={() => void move('back')}><ChevronLeft size={16} /></button>
+        <button type="button" aria-label="Forward" disabled={!sessionLabel || !history.canForward} onClick={() => void move('forward')}><ChevronRight size={16} /></button>
+        <button type="button" aria-label="Reload" disabled={!sessionLabel} onClick={reload}><RotateCw size={15} /></button>
+        <form className="browser-address-bar" onSubmit={(event) => { event.preventDefault(); void open(); }}>
+          <span className="browser-lock" aria-hidden="true">●</span>
+          <input
+            aria-label="Browser address"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            autoCapitalize="none"
+            autoCorrect="off"
+            inputMode="url"
+            spellCheck={false}
+          />
+          <button type="submit">{sessionLabel ? 'Navigate HTTPS' : 'Open HTTPS'}<ExternalLink size={14} /></button>
+        </form>
+        <button type="button" aria-label="Close" onClick={close}><X size={16} /></button>
+      </div>
+      <div ref={viewportRef} className="browser-page native-browser-viewport" aria-label="Browser page viewport" />
+      {status ? <p className="native-surface-status" role="status">{status}</p> : null}
+      <p className="native-policy-note">User mode opens only explicitly entered HTTPS URLs. Each explicit history target and every redirect is revalidated by native policy.</p>
+    </section>
+  );
 }

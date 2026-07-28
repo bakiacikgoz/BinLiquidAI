@@ -16,9 +16,37 @@ const workspace = vi.hoisted(() => ({ addLink: vi.fn(), addMessage: vi.fn(), get
 
 vi.mock('../adapters/useProductAssistant', () => ({ useProductAssistant: () => assistant }));
 vi.mock('../adapters/productWorkspaceClient', () => ({ productWorkspaceClient: workspace }));
-vi.mock('../workspace/WorkSurface', () => ({ WorkSurface: () => null }));
+vi.mock('../workspace/WorkSurface', () => ({
+  WorkSurface: ({
+    onOpenArtifacts,
+    onOpenTerminal,
+    onOpenBrowser,
+    onOpenPreview,
+  }: {
+    onOpenArtifacts: () => void;
+    onOpenTerminal: () => void;
+    onOpenBrowser: () => void;
+    onOpenPreview: () => void;
+  }) => <div>
+    <button type="button" onClick={onOpenArtifacts}>Open artifacts</button>
+    <button type="button" onClick={onOpenTerminal}>Open terminal</button>
+    <button type="button" onClick={onOpenBrowser}>Open browser</button>
+    <button type="button" onClick={onOpenPreview}>Open preview</button>
+  </div>,
+}));
 vi.mock('../workspace/ProductArtifactWorkspace', () => ({ ProductArtifactWorkspace: () => null }));
-vi.mock('../workspace/WorkspaceTabs', () => ({ WorkspaceTabs: ({ tabs }: { tabs: Array<{ title: string }> }) => <p>Workspace tabs: {tabs.map((tab) => tab.title).join(', ') || 'none'}</p> }));
+vi.mock('../workspace/WorkspaceTabs', () => ({
+  WorkspaceTabs: ({
+    tabs,
+    activeTabId,
+  }: {
+    tabs: Array<{ id: string; title: string }>;
+    activeTabId: string | null;
+  }) => <div>
+    <p>Workspace tabs: {tabs.map((tab) => tab.title).join(', ') || 'none'}</p>
+    <p>Active workspace tab: {tabs.find((tab) => tab.id === activeTabId)?.title ?? 'none'}</p>
+  </div>,
+}));
 
 import { renderOperatorPanel } from '../../test/render';
 import { useProductShellStore } from '../state/productShellStore';
@@ -49,6 +77,8 @@ describe('TaskPage', () => {
     const controls = { contextAttachmentKinds: ['artifact_summary'], toolIntents: ['inspect_run'] };
     renderOperatorPanel(<MemoryRouter initialEntries={[{ pathname: '/task/task-1', state: { initialMessage: 'Prepare a release', runtimeSettings, controls } }]}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter>);
 
+    expect(document.querySelector('main.task-page .task-layout .conversation-pane')).toBeInTheDocument();
+    expect(document.querySelector('.sticky-composer .composer-stack')).toBeInTheDocument();
     await waitFor(() => expect(assistant.actions.send).toHaveBeenCalledWith('Prepare a release', {
       ...runtimeSettings, reasoningEffort: 'medium', speedProfile: 'standard', approvalProfile: 'risk_based',
     }, controls));
@@ -84,6 +114,27 @@ describe('TaskPage', () => {
     renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1/workspace']}><Routes><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes></MemoryRouter>);
 
     expect(await screen.findByText('Workspace tabs: Artifacts')).toBeInTheDocument();
+    expect(screen.getByText('Active workspace tab: Artifacts')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['terminal', 'Terminal'],
+    ['browser', 'Browser'],
+    ['preview', 'Preview'],
+  ])('keeps an explicitly opened %s surface active after workspace navigation', async (buttonName, expectedTab) => {
+    const { user } = renderOperatorPanel(
+      <MemoryRouter initialEntries={['/task/task-1']}>
+        <Routes>
+          <Route path="/task/:taskId" element={<TaskPage />} />
+          <Route path="/task/:taskId/workspace" element={<TaskPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('button', { name: `Open ${buttonName}` }));
+
+    expect(await screen.findByText(`Workspace tabs: ${expectedTab}`)).toBeInTheDocument();
+    expect(screen.getByText(`Active workspace tab: ${expectedTab}`)).toBeInTheDocument();
   });
 
   it('persists completed assistant action references as durable task links', async () => {

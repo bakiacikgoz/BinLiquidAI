@@ -21,6 +21,9 @@ describe('WorkspaceTabs', () => {
 
     const { user } = renderOperatorPanel(<WorkspaceTabs tabs={[first, second]} activeTabId={second.id} assistantState={getAssistantFixture('running')} onActivate={onActivate} onClose={onClose} onUpdate={vi.fn()} />);
 
+    expect(document.querySelector('.workspace-tab-strip .workspace-tab-list')).toBeInTheDocument();
+    expect(document.querySelector('.workspace-tab.is-active')).toBeInTheDocument();
+    expect(document.querySelector('.surface-content')).toBeInTheDocument();
     expect(screen.getByText('Terminal surface runtime-root · active')).toBeInTheDocument();
     await user.click(screen.getAllByRole('tab', { name: 'Terminal' })[0]);
     await user.click(screen.getAllByRole('button', { name: 'Close Terminal' })[1]);

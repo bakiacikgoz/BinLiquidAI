@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { ChevronLeft, ChevronRight, RotateCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type BrowserHistoryState = { canBack: boolean; canForward: boolean };
@@ -103,5 +104,25 @@ export function PreviewSurface({ active = true, onClose, sessionLabel: persisted
       .catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Preview reload failed.'));
   };
 
-  return <section className="ps-browser" aria-label="Native preview"><header><strong>Preview</strong><button type="button" onClick={close}>Close</button></header><label>Registered local origin<select aria-label="Registered preview origin" value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">No verified origin</option>{origins.map((origin) => <option key={origin} value={origin}>{origin}</option>)}</select></label><div><button type="button" disabled={!selected} onClick={() => void open()}>{sessionLabel ? 'Navigate preview' : 'Open preview'}</button><button type="button" disabled={!sessionLabel || !history.canBack} onClick={() => void move('back')}>Back</button><button type="button" disabled={!sessionLabel || !history.canForward} onClick={() => void move('forward')}>Forward</button><button type="button" disabled={!sessionLabel} onClick={reload}>Reload</button></div><div ref={viewportRef} className="ps-browser-viewport" aria-label="Preview page viewport" />{status && <p role="status">{status}</p>}<p>Only ImperaOS runtime-registered localhost origins can be opened; arbitrary local ports and redirect targets outside the registry are denied.</p></section>;
+  return (
+    <section className="preview-surface" aria-label="Native preview">
+      <div className="preview-browser">
+        <button type="button" aria-label="Back" disabled={!sessionLabel || !history.canBack} onClick={() => void move('back')}><ChevronLeft size={16} /></button>
+        <button type="button" aria-label="Forward" disabled={!sessionLabel || !history.canForward} onClick={() => void move('forward')}><ChevronRight size={16} /></button>
+        <button type="button" aria-label="Reload" disabled={!sessionLabel} onClick={reload}><RotateCw size={15} /></button>
+        <label className="preview-origin-picker">
+          <span className="sr-only">Registered local origin</span>
+          <select aria-label="Registered preview origin" value={selected} onChange={(event) => setSelected(event.target.value)}>
+            <option value="">No verified origin</option>
+            {origins.map((origin) => <option key={origin} value={origin}>{origin}</option>)}
+          </select>
+        </label>
+        <button type="button" disabled={!selected} onClick={() => void open()}>{sessionLabel ? 'Navigate preview' : 'Open preview'}</button>
+        <button type="button" aria-label="Close" onClick={close}><X size={16} /></button>
+      </div>
+      <div ref={viewportRef} className="preview-hero native-preview-viewport" aria-label="Preview page viewport" />
+      {status ? <p className="native-surface-status" role="status">{status}</p> : null}
+      <p className="native-policy-note">Only ImperaOS runtime-registered localhost origins can be opened; arbitrary local ports and redirect targets outside the registry are denied.</p>
+    </section>
+  );
 }

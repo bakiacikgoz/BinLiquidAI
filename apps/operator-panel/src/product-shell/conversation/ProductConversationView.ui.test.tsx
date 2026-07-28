@@ -10,6 +10,25 @@ import { renderOperatorPanel } from '../../test/render';
 import { ProductConversationView } from './ProductConversationView';
 
 describe('ProductConversationView artifacts', () => {
+  it('renders durable turns with the UI Lab conversation hierarchy', async () => {
+    workspace.listMessages.mockResolvedValue({
+      messages: [
+        { messageId: 'message-user', role: 'user', body: 'Prepare release', createdAtUtc: '2026-07-25T00:00:00Z' },
+        { messageId: 'message-assistant', role: 'assistant', body: 'Release prepared', createdAtUtc: '2026-07-25T00:00:01Z' },
+      ],
+    });
+    workspace.listLinks.mockResolvedValue({ links: [] });
+    const { container } = renderOperatorPanel(
+      <ProductConversationView state={getAssistantFixture('welcome')} taskId="task-1" />,
+    );
+
+    expect(await screen.findByText('Prepare release')).toBeInTheDocument();
+    expect(container.querySelector('.conversation-view .conversation-inner')).toBeInTheDocument();
+    expect(container.querySelector('.user-message')).toBeInTheDocument();
+    expect(container.querySelector('.completion-message')).toBeInTheDocument();
+    expect(container.querySelector('.message-feedback')).toBeInTheDocument();
+  });
+
   it('opens an assistant-produced artifact in the governed workspace', async () => {
     workspace.listMessages.mockResolvedValue({ messages: [] });
     workspace.listLinks.mockResolvedValue({ links: [] });
@@ -60,5 +79,15 @@ describe('ProductConversationView artifacts', () => {
 
     expect(onOpenArtifacts).toHaveBeenCalledWith('artifact-release');
     expect(onOpenApproval).toHaveBeenCalledWith('approval-release');
+  });
+
+  it('surfaces durable conversation bridge failures instead of presenting a normal empty state', async () => {
+    workspace.listMessages.mockRejectedValue(new Error('Product workspace bridge unavailable'));
+    workspace.listLinks.mockResolvedValue({ links: [] });
+
+    renderOperatorPanel(<ProductConversationView state={getAssistantFixture('welcome')} taskId="task-1" />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Product workspace bridge unavailable');
+    expect(screen.queryByRole('heading', { name: 'Start governed work' })).not.toBeInTheDocument();
   });
 });

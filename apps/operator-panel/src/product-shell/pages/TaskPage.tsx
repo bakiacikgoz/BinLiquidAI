@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Folder } from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useAssistantModels } from '../../assistant/useAssistantModels';
@@ -103,7 +111,7 @@ export function TaskPage() {
     return () => { active = false; };
   }, [task, taskId, upsertTasks]);
   if (!taskId) return <Navigate to="/" replace />;
-  if (!task) return <section className="ps-empty" aria-live="polite"><h2>{loadError ? 'Task unavailable' : 'Loading governed task…'}</h2><p>{loadError || 'Restoring the durable task and its governed runtime context.'}</p>{loadError && <a href="#/">Return to new work</a>}</section>;
+  if (!task) return <section className="conversation-empty ps-empty" aria-live="polite"><h2>{loadError ? 'Task unavailable' : 'Loading governed task…'}</h2><p>{loadError || 'Restoring the durable task and its governed runtime context.'}</p>{loadError && <a href="#/">Return to new work</a>}</section>;
   return <TaskWorkspace key={task.id} task={task} />;
 }
 
@@ -111,12 +119,13 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const location = useLocation();
   const navigate = useNavigate();
   const contextRailOpen = useProductShellStore((state) => state.contextRailOpen);
-  const setContextRailOpen = useProductShellStore((state) => state.setContextRailOpen);
+  const dockOpen = useProductShellStore((state) => state.dockOpen);
   const upsertTasks = useProductShellStore((state) => state.upsertTasks);
   const projects = useProductShellStore((state) => state.projects);
   const assistant = useProductAssistant(task);
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>([]);
   const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(null);
+  const [conversationWidth, setConversationWidth] = useState(54);
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
   const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
   const persistedAssistantTurns = useRef(new Set<string>());
@@ -139,6 +148,7 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const projectRoot = task.projectId
     ? projects.find((project) => project.projectId === task.projectId)
     : undefined;
+  const hasWorkspace = location.pathname.endsWith('/workspace');
 
   useEffect(() => {
     const state = location.state as InitialTaskNavigationState;
@@ -218,7 +228,10 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
       setActiveWorkspaceTabId(next.id);
       return existing ? current.map((tab) => tab.id === existing.id ? next : tab) : [...current, next];
     });
-  }, []);
+    if (!location.pathname.endsWith('/workspace')) {
+      navigate(`/task/${task.id}/workspace`, { state: location.state });
+    }
+  }, [location.pathname, location.state, navigate, task.id]);
   const closeWorkspaceTab = (tabId: string) => {
     setWorkspaceTabs((current) => {
       const next = current.filter((tab) => tab.id !== tabId);
@@ -230,10 +243,118 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     setWorkspaceTabs((current) => current.map((tab) => tab.id === tabId ? { ...tab, ...changes } : tab));
   };
   useEffect(() => {
-    if (location.pathname.endsWith('/workspace')) openWorkspaceTab('artifacts');
-  }, [location.pathname, openWorkspaceTab]);
+    if (location.pathname.endsWith('/workspace') && !workspaceTabs.length && !activeWorkspaceTabId) {
+      openWorkspaceTab('artifacts');
+    }
+  }, [activeWorkspaceTabId, location.pathname, openWorkspaceTab, workspaceTabs.length]);
+  const resizeConversation = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const frame = event.currentTarget.parentElement;
+    if (!frame) return;
+    const move = (moveEvent: PointerEvent) => {
+      const box = frame.getBoundingClientRect();
+      const nextWidth = ((moveEvent.clientX - box.left) / box.width) * 100;
+      setConversationWidth(Math.min(65, Math.max(30, nextWidth)));
+    };
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  };
+  const resizeConversationWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 10 : 2;
+    if (event.key === 'ArrowLeft') setConversationWidth((current) => Math.max(30, current - step));
+    else if (event.key === 'ArrowRight') setConversationWidth((current) => Math.min(65, current + step));
+    else if (event.key === 'Home') setConversationWidth(30);
+    else if (event.key === 'End') setConversationWidth(65);
+    else return;
+    event.preventDefault();
+  };
   const readOnly = task.status === 'archived';
-  return <section className="ps-task"><header className="ps-topbar"><div><p className="ps-eyebrow">{task.status.toUpperCase()} TASK</p><h1>{task.title}</h1></div><div><button type="button" onClick={() => navigate(`/task/${task.id}/workspace`)}>Open workspace</button><button type="button" onClick={() => setContextRailOpen(!contextRailOpen)}>Context</button></div></header>
-    <div className="ps-task-grid"><div className="ps-task-center">{readOnly && <p className="ps-archive-banner" role="status">This task is archived and read-only.</p>}<ProductConversationView state={assistant.state} taskId={task.id} refreshToken={messageRefreshToken} onOpenArtifacts={(artifactId) => openWorkspaceTab('artifacts', artifactId)} onOpenApproval={(approvalId) => navigate(`/approvals?approval=${encodeURIComponent(approvalId)}`)} onRegenerate={(turnId) => void assistant.actions.regenerate(turnId, taskRuntimeSettings)} /><AssistantComposer label="Governed assistant" placeholder="Describe the next outcome…" sendLabel="Send" disabled={running || readOnly} statusLabel={assistant.state.status} runtimeSettings={taskRuntimeSettings} modelDiscovery={modelDiscovery} locale={resolveLocale(settings.locale)} onRuntimeSettingsChange={updateRuntimeSettings} onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)} onCancel={() => void (async () => { await assistant.actions.cancel(); const updated = await productWorkspaceClient.updateTask(task.id, { status: 'cancelled' }); upsertTasks([shellTask(updated)]); })()} /><WorkSurface taskTitle={task.title} onOpenArtifacts={() => openWorkspaceTab('artifacts')} onOpenTerminal={() => openWorkspaceTab('terminal')} onOpenBrowser={() => openWorkspaceTab('browser')} onOpenPreview={() => openWorkspaceTab('preview')} /><WorkspaceTabs tabs={workspaceTabs} activeTabId={activeWorkspaceTabId} assistantState={assistant.state} projectRootRef={projectRoot?.rootRef} projectRootDisplayName={projectRoot?.rootDisplayName} onActivate={setActiveWorkspaceTabId} onClose={closeWorkspaceTab} onUpdate={updateWorkspaceTab} /><BottomDock state={assistant.state} /></div>{contextRailOpen && <ContextRail task={task} state={assistant.state} />}</div>
-  </section>;
+  return (
+    <main className={`task-page${hasWorkspace ? ' is-workspace' : ''}`}>
+      <div className="task-stage">
+        <h1 className="sr-only">{task.title}</h1>
+        {readOnly ? <p className="ps-archive-banner" role="status">This task is archived and read-only.</p> : null}
+        <div className="task-layout">
+          <div className="conversation-pane" style={{ width: hasWorkspace ? `${conversationWidth}%` : '100%' }}>
+            <ProductConversationView
+              state={assistant.state}
+              taskId={task.id}
+              refreshToken={messageRefreshToken}
+              onOpenArtifacts={(artifactId) => openWorkspaceTab('artifacts', artifactId)}
+              onOpenApproval={(approvalId) => navigate(`/approvals?approval=${encodeURIComponent(approvalId)}`)}
+              onRegenerate={(turnId) => void assistant.actions.regenerate(turnId, taskRuntimeSettings)}
+            />
+            <div className="sticky-composer">
+              <AssistantComposer
+                label="Governed assistant"
+                placeholder="Describe the next outcome…"
+                sendLabel="Send"
+                disabled={running || readOnly}
+                statusLabel={assistant.state.status}
+                runtimeSettings={taskRuntimeSettings}
+                modelDiscovery={modelDiscovery}
+                locale={resolveLocale(settings.locale)}
+                variant="product"
+                projectControl={(
+                  <span className="composer-chip">
+                    <Folder size={14} strokeWidth={1.6} />
+                    <span>{projectRoot?.rootDisplayName || task.title}</span>
+                  </span>
+                )}
+                onRuntimeSettingsChange={updateRuntimeSettings}
+                onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)}
+                onCancel={() => void (async () => {
+                  await assistant.actions.cancel();
+                  const updated = await productWorkspaceClient.updateTask(task.id, { status: 'cancelled' });
+                  upsertTasks([shellTask(updated)]);
+                })()}
+              />
+            </div>
+          </div>
+          {hasWorkspace ? (
+            <>
+              <div
+                className="split-resize"
+                role="separator"
+                tabIndex={0}
+                aria-orientation="vertical"
+                aria-valuemin={30}
+                aria-valuemax={65}
+                aria-valuenow={conversationWidth}
+                onPointerDown={resizeConversation}
+                onKeyDown={resizeConversationWithKeyboard}
+              />
+              <div className="work-surface workspace-tabbed-surface">
+                <WorkspaceTabs
+                  tabs={workspaceTabs}
+                  activeTabId={activeWorkspaceTabId}
+                  assistantState={assistant.state}
+                  projectRootRef={projectRoot?.rootRef}
+                  projectRootDisplayName={projectRoot?.rootDisplayName}
+                  onActivate={setActiveWorkspaceTabId}
+                  onClose={closeWorkspaceTab}
+                  onUpdate={updateWorkspaceTab}
+                />
+              </div>
+            </>
+          ) : (
+            <WorkSurface
+              taskTitle={task.title}
+              onOpenArtifacts={() => openWorkspaceTab('artifacts')}
+              onOpenTerminal={() => openWorkspaceTab('terminal')}
+              onOpenBrowser={() => openWorkspaceTab('browser')}
+              onOpenPreview={() => openWorkspaceTab('preview')}
+            />
+          )}
+        </div>
+        {contextRailOpen ? <ContextRail task={task} state={assistant.state} /> : null}
+      </div>
+      {dockOpen ? <BottomDock state={assistant.state} /> : null}
+    </main>
+  );
 }

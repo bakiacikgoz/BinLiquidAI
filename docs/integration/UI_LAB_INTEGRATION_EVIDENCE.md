@@ -11,6 +11,22 @@ The Product Shell is authored under `apps/operator-panel/src/product-shell/`.
 It does not import the UI Lab checkout, `src/mocks/**`, or `demoStore.ts`.
 The UI Lab source remains unchanged.
 
+## Frozen theme contract
+
+- `tokens.css`, `globals.css`, and `surfaces.css` are retained byte-for-byte
+  under `product-shell/styles/ui-lab/`. `ProductTheme` removes only the two
+  source `@import` statements at runtime to avoid a duplicate load.
+- `uiLabThemeManifest.ts` pins the source commit and SHA-256 checksums;
+  `npm run ui-lab:theme:verify` reads the checked-in bytes and fails on drift:
+  - `tokens.css`: `47bfbda433800a6947f86e1e9a41f8096bacf93ad63f4c1dd9f88f893e65506a`
+  - `globals.css`: `9cba3ad4558258b07a2d05670593a9c3489c061a6fba2f3aa0fe013b2db2a904`
+  - `surfaces.css`: `25e000276ed2329d71fd5bcbcc2e7db07f91817c77ca3dd4ff441fb243307d2b`
+- Product-only adapter CSS resets pre-existing Operator Panel rules where a
+  shared class name would otherwise leak into the frozen template. It also
+  styles governed/native controls that have no UI Lab equivalent.
+- The style host is absent on `/system/*`; the legacy Operator Panel remains
+  isolated from the new template.
+
 ## Product/runtime evidence
 
 - The product router uses the desktop-safe hash router and preserves the old
@@ -65,6 +81,27 @@ The UI Lab source remains unchanged.
   disabled with `ASSISTANT_FEEDBACK_CAPABILITY_UNAVAILABLE` because this
   runtime provides no governed feedback sink.
 
+## Visual parity evidence
+
+- `npm run ui-lab:parity:capture` launches the frozen UI Lab and the Product
+  Shell independently, then captures source/target pairs for:
+  home collapsed, home expanded, task conversation, task workspace, library,
+  approvals, agents, settings and global search.
+- Coverage is five viewports (`1440×900`, `1280×800`, `1024×768`, `768×900`,
+  `390×844`) in dark and light themes: 90 cases and 180 PNGs.
+- The generated report is
+  `artifacts/operator-panel-ui/ui-lab-parity/report.html`; its JSON companion
+  records the frozen source commit and home geometry for both applications.
+- Source and target home geometry matches exactly for all captured viewports,
+  including the narrow expanded-sidebar layout.
+- `npm run test:e2e:ui-lab` independently checks the mounted theme, responsive
+  hierarchy, overflow boundary, collections, settings, search and a real
+  Chromium route transition proving product adapter styles leave `/system/*`.
+- The target capture uses an isolated page-init bridge fixture so the same
+  stable records can be compared visually. That fixture is test-only evidence;
+  it neither represents a Tauri/native success claim nor supplies a production
+  data fallback.
+
 ## Mock/static guards
 
 - `git diff --name-only origin/codex/imperaos-assistant-artifact-workspace-v1...HEAD`
@@ -74,19 +111,28 @@ The UI Lab source remains unchanged.
   `mockApprovals`, `mockArtifacts`, `demoScenarios` and `mockTerminal` returns
   no production match.
 
-## Recent verification
+## Fresh verification — 2026-07-25
 
-- UI Lab source: 39 Node tests passed; lint and production build passed.
-- Operator Panel: 132 test files / 478 tests passed.
-- Operator Panel lint and production build passed.
-- The full Python suite and Ruff passed.
-- Native library tests: 63 passed, including browser policy/native-history,
-  child-webview bounds and opaque folder-ticket coverage; `cargo check` and
-  `cargo fmt --check` passed.
-- The Tauri desktop launch probe remained alive for 10 seconds. Its live bridge
-  instrumentation is intentionally reported as conditional until a desktop
-  automation harness and assistant-runtime gate are available; it does not
-  claim a fabricated assistant response.
+- Operator Panel: 136 test files / 498 tests passed.
+- Operator Panel lint and production TypeScript/Vite build passed.
+- i18n coverage passed with 270 dictionary keys, 33 reason-code keys and both
+  `en`/`tr` locales.
+- Bridge parity passed with 12 checked actions and 87 registered commands.
+- UI Lab parity E2E passed (3/3), covering the five required viewports and
+  computed-style legacy isolation.
+- Visual capture produced 90 source/target cases and 180 PNGs. The measured
+  home geometry maximum delta was `0px`.
+- Frozen UI Lab source: 39 Node tests passed; lint and production build passed.
+- Native tests passed: 63 library tests plus artifact-crash-recovery and
+  desktop-identity integration tests. `cargo check` and `cargo fmt --check`
+  also passed.
+- The complete repository Python test suite and Ruff passed.
+- `git diff --check`, production mock-name guards and website-scope guards
+  passed.
+- The Tauri development process stayed alive for the 10-second launch probe.
+  Launched bridge instrumentation and a live assistant response remain
+  explicitly conditional; the smoke report does not convert them into a fake
+  success.
 
 ## Capability boundaries retained by design
 

@@ -18,8 +18,11 @@ describe('LibraryPage', () => {
     });
     artifacts.get.mockResolvedValue({ artifact: { artifactId: 'artifact-release', title: 'Release plan' }, revision: { revisionId: 'revision-1' } });
 
-    renderOperatorPanel(<MemoryRouter><LibraryPage /></MemoryRouter>);
+    const { container } = renderOperatorPanel(<MemoryRouter><LibraryPage /></MemoryRouter>);
 
+    expect(container.querySelector('.collection-page .collection-list')).toBeInTheDocument();
+    expect(container.querySelector('.collection-icon')).toBeInTheDocument();
+    expect(container.querySelector('.collection-detail-panel')).toBeInTheDocument();
     await screen.findByRole('button', { name: /Release plan/ });
     await waitFor(() => expect(artifacts.get).toHaveBeenCalledWith({ artifactId: 'artifact-release' }));
     expect(await screen.findByText(/revision-1/)).toBeInTheDocument();
@@ -32,8 +35,9 @@ describe('LibraryPage', () => {
       risk_profile: 'guarded', last_evidence_status: 'valid',
     }] });
 
-    renderOperatorPanel(<MemoryRouter initialEntries={['/agents?agent=release-agent']}><AgentsPage /></MemoryRouter>);
+    const { container } = renderOperatorPanel(<MemoryRouter initialEntries={['/agents?agent=release-agent']}><AgentsPage /></MemoryRouter>);
 
+    expect(container.querySelector('.collection-page.agents-collection-page')).toBeInTheDocument();
     const agent = await screen.findByRole('button', { name: /Release Agent/ });
     expect(agent).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByText('release-policy')).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState } from 'react';
 
@@ -16,6 +16,7 @@ export function BrowserApprovalInbox() {
   const [status, setStatus] = useState('');
 
   useEffect(() => {
+    if (!isTauri()) return;
     let unlisten: (() => void) | undefined;
     void listen<BrowserApprovalRequest>('browser://approval-required', (event) => {
       setStatus('');
@@ -57,17 +58,17 @@ export function BrowserApprovalInbox() {
       ? 'A download needs your approval.'
       : 'An external application needs your approval.';
 
-  return <section className="ps-browser-approval" role="alertdialog" aria-label="Browser approval required">
-    <strong>{title}</strong>
-    <code>{request.url}</code>
-    <p>{isPopup
-      ? 'The popup was blocked until you explicitly approve opening it in the governed browser tab.'
-      : request.kind === 'download'
-        ? 'Browser downloads stay blocked until ImperaOS has a governed save-and-approval workflow.'
-        : 'External applications stay blocked; no operating-system application will be opened from the browser.'}</p>
-    <div>
-      {isPopup ? <button type="button" onClick={() => void openApprovedWindow()}>Approve and open</button> : null}
-      <button type="button" onClick={dismiss}>{isPopup ? 'Deny' : 'Acknowledge and keep blocked'}</button>
-    </div>
-  </section>;
+  return <div className="browser-approval-backdrop"><section className="browser-approval-modal" role="alertdialog" aria-label="Browser approval required">
+      <strong>{title}</strong>
+      <code>{request.url}</code>
+      <p>{isPopup
+        ? 'The popup was blocked until you explicitly approve opening it in the governed browser tab.'
+        : request.kind === 'download'
+          ? 'Browser downloads stay blocked until ImperaOS has a governed save-and-approval workflow.'
+          : 'External applications stay blocked; no operating-system application will be opened from the browser.'}</p>
+      <div>
+        {isPopup ? <button type="button" onClick={() => void openApprovedWindow()}>Approve and open</button> : null}
+        <button type="button" onClick={dismiss}>{isPopup ? 'Deny' : 'Acknowledge and keep blocked'}</button>
+      </div>
+    </section></div>;
 }

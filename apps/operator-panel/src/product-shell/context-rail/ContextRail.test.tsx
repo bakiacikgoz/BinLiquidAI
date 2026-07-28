@@ -15,8 +15,11 @@ describe('ContextRail', () => {
       toolIntents: ['inspect_run'],
     };
 
-    renderOperatorPanel(<ContextRail task={{ id: 'task-release', title: 'Release approval', createdAt: '2026-07-25T00:00:00Z', status: 'awaiting_approval' }} state={state} />);
+    const { container } = renderOperatorPanel(<ContextRail task={{ id: 'task-release', title: 'Release approval', createdAt: '2026-07-25T00:00:00Z', status: 'awaiting_approval' }} state={state} />);
 
+    expect(container.querySelector('.context-rail.reference-environment-rail')).toBeInTheDocument();
+    expect(container.querySelector('.environment-rows')).toBeInTheDocument();
+    expect(container.querySelector('.environment-section')).toBeInTheDocument();
     expect(screen.getByText('run-release')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open approval apr-release' })).toHaveAttribute('href', '#/approvals');
     expect(screen.getByText('attachment · active_run')).toBeInTheDocument();

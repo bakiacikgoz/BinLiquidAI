@@ -30,17 +30,21 @@ type ProductShellState = {
   selectedTaskId: string | null;
   contextRailOpen: boolean;
   dockOpen: boolean;
+  dockHeight: number;
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   theme: 'dark' | 'light';
+  searchOpen: boolean;
   upsertTasks: (tasks: ProductTask[]) => void;
   upsertProjects: (projects: ProductProjectRoot[]) => void;
   selectTask: (taskId: string | null) => void;
   setContextRailOpen: (open: boolean) => void;
   setDockOpen: (open: boolean) => void;
+  setDockHeight: (height: number) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setTheme: (theme: 'dark' | 'light') => void;
+  setSearchOpen: (open: boolean) => void;
 };
 
 /** UI-only navigation state. Product records are deliberately not fabricated here. */
@@ -48,11 +52,13 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
   tasks: [],
   projects: [],
   selectedTaskId: null,
-  contextRailOpen: true,
+  contextRailOpen: false,
   dockOpen: false,
-  sidebarCollapsed: false,
-  sidebarWidth: 260,
+  dockHeight: 240,
+  sidebarCollapsed: true,
+  sidebarWidth: 300,
   theme: 'dark',
+  searchOpen: false,
   upsertTasks: (tasks) => set((state) => {
     const next = new Map(state.tasks.map((task) => [task.id, task]));
     tasks.forEach((task) => next.set(task.id, task));
@@ -69,9 +75,11 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
   selectTask: (selectedTaskId) => set({ selectedTaskId }),
   setContextRailOpen: (contextRailOpen) => set({ contextRailOpen }),
   setDockOpen: (dockOpen) => set({ dockOpen }),
+  setDockHeight: (dockHeight) => set({ dockHeight: Math.min(520, Math.max(140, dockHeight)) }),
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
-  setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: Math.min(420, Math.max(220, sidebarWidth)) }),
+  setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: Math.min(420, Math.max(240, sidebarWidth)) }),
   setTheme: (theme) => set({ theme }),
+  setSearchOpen: (searchOpen) => set({ searchOpen }),
 }), {
   name: 'imperaos-product-shell-preferences-v2',
   // Tasks and conversations remain owned by the future Product Workspace domain,
@@ -79,6 +87,7 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
   partialize: (state) => ({
     contextRailOpen: state.contextRailOpen,
     dockOpen: state.dockOpen,
+    dockHeight: state.dockHeight,
     sidebarCollapsed: state.sidebarCollapsed,
     sidebarWidth: state.sidebarWidth,
     theme: state.theme,

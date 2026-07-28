@@ -17,8 +17,10 @@ describe('PreviewSurface', () => {
       return undefined;
     });
     const onClose = vi.fn();
-    const { user } = renderOperatorPanel(<PreviewSurface onClose={onClose} />);
+    const { user, container } = renderOperatorPanel(<PreviewSurface onClose={onClose} />);
 
+    expect(container.querySelector('.preview-surface .preview-browser')).toBeInTheDocument();
+    expect(container.querySelector('.preview-hero.native-preview-viewport')).toBeInTheDocument();
     await screen.findByRole('option', { name: 'http://localhost:5173' });
     await user.click(screen.getByRole('button', { name: 'Open preview' }));
     await user.click(screen.getByRole('button', { name: 'Close' }));

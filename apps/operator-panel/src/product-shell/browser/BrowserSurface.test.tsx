@@ -19,8 +19,10 @@ describe('BrowserSurface', () => {
   });
 
   it('sends history navigation back through the native governed session', async () => {
-    const { user } = renderOperatorPanel(<BrowserSurface onClose={vi.fn()} />);
+    const { user, container } = renderOperatorPanel(<BrowserSurface onClose={vi.fn()} />);
 
+    expect(container.querySelector('.browser-surface .browser-toolbar .browser-address-bar')).toBeInTheDocument();
+    expect(container.querySelector('.browser-page.native-browser-viewport')).toBeInTheDocument();
     await user.clear(screen.getByRole('textbox', { name: 'Browser address' }));
     await user.type(screen.getByRole('textbox', { name: 'Browser address' }), 'https://imperaos.dev/docs');
     await user.click(screen.getByRole('button', { name: 'Open HTTPS' }));

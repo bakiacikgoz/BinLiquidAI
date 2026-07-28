@@ -18,6 +18,8 @@ describe('WorkSurface', () => {
       <WorkSurface taskTitle="Release checklist" onOpenArtifacts={onOpenArtifacts} onOpenTerminal={onOpenTerminal} onOpenBrowser={onOpenBrowser} onOpenPreview={onOpenPreview} />,
     );
 
+    expect(document.querySelector('.open-surface-prompt')).toBeInTheDocument();
+    expect(document.querySelector('.workspace-launcher-menu')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Open Artifact Workspace' }));
     await user.click(screen.getByRole('button', { name: 'Open terminal' }));
     await user.click(screen.getByRole('button', { name: 'Open browser' }));

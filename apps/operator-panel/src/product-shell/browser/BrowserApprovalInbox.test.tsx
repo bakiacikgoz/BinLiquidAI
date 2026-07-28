@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   receive: null as ((event: { payload: unknown }) => void) | null,
 }));
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke, isTauri: () => true }));
 vi.mock('@tauri-apps/api/event', () => ({
   listen: mocks.listen.mockImplementation(async (_name: string, callback: (event: { payload: unknown }) => void) => {
     mocks.receive = callback;

@@ -12,10 +12,21 @@ const navigate = vi.hoisted(() => vi.fn());
 
 vi.mock('../adapters/productWorkspaceClient', () => ({ productWorkspaceClient: workspace }));
 vi.mock('../../components/assistant/AssistantComposer', () => ({
-  AssistantComposer: ({ onSend }: { onSend: (message: string, settings: unknown, controls: unknown) => void }) => (
-    <button type="button" onClick={() => onSend('Prepare a release', {
-      assistantProvider: 'ollama', assistantFallbackProvider: '', assistantModel: 'qwen3.5:4b', assistantHfModelId: '',
-    }, { contextAttachmentKinds: ['artifact_summary'], toolIntents: ['inspect_run'] })}>Submit composed work</button>
+  AssistantComposer: ({
+    onSend,
+    projectControl,
+    variant,
+  }: {
+    onSend: (message: string, settings: unknown, controls: unknown) => void;
+    projectControl?: React.ReactNode;
+    variant?: string;
+  }) => (
+    <div data-testid="assistant-composer" data-variant={variant}>
+      {projectControl}
+      <button type="button" onClick={() => onSend('Prepare a release', {
+        assistantProvider: 'ollama', assistantFallbackProvider: '', assistantModel: 'qwen3.5:4b', assistantHfModelId: '',
+      }, { contextAttachmentKinds: ['artifact_summary'], toolIntents: ['inspect_run'] })}>Submit composed work</button>
+    </div>
   ),
 }));
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -45,6 +56,9 @@ describe('NewWorkPage', () => {
   it('creates work in the project the user selected', async () => {
     const { user } = renderOperatorPanel(<MemoryRouter><NewWorkPage /></MemoryRouter>);
 
+    expect(document.querySelector('.new-work-page.codex-home')).toBeInTheDocument();
+    expect(document.querySelector('.suggestion-grid.codex-suggestions')).toBeInTheDocument();
+    expect(screen.getByTestId('assistant-composer')).toHaveAttribute('data-variant', 'product');
     await screen.findByRole('option', { name: 'Release work' });
     await user.selectOptions(screen.getByRole('combobox', { name: 'Project' }), 'project-existing');
     await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
@@ -61,5 +75,22 @@ describe('NewWorkPage', () => {
         controls: { contextAttachmentKinds: ['artifact_summary'], toolIntents: ['inspect_run'] },
       }),
     });
+  });
+
+  it('truthfully labels and creates the fallback project when no durable project exists', async () => {
+    workspace.listProjects.mockResolvedValue({ projects: [] });
+    workspace.getOrCreateProject.mockResolvedValue({ projectId: 'project-created' });
+    const { user } = renderOperatorPanel(<MemoryRouter><NewWorkPage /></MemoryRouter>);
+
+    expect(await screen.findByRole('option', { name: 'Yeni “Operator work” projesi oluştur' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+
+    expect(workspace.getOrCreateProject).toHaveBeenCalledWith('Operator work');
+    expect(workspace.createTask).toHaveBeenCalledWith(
+      'project-created',
+      'Prepare a release',
+      expect.stringMatching(/^product-session-/),
+      expect.any(Object),
+    );
   });
 });
