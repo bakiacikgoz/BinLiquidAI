@@ -57,3 +57,60 @@ test('product adapter styles are removed during a real route transition into the
     return getComputedStyle(probe).display;
   })).toBe('block');
 });
+
+test('expanded product sidebar keeps Codex proportions, hierarchy, and resize bounds', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('imperaos-product-shell-preferences-v2', JSON.stringify({
+      state: {
+        contextRailOpen: false,
+        dockOpen: false,
+        dockHeight: 240,
+        sidebarCollapsed: false,
+        sidebarWidth: 260,
+        theme: 'dark',
+      },
+      version: 3,
+    }));
+  });
+  await page.setViewportSize({ width: 919, height: 863 });
+  await page.goto('/#/', { waitUntil: 'networkidle' });
+
+  const sidebar = page.getByRole('complementary', { name: 'Product navigation' });
+  await expect(sidebar).toBeVisible();
+  expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(260);
+
+  const surface = await page.evaluate(() => {
+    const aside = document.querySelector<HTMLElement>('.sidebar.codex-sidebar');
+    const frame = document.querySelector<HTMLElement>('.app-frame');
+    const primary = document.querySelector<HTMLElement>('.sidebar-primary-action.is-active');
+    if (!aside || !frame || !primary) throw new Error('Sidebar parity probes are missing.');
+    return {
+      sidebar: getComputedStyle(aside).backgroundColor,
+      frame: getComputedStyle(frame).backgroundColor,
+      primary: getComputedStyle(primary).backgroundColor,
+    };
+  });
+  expect(surface.sidebar).not.toBe('rgb(32, 32, 32)');
+  expect(surface.sidebar).not.toBe(surface.frame);
+  expect(surface.primary).toBe('rgba(0, 0, 0, 0)');
+
+  const separator = page.getByRole('separator', { name: 'Kenar çubuğu genişliği' });
+  let separatorBox = await separator.boundingBox();
+  if (!separatorBox) throw new Error('Sidebar resize separator is not visible.');
+  await page.mouse.move(separatorBox.x + separatorBox.width / 2, separatorBox.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(separatorBox.x + 500, separatorBox.y + 40);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(340);
+
+  separatorBox = await separator.boundingBox();
+  if (!separatorBox) throw new Error('Sidebar resize separator disappeared.');
+  await page.mouse.move(separatorBox.x + separatorBox.width / 2, separatorBox.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(separatorBox.x - 500, separatorBox.y + 40);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(220);
+
+  const overflow = await page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth));
+  expect(overflow).toBeLessThanOrEqual(2);
+});

@@ -104,7 +104,9 @@ export async function gotoOperatorPanel(page: Page, settings: Partial<E2eSetting
     { key: SETTINGS_KEY, value: seededSettings },
   );
 
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  // The v2 product shell is the default application. Legacy E2E scenarios
+  // exercise the retained rollback shell through its explicit system route.
+  await page.goto('/#/system', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveTitle('ImperaOS Operator Panel');
   await expect(page.locator('#root')).toContainText('Mission Control');
   await expect(page.locator('.pill-preview')).toHaveText('Preview');

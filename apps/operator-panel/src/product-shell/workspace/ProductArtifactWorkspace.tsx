@@ -66,7 +66,7 @@ export function ProductArtifactWorkspace({ state, openRequest, requestedArtifact
     artifacts={workspace.legacyArtifacts}
     selectedArtifactName={workspace.selectedLegacyArtifactName}
     onSelectArtifact={workspace.actions.selectLegacyArtifact}
-    onViewRuns={() => undefined}
+    onViewRuns={() => void workspace.actions.loadCatalog()}
     workspaceState={workspace.state}
     catalog={workspace.catalog}
     catalogNextCursor={workspace.catalogNextCursor}

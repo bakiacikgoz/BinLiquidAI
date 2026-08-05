@@ -3583,7 +3583,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                   <div className="metric-row"><dt>AI SDK transport</dt><dd>{(artifactCapabilitySnapshot?.features['ai_sdk_tauri_transport.enabled'] ?? artifactFeatureFlags.aiSdkTauriTransport) ? 'enabled' : 'disabled'}</dd></div>
                   <div className="metric-row"><dt>Export</dt><dd>{(artifactCapabilitySnapshot?.features['artifact_workspace.export.enabled'] ?? artifactFeatureFlags.export) ? 'enabled' : 'disabled'}</dd></div>
                   <div className="metric-row"><dt>Backend doctor</dt><dd>{artifactCapabilitySnapshot ? `spreadsheet ${artifactCapabilitySnapshot.licenses.spreadsheet ? 'verified' : 'fallback'} · canvas ${artifactCapabilitySnapshot.licenses.canvas ? 'verified' : 'fallback'}` : artifactCapabilityStatus === 'failed' ? 'capability unavailable; workspace disabled' : 'unavailable'}</dd></div>
-                  <div className="metric-row"><dt>Runtime config</dt><dd><code>IMPERAOS_ARTIFACT_WORKSPACE_PROFILE</code> · <code>IMPERAOS_ARTIFACT_*_EDITOR_ENABLED</code></dd></div>
+                  <div className="metric-row"><dt>Runtime config</dt><dd><span className="inline-token">IMPERAOS_ARTIFACT_WORKSPACE_PROFILE</span> · <span className="inline-token">IMPERAOS_ARTIFACT_*_EDITOR_ENABLED</span></dd></div>
                   {(artifactCapabilitySnapshot
                     ? Object.entries(artifactCapabilitySnapshot.kindCapabilities)
                     : Object.entries({

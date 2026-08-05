@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { ChevronLeft, ChevronRight, RotateCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { nativeErrorMessage } from '../nativeErrorMessage';
+
 type BrowserHistoryState = { canBack: boolean; canForward: boolean };
 
 const emptyHistory: BrowserHistoryState = { canBack: false, canForward: false };
@@ -15,15 +17,21 @@ function normalizeHistory(value: unknown): BrowserHistoryState {
   };
 }
 
-export function PreviewSurface({ active = true, onClose, sessionLabel: persistedSessionLabel, onSessionChange }: { active?: boolean; onClose: () => void; sessionLabel?: string; onSessionChange?: (sessionLabel: string | null) => void }) {
+export function PreviewSurface({ taskId, active = true, onClose, sessionLabel: persistedSessionLabel, onSessionChange }: { taskId: string; active?: boolean; onClose: () => void; sessionLabel?: string; onSessionChange?: (sessionLabel: string | null) => void }) {
   const [origins, setOrigins] = useState<string[]>([]);
   const [selected, setSelected] = useState('');
   const [ownedSessionLabel, setOwnedSessionLabel] = useState<string | null>(null);
   const [history, setHistory] = useState<BrowserHistoryState>(emptyHistory);
   const [status, setStatus] = useState('');
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const openingRef = useRef(false);
+  const disposedRef = useRef(false);
+  const [opening, setOpening] = useState(false);
   const sessionLabel = persistedSessionLabel ?? ownedSessionLabel;
+  const sessionLabelRef = useRef<string | null>(sessionLabel);
+  sessionLabelRef.current = sessionLabel;
   const setSessionLabel = (next: string | null) => {
+    sessionLabelRef.current = next;
     setOwnedSessionLabel(next);
     onSessionChange?.(next);
   };
@@ -33,14 +41,26 @@ export function PreviewSurface({ active = true, onClose, sessionLabel: persisted
   };
 
   useEffect(() => {
-    void invoke<string[]>('browser_list_preview_origins').then((items) => {
-      setOrigins(items);
-      setSelected((current) => current && items.includes(current) ? current : items[0] ?? '');
-    }).catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Verified preview origins are unavailable.'));
+    disposedRef.current = false;
+    return () => {
+      disposedRef.current = true;
+      const label = sessionLabelRef.current;
+      queueMicrotask(() => {
+        if (!disposedRef.current || !label || sessionLabelRef.current !== label) return;
+        sessionLabelRef.current = null;
+        void invoke('browser_close', { request: { label } }).catch(() => undefined);
+      });
+    };
   }, []);
   useEffect(() => {
+    void invoke<string[]>('browser_list_preview_origins', { request: { taskId } }).then((items) => {
+      setOrigins(items);
+      setSelected((current) => current && items.includes(current) ? current : items[0] ?? '');
+    }).catch((cause) => setStatus(nativeErrorMessage(cause, 'Verified preview origins are unavailable.')));
+  }, [taskId]);
+  useEffect(() => {
     if (!sessionLabel) return;
-    void refreshHistory(sessionLabel).catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Preview history is unavailable.'));
+    void refreshHistory(sessionLabel).catch((cause) => setStatus(nativeErrorMessage(cause, 'Preview history is unavailable.')));
   }, [sessionLabel]);
   useEffect(() => {
     if (!sessionLabel || !active || !viewportRef.current) return;
@@ -57,7 +77,7 @@ export function PreviewSurface({ active = true, onClose, sessionLabel: persisted
       };
       void invoke('browser_set_bounds', { request })
         .then(() => invoke('browser_show', { request: { label: sessionLabel } }))
-        .catch((cause) => { if (mounted) setStatus(cause instanceof Error ? cause.message : 'Preview viewport could not be synchronized.'); });
+        .catch((cause) => { if (mounted) setStatus(nativeErrorMessage(cause, 'Preview viewport could not be synchronized.')); });
     };
     synchronize();
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(synchronize);
@@ -72,18 +92,30 @@ export function PreviewSurface({ active = true, onClose, sessionLabel: persisted
   }, [active, sessionLabel]);
 
   const open = async () => {
-    if (!selected) return;
+    if (!selected || openingRef.current || disposedRef.current) return;
+    openingRef.current = true;
+    setOpening(true);
     try {
       if (sessionLabel) {
         await invoke('browser_navigate', { request: { label: sessionLabel, url: selected } });
+        if (disposedRef.current) return;
         await refreshHistory(sessionLabel);
       } else {
-        const label = await invoke<string>('browser_open', { request: { mode: 'preview', url: selected } });
+        const label = await invoke<string>('browser_open', { request: { mode: 'preview', url: selected, taskId } });
+        if (disposedRef.current) {
+          void invoke('browser_close', { request: { label } }).catch(() => undefined);
+          return;
+        }
         setSessionLabel(label);
         setHistory(emptyHistory);
       }
       setStatus('Opened only the runtime-registered preview origin.');
-    } catch (cause) { setStatus(cause instanceof Error ? cause.message : 'Preview navigation failed.'); }
+    } catch (cause) {
+      if (!disposedRef.current) setStatus(nativeErrorMessage(cause, 'Preview navigation failed.'));
+    } finally {
+      openingRef.current = false;
+      if (!disposedRef.current) setOpening(false);
+    }
   };
   const move = async (direction: 'back' | 'forward') => {
     if (!sessionLabel) return;
@@ -91,17 +123,19 @@ export function PreviewSurface({ active = true, onClose, sessionLabel: persisted
       await invoke(direction === 'back' ? 'browser_back' : 'browser_forward', { request: { label: sessionLabel } });
       await refreshHistory(sessionLabel);
       setStatus(`Navigated ${direction} through governed preview history.`);
-    } catch (cause) { setStatus(cause instanceof Error ? cause.message : 'Preview history navigation failed.'); }
+    } catch (cause) { setStatus(nativeErrorMessage(cause, 'Preview history navigation failed.')); }
   };
   const close = () => {
-    if (sessionLabel) void invoke('browser_close', { request: { label: sessionLabel } });
+    disposedRef.current = true;
+    const label = sessionLabelRef.current;
+    if (label) void invoke('browser_close', { request: { label } }).catch(() => undefined);
     setSessionLabel(null);
     onClose();
   };
   const reload = () => {
     if (!sessionLabel) return;
     void invoke('browser_reload', { request: { label: sessionLabel } })
-      .catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Preview reload failed.'));
+      .catch((cause) => setStatus(nativeErrorMessage(cause, 'Preview reload failed.')));
   };
 
   return (
@@ -117,12 +151,12 @@ export function PreviewSurface({ active = true, onClose, sessionLabel: persisted
             {origins.map((origin) => <option key={origin} value={origin}>{origin}</option>)}
           </select>
         </label>
-        <button type="button" disabled={!selected} onClick={() => void open()}>{sessionLabel ? 'Navigate preview' : 'Open preview'}</button>
+        <button type="button" disabled={!selected || opening} onClick={() => void open()}>{opening ? 'Opening…' : sessionLabel ? 'Navigate preview' : 'Open preview'}</button>
         <button type="button" aria-label="Close" onClick={close}><X size={16} /></button>
       </div>
       <div ref={viewportRef} className="preview-hero native-preview-viewport" aria-label="Preview page viewport" />
       {status ? <p className="native-surface-status" role="status">{status}</p> : null}
-      <p className="native-policy-note">Only ImperaOS runtime-registered localhost origins can be opened; arbitrary local ports and redirect targets outside the registry are denied.</p>
+      <p className="native-policy-note">Only ImperaOS runtime-owned, task-scoped localhost origins are available here. The renderer cannot register ports; arbitrary ports and redirect targets outside the exact native registry are denied.</p>
     </section>
   );
 }

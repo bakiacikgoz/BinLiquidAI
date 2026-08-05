@@ -64,4 +64,16 @@ describe('Sidebar project lifecycle', () => {
       .toHaveAttribute('aria-disabled', 'true');
     expect(screen.queryByRole('button', { name: /Görevleri düzenle/i })).not.toBeInTheDocument();
   });
+
+  it('distinguishes the primary create route and keeps desktop-only data truth compact', async () => {
+    workspace.listProjects.mockRejectedValueOnce(new Error(
+      'Workspace data requires the ImperaOS desktop runtime. Open this screen in the desktop app.',
+    ));
+
+    const { container } = renderOperatorPanel(<MemoryRouter><Sidebar /></MemoryRouter>);
+
+    expect(screen.getByRole('link', { name: /Yeni görev/i })).toHaveClass('sidebar-primary-action');
+    expect(await screen.findByRole('alert')).toHaveClass('sidebar-runtime-notice');
+    expect(container.querySelector('.sidebar-runtime-notice')).toHaveTextContent(/desktop runtime/i);
+  });
 });

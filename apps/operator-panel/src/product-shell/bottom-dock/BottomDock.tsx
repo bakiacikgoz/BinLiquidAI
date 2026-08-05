@@ -18,7 +18,7 @@ const tabs = [
   { id: 'evidence', label: 'Evidence', icon: ClipboardCheck },
 ] as const;
 
-export function BottomDock({ state }: { state: AssistantSessionState }) {
+export function BottomDock({ state, onOpenTerminal }: { state: AssistantSessionState; onOpenTerminal: () => void }) {
   const setDockOpen = useProductShellStore((shellState) => shellState.setDockOpen);
   const height = useProductShellStore((shellState) => shellState.dockHeight);
   const setHeight = useProductShellStore((shellState) => shellState.setDockHeight);
@@ -76,10 +76,10 @@ export function BottomDock({ state }: { state: AssistantSessionState }) {
               type="button"
               key={id}
               className={id === activeTab ? 'is-active' : ''}
-              disabled={id === 'terminal'}
-              title={id === 'terminal' ? 'Terminal, governed workspace sekmesinden açılır.' : undefined}
-              data-disabled-reason={id === 'terminal' ? 'DOCK_TERMINAL_CAPABILITY_UNAVAILABLE' : undefined}
-              onClick={() => setActiveTab(id)}
+              onClick={() => {
+                setActiveTab(id);
+                if (id === 'terminal') onOpenTerminal();
+              }}
             >
               <TabIcon size={15} /> {label}
             </button>
@@ -98,6 +98,9 @@ export function BottomDock({ state }: { state: AssistantSessionState }) {
           {runRefs.length
             ? runRefs.map((run) => <div key={run.id}><i className="accent" /><span>{run.id} · {run.status || run.summary || 'Governed run'}</span></div>)
             : <div><i /><span>No governed agent or run references</span></div>}
+        </div> : null}
+      {activeTab === 'terminal' ? <div className="activity-view" role="region" aria-label="Governed terminal attachment">
+          <div><i className="accent" /><span>This dock is attached to the active workspace terminal; reopening focuses the same live PTY session.</span></div>
         </div> : null}
       {activeTab === 'logs' ? <div className="activity-view" role="region" aria-label="Assistant timeline logs">
           {timeline.length

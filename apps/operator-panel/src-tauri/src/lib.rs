@@ -11,7 +11,7 @@ pub fn run() {
         .manage(bridge::AssistantProcessRegistry::default())
         .manage(artifact_rpc::WorkspaceRpcRegistry::default())
         .manage(bridge::ProductFolderTicketState::default())
-        .manage(browser::BrowserPolicyState::with_runtime_preview_origins())
+        .manage(browser::BrowserPolicyState::from_trusted_deployment_environment())
         .manage(browser::BrowserSessionRegistry::default())
         .manage(terminal::TerminalManager::default())
         .manage(artifact_asset::ArtifactAssetState::default())

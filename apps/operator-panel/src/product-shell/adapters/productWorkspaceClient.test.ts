@@ -88,6 +88,14 @@ describe('ProductWorkspaceClient default projects', () => {
     }));
   });
 
+  it('reports a clear desktop-runtime requirement when native invoke is unavailable', async () => {
+    invoke.mockRejectedValueOnce(new TypeError("Cannot read properties of undefined (reading 'invoke')"));
+
+    await expect(new ProductWorkspaceClient().listProjects()).rejects.toThrow(
+      'Workspace data requires the ImperaOS desktop runtime.',
+    );
+  });
+
   it('archives a task through the governed archive bridge rather than local UI state', async () => {
     const task = {
       taskId: 'task-release', workspaceId: 'workspace-1', projectId: 'project-operator', title: 'Prepare release',

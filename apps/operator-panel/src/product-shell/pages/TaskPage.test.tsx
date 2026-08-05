@@ -12,7 +12,7 @@ const assistant = vi.hoisted(() => ({
     markApprovalDetailLoaded: vi.fn(), updateApprovalStatus: vi.fn(), appendSystemMessage: vi.fn(),
   },
 }));
-const workspace = vi.hoisted(() => ({ addLink: vi.fn(), addMessage: vi.fn(), getTask: vi.fn(), listLinks: vi.fn(), listMessages: vi.fn(), updateTask: vi.fn() }));
+const workspace = vi.hoisted(() => ({ addLink: vi.fn(), addMessage: vi.fn(), getTask: vi.fn(), listLinks: vi.fn(), listMessages: vi.fn(), listProjects: vi.fn(), updateTask: vi.fn() }));
 
 vi.mock('../adapters/useProductAssistant', () => ({ useProductAssistant: () => assistant }));
 vi.mock('../adapters/productWorkspaceClient', () => ({ productWorkspaceClient: workspace }));
@@ -39,12 +39,18 @@ vi.mock('../workspace/WorkspaceTabs', () => ({
   WorkspaceTabs: ({
     tabs,
     activeTabId,
+    onOpen,
+    projectRootRef,
   }: {
     tabs: Array<{ id: string; title: string }>;
     activeTabId: string | null;
+    onOpen: (kind: 'artifacts') => void;
+    projectRootRef?: string;
   }) => <div>
     <p>Workspace tabs: {tabs.map((tab) => tab.title).join(', ') || 'none'}</p>
     <p>Active workspace tab: {tabs.find((tab) => tab.id === activeTabId)?.title ?? 'none'}</p>
+    <p>Terminal root: {projectRootRef ?? 'runtime-root'}</p>
+    <button type="button" onClick={() => onOpen('artifacts')}>Open another artifact tab</button>
   </div>,
 }));
 
@@ -55,10 +61,12 @@ import { TaskPage } from './TaskPage';
 describe('TaskPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     workspace.addMessage.mockResolvedValue({});
     workspace.addLink.mockResolvedValue({});
     workspace.listMessages.mockResolvedValue({ messages: [] });
     workspace.listLinks.mockResolvedValue({ links: [] });
+    workspace.listProjects.mockResolvedValue({ projects: [], nextCursor: null });
     workspace.updateTask.mockResolvedValue({
       taskId: 'task-1', title: 'Prepare release', status: 'active', assistantSessionId: 'session-task-1',
       reasoningEffort: 'high', speedProfile: 'standard', approvalProfile: 'risk_based',
@@ -67,6 +75,7 @@ describe('TaskPage', () => {
     useProductShellStore.setState({
       tasks: [{ id: 'task-1', title: 'Prepare release', createdAt: '2026-07-24T12:00:00Z', status: 'active', assistantSessionId: 'session-task-1' }],
       selectedTaskId: null,
+      dockOpen: false,
     });
   });
 
@@ -102,6 +111,13 @@ describe('TaskPage', () => {
       assistantSessionId: 'session-task-1', reasoningEffort: 'high', speedProfile: 'standard',
       approvalProfile: 'risk_based', createdAtUtc: '2026-07-24T12:00:00Z', updatedAtUtc: '2026-07-24T12:00:00Z',
     });
+    workspace.listProjects.mockResolvedValue({
+      projects: [{
+        projectId: 'project-1', rootRef: '', rootDisplayName: '',
+        title: 'Release', status: 'active',
+      }],
+      nextCursor: null,
+    });
 
     renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1']}><Routes><Route path="/task/:taskId" element={<TaskPage />} /><Route path="/" element={<p>Fallback route</p>} /></Routes></MemoryRouter>);
 
@@ -110,11 +126,55 @@ describe('TaskPage', () => {
     expect(screen.queryByText('Fallback route')).not.toBeInTheDocument();
   });
 
+  it('hydrates the task project root on a direct workspace-route reload', async () => {
+    useProductShellStore.setState({ tasks: [], projects: [], selectedTaskId: null });
+    workspace.getTask.mockResolvedValue({
+      taskId: 'task-1', projectId: 'project-1', title: 'Prepare release', status: 'active',
+      assistantSessionId: 'session-task-1', reasoningEffort: 'high', speedProfile: 'standard',
+      approvalProfile: 'risk_based', createdAtUtc: '2026-07-24T12:00:00Z', updatedAtUtc: '2026-07-24T12:00:00Z',
+    });
+    workspace.listProjects.mockResolvedValue({
+      projects: [{
+        projectId: 'project-1', rootRef: 'root-release', rootDisplayName: 'Release workspace',
+        title: 'Release', status: 'active',
+      }],
+      nextCursor: null,
+    });
+
+    renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1/workspace']}><Routes><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes></MemoryRouter>);
+
+    expect(await screen.findByText('Terminal root: root-release')).toBeInTheDocument();
+    expect(workspace.listProjects).toHaveBeenCalled();
+  });
+
+  it('treats an empty project root reference as no registered root', async () => {
+    useProductShellStore.setState({
+      projects: [{ projectId: 'project-1', rootRef: '', rootDisplayName: '' }],
+      tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Prepare release', createdAt: '2026-07-24T12:00:00Z', status: 'active' }],
+    });
+
+    renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1/workspace']}><Routes><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes></MemoryRouter>);
+
+    expect(await screen.findByText('Terminal root: runtime-root')).toBeInTheDocument();
+  });
+
   it('restores the workspace surface from the durable workspace route', async () => {
     renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1/workspace']}><Routes><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes></MemoryRouter>);
 
     expect(await screen.findByText('Workspace tabs: Artifacts')).toBeInTheDocument();
     expect(screen.getByText('Active workspace tab: Artifacts')).toBeInTheDocument();
+  });
+
+  it('restores task-scoped workspace tabs and focus after the renderer remounts', async () => {
+    sessionStorage.setItem('imperaos.workspace-tabs.task-1', JSON.stringify({
+      tabs: [{ id: 'terminal-restored', kind: 'terminal', title: 'Terminal' }],
+      activeTabId: 'terminal-restored',
+    }));
+
+    renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1/workspace']}><Routes><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes></MemoryRouter>);
+
+    expect(await screen.findByText('Workspace tabs: Terminal')).toBeInTheDocument();
+    expect(screen.getByText('Active workspace tab: Terminal')).toBeInTheDocument();
   });
 
   it.each([
@@ -135,6 +195,38 @@ describe('TaskPage', () => {
 
     expect(await screen.findByText(`Workspace tabs: ${expectedTab}`)).toBeInTheDocument();
     expect(screen.getByText(`Active workspace tab: ${expectedTab}`)).toBeInTheDocument();
+  });
+
+  it('keeps separately opened artifacts in separate workspace tabs', async () => {
+    const { user } = renderOperatorPanel(
+      <MemoryRouter initialEntries={['/task/task-1/workspace']}>
+        <Routes><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByText('Workspace tabs: Artifacts');
+
+    await user.click(screen.getByRole('button', { name: 'Open another artifact tab' }));
+
+    expect(await screen.findByText('Workspace tabs: Artifacts, Artifacts')).toBeInTheDocument();
+  });
+
+  it('focuses the existing terminal session when the dock Terminal tab is opened again', async () => {
+    useProductShellStore.setState({ dockOpen: true });
+    const { user } = renderOperatorPanel(
+      <MemoryRouter initialEntries={['/task/task-1']}>
+        <Routes>
+          <Route path="/task/:taskId" element={<TaskPage />} />
+          <Route path="/task/:taskId/workspace" element={<TaskPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Terminal' }));
+    expect(await screen.findByText('Workspace tabs: Terminal')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Terminal' }));
+
+    expect(screen.getByText('Workspace tabs: Terminal')).toBeInTheDocument();
+    expect(screen.queryByText('Workspace tabs: Terminal, Terminal')).not.toBeInTheDocument();
   });
 
   it('persists completed assistant action references as durable task links', async () => {

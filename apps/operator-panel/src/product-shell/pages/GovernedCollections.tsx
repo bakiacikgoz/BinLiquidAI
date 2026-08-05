@@ -13,6 +13,24 @@ function record(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
 }
 
+function detailText(value: unknown, fallback = '—'): string {
+  if (typeof value === 'string' && value) return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+}
+
+function DetailGrid({ rows, empty }: { rows: Array<[string, unknown]>; empty: string }) {
+  const visible = rows.filter(([, value]) => value !== undefined && value !== null && value !== '');
+  if (!visible.length) return <p className="ps-muted">{empty}</p>;
+  return (
+    <dl className="collection-detail-grid">
+      {visible.map(([label, value]) => (
+        <div key={label}><dt>{label}</dt><dd>{detailText(value)}</dd></div>
+      ))}
+    </dl>
+  );
+}
+
 function pendingApprovals(value: unknown): ApprovalRow[] {
   const pending = record(value).pending;
   if (!Array.isArray(pending)) return [];
@@ -117,7 +135,25 @@ export function LibraryPage() {
       </section>
       <article className="collection-detail-panel">
         <h2>{selectedArtifactId ?? 'No artifact selected'}</h2>
-        <pre>{detail ? JSON.stringify(detail, null, 2) : 'Select an artifact to inspect its canonical detail.'}</pre>
+        <DetailGrid
+          empty="Select an artifact to inspect its canonical detail."
+          rows={detail ? (() => {
+            const value = record(detail);
+            const artifact = record(value.artifact);
+            const revision = record(value.revision);
+            return [
+              ['Title', artifact.title],
+              ['Artifact ID', artifact.artifactId],
+              ['Kind', artifact.kind],
+              ['Status', artifact.status],
+              ['Data class', artifact.dataClass],
+              ['Revision', revision.revisionId],
+              ['Revision number', revision.revisionNumber],
+              ['Change summary', revision.changeSummary],
+              ['Updated', artifact.updatedAtUtc],
+            ] as Array<[string, unknown]>;
+          })() : []}
+        />
       </article>
     </CollectionFrame>
   );
@@ -181,7 +217,27 @@ export function ApprovalsPage() {
       </section>
       <article className="collection-detail-panel">
         <h2>{selected?.approvalId ?? 'No approval selected'}</h2>
-        <pre>{detail ? JSON.stringify(detail, null, 2) : 'Select an approval to inspect its governed detail.'}</pre>
+        <DetailGrid
+          empty="Select an approval to inspect its governed detail."
+          rows={detail ? (() => {
+            const value = record(detail);
+            const ticket = record(value.ticket);
+            const snapshot = record(ticket.snapshot);
+            return [
+              ['Status', value.status ?? ticket.status],
+              ['Execution', value.execution_status ?? ticket.execution_status],
+              ['Run', ticket.run_id],
+              ['Target kind', ticket.target_kind],
+              ['Target', ticket.target_ref],
+              ['Risk', snapshot.risk_class],
+              ['Category', snapshot.category],
+              ['Requested by', ticket.actor],
+              ['Decision reason', ticket.decision_reason],
+              ['Expires', ticket.expires_at],
+              ['Policy hash', ticket.policy_hash],
+            ] as Array<[string, unknown]>;
+          })() : []}
+        />
         <div className="collection-detail-actions">
           <button type="button" disabled={!canDecide} onClick={() => void decide(true)}>Approve</button>
           <button type="button" disabled={!canDecide} onClick={() => void decide(false)}>Reject</button>

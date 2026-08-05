@@ -19,8 +19,17 @@ pub enum BrowserMode {
 pub struct BrowserPolicyState {
     // Arcs are intentional: redirect handlers must observe runtime policy
     // changes instead of holding a stale policy snapshot.
-    preview_origins: Arc<Mutex<HashSet<String>>>,
+    preview_origins: Arc<Mutex<HashMap<String, HashSet<String>>>>,
     agent_domains: Arc<Mutex<HashMap<String, HashSet<String>>>>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BrowserDeploymentPolicy {
+    #[serde(default)]
+    preview_origins: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    agent_domains: HashMap<String, Vec<String>>,
 }
 
 #[derive(Clone)]
@@ -58,6 +67,12 @@ pub struct BrowserNavigateRequest {
 #[serde(rename_all = "camelCase")]
 pub struct BrowserSessionRequest {
     pub label: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserPreviewOriginsRequest {
+    pub task_id: String,
 }
 
 #[derive(Deserialize)]
@@ -104,6 +119,24 @@ fn origin(url: &Url) -> String {
     )
 }
 
+fn parse_preview_origin(origin_value: &str) -> Result<Url, String> {
+    let url =
+        Url::parse(origin_value).map_err(|_| "BROWSER_POLICY_DENIED: invalid preview origin")?;
+    if !matches!(url.scheme(), "http" | "https")
+        || !matches!(url.host_str(), Some("localhost") | Some("127.0.0.1"))
+        || url.port().is_none()
+        || url.path() != "/"
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(
+            "BROWSER_POLICY_DENIED: preview origin must be exact localhost or 127.0.0.1 with a port"
+                .into(),
+        );
+    }
+    Ok(url)
+}
+
 fn normalize_agent_domain(value: &str) -> Result<String, String> {
     let candidate = value.trim().to_ascii_lowercase();
     if candidate.is_empty()
@@ -129,36 +162,49 @@ fn normalize_agent_domain(value: &str) -> Result<String, String> {
 }
 
 impl BrowserPolicyState {
-    pub fn with_runtime_preview_origins() -> Self {
-        let state = Self::default();
-        // The desktop dev runtime owns this port through tauri.conf.json; no
-        // renderer input can extend the preview registry.
-        if cfg!(debug_assertions) {
-            let _ = state.register_preview_origin("http://localhost:5173");
+    pub fn from_trusted_deployment_environment() -> Self {
+        let Ok(policy_json) = std::env::var("IMPERAOS_BROWSER_DEPLOYMENT_POLICY_JSON") else {
+            return Self::default();
+        };
+        match Self::from_trusted_deployment_policy_json(&policy_json) {
+            Ok(state) => state,
+            Err(_) => {
+                eprintln!(
+                    "ImperaOS browser deployment policy was rejected; browser capabilities fail closed."
+                );
+                Self::default()
+            }
         }
-        state
     }
 
-    /// Called only by trusted runtime/deployment-policy code. This deliberately
-    /// has no Tauri command so renderer code cannot forge a preview origin.
-    pub fn register_preview_origin(&self, origin_value: &str) -> Result<(), String> {
-        let url = Url::parse(origin_value)
-            .map_err(|_| "BROWSER_POLICY_DENIED: invalid preview origin")?;
-        if !matches!(url.scheme(), "http" | "https")
-            || !matches!(url.host_str(), Some("localhost") | Some("127.0.0.1"))
-            || url.port().is_none()
-            || url.path() != "/"
-            || url.query().is_some()
-            || url.fragment().is_some()
-        {
-            return Err(
-                "BROWSER_POLICY_DENIED: preview origin must be registered localhost with port"
-                    .into(),
-            );
+    fn from_trusted_deployment_policy_json(policy_json: &str) -> Result<Self, String> {
+        if policy_json.len() > 64 * 1024 {
+            return Err("BROWSER_POLICY_DENIED: deployment policy is too large".into());
         }
+        let policy: BrowserDeploymentPolicy = serde_json::from_str(policy_json)
+            .map_err(|_| "BROWSER_POLICY_DENIED: deployment policy is invalid")?;
+        let state = Self::default();
+        for (task_id, origins) in policy.preview_origins {
+            for origin in origins {
+                state.register_preview_origin(&task_id, &origin)?;
+            }
+        }
+        for (task_id, domains) in policy.agent_domains {
+            state.set_agent_domains_from_governed_policy(&task_id, domains)?;
+        }
+        Ok(state)
+    }
+
+    pub fn register_preview_origin(&self, task_id: &str, origin_value: &str) -> Result<(), String> {
+        if task_id.trim().is_empty() {
+            return Err("BROWSER_POLICY_DENIED: preview registration requires a task".into());
+        }
+        let url = parse_preview_origin(origin_value)?;
         self.preview_origins
             .lock()
             .map_err(|_| "BROWSER_POLICY_DENIED: policy unavailable")?
+            .entry(task_id.to_owned())
+            .or_default()
             .insert(origin(&url));
         Ok(())
     }
@@ -188,12 +234,14 @@ impl BrowserPolicyState {
         Ok(())
     }
 
-    pub fn preview_origins(&self) -> Result<Vec<String>, String> {
+    pub fn preview_origins(&self, task_id: &str) -> Result<Vec<String>, String> {
         let mut origins = self
             .preview_origins
             .lock()
             .map_err(|_| "BROWSER_POLICY_DENIED: policy unavailable")?
-            .iter()
+            .get(task_id)
+            .into_iter()
+            .flatten()
             .cloned()
             .collect::<Vec<_>>();
         origins.sort();
@@ -215,10 +263,14 @@ fn allowed(
             {
                 return false;
             }
-            state
-                .preview_origins
-                .lock()
-                .ok()
+            task_id
+                .and_then(|task_id| {
+                    state
+                        .preview_origins
+                        .lock()
+                        .ok()
+                        .and_then(|origins| origins.get(task_id).cloned())
+                })
                 .is_some_and(|origins| origins.contains(&origin(url)))
         }
         BrowserMode::Agent => task_id
@@ -382,7 +434,7 @@ fn open_browser_window(
     // those bounds have been received.
     let parent = app
         .get_window("main")
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: product window is unavailable")?;
+        .ok_or("BROWSER_POLICY_DENIED: product window is unavailable")?;
     let webview = parent
         .add_child(
             WebviewBuilder::new(label.clone(), WebviewUrl::External(url))
@@ -472,8 +524,9 @@ fn open_browser_window(
 #[tauri::command]
 pub fn browser_list_preview_origins(
     state: tauri::State<'_, BrowserPolicyState>,
+    request: BrowserPreviewOriginsRequest,
 ) -> Result<Vec<String>, String> {
-    state.preview_origins()
+    state.preview_origins(&request.task_id)
 }
 
 #[tauri::command]
@@ -512,13 +565,13 @@ pub fn browser_navigate(
         .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?
         .get(&request.label)
         .cloned()
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+        .ok_or("BROWSER_POLICY_DENIED: unknown browser session")?;
     let url = Url::parse(&request.url).map_err(|_| "BROWSER_POLICY_DENIED: invalid URL")?;
     if !allowed(&state, &session.mode, session.task_id.as_deref(), &url) {
         return Err("BROWSER_POLICY_DENIED: URL is not allowed for this browser mode".into());
     }
     app.get_webview(&request.label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .ok_or("BROWSER_POLICY_DENIED: browser session is no longer available")?
         .navigate(url.clone())
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not navigate".to_owned())?;
     let mut sessions = sessions
@@ -527,7 +580,7 @@ pub fn browser_navigate(
         .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?;
     let session = sessions
         .get_mut(&request.label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+        .ok_or("BROWSER_POLICY_DENIED: unknown browser session")?;
     record_history_navigation(session, url.as_str());
     Ok(())
 }
@@ -546,12 +599,12 @@ fn browser_move_history(
             .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?;
         let session = sessions
             .get(label)
-            .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+            .ok_or("BROWSER_POLICY_DENIED: unknown browser session")?;
         (
             session.mode.clone(),
             session.task_id.clone(),
             history_target(session, direction)
-                .ok_or_else(|| "BROWSER_POLICY_DENIED: browser history is unavailable")?,
+                .ok_or("BROWSER_POLICY_DENIED: browser history is unavailable")?,
         )
     };
     let target_url =
@@ -562,7 +615,7 @@ fn browser_move_history(
         );
     }
     app.get_webview(label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .ok_or("BROWSER_POLICY_DENIED: browser session is no longer available")?
         .navigate(target_url)
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not navigate history".to_owned())?;
     let mut sessions = sessions
@@ -571,7 +624,7 @@ fn browser_move_history(
         .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?;
     let session = sessions
         .get_mut(label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+        .ok_or("BROWSER_POLICY_DENIED: unknown browser session")?;
     let moved = move_history(session, direction);
     if moved.as_deref() != Some(target.as_str()) {
         return Err("BROWSER_POLICY_DENIED: browser history changed during navigation".into());
@@ -610,7 +663,7 @@ pub fn browser_history_state(
         .map_err(|_| "BROWSER_POLICY_DENIED: browser session registry unavailable")?;
     let session = sessions
         .get(&request.label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session")?;
+        .ok_or("BROWSER_POLICY_DENIED: unknown browser session")?;
     Ok(history_state(session))
 }
 
@@ -631,7 +684,7 @@ pub fn browser_set_bounds(
     }
     let webview = app
         .get_webview(&request.label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?;
+        .ok_or("BROWSER_POLICY_DENIED: browser session is no longer available")?;
     webview
         .set_position(LogicalPosition::new(request.x, request.y))
         .map_err(|_| "BROWSER_POLICY_DENIED: browser bounds could not be synchronized")?;
@@ -656,7 +709,7 @@ pub fn browser_reload(
         .ok_or_else(|| "BROWSER_POLICY_DENIED: unknown browser session".to_owned())?;
     let webview = app
         .get_webview(&request.label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?;
+        .ok_or("BROWSER_POLICY_DENIED: browser session is no longer available")?;
     let current = webview
         .url()
         .map_err(|_| "BROWSER_POLICY_DENIED: browser URL is unavailable")?;
@@ -685,7 +738,7 @@ pub fn browser_show(
         return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
     }
     app.get_webview(&request.label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .ok_or("BROWSER_POLICY_DENIED: browser session is no longer available")?
         .show()
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not show".to_owned())
 }
@@ -705,7 +758,7 @@ pub fn browser_hide(
         return Err("BROWSER_POLICY_DENIED: unknown browser session".into());
     }
     app.get_webview(&request.label)
-        .ok_or_else(|| "BROWSER_POLICY_DENIED: browser session is no longer available")?
+        .ok_or("BROWSER_POLICY_DENIED: browser session is no longer available")?
         .hide()
         .map_err(|_| "BROWSER_POLICY_DENIED: browser could not hide".to_owned())
 }
@@ -771,34 +824,86 @@ mod tests {
     fn preview_mode_requires_a_runtime_registered_exact_origin() {
         let state = BrowserPolicyState::default();
         assert!(state
-            .register_preview_origin("http://localhost:4173")
+            .register_preview_origin("task-1", "http://localhost:4173")
             .is_ok());
         assert!(allowed(
             &state,
             &BrowserMode::Preview,
-            None,
+            Some("task-1"),
             &url("http://localhost:4173/path")
         ));
         assert!(!allowed(
             &state,
             &BrowserMode::Preview,
-            None,
+            Some("task-2"),
+            &url("http://localhost:4173/path")
+        ));
+        assert!(!allowed(
+            &state,
+            &BrowserMode::Preview,
+            Some("task-1"),
             &url("http://localhost:4174/path")
         ));
         assert!(!allowed(
             &state,
             &BrowserMode::Preview,
-            None,
+            Some("task-1"),
             &url("https://localhost:4173/path")
         ));
         assert!(!allowed(
             &state,
             &BrowserMode::Preview,
-            None,
+            Some("task-1"),
             &url("http://127.0.0.1:4173/path")
         ));
-        assert!(state.register_preview_origin("http://localhost").is_err());
-        assert_eq!(state.preview_origins().unwrap(), ["http://localhost:4173"]);
+        assert!(state
+            .register_preview_origin("task-1", "http://localhost")
+            .is_err());
+        assert_eq!(
+            state.preview_origins("task-1").unwrap(),
+            ["http://localhost:4173"]
+        );
+        assert!(state.preview_origins("task-2").unwrap().is_empty());
+    }
+
+    #[test]
+    fn trusted_startup_policy_populates_task_scoped_preview_and_agent_registries() {
+        let state = BrowserPolicyState::from_trusted_deployment_policy_json(
+            r#"{
+                "previewOrigins": {"task-1": ["http://127.0.0.1:4173"]},
+                "agentDomains": {"task-1": ["api.example.com"]}
+            }"#,
+        )
+        .expect("trusted deployment policy");
+
+        assert_eq!(
+            state.preview_origins("task-1").unwrap(),
+            ["http://127.0.0.1:4173"]
+        );
+        assert!(allowed(
+            &state,
+            &BrowserMode::Agent,
+            Some("task-1"),
+            &url("https://api.example.com/v1")
+        ));
+        assert!(!allowed(
+            &state,
+            &BrowserMode::Agent,
+            Some("task-2"),
+            &url("https://api.example.com/v1")
+        ));
+    }
+
+    #[test]
+    fn invalid_trusted_startup_policy_fails_closed() {
+        assert!(BrowserPolicyState::from_trusted_deployment_policy_json(
+            r#"{"previewOrigins":{"task-1":["http://localhost"]}}"#
+        )
+        .is_err());
+        assert!(BrowserPolicyState::from_trusted_deployment_policy_json(
+            r#"{"agentDomains":{"task-1":["localhost"]}}"#
+        )
+        .is_err());
     }
 
     #[test]

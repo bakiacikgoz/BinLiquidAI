@@ -15,7 +15,7 @@ test('pilot readiness flow exposes governed run, approval, evidence, reports, an
   await expect(page.getByTestId('page-primary-region')).toContainText('Pilot Launch Candidate');
 
   await openPrimaryView(page, 'Agents', 'Agents');
-  await expect(page.getByText('Governed Ops Agent', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Governed Ops Agent', exact: true })).toBeVisible();
 
   await openPrimaryView(page, 'Policy', 'Policy Simulation');
   await expect(page.getByTestId('page-primary-region')).toContainText('require_approval');

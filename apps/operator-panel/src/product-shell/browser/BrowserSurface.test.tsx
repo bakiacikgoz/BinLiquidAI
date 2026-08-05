@@ -48,4 +48,64 @@ describe('BrowserSurface', () => {
     }));
     bounds.mockRestore();
   });
+
+  it('shows the exact native policy denial returned as a Tauri string error', async () => {
+    invoke.mockRejectedValueOnce('BROWSER_POLICY_DENIED: user mode requires an explicit HTTPS URL');
+    const { user } = renderOperatorPanel(<BrowserSurface onClose={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Open HTTPS' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'BROWSER_POLICY_DENIED: user mode requires an explicit HTTPS URL',
+    );
+  });
+
+  it('closes a native browser session that finishes opening after the tab unmounts', async () => {
+    let resolveOpen: ((label: string) => void) | undefined;
+    invoke.mockImplementation((command: string) => {
+      if (command === 'browser_open') {
+        return new Promise((resolve) => { resolveOpen = resolve; });
+      }
+      return Promise.resolve(undefined);
+    });
+    const { user, unmount } = renderOperatorPanel(<BrowserSurface onClose={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Open HTTPS' }));
+    unmount();
+    resolveOpen?.('imperaos-browser-late');
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('browser_close', {
+      request: { label: 'imperaos-browser-late' },
+    }));
+  });
+
+  it('does not create duplicate native sessions while an open is pending', async () => {
+    let resolveOpen: ((label: string) => void) | undefined;
+    invoke.mockImplementation((command: string) => {
+      if (command === 'browser_open') {
+        return new Promise((resolve) => { resolveOpen = resolve; });
+      }
+      return Promise.resolve(undefined);
+    });
+    const { user } = renderOperatorPanel(<BrowserSurface onClose={vi.fn()} />);
+    const openButton = screen.getByRole('button', { name: 'Open HTTPS' });
+
+    await user.click(openButton);
+    await user.click(openButton);
+
+    expect(invoke.mock.calls.filter(([command]) => command === 'browser_open')).toHaveLength(1);
+    resolveOpen?.('imperaos-browser-one');
+  });
+
+  it('closes an already-open native session when the owning workspace tab unmounts', async () => {
+    const { user, unmount } = renderOperatorPanel(<BrowserSurface onClose={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Open HTTPS' }));
+    await waitFor(() => expect(screen.getByText(/Opened native browser/)).toBeInTheDocument());
+
+    unmount();
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('browser_close', {
+      request: { label: 'imperaos-browser-user' },
+    }));
+  });
 });

@@ -16,11 +16,21 @@ import { BottomDock } from '../bottom-dock/BottomDock';
 import { ContextRail } from '../context-rail/ContextRail';
 import { ProductConversationView } from '../conversation/ProductConversationView';
 import { useProductAssistant } from '../adapters/useProductAssistant';
-import { productWorkspaceClient, type ProductWorkspaceTask } from '../adapters/productWorkspaceClient';
+import {
+  productWorkspaceClient,
+  type ProductWorkspaceProject,
+  type ProductWorkspaceTask,
+} from '../adapters/productWorkspaceClient';
 import { useProductShellStore, type ProductTask } from '../state/productShellStore';
 import { WorkSurface } from '../workspace/WorkSurface';
 import { WorkspaceTabs } from '../workspace/WorkspaceTabs';
-import { createWorkspaceTab, type WorkspaceTab, type WorkspaceTabKind } from '../workspace/workspaceTabState';
+import {
+  createWorkspaceTab,
+  loadWorkspaceTabSnapshot,
+  saveWorkspaceTabSnapshot,
+  type WorkspaceTab,
+  type WorkspaceTabKind,
+} from '../workspace/workspaceTabState';
 import { AssistantComposer } from '../../components/assistant/AssistantComposer';
 import {
   getAssistantRuntimeSettings,
@@ -77,6 +87,28 @@ function shellTask(task: ProductWorkspaceTask): ProductTask {
   };
 }
 
+async function findOwningProject(projectId: string): Promise<ProductWorkspaceProject | undefined> {
+  for (const status of ['active', 'archived'] as const) {
+    let cursor: string | undefined;
+    const visitedCursors = new Set<string>();
+    do {
+      const page = await productWorkspaceClient.listProjects({
+        cursor,
+        limit: 100,
+        status,
+        sort: 'updated_desc',
+      });
+      const match = page.projects.find((project) => project.projectId === projectId);
+      if (match) return match;
+      const nextCursor = page.nextCursor ?? undefined;
+      if (!nextCursor || visitedCursors.has(nextCursor)) break;
+      visitedCursors.add(nextCursor);
+      cursor = nextCursor;
+    } while (cursor);
+  }
+  return undefined;
+}
+
 function controlsFromNavigation(value: unknown): AssistantComposerControls | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const source = value as Record<string, unknown>;
@@ -96,7 +128,11 @@ export function TaskPage() {
   const task = useProductShellStore((state) => state.tasks.find((item) => item.id === taskId));
   const selectTask = useProductShellStore((state) => state.selectTask);
   const upsertTasks = useProductShellStore((state) => state.upsertTasks);
+  const projects = useProductShellStore((state) => state.projects);
+  const upsertProjects = useProductShellStore((state) => state.upsertProjects);
   const [loadError, setLoadError] = useState('');
+  const [projectLoadError, setProjectLoadError] = useState('');
+  const projectLookupRef = useRef<string | null>(null);
   useEffect(() => { if (taskId) selectTask(taskId); }, [selectTask, taskId]);
   useEffect(() => {
     if (!taskId || task) return;
@@ -110,8 +146,38 @@ export function TaskPage() {
     });
     return () => { active = false; };
   }, [task, taskId, upsertTasks]);
+  const owningProject = task?.projectId
+    ? projects.find((project) => project.projectId === task.projectId)
+    : undefined;
+  useEffect(() => {
+    const projectId = task?.projectId;
+    if (!projectId || owningProject || projectLookupRef.current === projectId) return;
+    projectLookupRef.current = projectId;
+    let active = true;
+    setProjectLoadError('');
+    void findOwningProject(projectId).then((project) => {
+      if (!active) return;
+      if (!project) {
+        setProjectLoadError('The task project runtime authority could not be recovered.');
+        return;
+      }
+      upsertProjects([{
+        projectId: project.projectId,
+        rootRef: project.rootRef,
+        rootDisplayName: project.rootDisplayName,
+      }]);
+    }).catch((cause) => {
+      if (active) {
+        setProjectLoadError(cause instanceof Error
+          ? cause.message
+          : 'The task project runtime authority could not be recovered.');
+      }
+    });
+    return () => { active = false; };
+  }, [owningProject, task?.projectId, upsertProjects]);
   if (!taskId) return <Navigate to="/" replace />;
   if (!task) return <section className="conversation-empty ps-empty" aria-live="polite"><h2>{loadError ? 'Task unavailable' : 'Loading governed task…'}</h2><p>{loadError || 'Restoring the durable task and its governed runtime context.'}</p>{loadError && <a href="#/">Return to new work</a>}</section>;
+  if (task.projectId && !owningProject) return <section className="conversation-empty ps-empty" aria-live="polite"><h2>{projectLoadError ? 'Project runtime unavailable' : 'Loading governed project…'}</h2><p>{projectLoadError || 'Restoring the task project and its registered terminal root.'}</p></section>;
   return <TaskWorkspace key={task.id} task={task} />;
 }
 
@@ -123,8 +189,9 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const upsertTasks = useProductShellStore((state) => state.upsertTasks);
   const projects = useProductShellStore((state) => state.projects);
   const assistant = useProductAssistant(task);
-  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>([]);
-  const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(null);
+  const [initialWorkspaceSnapshot] = useState(() => loadWorkspaceTabSnapshot(sessionStorage, task.id));
+  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>(initialWorkspaceSnapshot.tabs);
+  const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(initialWorkspaceSnapshot.activeTabId);
   const [conversationWidth, setConversationWidth] = useState(54);
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
   const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
@@ -148,7 +215,12 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const projectRoot = task.projectId
     ? projects.find((project) => project.projectId === task.projectId)
     : undefined;
+  const projectRootRef = projectRoot?.rootRef.trim() || undefined;
   const hasWorkspace = location.pathname.endsWith('/workspace');
+
+  useEffect(() => {
+    saveWorkspaceTabSnapshot(sessionStorage, task.id, workspaceTabs, activeWorkspaceTabId);
+  }, [activeWorkspaceTabId, task.id, workspaceTabs]);
 
   useEffect(() => {
     const state = location.state as InitialTaskNavigationState;
@@ -221,12 +293,24 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   };
   const openWorkspaceTab = useCallback((kind: WorkspaceTabKind, artifactId?: string) => {
     setWorkspaceTabs((current) => {
-      const existing = kind === 'artifacts' ? current.find((tab) => tab.kind === 'artifacts') : undefined;
-      const next = existing
-        ? { ...existing, ...(artifactId ? { artifactId } : {}) }
-        : createWorkspaceTab(kind, artifactId);
+      const next = createWorkspaceTab(kind, artifactId);
       setActiveWorkspaceTabId(next.id);
-      return existing ? current.map((tab) => tab.id === existing.id ? next : tab) : [...current, next];
+      return [...current, next];
+    });
+    if (!location.pathname.endsWith('/workspace')) {
+      navigate(`/task/${task.id}/workspace`, { state: location.state });
+    }
+  }, [location.pathname, location.state, navigate, task.id]);
+  const focusOrOpenTerminal = useCallback(() => {
+    setWorkspaceTabs((current) => {
+      const existing = [...current].reverse().find((tab) => tab.kind === 'terminal');
+      if (existing) {
+        setActiveWorkspaceTabId(existing.id);
+        return current;
+      }
+      const next = createWorkspaceTab('terminal');
+      setActiveWorkspaceTabId(next.id);
+      return [...current, next];
     });
     if (!location.pathname.endsWith('/workspace')) {
       navigate(`/task/${task.id}/workspace`, { state: location.state });
@@ -334,11 +418,13 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
                   tabs={workspaceTabs}
                   activeTabId={activeWorkspaceTabId}
                   assistantState={assistant.state}
-                  projectRootRef={projectRoot?.rootRef}
+                  taskId={task.id}
+                  projectRootRef={projectRootRef}
                   projectRootDisplayName={projectRoot?.rootDisplayName}
                   onActivate={setActiveWorkspaceTabId}
                   onClose={closeWorkspaceTab}
                   onUpdate={updateWorkspaceTab}
+                  onOpen={openWorkspaceTab}
                 />
               </div>
             </>
@@ -349,12 +435,14 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
               onOpenTerminal={() => openWorkspaceTab('terminal')}
               onOpenBrowser={() => openWorkspaceTab('browser')}
               onOpenPreview={() => openWorkspaceTab('preview')}
+              onOpenFiles={() => openWorkspaceTab('files')}
+              onOpenData={() => openWorkspaceTab('data')}
             />
           )}
         </div>
         {contextRailOpen ? <ContextRail task={task} state={assistant.state} /> : null}
       </div>
-      {dockOpen ? <BottomDock state={assistant.state} /> : null}
+      {dockOpen ? <BottomDock state={assistant.state} onOpenTerminal={focusOrOpenTerminal} /> : null}
     </main>
   );
 }

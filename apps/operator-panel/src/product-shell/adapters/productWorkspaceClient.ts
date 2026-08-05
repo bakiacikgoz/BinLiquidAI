@@ -28,17 +28,34 @@ export type ProductWorkspaceProject = z.infer<typeof project>;
 export type ProductTaskRuntimeOptions = z.infer<typeof taskRuntime>;
 export type ProductTaskLink = z.infer<typeof taskLink>;
 
+async function invokeWorkspace(command: string, args: Record<string, unknown>): Promise<unknown> {
+  try {
+    return await invoke<unknown>(command, args);
+  } catch (cause) {
+    if (
+      cause instanceof TypeError
+      && /undefined.*invoke|invoke.*undefined/i.test(cause.message)
+    ) {
+      throw new Error(
+        'Workspace data requires the ImperaOS desktop runtime. Open this screen in the desktop app.',
+        { cause },
+      );
+    }
+    throw cause;
+  }
+}
+
 export class ProductWorkspaceClient {
   private async call<T>(command: string, params: Record<string, unknown>, schema: z.ZodType<T>, idempotencyKey: string | null = null): Promise<T> {
     const boundParams = idempotencyKey ? { ...params, idempotencyKey } : params;
-    const raw = await invoke<unknown>(command, { payload: { params: boundParams, idempotencyKey, timeoutMs: 15_000 } });
+    const raw = await invokeWorkspace(command, { payload: { params: boundParams, idempotencyKey, timeoutMs: 15_000 } });
     const parsed = envelope.parse(raw);
     if (!parsed.ok) throw new Error(parsed.error.message);
     return schema.parse(parsed.data);
   }
 
   private async nativeCall<T>(command: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
-    const raw = await invoke<unknown>(command, args);
+    const raw = await invokeWorkspace(command, args);
     const parsed = envelope.parse(raw);
     if (!parsed.ok) throw new Error(parsed.error.message);
     return schema.parse(parsed.data);

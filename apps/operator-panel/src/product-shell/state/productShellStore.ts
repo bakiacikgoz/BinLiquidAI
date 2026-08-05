@@ -1,6 +1,28 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export const DEFAULT_SIDEBAR_WIDTH = 260;
+export const MIN_SIDEBAR_WIDTH = 220;
+export const MAX_SIDEBAR_WIDTH = 340;
+
+export function clampSidebarWidth(sidebarWidth: number): number {
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth));
+}
+
+export function migrateProductShellPreferences(persistedState: unknown, _version: number): unknown {
+  if (!persistedState || typeof persistedState !== 'object') return persistedState;
+  const preferences = persistedState as Record<string, unknown>;
+  const sidebarWidth = preferences.sidebarWidth;
+  const hasValidSidebarWidth = typeof sidebarWidth === 'number'
+    && Number.isFinite(sidebarWidth)
+    && sidebarWidth >= MIN_SIDEBAR_WIDTH
+    && sidebarWidth <= MAX_SIDEBAR_WIDTH;
+  return {
+    ...preferences,
+    sidebarWidth: hasValidSidebarWidth ? sidebarWidth : DEFAULT_SIDEBAR_WIDTH,
+  };
+}
+
 export type ProductTask = {
   id: string;
   projectId?: string;
@@ -56,7 +78,7 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
   dockOpen: false,
   dockHeight: 240,
   sidebarCollapsed: true,
-  sidebarWidth: 300,
+  sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   theme: 'dark',
   searchOpen: false,
   upsertTasks: (tasks) => set((state) => {
@@ -77,11 +99,13 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
   setDockOpen: (dockOpen) => set({ dockOpen }),
   setDockHeight: (dockHeight) => set({ dockHeight: Math.min(520, Math.max(140, dockHeight)) }),
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
-  setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: Math.min(420, Math.max(240, sidebarWidth)) }),
+  setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: clampSidebarWidth(sidebarWidth) }),
   setTheme: (theme) => set({ theme }),
   setSearchOpen: (searchOpen) => set({ searchOpen }),
 }), {
   name: 'imperaos-product-shell-preferences-v2',
+  version: 3,
+  migrate: (persistedState, version) => migrateProductShellPreferences(persistedState, version) as ProductShellState,
   // Tasks and conversations remain owned by the future Product Workspace domain,
   // never by this UI preference store.
   partialize: (state) => ({

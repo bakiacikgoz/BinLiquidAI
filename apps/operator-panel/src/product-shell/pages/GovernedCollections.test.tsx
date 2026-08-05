@@ -3,13 +3,18 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 const artifacts = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn() }));
-const bridge = vi.hoisted(() => ({ listControlPlaneAgents: vi.fn() }));
+const bridge = vi.hoisted(() => ({
+  listControlPlaneAgents: vi.fn(),
+  fetchApprovals: vi.fn(),
+  showApproval: vi.fn(),
+  decideApproval: vi.fn(),
+}));
 
 vi.mock('../../artifact-workspace/artifactBridge', () => ({ artifactBridge: artifacts }));
 vi.mock('../../bridge', () => bridge);
 
 import { renderOperatorPanel } from '../../test/render';
-import { AgentsPage, LibraryPage } from './GovernedCollections';
+import { AgentsPage, ApprovalsPage, LibraryPage } from './GovernedCollections';
 
 describe('LibraryPage', () => {
   it('opens the canonical detail for a selected governed artifact', async () => {
@@ -26,6 +31,33 @@ describe('LibraryPage', () => {
     await screen.findByRole('button', { name: /Release plan/ });
     await waitFor(() => expect(artifacts.get).toHaveBeenCalledWith({ artifactId: 'artifact-release' }));
     expect(await screen.findByText(/revision-1/)).toBeInTheDocument();
+    expect(container.querySelector('pre')).not.toBeInTheDocument();
+  });
+
+  it('renders approval evidence as labeled fields rather than primary raw JSON', async () => {
+    bridge.fetchApprovals.mockResolvedValue({
+      pending: [{ approval_id: 'approval-release', target_kind: 'deployment', status: 'pending' }],
+    });
+    bridge.showApproval.mockResolvedValue({
+      approval_id: 'approval-release',
+      status: 'pending',
+      execution_status: 'not_executed',
+      ticket: {
+        run_id: 'run-release',
+        target_kind: 'deployment',
+        target_ref: 'production',
+        expires_at: '2026-07-30T12:00:00Z',
+        actor: 'policy-router',
+        decision_reason: 'POLICY_REQUIRE_APPROVAL',
+        snapshot: { risk_class: 'high', category: 'external_action' },
+      },
+    });
+
+    const { container } = renderOperatorPanel(<MemoryRouter><ApprovalsPage /></MemoryRouter>);
+
+    expect(await screen.findByText('run-release')).toBeInTheDocument();
+    expect(screen.getByText('high')).toBeInTheDocument();
+    expect(container.querySelector('pre')).not.toBeInTheDocument();
   });
 
   it('opens the requested governed agent detail from a canonical search route', async () => {

@@ -15,6 +15,9 @@ switch and a decision in one mode never grants access in another mode.
   trusted ImperaOS runtime registered with an explicit port.
 - The renderer cannot register preview origins. Arbitrary local ports are
   denied, as are host, scheme, or port substitutions during redirects.
+- The trusted desktop launcher may bootstrap task-owned preview origins through
+  `IMPERAOS_BROWSER_DEPLOYMENT_POLICY_JSON` before the renderer starts. Invalid
+  or oversized policy fails closed.
 
 ## Agent browser
 
@@ -24,6 +27,8 @@ switch and a decision in one mode never grants access in another mode.
   fails closed.
 - Each agent window has a fresh browser profile; it cannot read user browser
   cookies or reuse the user session.
+- Trusted task/deployment domain allowlists use the same startup policy
+  envelope; the renderer cannot extend them.
 
 ## External effects
 

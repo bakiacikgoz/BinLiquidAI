@@ -220,7 +220,12 @@ export function Sidebar() {
 
         <nav className="sidebar-nav" aria-label="Ana navigasyon">
           {primaryLinks.map(({ label, icon: Icon, to, trailingIcon: TrailingIcon }) => (
-            <NavLink key={label} to={to} end={to === '/'} className={({ isActive }) => `sidebar-link ${isActive ? 'is-active' : ''}`}>
+            <NavLink
+              key={label}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) => `sidebar-link ${to === '/' ? 'sidebar-primary-action' : ''} ${isActive ? 'is-active' : ''}`}
+            >
               <Icon size={14} strokeWidth={1.75} /><span>{label}</span>
               {TrailingIcon && <TrailingIcon className="sidebar-link-action" size={14} strokeWidth={1.7} />}
             </NavLink>
@@ -250,7 +255,11 @@ export function Sidebar() {
               </label>
             </div>
           )}
-          {error && <p className="sidebar-error" role="alert">{error}</p>}
+          {error && (
+            <p className={`sidebar-error ${error.includes('desktop runtime') ? 'sidebar-runtime-notice' : ''}`} role="alert">
+              {error}
+            </p>
+          )}
           <div className="project-list">
             {projects.map((project) => {
               const projectTasks = activeTasks.filter((task) => task.projectId === project.projectId);

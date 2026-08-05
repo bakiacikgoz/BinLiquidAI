@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { ChevronLeft, ChevronRight, ExternalLink, RotateCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { nativeErrorMessage } from '../nativeErrorMessage';
+
 type BrowserHistoryState = { canBack: boolean; canForward: boolean };
 
 const emptyHistory: BrowserHistoryState = { canBack: false, canForward: false };
@@ -21,8 +23,14 @@ export function BrowserSurface({ active = true, onClose, sessionLabel: persisted
   const [history, setHistory] = useState<BrowserHistoryState>(emptyHistory);
   const [status, setStatus] = useState('');
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const openingRef = useRef(false);
+  const disposedRef = useRef(false);
+  const [opening, setOpening] = useState(false);
   const sessionLabel = persistedSessionLabel ?? ownedSessionLabel;
+  const sessionLabelRef = useRef<string | null>(sessionLabel);
+  sessionLabelRef.current = sessionLabel;
   const setSessionLabel = (next: string | null) => {
+    sessionLabelRef.current = next;
     setOwnedSessionLabel(next);
     onSessionChange?.(next);
   };
@@ -33,18 +41,31 @@ export function BrowserSurface({ active = true, onClose, sessionLabel: persisted
     setHistory(normalizeHistory(next));
   };
   const open = async () => {
+    if (openingRef.current || disposedRef.current) return;
+    openingRef.current = true;
+    setOpening(true);
     try {
       if (sessionLabel) {
         await invoke('browser_navigate', { request: { label: sessionLabel, url: address } });
+        if (disposedRef.current) return;
         await refreshHistory(sessionLabel);
         setStatus(`Navigated governed browser: ${sessionLabel}`);
       } else {
         const label = await invoke<string>('browser_open', { request: { mode: 'user', url: address } });
+        if (disposedRef.current) {
+          void invoke('browser_close', { request: { label } }).catch(() => undefined);
+          return;
+        }
         setSessionLabel(label);
         setHistory(emptyHistory);
         setStatus(`Opened native browser: ${label}`);
       }
-    } catch (cause) { setStatus(cause instanceof Error ? cause.message : 'Browser navigation failed.'); }
+    } catch (cause) {
+      if (!disposedRef.current) setStatus(nativeErrorMessage(cause, 'Browser navigation failed.'));
+    } finally {
+      openingRef.current = false;
+      if (!disposedRef.current) setOpening(false);
+    }
   };
   const move = async (direction: 'back' | 'forward') => {
     if (!sessionLabel) return;
@@ -52,22 +73,37 @@ export function BrowserSurface({ active = true, onClose, sessionLabel: persisted
       await invoke(direction === 'back' ? 'browser_back' : 'browser_forward', { request: { label: sessionLabel } });
       await refreshHistory(sessionLabel);
       setStatus(`Navigated ${direction} through governed browser history.`);
-    } catch (cause) { setStatus(cause instanceof Error ? cause.message : 'Browser history navigation failed.'); }
+    } catch (cause) { setStatus(nativeErrorMessage(cause, 'Browser history navigation failed.')); }
   };
   const close = () => {
-    if (sessionLabel) void invoke('browser_close', { request: { label: sessionLabel } });
+    disposedRef.current = true;
+    const label = sessionLabelRef.current;
+    if (label) void invoke('browser_close', { request: { label } }).catch(() => undefined);
     setSessionLabel(null);
     onClose();
   };
   const reload = () => {
     if (!sessionLabel) return;
     void invoke('browser_reload', { request: { label: sessionLabel } })
-      .catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Browser reload failed.'));
+      .catch((cause) => setStatus(nativeErrorMessage(cause, 'Browser reload failed.')));
   };
 
   useEffect(() => {
+    disposedRef.current = false;
+    return () => {
+      disposedRef.current = true;
+      const label = sessionLabelRef.current;
+      queueMicrotask(() => {
+        if (!disposedRef.current || !label || sessionLabelRef.current !== label) return;
+        sessionLabelRef.current = null;
+        void invoke('browser_close', { request: { label } }).catch(() => undefined);
+      });
+    };
+  }, []);
+
+  useEffect(() => {
     if (!sessionLabel) return;
-    void refreshHistory(sessionLabel).catch((cause) => setStatus(cause instanceof Error ? cause.message : 'Browser history is unavailable.'));
+    void refreshHistory(sessionLabel).catch((cause) => setStatus(nativeErrorMessage(cause, 'Browser history is unavailable.')));
   }, [sessionLabel]);
 
   useEffect(() => {
@@ -85,7 +121,7 @@ export function BrowserSurface({ active = true, onClose, sessionLabel: persisted
       };
       void invoke('browser_set_bounds', { request })
         .then(() => invoke('browser_show', { request: { label: sessionLabel } }))
-        .catch((cause) => { if (mounted) setStatus(cause instanceof Error ? cause.message : 'Browser viewport could not be synchronized.'); });
+        .catch((cause) => { if (mounted) setStatus(nativeErrorMessage(cause, 'Browser viewport could not be synchronized.')); });
     };
     synchronize();
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(synchronize);
@@ -116,7 +152,7 @@ export function BrowserSurface({ active = true, onClose, sessionLabel: persisted
             inputMode="url"
             spellCheck={false}
           />
-          <button type="submit">{sessionLabel ? 'Navigate HTTPS' : 'Open HTTPS'}<ExternalLink size={14} /></button>
+          <button type="submit" disabled={opening}>{opening ? 'Opening…' : sessionLabel ? 'Navigate HTTPS' : 'Open HTTPS'}<ExternalLink size={14} /></button>
         </form>
         <button type="button" aria-label="Close" onClick={close}><X size={16} /></button>
       </div>
