@@ -34,3 +34,33 @@ describe('product shell sidebar preferences', () => {
     });
   });
 });
+
+describe('product shell task lifecycle', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useProductShellStore.setState(useProductShellStore.getInitialState(), true);
+  });
+
+  it('retains an archived task record while clearing its active selection', () => {
+    const activeTask = {
+      id: 'task-release',
+      title: 'Prepare release',
+      createdAt: '2026-07-24T12:00:00Z',
+      status: 'active' as const,
+    };
+    useProductShellStore.setState({ tasks: [activeTask], selectedTaskId: activeTask.id });
+
+    useProductShellStore.getState().upsertTasks([{
+      ...activeTask,
+      status: 'archived',
+      archivedAt: '2026-08-07T07:00:00Z',
+    }]);
+
+    expect(useProductShellStore.getState().tasks).toEqual([expect.objectContaining({
+      id: activeTask.id,
+      status: 'archived',
+      archivedAt: '2026-08-07T07:00:00Z',
+    })]);
+    expect(useProductShellStore.getState().selectedTaskId).toBeNull();
+  });
+});

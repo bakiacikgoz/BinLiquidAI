@@ -84,10 +84,14 @@ export const useProductShellStore = create<ProductShellState>()(persist((set) =>
   upsertTasks: (tasks) => set((state) => {
     const next = new Map(state.tasks.map((task) => [task.id, task]));
     tasks.forEach((task) => next.set(task.id, task));
-    return { tasks: [...next.values()].sort((left, right) => Number(right.pinned) - Number(left.pinned)
-      || (left.manualOrder ?? 0) - (right.manualOrder ?? 0)
-      || (right.priority ?? 0) - (left.priority ?? 0)
-      || (right.updatedAt ?? right.createdAt).localeCompare(left.updatedAt ?? left.createdAt)) };
+    const selectedTaskArchived = tasks.some((task) => task.id === state.selectedTaskId && task.status === 'archived');
+    return {
+      tasks: [...next.values()].sort((left, right) => Number(right.pinned) - Number(left.pinned)
+        || (left.manualOrder ?? 0) - (right.manualOrder ?? 0)
+        || (right.priority ?? 0) - (left.priority ?? 0)
+        || (right.updatedAt ?? right.createdAt).localeCompare(left.updatedAt ?? left.createdAt)),
+      ...(selectedTaskArchived ? { selectedTaskId: null } : {}),
+    };
   }),
   upsertProjects: (projects) => set((state) => {
     const next = new Map(state.projects.map((project) => [project.projectId, project]));

@@ -36,6 +36,18 @@ describe('workspace tab persistence', () => {
     });
   });
 
+  it('recovers the first valid tab when a persisted active id is stale', () => {
+    const storage = new Map<string, string>();
+    const terminal = createWorkspaceTab('terminal');
+
+    saveWorkspaceTabSnapshot(storage, 'task-stale-active', [terminal], 'removed-tab');
+
+    expect(loadWorkspaceTabSnapshot(storage, 'task-stale-active')).toEqual({
+      tabs: [terminal],
+      activeTabId: terminal.id,
+    });
+  });
+
   it('persists the governed files and data explorer surfaces', () => {
     const storage = new Map<string, string>();
     const files = createWorkspaceTab('files');

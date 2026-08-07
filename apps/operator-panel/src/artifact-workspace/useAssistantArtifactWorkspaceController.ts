@@ -108,6 +108,7 @@ export function useAssistantArtifactWorkspaceController({
   const comparisonRequestSequence = useRef(0);
   const conflictForkKeys = useRef(new Map<string, string>());
   const workspaceEpoch = useRef(0);
+  const openRef = useRef(false);
   const state = useSyncExternalStore(
     useCallback((listener) => controller.subscribe(listener), [controller]),
     useCallback(() => controller.getState(), [controller]),
@@ -742,6 +743,7 @@ export function useAssistantArtifactWorkspaceController({
     autosave.dispose();
     formRuntime.resetAll();
     controller.getState().tabs.forEach((tab) => controller.discardAndClose(tab.artifact.artifactId));
+    openRef.current = false;
     setOpen(false);
     setLoadingArtifactId(null);
     setError(null);
@@ -757,13 +759,23 @@ export function useAssistantArtifactWorkspaceController({
     invalidateComparison();
   }, [autosave, controller, formRuntime, invalidateComparison]);
 
+  const openWorkspace = useCallback(() => {
+    if (openRef.current) return;
+    openRef.current = true;
+    if (catalog.length === 0 && !catalogLoading) void loadCatalog(false);
+    setOpen(true);
+  }, [catalog.length, catalogLoading, loadCatalog]);
+
   const toggle = useCallback(() => {
-    if (!open && catalog.length === 0 && !catalogLoading) void loadCatalog(false);
-    setOpen((value) => !value);
-  }, [catalog.length, catalogLoading, loadCatalog, open]);
+    const nextOpen = !openRef.current;
+    openRef.current = nextOpen;
+    if (nextOpen && catalog.length === 0 && !catalogLoading) void loadCatalog(false);
+    setOpen(nextOpen);
+  }, [catalog.length, catalogLoading, loadCatalog]);
 
   const actions = useMemo(
     () => ({
+      open: openWorkspace,
       toggle,
       reset,
       selectLegacyArtifact: onSelectLegacyArtifact,
@@ -815,7 +827,7 @@ export function useAssistantArtifactWorkspaceController({
       loadHistory: (artifactId: string) => loadHistory(artifactId, false),
       loadMoreHistory: (artifactId: string) => loadHistory(artifactId, true),
     }),
-    [applyProposal, autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSlides, exportSpreadsheet, exportStructured, formRuntime, forkConflict, importAsset, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, refreshConflict, reloadConflict, reset, resolveAsset, restoreArtifact, submitForm, toggle],
+    [applyProposal, autosave, closeComparison, compareConflict, compareRevision, controller, edit, exportCanvas, exportCode, exportDocument, exportFlow, exportSlides, exportSpreadsheet, exportStructured, formRuntime, forkConflict, importAsset, invalidateComparison, loadCatalog, loadHistory, onSelectLegacyArtifact, openArtifact, openWorkspace, refreshConflict, reloadConflict, reset, resolveAsset, restoreArtifact, submitForm, toggle],
   );
 
   const activeTab =

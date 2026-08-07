@@ -28,6 +28,18 @@ export type ProductWorkspaceProject = z.infer<typeof project>;
 export type ProductTaskRuntimeOptions = z.infer<typeof taskRuntime>;
 export type ProductTaskLink = z.infer<typeof taskLink>;
 
+export class ProductWorkspaceError extends Error {
+  readonly code: string;
+  readonly retryable: boolean;
+
+  constructor(code: string, message: string, retryable: boolean, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'ProductWorkspaceError';
+    this.code = code;
+    this.retryable = retryable;
+  }
+}
+
 async function invokeWorkspace(command: string, args: Record<string, unknown>): Promise<unknown> {
   try {
     return await invoke<unknown>(command, args);
@@ -36,8 +48,10 @@ async function invokeWorkspace(command: string, args: Record<string, unknown>): 
       cause instanceof TypeError
       && /undefined.*invoke|invoke.*undefined/i.test(cause.message)
     ) {
-      throw new Error(
+      throw new ProductWorkspaceError(
+        'PRODUCT_RUNTIME_UNAVAILABLE',
         'Workspace data requires the ImperaOS desktop runtime. Open this screen in the desktop app.',
+        false,
         { cause },
       );
     }
@@ -50,14 +64,22 @@ export class ProductWorkspaceClient {
     const boundParams = idempotencyKey ? { ...params, idempotencyKey } : params;
     const raw = await invokeWorkspace(command, { payload: { params: boundParams, idempotencyKey, timeoutMs: 15_000 } });
     const parsed = envelope.parse(raw);
-    if (!parsed.ok) throw new Error(parsed.error.message);
+    if (!parsed.ok) throw new ProductWorkspaceError(
+      parsed.error.code,
+      parsed.error.message,
+      parsed.error.retryable,
+    );
     return schema.parse(parsed.data);
   }
 
   private async nativeCall<T>(command: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
     const raw = await invokeWorkspace(command, args);
     const parsed = envelope.parse(raw);
-    if (!parsed.ok) throw new Error(parsed.error.message);
+    if (!parsed.ok) throw new ProductWorkspaceError(
+      parsed.error.code,
+      parsed.error.message,
+      parsed.error.retryable,
+    );
     return schema.parse(parsed.data);
   }
 

@@ -1,5 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const assistant = vi.hoisted(() => ({
@@ -57,6 +57,10 @@ vi.mock('../workspace/WorkspaceTabs', () => ({
 import { renderOperatorPanel } from '../../test/render';
 import { useProductShellStore } from '../state/productShellStore';
 import { TaskPage } from './TaskPage';
+
+function LocationProbe() {
+  return <p>Current route: {useLocation().pathname}</p>;
+}
 
 describe('TaskPage', () => {
   beforeEach(() => {
@@ -125,6 +129,40 @@ describe('TaskPage', () => {
     expect(workspace.getTask).toHaveBeenCalledWith('task-1');
     expect(screen.queryByText('Fallback route')).not.toBeInTheDocument();
   });
+
+  it.each(['/task/task-1', '/task/task-1/workspace'])(
+    'clears selection and redirects an archived task route to safe navigation: %s',
+    async (route) => {
+      useProductShellStore.setState({
+        tasks: [{
+          id: 'task-1',
+          title: 'Prepare release',
+          createdAt: '2026-07-24T12:00:00Z',
+          status: 'archived',
+          archivedAt: '2026-08-07T07:00:00Z',
+        }],
+        selectedTaskId: 'task-1',
+      });
+
+      renderOperatorPanel(
+        <MemoryRouter initialEntries={[route]}>
+          <LocationProbe />
+          <Routes>
+            <Route path="/task/:taskId" element={<TaskPage />} />
+            <Route path="/task/:taskId/workspace" element={<TaskPage />} />
+            <Route path="/" element={<p>Safe route</p>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText('Safe route')).toBeInTheDocument();
+      expect(screen.getByText('Current route: /')).toBeInTheDocument();
+      expect(useProductShellStore.getState().selectedTaskId).toBeNull();
+      expect(useProductShellStore.getState().tasks).toEqual([
+        expect.objectContaining({ id: 'task-1', status: 'archived' }),
+      ]);
+    },
+  );
 
   it('hydrates the task project root on a direct workspace-route reload', async () => {
     useProductShellStore.setState({ tasks: [], projects: [], selectedTaskId: null });

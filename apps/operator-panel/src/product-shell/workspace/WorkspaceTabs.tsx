@@ -53,7 +53,7 @@ export function WorkspaceTabs({
 }) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
-  const active = tabs.find((tab) => tab.id === activeTabId) ?? null;
+  const active = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0] ?? null;
   useEffect(() => {
     if (!addMenuOpen) return;
     const closeOnOutside = (event: MouseEvent) => {

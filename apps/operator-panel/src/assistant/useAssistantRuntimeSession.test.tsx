@@ -15,43 +15,12 @@ const bridgeMocks = vi.hoisted(() => ({
   isBridgePreviewMode: vi.fn(),
 }));
 
-const legacySession = vi.hoisted(() => ({
-  state: {
-    sessionId: 'legacy-session',
-    turns: [],
-    activeTurnId: null,
-    status: 'idle' as const,
-    selectedRunIds: [],
-    referencedArtifacts: [],
-    pendingApprovalId: null,
-    error: null,
-  },
-  actions: {
-    send: vi.fn(),
-    newChat: vi.fn(),
-    regenerate: vi.fn(),
-    cancel: vi.fn(),
-    applyEvent: vi.fn(),
-    markApprovalDetailLoaded: vi.fn(),
-    updateApprovalStatus: vi.fn(),
-    appendSystemMessage: vi.fn(),
-  },
-}));
-
 vi.mock('../bridge', () => ({
   startAssistantTurn: bridgeMocks.startAssistantTurn,
   cancelAssistantTurn: bridgeMocks.cancelAssistantTurn,
   listenAssistantEvents: bridgeMocks.listenAssistantEvents,
   isBridgePreviewMode: bridgeMocks.isBridgePreviewMode,
 }));
-
-vi.mock('./useAssistantSession', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./useAssistantSession')>();
-  return {
-    ...actual,
-    useAssistantSession: vi.fn(() => legacySession),
-  };
-});
 
 const emptyContext = {
   selectedRunId: '',
@@ -89,6 +58,7 @@ describe('AI SDK assistant runtime cutover', () => {
     bridgeMocks.isBridgePreviewMode.mockReturnValue(false);
     bridgeMocks.cancelAssistantTurn.mockResolvedValue(undefined);
     bridgeMocks.startAssistantTurn.mockResolvedValue({ status: 'started' });
+    bridgeMocks.listenAssistantEvents.mockResolvedValue(vi.fn());
   });
 
   it('enables only explicit rollback-safe feature flag values', () => {
@@ -99,13 +69,24 @@ describe('AI SDK assistant runtime cutover', () => {
     expect(isAiSdkAssistantRuntimeEnabled('TRUE')).toBe(true);
   });
 
-  it('returns the legacy session unchanged while the feature flag is disabled', () => {
+  it('keeps the task-bound session identity in the legacy runtime', async () => {
     const { result } = renderHook(() =>
-      useAssistantRuntimeSession(DEFAULT_SETTINGS, () => emptyContext, { enabled: false }),
+      useAssistantRuntimeSession(DEFAULT_SETTINGS, () => emptyContext, {
+        enabled: false,
+        initialSessionId: 'persisted-task-session',
+      }),
     );
 
-    expect(result.current).toBe(legacySession);
-    expect(bridgeMocks.listenAssistantEvents).not.toHaveBeenCalled();
+    expect(result.current.state.sessionId).toBe('persisted-task-session');
+
+    await act(async () => {
+      await result.current.actions.send('Continue the persisted task.');
+    });
+
+    expect(bridgeMocks.startAssistantTurn).toHaveBeenCalledWith(
+      DEFAULT_SETTINGS,
+      expect.objectContaining({ sessionId: 'persisted-task-session' }),
+    );
   });
 
   it('uses the Tauri transport and projects AI SDK messages into the legacy view model', async () => {
@@ -116,7 +97,10 @@ describe('AI SDK assistant runtime cutover', () => {
       return unlisten;
     });
     const { result } = renderHook(() =>
-      useAssistantRuntimeSession(DEFAULT_SETTINGS, () => emptyContext, { enabled: true }),
+      useAssistantRuntimeSession(DEFAULT_SETTINGS, () => emptyContext, {
+        enabled: true,
+        initialSessionId: 'persisted-ai-sdk-session',
+      }),
     );
 
     let sendPromise!: Promise<void>;
@@ -125,6 +109,7 @@ describe('AI SDK assistant runtime cutover', () => {
     });
     await waitFor(() => expect(bridgeMocks.startAssistantTurn).toHaveBeenCalledTimes(1));
     const options = bridgeMocks.startAssistantTurn.mock.calls[0][1];
+    expect(options.sessionId).toBe('persisted-ai-sdk-session');
 
     act(() => {
       handler(event(options.assistantTurnId, options.sessionId, 1, 'text_delta', { text: 'Draft ready.' }));

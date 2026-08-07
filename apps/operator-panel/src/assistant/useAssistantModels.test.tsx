@@ -54,6 +54,44 @@ function providerModels(models: unknown[] = []) {
   };
 }
 
+function canonicalProviderModels({
+  provider,
+  legacyProvider,
+}: {
+  provider: 'local-ollama' | 'local-transformers';
+  legacyProvider: 'ollama' | 'transformers';
+}) {
+  const modelId = provider === 'local-ollama' ? 'qwen3.5:4b' : 'Qwen/Qwen2.5';
+  return {
+    contractVersion: 'operator-panel.assistant-provider-models/v2',
+    profile: 'balanced',
+    provider,
+    generatedAtUtc: '2026-06-07T00:00:00.000Z',
+    providers: [
+      {
+        provider,
+        legacyProvider,
+        kind: provider === 'local-ollama' ? 'local_ollama' : 'local_transformers',
+        displayName: provider === 'local-ollama' ? 'Local Ollama' : 'Local Transformers',
+        available: true,
+        selectedByConfig: true,
+        disabledReason: null,
+        models: [
+          {
+            provider,
+            id: modelId,
+            displayName: modelId,
+            installed: true,
+            configured: true,
+            source: provider === 'local-ollama' ? 'ollama' : 'transformers_cache',
+            warnings: [],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe('useAssistantModels', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -84,6 +122,50 @@ describe('useAssistantModels', () => {
     expect(bridgeMocks.listAssistantModels).toHaveBeenCalledWith(
       expect.objectContaining({ profile: 'balanced' }),
       expect.objectContaining({ profile: 'balanced', provider: 'local-ollama', refresh: false }),
+    );
+  });
+
+  it.each([
+    ['ollama', 'local-ollama', 'qwen3.5:4b'],
+    ['transformers', 'local-transformers', 'Qwen/Qwen2.5'],
+  ] as const)(
+    'resolves legacy provider %s to canonical discovery record %s',
+    async (legacyProvider, canonicalProvider, modelId) => {
+      bridgeMocks.listAssistantModels.mockResolvedValue(
+        canonicalProviderModels({ provider: canonicalProvider, legacyProvider }),
+      );
+
+      const { result } = renderHook(() =>
+        useAssistantModels({ settings: { ...DEFAULT_SETTINGS }, profile: 'balanced', provider: legacyProvider }),
+      );
+
+      await waitFor(() => expect(result.current.status).toBe('success'));
+      expect(result.current.models).toEqual([
+        expect.objectContaining({ provider: canonicalProvider, id: modelId }),
+      ]);
+      expect(bridgeMocks.listAssistantModels).toHaveBeenCalledWith(
+        expect.objectContaining({ profile: 'balanced' }),
+        expect.objectContaining({ provider: canonicalProvider }),
+      );
+    },
+  );
+
+  it.each([
+    ['local-ollama', 'ollama'],
+    ['local-transformers', 'transformers'],
+  ] as const)('passes canonical provider %s through to discovery', async (canonicalProvider, legacyProvider) => {
+    bridgeMocks.listAssistantModels.mockResolvedValue(
+      canonicalProviderModels({ provider: canonicalProvider, legacyProvider }),
+    );
+
+    const { result } = renderHook(() =>
+      useAssistantModels({ settings: { ...DEFAULT_SETTINGS }, profile: 'balanced', provider: canonicalProvider }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    expect(bridgeMocks.listAssistantModels).toHaveBeenCalledWith(
+      expect.objectContaining({ profile: 'balanced' }),
+      expect.objectContaining({ provider: canonicalProvider }),
     );
   });
 

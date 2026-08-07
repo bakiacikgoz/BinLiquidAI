@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -20,6 +21,7 @@ const workspace = vi.hoisted(() => ({
     operationNotice: null,
     formRuntime: undefined,
     actions: {
+      open: vi.fn(),
       toggle: vi.fn(),
       openArtifact: vi.fn(),
       selectLegacyArtifact: vi.fn(),
@@ -67,6 +69,22 @@ import { renderOperatorPanel } from '../../test/render';
 import { ProductArtifactWorkspace } from './ProductArtifactWorkspace';
 
 describe('ProductArtifactWorkspace', () => {
+  it('requests an idempotent open exactly once for a workspace tab mount', () => {
+    workspace.controller.open = false;
+    workspace.controller.actions.open.mockClear();
+    workspace.controller.actions.toggle.mockClear();
+
+    renderOperatorPanel(
+      <StrictMode>
+        <ProductArtifactWorkspace state={getAssistantFixture('running')} openRequest={1} />
+      </StrictMode>,
+    );
+
+    workspace.controller.open = true;
+    expect(workspace.controller.actions.open).toHaveBeenCalledOnce();
+    expect(workspace.controller.actions.toggle).not.toHaveBeenCalled();
+  });
+
   it('refreshes the real governed catalog instead of leaving Open artifacts as a no-op', async () => {
     const { user } = renderOperatorPanel(
       <ProductArtifactWorkspace state={getAssistantFixture('running')} openRequest={1} />,

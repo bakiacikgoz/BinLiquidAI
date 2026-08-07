@@ -67,6 +67,14 @@ describe('WorkspaceTabs', () => {
     expect(screen.getByText('Terminal surface runtime-root · active')).toBeInTheDocument();
   });
 
+  it('renders the first surviving workspace tab when the active id is stale', () => {
+    const terminal = createWorkspaceTab('terminal');
+
+    renderOperatorPanel(<WorkspaceTabs tabs={[terminal]} activeTabId="removed-tab" assistantState={getAssistantFixture('running')} taskId="task-1" onActivate={vi.fn()} onClose={vi.fn()} onUpdate={vi.fn()} onOpen={vi.fn()} />);
+
+    expect(screen.getByText('Terminal surface runtime-root · active')).toBeInTheDocument();
+  });
+
   it('opens every governed runtime surface from the UI Lab new-tab menu', async () => {
     const artifact = createWorkspaceTab('artifacts');
     const onOpen = vi.fn();

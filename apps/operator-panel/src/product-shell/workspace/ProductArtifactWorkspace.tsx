@@ -18,6 +18,7 @@ type ProductArtifactWorkspaceProps = {
 export function ProductArtifactWorkspace({ state, openRequest, requestedArtifactId }: ProductArtifactWorkspaceProps) {
   const [selectedLegacyArtifactName, setSelectedLegacyArtifactName] = useState('');
   const lastRequestedArtifactId = useRef<string | null>(null);
+  const lastOpenRequest = useRef(0);
   const legacyArtifacts = useMemo(
     () => state.referencedArtifacts.map((artifact) => ({
       name: artifact.name,
@@ -34,8 +35,10 @@ export function ProductArtifactWorkspace({ state, openRequest, requestedArtifact
   });
 
   useEffect(() => {
-    if (openRequest > 0 && !workspace.open) workspace.actions.toggle();
-  }, [openRequest, workspace.actions, workspace.open]);
+    if (openRequest <= lastOpenRequest.current) return;
+    lastOpenRequest.current = openRequest;
+    workspace.actions.open();
+  }, [openRequest, workspace.actions]);
 
   useEffect(() => {
     if (!requestedArtifactId || requestedArtifactId === lastRequestedArtifactId.current) return;

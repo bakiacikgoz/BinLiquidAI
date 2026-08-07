@@ -35,6 +35,7 @@ vi.mock('react-router-dom', async (importOriginal) => ({
 }));
 
 import { renderOperatorPanel } from '../../test/render';
+import { useProductShellStore } from '../state/productShellStore';
 import { NewWorkPage } from './NewWorkPage';
 
 const existingProject = {
@@ -45,11 +46,12 @@ const existingProject = {
 describe('NewWorkPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useProductShellStore.setState({ tasks: [], selectedTaskId: null });
     workspace.listProjects.mockResolvedValue({ projects: [existingProject] });
-    workspace.createTask.mockResolvedValue({
-      taskId: 'task-1', title: 'Prepare a release', status: 'active', assistantSessionId: 'session-1',
+    workspace.createTask.mockImplementation(async (projectId, _title, assistantSessionId) => ({
+      taskId: 'task-1', projectId, title: 'Prepare a release', status: 'active', assistantSessionId,
       createdAtUtc: '2026-07-24T12:01:00Z', updatedAtUtc: '2026-07-24T12:01:00Z',
-    });
+    }));
     workspace.addMessage.mockResolvedValue({ messageId: 'message-1' });
   });
 
@@ -68,6 +70,10 @@ describe('NewWorkPage', () => {
     });
     expect(workspace.addMessage).toHaveBeenCalledWith('task-1', 'user', 'Prepare a release');
     expect(workspace.getOrCreateProject).not.toHaveBeenCalled();
+    const persistedSessionId = workspace.createTask.mock.calls[0][2];
+    expect(useProductShellStore.getState().tasks).toContainEqual(
+      expect.objectContaining({ id: 'task-1', assistantSessionId: persistedSessionId }),
+    );
     expect(navigate).toHaveBeenCalledWith('/task/task-1', {
       state: expect.objectContaining({
         initialMessage: 'Prepare a release',
@@ -92,5 +98,17 @@ describe('NewWorkPage', () => {
       expect.stringMatching(/^product-session-/),
       expect.any(Object),
     );
+  });
+
+  it('stays on New Work when the initial message cannot be persisted', async () => {
+    workspace.addMessage.mockRejectedValue(new Error('Initial message persistence failed.'));
+    const { user } = renderOperatorPanel(<MemoryRouter><NewWorkPage /></MemoryRouter>);
+
+    await screen.findByRole('option', { name: 'Release work' });
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Initial message persistence failed.');
+    expect(navigate).not.toHaveBeenCalled();
+    expect(useProductShellStore.getState()).toMatchObject({ tasks: [], selectedTaskId: null });
   });
 });

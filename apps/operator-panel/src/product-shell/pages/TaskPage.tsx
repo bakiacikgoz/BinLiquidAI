@@ -133,7 +133,9 @@ export function TaskPage() {
   const [loadError, setLoadError] = useState('');
   const [projectLoadError, setProjectLoadError] = useState('');
   const projectLookupRef = useRef<string | null>(null);
-  useEffect(() => { if (taskId) selectTask(taskId); }, [selectTask, taskId]);
+  useEffect(() => {
+    if (taskId) selectTask(task?.status === 'archived' ? null : taskId);
+  }, [selectTask, task?.status, taskId]);
   useEffect(() => {
     if (!taskId || task) return;
     let active = true;
@@ -177,6 +179,7 @@ export function TaskPage() {
   }, [owningProject, task?.projectId, upsertProjects]);
   if (!taskId) return <Navigate to="/" replace />;
   if (!task) return <section className="conversation-empty ps-empty" aria-live="polite"><h2>{loadError ? 'Task unavailable' : 'Loading governed task…'}</h2><p>{loadError || 'Restoring the durable task and its governed runtime context.'}</p>{loadError && <a href="#/">Return to new work</a>}</section>;
+  if (task.status === 'archived') return <Navigate to="/" replace />;
   if (task.projectId && !owningProject) return <section className="conversation-empty ps-empty" aria-live="polite"><h2>{projectLoadError ? 'Project runtime unavailable' : 'Loading governed project…'}</h2><p>{projectLoadError || 'Restoring the task project and its registered terminal root.'}</p></section>;
   return <TaskWorkspace key={task.id} task={task} />;
 }

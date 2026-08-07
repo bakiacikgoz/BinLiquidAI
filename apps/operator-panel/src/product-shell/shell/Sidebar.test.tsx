@@ -1,5 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const workspace = vi.hoisted(() => ({
@@ -11,6 +11,7 @@ vi.mock('../adapters/productWorkspaceClient', () => ({ productWorkspaceClient: w
 vi.mock('./GlobalSearch', () => ({ GlobalSearch: () => <div /> }));
 
 import { renderOperatorPanel } from '../../test/render';
+import { useProductShellStore } from '../state/productShellStore';
 import { Sidebar } from './Sidebar';
 
 const project = {
@@ -25,10 +26,22 @@ const task = {
   assistantSessionId: 'session-release', assistantTurnId: null, teamJobId: null,
   createdAtUtc: '2026-07-24T12:00:00Z', updatedAtUtc: '2026-07-24T12:00:00Z', archivedAtUtc: null,
 };
+const archivedTask = {
+  ...task,
+  status: 'archived' as const,
+  updatedAtUtc: '2026-08-07T07:00:00Z',
+  archivedAtUtc: '2026-08-07T07:00:00Z',
+};
+
+function LocationProbe() {
+  return <p>Current route: {useLocation().pathname}</p>;
+}
 
 describe('Sidebar project lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    useProductShellStore.setState(useProductShellStore.getInitialState(), true);
     workspace.listProjects.mockResolvedValue({ projects: [project], nextCursor: null });
     workspace.listTasks.mockResolvedValue({ tasks: [task] });
     workspace.updateProject.mockResolvedValue({ ...project, pinned: true });
@@ -59,7 +72,7 @@ describe('Sidebar project lifecycle', () => {
   it('renders the unavailable task-collection action as non-interactive truth', async () => {
     const { container } = renderOperatorPanel(<MemoryRouter><Sidebar /></MemoryRouter>);
 
-    await screen.findByText('Prepare release');
+    await screen.findAllByText('Prepare release');
     expect(container.querySelector('[data-disabled-reason="TASK_COLLECTION_ACTIONS_UNAVAILABLE"]'))
       .toHaveAttribute('aria-disabled', 'true');
     expect(screen.queryByRole('button', { name: /Görevleri düzenle/i })).not.toBeInTheDocument();
@@ -75,5 +88,49 @@ describe('Sidebar project lifecycle', () => {
     expect(screen.getByRole('link', { name: /Yeni görev/i })).toHaveClass('sidebar-primary-action');
     expect(await screen.findByRole('alert')).toHaveClass('sidebar-runtime-notice');
     expect(container.querySelector('.sidebar-runtime-notice')).toHaveTextContent(/desktop runtime/i);
+  });
+
+  it('archives a selected task only after success, removes it from active navigation, and leaves its record retained', async () => {
+    useProductShellStore.setState({ selectedTaskId: task.taskId });
+    workspace.archiveTask.mockImplementation(async () => {
+      workspace.listTasks.mockResolvedValue({ tasks: [archivedTask] });
+      return archivedTask;
+    });
+    const { user } = renderOperatorPanel(
+      <MemoryRouter initialEntries={[`/task/${task.taskId}/workspace`]}>
+        <Sidebar />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    await user.click((await screen.findAllByRole('button', { name: `Archive ${task.title}` }))[0]);
+
+    await waitFor(() => expect(screen.getByText('Current route: /')).toBeInTheDocument());
+    expect(screen.queryByText(task.title)).not.toBeInTheDocument();
+    expect(useProductShellStore.getState().selectedTaskId).toBeNull();
+    expect(useProductShellStore.getState().tasks).toEqual([
+      expect.objectContaining({ id: task.taskId, status: 'archived' }),
+    ]);
+  });
+
+  it('leaves the active row, task route, and selection unchanged when archive fails', async () => {
+    useProductShellStore.setState({ selectedTaskId: task.taskId });
+    workspace.archiveTask.mockRejectedValue(new Error('Archive denied'));
+    const { user } = renderOperatorPanel(
+      <MemoryRouter initialEntries={[`/task/${task.taskId}`]}>
+        <Sidebar />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    await user.click((await screen.findAllByRole('button', { name: `Archive ${task.title}` }))[0]);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Archive denied');
+    expect(screen.getByText(`Current route: /task/${task.taskId}`)).toBeInTheDocument();
+    expect(screen.getAllByText(task.title)).toHaveLength(2);
+    expect(useProductShellStore.getState().selectedTaskId).toBe(task.taskId);
+    expect(useProductShellStore.getState().tasks).toEqual([
+      expect.objectContaining({ id: task.taskId, status: 'active' }),
+    ]);
   });
 });

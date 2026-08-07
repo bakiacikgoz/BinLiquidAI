@@ -99,7 +99,7 @@ export function loadWorkspaceTabSnapshot(
     });
     const activeTabId = typeof record.activeTabId === 'string' && ids.has(record.activeTabId)
       ? record.activeTabId
-      : null;
+      : tabs[0]?.id ?? null;
     return { tabs, activeTabId };
   } catch {
     return { tabs: [], activeTabId: null };

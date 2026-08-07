@@ -261,7 +261,10 @@ export function useAssistantRuntimeSession(
   options: RuntimeSessionOptions = {},
 ): { state: AssistantSessionState; actions: AssistantSessionActions } {
   const enabled = options.enabled ?? isAiSdkAssistantRuntimeEnabled(import.meta.env.VITE_ASSISTANT_AI_SDK_RUNTIME);
-  const legacy = useAssistantSession(settings, getContext, { enabled: !enabled });
+  const legacy = useAssistantSession(settings, getContext, {
+    enabled: !enabled,
+    initialSessionId: options.initialSessionId,
+  });
   const [chatId, setChatId] = useState(
     () => options.initialSessionId ?? createAssistantSession().sessionId,
   );

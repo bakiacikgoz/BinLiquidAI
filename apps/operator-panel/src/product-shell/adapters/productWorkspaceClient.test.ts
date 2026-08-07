@@ -4,7 +4,7 @@ const invoke = vi.hoisted(() => vi.fn());
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke }));
 
-import { ProductWorkspaceClient } from './productWorkspaceClient';
+import { ProductWorkspaceClient, ProductWorkspaceError } from './productWorkspaceClient';
 
 const activeProject = {
   projectId: 'project-operator',
@@ -94,6 +94,25 @@ describe('ProductWorkspaceClient default projects', () => {
     await expect(new ProductWorkspaceClient().listProjects()).rejects.toThrow(
       'Workspace data requires the ImperaOS desktop runtime.',
     );
+  });
+
+  it('preserves governed product error codes and retryability for the shell', async () => {
+    invoke.mockResolvedValueOnce({
+      ok: false,
+      data: null,
+      error: {
+        code: 'PRODUCT_RPC_UNAVAILABLE',
+        message: 'The governed product runtime is temporarily unavailable.',
+        retryable: true,
+      },
+    });
+
+    await expect(new ProductWorkspaceClient().listProjects()).rejects.toMatchObject({
+      name: 'ProductWorkspaceError',
+      code: 'PRODUCT_RPC_UNAVAILABLE',
+      retryable: true,
+      message: 'The governed product runtime is temporarily unavailable.',
+    } satisfies Partial<ProductWorkspaceError>);
   });
 
   it('archives a task through the governed archive bridge rather than local UI state', async () => {

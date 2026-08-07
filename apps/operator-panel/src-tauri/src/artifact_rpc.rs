@@ -19,11 +19,18 @@ const MAX_RESTART_ATTEMPTS: u8 = 3;
 const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
     "project.list",
     "project.create",
+    "project.register",
+    "project.update",
+    "project.archive",
+    "task.get",
     "task.list",
     "task.create",
+    "task.update",
+    "task.archive",
     "task.message.add",
     "task.message.list",
     "task.link.add",
+    "task.link.list",
     "preferences.get",
     "preferences.set",
     "artifact.list",
@@ -48,7 +55,12 @@ const ALLOWED_ARTIFACT_METHODS: &[&str] = &[
 ];
 const MUTATION_METHODS_WITH_KEYS: &[&str] = &[
     "project.create",
+    "project.register",
+    "project.update",
+    "project.archive",
     "task.create",
+    "task.update",
+    "task.archive",
     "task.message.add",
     "task.link.add",
     "preferences.set",
@@ -983,5 +995,57 @@ mod tests {
             5000,
         )
         .is_err());
+    }
+
+    #[test]
+    fn trusted_request_builder_allows_frontend_product_methods_and_rejects_deletes() {
+        let identity = TrustedArtifactIdentity::new(
+            "workspace-1",
+            "user-1",
+            "user",
+            vec!["artifact_editor".to_string()],
+        )
+        .expect("identity should validate");
+        let read_methods = [
+            "project.list",
+            "task.get",
+            "task.list",
+            "task.message.list",
+            "task.link.list",
+            "preferences.get",
+        ];
+        let mutation_methods = [
+            "project.create",
+            "project.register",
+            "project.update",
+            "project.archive",
+            "task.create",
+            "task.update",
+            "task.archive",
+            "task.message.add",
+            "task.link.add",
+            "preferences.set",
+        ];
+
+        for method in read_methods {
+            let request = build_trusted_request(method, json!({}), &identity, None, 5000)
+                .unwrap_or_else(|error| panic!("{method} should be allowlisted: {error:?}"));
+            assert_eq!(request["method"], method);
+        }
+        for method in mutation_methods {
+            let request = build_trusted_request(
+                method,
+                json!({"idempotencyKey": "mutation-1"}),
+                &identity,
+                Some("mutation-1".to_string()),
+                5000,
+            )
+            .unwrap_or_else(|error| panic!("{method} should be allowlisted: {error:?}"));
+            assert_eq!(request["method"], method);
+            assert!(build_trusted_request(method, json!({}), &identity, None, 5000).is_err());
+        }
+        for method in ["project.delete", "task.delete", "product.unknown"] {
+            assert!(build_trusted_request(method, json!({}), &identity, None, 5000).is_err());
+        }
     }
 }

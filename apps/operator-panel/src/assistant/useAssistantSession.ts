@@ -57,10 +57,12 @@ export type AssistantSessionActions = {
 export function useAssistantSession(
   settings: PanelSettings,
   getContext: () => AssistantContextSnapshot,
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; initialSessionId?: string } = {},
 ): { state: AssistantSessionState; actions: AssistantSessionActions } {
   const enabled = options.enabled ?? true;
-  const [state, setState] = useState<AssistantSessionState>(() => createAssistantSession());
+  const [state, setState] = useState<AssistantSessionState>(
+    () => createAssistantSession(options.initialSessionId),
+  );
   const stateRef = useRef(state);
   const eventQueueRef = useRef<AssistantStreamEvent[]>([]);
   const flushTimerRef = useRef<number | null>(null);
@@ -69,6 +71,14 @@ export function useAssistantSession(
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    const taskSessionId = options.initialSessionId;
+    if (!taskSessionId || taskSessionId === stateRef.current.sessionId) return;
+    const nextState = createAssistantSession(taskSessionId);
+    stateRef.current = nextState;
+    setState(nextState);
+  }, [options.initialSessionId]);
 
   const flushEvents = useCallback(() => {
     const queued = eventQueueRef.current;

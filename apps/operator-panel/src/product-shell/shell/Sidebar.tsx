@@ -166,6 +166,13 @@ export function Sidebar() {
     }
   };
 
+  const archiveTask = (taskId: string) => mutate(async () => {
+    const changed = await productWorkspaceClient.archiveTask(taskId, 'Archived from sidebar');
+    const archivedSelectedTask = useProductShellStore.getState().selectedTaskId === taskId;
+    upsertTasks([shellTask(changed)]);
+    if (archivedSelectedTask) navigate('/', { replace: true });
+  });
+
   const resizeSidebar = (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const startX = event.clientX;
@@ -309,10 +316,7 @@ export function Sidebar() {
                           const changed = await productWorkspaceClient.updateTask(task.id, { manualOrder: Math.max(0, (task.manualOrder ?? 0) - 1) });
                           upsertTasks([shellTask(changed)]);
                         })}
-                        onArchive={() => void mutate(async () => {
-                          const changed = await productWorkspaceClient.archiveTask(task.id, 'Archived from sidebar');
-                          upsertTasks([shellTask(changed)]);
-                        })}
+                        onArchive={() => void archiveTask(task.id)}
                       />
                     </div>
                   ))}
@@ -361,10 +365,7 @@ export function Sidebar() {
                     const changed = await productWorkspaceClient.updateTask(task.id, { manualOrder: Math.max(0, (task.manualOrder ?? 0) - 1) });
                     upsertTasks([shellTask(changed)]);
                   })}
-                  onArchive={() => void mutate(async () => {
-                    const changed = await productWorkspaceClient.archiveTask(task.id, 'Archived from sidebar');
-                    upsertTasks([shellTask(changed)]);
-                  })}
+                  onArchive={() => void archiveTask(task.id)}
                 />
               </div>
             ))}
