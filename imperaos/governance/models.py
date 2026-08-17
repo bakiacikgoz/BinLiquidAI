@@ -24,6 +24,7 @@ class GovernancePhase(StrEnum):
 class ApprovalStatus(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
+    EXECUTING = "executing"
     REJECTED = "rejected"
     EXPIRED = "expired"
     EXECUTED = "executed"
@@ -34,6 +35,7 @@ class ApprovalStatus(StrEnum):
 
 class ExecutionStatus(StrEnum):
     NOT_EXECUTED = "not_executed"
+    EXECUTING = "executing"
     EXECUTED = "executed"
     EXECUTION_FAILED = "execution_failed"
 
@@ -121,6 +123,9 @@ class ApprovalTicket(BaseModel):
     execution_error_code: str | None = None
     executed_by: str | None = None
     execution_contract_hash: str | None = None
+    execution_attempt_id: str | None = None
+    execution_claimed_at: datetime | None = None
+    execution_result_hash: str | None = None
     resume_token_ref: str | None = None
     resume_claimed_job_id: str | None = None
     resume_claimed_at: datetime | None = None

@@ -21,13 +21,13 @@ describe('operator id validation', () => {
     const formerKey = ['ae', 'gis', 'os.operator.settings.v1'].join('');
     localStorage.setItem(formerKey, JSON.stringify({ ...DEFAULT_SETTINGS, profile: 'strict' }));
 
-    expect(SETTINGS_KEY).toBe('imperaos.operator.settings.v1');
-    expect(loadSettings().profile).toBe(DEFAULT_SETTINGS.profile);
+    expect(SETTINGS_KEY).toBe('imperaos.operator.settings.v2');
+    expect(loadSettings().profile).toBe('strict');
 
     const nextSettings = { ...DEFAULT_SETTINGS, profile: 'fast' };
     saveSettings(nextSettings);
-    expect(JSON.parse(localStorage.getItem('imperaos.operator.settings.v1') ?? '{}')).toEqual(nextSettings);
-    expect(localStorage.getItem(formerKey)).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem('imperaos.operator.settings.v2') ?? '{}')).toEqual(nextSettings);
+    expect(localStorage.getItem(formerKey)).toBeNull();
   });
 
   it('accepts expected format', () => {
@@ -113,8 +113,9 @@ describe('assistant runtime settings', () => {
   });
 
   it('scrubs legacy assistant API keys from renderer storage', () => {
+    const legacyKey = ['ae', 'gis', 'os.operator.settings.v1'].join('');
     localStorage.setItem(
-      SETTINGS_KEY,
+      legacyKey,
       JSON.stringify({
         ...DEFAULT_SETTINGS,
         assistantOpenAiApiKey: 'sk-openai',
@@ -127,6 +128,15 @@ describe('assistant runtime settings', () => {
     expect(loaded).not.toHaveProperty('assistantDeepSeekApiKey');
     expect(localStorage.getItem(SETTINGS_KEY)).not.toContain('sk-openai');
     expect(localStorage.getItem(SETTINGS_KEY)).not.toContain('sk-deepseek');
+    expect(localStorage.getItem(legacyKey)).toBeNull();
+  });
+
+  it('does not delete corrupt legacy settings before they can be recovered', () => {
+    const legacyKey = ['ae', 'gis', 'os.operator.settings.v1'].join('');
+    localStorage.setItem(legacyKey, '{broken');
+
+    expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
+    expect(localStorage.getItem(legacyKey)).toBe('{broken');
   });
 
   it('leaves empty assistant runtime overrides undefined for CLI defaults', () => {

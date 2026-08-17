@@ -202,6 +202,10 @@ from imperaos.enterprise.signing import (
 from imperaos.experts.code_expert import CodeExpert
 from imperaos.experts.memory_plan_expert import MemoryPlanExpert
 from imperaos.experts.research_expert import ResearchExpert
+from imperaos.governance.approval_execution import ApprovalExecutionService
+from imperaos.governance.approval_executors.control_plane import ControlPlaneApprovalExecutor
+from imperaos.governance.approval_executors.device import DeviceActionApprovalExecutor
+from imperaos.governance.approval_executors.external_agent import ExternalAgentApprovalExecutor
 from imperaos.governance.runtime import (
     GovernanceRuntime,
     build_governance_runtime,
@@ -244,6 +248,7 @@ from imperaos.memory.workspace_models import (
     WorkspaceMemoryWriteRequest,
 )
 from imperaos.memory.workspace_sync import WorkspaceMemorySyncCoordinator
+from imperaos.migration.legacy_state import migrate_legacy_state
 from imperaos.model_providers.adapters.adapter_factory import ProviderAdapterFactory
 from imperaos.model_providers.canary import run_provider_canary
 from imperaos.model_providers.canary_evidence import (
@@ -903,9 +908,7 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
         profile=profile,
         mode="offline",
     )
-    conformance_by_provider = {
-        item.provider_id: item for item in conformance_matrix.providers
-    }
+    conformance_by_provider = {item.provider_id: item for item in conformance_matrix.providers}
     valid_ids = {item.provider_id for item in registry.providers}
     valid_legacy = {"all", "ollama", "transformers"}
     if normalized_provider not in valid_legacy and normalized_provider not in valid_ids:
@@ -1853,12 +1856,8 @@ def assistant_turn(
     artifact_root: Annotated[
         Path | None, typer.Option("--artifact-root", help="Governed artifact root")
     ] = None,
-    artifact_workspace_id: Annotated[
-        str | None, typer.Option("--artifact-workspace-id")
-    ] = None,
-    artifact_principal_id: Annotated[
-        str | None, typer.Option("--artifact-principal-id")
-    ] = None,
+    artifact_workspace_id: Annotated[str | None, typer.Option("--artifact-workspace-id")] = None,
+    artifact_principal_id: Annotated[str | None, typer.Option("--artifact-principal-id")] = None,
     artifact_role: Annotated[list[str] | None, typer.Option("--artifact-role")] = None,
     artifact_prompt_data_class: Annotated[
         ArtifactDataClass,
@@ -2372,7 +2371,8 @@ def control_plane_agent_register(
     root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
-    _ = profile
+    config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "agent.registry.write")
     try:
         loaded = load_agent_spec(spec)
         result = _control_plane_registry(root_dir).register(loaded, actor=actor)
@@ -2410,6 +2410,7 @@ def control_plane_agent_disable(
     agent_id: str = typer.Option(..., "--agent-id", help="Agent ID"),
     reason: str = typer.Option(..., "--reason", help="Disable reason"),
     actor: str = typer.Option("cli:operator", "--actor", help="Registry actor"),
+    profile: str = typer.Option("enterprise", "--profile", help="Runtime profile"),
     root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit JSON output"),
 ) -> None:
@@ -4523,9 +4524,7 @@ def provider_call_test(
     }
     if not dry_run and decision.safe_to_call_provider:
         response = (
-            ProviderAdapterFactory(registry=registry)
-            .create(provider.provider_id)
-            .generate(request)
+            ProviderAdapterFactory(registry=registry).create(provider.provider_id).generate(request)
         )
         payload["response"] = response.model_dump(mode="json")
     if json_output:
@@ -5331,9 +5330,7 @@ def _collect_resume_overrides(
             continue
 
         target = _normalize_resume_target(str(data.get("target") or "handoff"))
-        ticket = governance_runtime.get_approval(
-            approval_id, workspace_id=workspace_id
-        )
+        ticket = governance_runtime.get_approval(approval_id, workspace_id=workspace_id)
         if ticket is None:
             continue
         status = ticket.status.value
@@ -5574,16 +5571,12 @@ def _require_approval_workspace(
         return
     if workspace_id is None or not workspace_id.strip():
         typer.echo(
-            json.dumps(
-                {"error_code": "APPROVAL_WORKSPACE_REQUIRED", "approval_id": approval_id}
-            )
+            json.dumps({"error_code": "APPROVAL_WORKSPACE_REQUIRED", "approval_id": approval_id})
         )
         raise typer.Exit(code=1)
     if _approval_bound_workspace(ticket) != workspace_id.strip():
         typer.echo(
-            json.dumps(
-                {"error_code": "APPROVAL_WORKSPACE_MISMATCH", "approval_id": approval_id}
-            )
+            json.dumps({"error_code": "APPROVAL_WORKSPACE_MISMATCH", "approval_id": approval_id})
         )
         raise typer.Exit(code=1)
 
@@ -5673,7 +5666,10 @@ def approval_execute(
     actor: str = typer.Option(..., "--actor", help="Execution actor identity"),
     workspace_id: str | None = typer.Option(None, "--workspace-id", help="Trusted workspace"),
     profile: str = typer.Option("balanced", help="Config profile"),
+    root_dir: str = typer.Option(CONTROL_PLANE_STATE_ROOT, "--root-dir"),
 ) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "agent.registry.write")
     ensure_artifact_scaffold()
     config = RuntimeConfig.from_profile(profile)
     verified_actor = _require_permission_or_exit(config, "approval.execute")
@@ -5701,6 +5697,33 @@ def approval_execute(
     if ticket.execution_status.value == "executed":
         typer.echo(json.dumps({"error_code": "REPLAY_BLOCKED", "approval_id": approval_id}))
         raise typer.Exit(code=1)
+
+    if ticket.snapshot.get("schema_version") == "approval.snapshot/v2":
+        result = ApprovalExecutionService(
+            runtime.approval_store,
+            [
+                ControlPlaneApprovalExecutor(config=config, root_dir=root_dir),
+                ExternalAgentApprovalExecutor(),
+                DeviceActionApprovalExecutor(),
+            ],
+        ).execute(approval_id=approval_id, workspace_id=workspace_id, actor=actor)
+        typer.echo(
+            json.dumps(
+                {
+                    "contractVersion": "approval.execution/v2",
+                    "approval_id": approval_id,
+                    "attempt_id": result.attempt_id,
+                    "status": "executed" if result.ok else "blocked",
+                    "reason_code": result.reason_code,
+                    "result": result.result,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        if not result.ok:
+            raise typer.Exit(code=1)
+        return
 
     snapshot_hash = _hash_payload(ticket.snapshot)
     if snapshot_hash != ticket.snapshot_hash:
@@ -5790,6 +5813,66 @@ def approval_execute(
 
     output["ticket"] = decision.ticket.model_dump(mode="json") if decision.ticket else None
     typer.echo(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+@approval_app.command("reconcile")
+def approval_reconcile(
+    approval_id: str = typer.Option(..., "--id"),
+    attempt_id: str = typer.Option(..., "--attempt-id"),
+    outcome: str = typer.Option(..., "--outcome", help="executed|failed|unknown"),
+    proof_hash: str | None = typer.Option(None, "--proof-hash"),
+    actor: str = typer.Option(..., "--actor"),
+    workspace_id: str = typer.Option(..., "--workspace-id"),
+    profile: str = typer.Option("enterprise", "--profile"),
+) -> None:
+    config = RuntimeConfig.from_profile(profile)
+    _require_permission_or_exit(config, "approval.reconcile")
+    runtime = _build_governance_runtime(config)
+    if runtime is None:
+        _emit_payload({"status": "blocked", "reason_code": "GOVERNANCE_DISABLED"})
+        raise typer.Exit(code=1)
+    ticket = runtime.approval_store.get(approval_id, workspace_id=workspace_id)
+    if ticket is None or ticket.status.value != "executing":
+        _emit_payload({"status": "blocked", "reason_code": "APPROVAL_NOT_EXECUTING"})
+        raise typer.Exit(code=1)
+    if ticket.execution_attempt_id != attempt_id:
+        _emit_payload({"status": "blocked", "reason_code": "APPROVAL_EXECUTION_ATTEMPT_MISMATCH"})
+        raise typer.Exit(code=1)
+    if outcome == "unknown":
+        _emit_payload(
+            {"status": "reconciliation_required", "reason_code": "EXECUTION_OUTCOME_UNKNOWN"}
+        )
+        return
+    if not proof_hash:
+        _emit_payload({"status": "blocked", "reason_code": "RECONCILIATION_PROOF_REQUIRED"})
+        raise typer.Exit(code=1)
+    if outcome == "executed":
+        result = runtime.approval_store.finalize_execution_success(
+            approval_id=approval_id,
+            workspace_id=workspace_id,
+            attempt_id=attempt_id,
+            result_hash=proof_hash,
+        )
+    elif outcome == "failed":
+        result = runtime.approval_store.finalize_execution_failure(
+            approval_id=approval_id,
+            workspace_id=workspace_id,
+            attempt_id=attempt_id,
+            error_code=f"RECONCILED_FAILURE:{proof_hash}",
+        )
+    else:
+        _emit_payload({"status": "blocked", "reason_code": "RECONCILIATION_OUTCOME_INVALID"})
+        raise typer.Exit(code=1)
+    _emit_payload(
+        {
+            "status": result.ticket.status.value if result.ticket else "blocked",
+            "reason_code": result.error_code or "OK",
+            "actor": actor,
+            "attempt_id": attempt_id,
+        }
+    )
+    if result.error_code:
+        raise typer.Exit(code=1)
 
 
 @operator_app.command("panel")
@@ -7436,6 +7519,26 @@ def migrate_apply_cmd(
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         typer.echo(payload["status"])
+
+
+@migrate_app.command("legacy-state")
+def migrate_legacy_state_cmd(
+    source: str = typer.Option(".binliquid", "--source"),
+    destination: str = typer.Option(".imperaos", "--destination"),
+    copy: bool = typer.Option(False, "--copy"),
+    verify: bool = typer.Option(False, "--verify"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    json_output: bool = typer.Option(True, "--json/--no-json"),
+) -> None:
+    payload = migrate_legacy_state(
+        source,
+        destination,
+        copy=copy and not dry_run,
+        verify=verify,
+    )
+    _emit_payload(payload, json_output=json_output)
+    if payload.get("status") == "blocked":
+        raise typer.Exit(code=1)
 
 
 @backup_app.command("create")

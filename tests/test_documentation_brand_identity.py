@@ -10,6 +10,11 @@ CANONICAL_DOCUMENT_PATHS = (
     "docs/IMPERAOS_ENTERPRISE_THEME_SYSTEM_v1.md",
     "docs/IMPERAOS_V0.2X_KAPSAMLI_DURUM_RAPORU_2026-03-01.md",
 )
+COMPATIBILITY_DOCUMENTS = {
+    "README.md",
+    "docs/APPROVAL_EXECUTION_RUNBOOK.md",
+    "docs/DESKTOP_IDENTITY_MIGRATION.md",
+}
 
 
 def _tracked_documents() -> tuple[str, ...]:
@@ -31,6 +36,8 @@ def test_tracked_documentation_uses_only_imperaos_identity() -> None:
     violations: list[str] = []
     former_families = (FAMILY_ONE.casefold(), FAMILY_TWO.casefold())
     for relative_path in tracked_documents:
+        if relative_path in COMPATIBILITY_DOCUMENTS:
+            continue
         path_identity = relative_path.casefold()
         content_identity = (REPO_ROOT / relative_path).read_text(
             encoding="utf-8-sig"

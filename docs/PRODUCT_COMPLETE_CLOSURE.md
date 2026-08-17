@@ -19,9 +19,17 @@ The gate aggregates:
 - Governed agent workflow smoke.
 - Evidence/release closure.
 
+Every required readiness field starts as `not_run`. A field becomes `pass` only
+after its named check actually runs successfully, and the report records that
+check as readiness evidence. Missing or skipped required checks are blockers:
+`not_run` never equals `pass`.
+
 Generated artifacts:
 
 - `artifacts/product-complete-closure/product_complete_closure_report.json`
 - `artifacts/product-complete-closure/product_complete_closure_report.md`
 - `artifacts/product-complete-closure/product_complete_pr_body.md`
 - `artifacts/product-complete-closure/no_ship_register.json`
+
+`--skip-commands` is diagnostic only and always produces no-ship blockers for
+missing required checks. It cannot be used to create a passing closure report.

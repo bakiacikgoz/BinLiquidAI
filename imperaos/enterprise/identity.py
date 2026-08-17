@@ -28,6 +28,8 @@ _ARTIFACT_ALL_PERMISSIONS = {
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "platform_admin": {
+        "agent.registry.write",
+        "evidence.verify",
         "runtime.run",
         "runtime.resume",
         "runtime.disable",
@@ -51,6 +53,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "artifact.ai.apply",
     },
     "security_admin": {
+        "approval.reconcile",
+        "evidence.verify",
         "approval.decide",
         "approval.execute",
         "audit.read",

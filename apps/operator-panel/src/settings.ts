@@ -1,4 +1,5 @@
 import { PRODUCT_IDENTITY } from './productIdentity';
+import { readSettingsForMigration, sanitizePersistedSettings } from './settings/migrateSettings';
 
 export type CoreMode = 'auto' | 'external' | 'bundled';
 export type LocaleMode = 'auto' | 'en' | 'tr';
@@ -36,7 +37,7 @@ export interface PanelSettings {
   approvalProfile: 'always_ask' | 'risk_based' | 'policy_automatic';
 }
 
-export const SETTINGS_KEY = `${PRODUCT_IDENTITY.slug}.operator.settings.v1`;
+export const SETTINGS_KEY = `${PRODUCT_IDENTITY.slug}.operator.settings.v2`;
 
 export const DEFAULT_ASSISTANT_RUNTIME_SETTINGS: AssistantRuntimeSettings = {
   assistantProvider: '',
@@ -143,16 +144,16 @@ export function validateAssistantRuntimeSettings(settings: AssistantRuntimeSetti
 }
 
 export function loadSettings(): PanelSettings {
-  const raw = globalThis.localStorage?.getItem(SETTINGS_KEY);
-  if (!raw) {
+  const storage = globalThis.localStorage;
+  if (!storage) {
     return { ...DEFAULT_SETTINGS };
   }
-
+  const migration = readSettingsForMigration(storage, SETTINGS_KEY);
+  if (!migration.value || migration.corrupt) {
+    return { ...DEFAULT_SETTINGS };
+  }
   try {
-    const parsed = JSON.parse(raw) as Partial<PanelSettings> & {
-      assistantOpenAiApiKey?: unknown;
-      assistantDeepSeekApiKey?: unknown;
-    };
+    const parsed = migration.value as Partial<PanelSettings>;
     const loaded: PanelSettings = {
       ...DEFAULT_SETTINGS,
       ...parsed,
@@ -169,10 +170,9 @@ export function loadSettings(): PanelSettings {
       approvalProfile: ['always_ask', 'risk_based', 'policy_automatic'].includes(String(parsed.approvalProfile))
         ? parsed.approvalProfile as PanelSettings['approvalProfile'] : 'risk_based',
     };
-    delete (loaded as PanelSettings & { assistantOpenAiApiKey?: unknown }).assistantOpenAiApiKey;
-    delete (loaded as PanelSettings & { assistantDeepSeekApiKey?: unknown }).assistantDeepSeekApiKey;
-    if ('assistantOpenAiApiKey' in parsed || 'assistantDeepSeekApiKey' in parsed) {
-      globalThis.localStorage?.setItem(SETTINGS_KEY, JSON.stringify(loaded));
+    storage.setItem(SETTINGS_KEY, JSON.stringify(loaded));
+    if (migration.migratedFrom) {
+      storage.removeItem(migration.migratedFrom);
     }
     return loaded;
   } catch {
@@ -181,7 +181,10 @@ export function loadSettings(): PanelSettings {
 }
 
 export function saveSettings(settings: PanelSettings): void {
-  globalThis.localStorage?.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  globalThis.localStorage?.setItem(
+    SETTINGS_KEY,
+    JSON.stringify(sanitizePersistedSettings(settings as unknown as Record<string, unknown>)),
+  );
 }
 
 export function resolveLocale(locale: LocaleMode): 'en' | 'tr' {

@@ -70,6 +70,15 @@ const bridgeActions: Partial<Record<RouteId, RouteCapability['primaryActions']>>
       requiredPermission: 'approval.decide',
       noShipIfInert: true,
     },
+    {
+      actionId: 'approval.execute',
+      label: 'Execute approved action',
+      state: 'working',
+      bridgeCommand: 'bridge_approval_execute',
+      cliCommand: 'imperaos approval execute',
+      requiredPermission: 'approval.execute',
+      noShipIfInert: true,
+    },
   ],
   evidence: [
     {

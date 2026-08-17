@@ -49,11 +49,16 @@ def test_editable_console_scripts_use_path_safe_exact_mode() -> None:
     assert project["version"] == "0.4.1"
     assert project["description"] == "ImperaOS governed AI workforce operating platform"
     assert project["authors"] == [{"name": "ImperaOS Contributors"}]
-    assert project["scripts"] == {"imperaos": "imperaos.cli:app"}
+    assert project["scripts"] == {
+        "imperaos": "imperaos.cli:app",
+        "binliquid": "binliquid.__main__:main",
+        "aegis": "binliquid.__main__:main",
+    }
     assert wheel["dev-mode-exact"] is True
-    assert wheel["packages"] == ["imperaos", "benchmarks", "research", "scripts"]
+    assert wheel["packages"] == ["imperaos", "binliquid", "benchmarks", "research", "scripts"]
     assert sdist["include"] == [
         "/imperaos",
+        "/binliquid",
         "/benchmarks",
         "/research",
         "/scripts",

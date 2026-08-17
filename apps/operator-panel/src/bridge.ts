@@ -466,10 +466,12 @@ export async function executeApproval(
 ): Promise<unknown> {
   if (isBridgePreviewMode()) {
     return {
-      contract_version: '3.0',
+      contract_version: 'approval.execution.preview/v1',
+      runtime_mode: 'preview_fixture',
+      isMock: true,
       approval_id: approvalId,
       actor: operatorId,
-      execution_used_path: 'llm_only',
+      execution_used_path: 'preview_simulation',
       trace_id: 'trace-preview-execute',
       fallback_events: [],
       metrics: {
@@ -477,10 +479,10 @@ export async function executeApproval(
       },
       ticket: {
         ...previewApprovalDetail(approvalId).ticket,
-        status: 'executed',
-        execution_status: 'executed',
+        status: 'simulated',
+        execution_status: 'not_executed',
         actor: operatorId,
-        executed_at: '2026-03-08T09:41:00Z',
+        simulated_at: '2026-03-08T09:41:00Z',
       },
     };
   }

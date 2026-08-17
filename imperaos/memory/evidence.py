@@ -25,6 +25,7 @@ class MemoryEvidenceWriter:
         scope: str | None = None,
         visibility: str | None = None,
     ) -> tuple[MemoryEvidenceEvent, str]:
+        self.events_root.mkdir(parents=True, exist_ok=True)
         event_id = stable_id("mem_evt", event_type, memory_id, proposal_id, utc_now().isoformat())
         event_hash = stable_id(
             "mem_hash",

@@ -14,6 +14,7 @@ from imperaos.control_plane.policy_simulator import PolicySimulator
 from imperaos.control_plane.registry import AgentRegistry
 from imperaos.control_plane.storage import ControlPlaneStore, canonical_json_hash
 from imperaos.enterprise.identity import IdentityResolutionError, require_permission
+from imperaos.governance.approval_snapshots import compute_approval_request_hash
 from imperaos.governance.approval_store import ApprovalStore
 from imperaos.runtime.config import RuntimeConfig
 from imperaos.runtime.paths import CONTROL_PLANE_STATE_ROOT
@@ -65,26 +66,38 @@ class ControlPlaneRunCoordinator:
             ]
             if approval_decisions and mode != "dry_run":
                 for decision in approval_decisions:
-                    snapshot = {
-                        "kind": "control_plane_action",
+                    proposal = {
                         "run_id": run_id,
                         "agent_id": agent_id,
                         "action_id": decision.action_id,
                         "decision": decision.model_dump(mode="json"),
                         "input_hash": input_hash,
+                    }
+                    proposal_ref = f"proposals/{run_id}/{decision.action_id}.json"
+                    proposal_hash = canonical_json_hash(proposal)
+                    self.store.write_json_atomic(proposal_ref, proposal)
+                    snapshot = {
+                        "schema_version": "approval.snapshot/v2",
+                        "kind": "control_plane_action",
+                        "run_id": run_id,
+                        "agent_id": agent_id,
+                        "action_id": decision.action_id,
+                        "proposal_ref": proposal_ref,
+                        "proposal_hash": proposal_hash,
+                        "policy_hash": decision.policy_hash,
+                        "input_hash": input_hash,
                         "runtime_version": __version__,
                     }
+                    request_hash = compute_approval_request_hash(snapshot)
                     ticket = self.approvals.create_ticket(
-                        workspace_id=(
-                            self.config.memory.workspace_authority.default_workspace_id
-                        ),
+                        workspace_id=(self.config.memory.workspace_authority.default_workspace_id),
                         run_id=run_id,
                         target_kind="control_plane_action",
                         target_ref=f"{agent_id}:{decision.action_id}",
-                        action_hash=canonical_json_hash(decision.model_dump(mode="json")),
+                        action_hash=proposal_hash,
                         policy_hash=decision.policy_hash,
-                        request_hash=input_hash,
-                        snapshot_hash=canonical_json_hash(snapshot),
+                        request_hash=request_hash,
+                        snapshot_hash=request_hash,
                         snapshot=snapshot,
                         ttl_seconds=self.config.governance.approval_ttl_seconds,
                         idempotency_key=f"control-plane:{run_id}:{decision.action_id}",
@@ -125,8 +138,7 @@ class ControlPlaneRunCoordinator:
         if summary.status == RunStatus.APPROVAL_PENDING:
             workspace_id = self.config.memory.workspace_authority.default_workspace_id
             tickets = [
-                self.approvals.get(item, workspace_id=workspace_id)
-                for item in summary.approval_ids
+                self.approvals.get(item, workspace_id=workspace_id) for item in summary.approval_ids
             ]
             if tickets and all(ticket and ticket.status.value == "executed" for ticket in tickets):
                 summary = summary.model_copy(

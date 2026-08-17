@@ -60,6 +60,7 @@
       "enum": [
         "pending",
         "approved",
+        "executing",
         "rejected",
         "expired",
         "executed",
@@ -173,6 +174,31 @@
           "default": null,
           "title": "Executed By"
         },
+        "execution_attempt_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Attempt Id"
+        },
+        "execution_claimed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Claimed At"
+        },
         "execution_contract_hash": {
           "anyOf": [
             {
@@ -196,6 +222,18 @@
           ],
           "default": null,
           "title": "Execution Error Code"
+        },
+        "execution_result_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Result Hash"
         },
         "execution_status": {
           "$ref": "#/$defs/ExecutionStatus",
@@ -1346,6 +1384,7 @@
     "ExecutionStatus": {
       "enum": [
         "not_executed",
+        "executing",
         "executed",
         "execution_failed"
       ],

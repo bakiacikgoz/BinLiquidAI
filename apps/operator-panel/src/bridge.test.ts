@@ -222,8 +222,10 @@ describe('bridge preview fallback', () => {
     expect(((approvalDecision as Record<string, unknown>).ticket as Record<string, unknown>).status).toBe(
       'approved',
     );
+    expect((approvalExecution as Record<string, unknown>).runtime_mode).toBe('preview_fixture');
+    expect((approvalExecution as Record<string, unknown>).isMock).toBe(true);
     expect(((approvalExecution as Record<string, unknown>).ticket as Record<string, unknown>).status).toBe(
-      'executed',
+      'simulated',
     );
     expect((exportPayload as Record<string, unknown>).export_dir).toBe('./exports/job-preview');
   });

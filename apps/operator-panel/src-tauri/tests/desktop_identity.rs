@@ -17,10 +17,7 @@ fn desktop_metadata_uses_imperaos_identity() {
     assert!(cargo.contains("name = \"imperaos_operator_panel_lib\""));
     assert!(cargo.contains("description = \"ImperaOS Operator Panel\""));
     assert!(cargo.contains("authors = [\"ImperaOS Contributors\"]"));
-    assert_eq!(tauri["productName"], "ImperaOS Operator Panel");
+    assert_eq!(tauri["productName"], "ImperaOS");
     assert_eq!(tauri["identifier"], "com.imperaos.operatorpanel");
-    assert_eq!(
-        tauri["app"]["windows"][0]["title"],
-        "ImperaOS Operator Panel"
-    );
+    assert_eq!(tauri["app"]["windows"][0]["title"], "ImperaOS");
 }

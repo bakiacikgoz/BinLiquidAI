@@ -100,7 +100,8 @@ def run_governed_pilot_workflow(
     generated_at = now or datetime.now(UTC)
     run_id = f"{spec.workflow_id}-{generated_at.strftime('%Y%m%d%H%M%S')}"
     root = Path(output_root)
-    run_root = root / run_id
+    run_storage_id = safe_hash_payload({"runId": run_id}).split(":")[-1][:12]
+    run_root = root / f"run-{run_storage_id}"
     writer = PilotWorkflowEvidenceWriter(run_root)
     spec_hash = safe_hash_payload(spec.model_dump(mode="json", by_alias=True))
     config = RuntimeConfig.from_profile(effective_profile)
@@ -260,8 +261,9 @@ def _run_scenario(
 ) -> tuple[PilotWorkflowStepResult, list[str]]:
     refs: list[str] = []
     writer = PilotWorkflowEvidenceWriter(run_root / "scenarios" / scenario.scenario_id)
+    fixture_id = safe_hash_payload({"scenarioId": scenario.scenario_id}).split(":")[-1][:12]
     fixture = build_memory_runtime_policy_fixture(
-        run_root / "fixtures" / scenario.scenario_id,
+        run_root / "fixtures" / fixture_id,
         profile=profile,
         semantic_mode=scenario.memory.semantic_runtime_mode,
         semantic_enabled=scenario.memory.semantic_runtime_mode != "disabled",

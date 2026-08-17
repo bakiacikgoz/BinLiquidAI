@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "ImperaOS Operator Panel",
+  "productName": "ImperaOS",
   "version": "0.5.0-beta.1",
   "identifier": "com.imperaos.operatorpanel",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "ImperaOS Operator Panel",
+        "title": "ImperaOS",
         "width": 1480,
         "height": 920,
         "minWidth": 1200,
