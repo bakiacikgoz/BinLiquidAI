@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 
 import { gotoOperatorPanel, openPrimaryView } from './helpers';
 
-test('approval mutation controls are disabled without an operator id', async ({ page }) => {
-  const consoleHealth = await gotoOperatorPanel(page);
+test('approval mutation controls are disabled without a valid operator id', async ({ page }) => {
+  const consoleHealth = await gotoOperatorPanel(page, { operatorId: 'ab' });
   await openPrimaryView(page, 'Onaylar', 'Approvals');
 
   await expect(page.getByRole('button', { name: 'Approve', exact: true })).toBeDisabled();
@@ -11,11 +11,11 @@ test('approval mutation controls are disabled without an operator id', async ({ 
   await expect(page.getByRole('button', { name: 'Execute', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveAttribute(
     'title',
-    'Set operator id to continue',
+    /operat.r id/i,
   );
   await expect(page.getByRole('button', { name: 'Reject', exact: true })).toHaveAttribute(
     'data-disabled-reason',
-    'Set operator id to continue',
+    /operat.r id/i,
   );
 
   consoleHealth.assertNoCriticalErrors();

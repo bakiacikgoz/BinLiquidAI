@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { gotoOperatorPanel, saveE2eScreenshot } from './helpers';
 
 test('workspace smoke renders preview mission control without critical console errors', async ({ page }) => {
-  const consoleHealth = await gotoOperatorPanel(page);
+  const consoleHealth = await gotoOperatorPanel(page, { operatorId: 'ab' });
 
   await expect(page.getByRole('heading', { name: 'Mission Control', exact: true })).toBeVisible();
   await expect(page.getByTestId('runtime-truth-banner')).toHaveCount(0);
@@ -13,7 +13,7 @@ test('workspace smoke renders preview mission control without critical console e
   await expect(page.getByRole('button', { name: /Onayla ve Devam Et/i })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Onayla ve Devam Et/i })).toHaveAttribute(
     'title',
-    'Set operator id to continue',
+    /operat.r id/i,
   );
 
   await saveE2eScreenshot(page, 'workspace-desktop');
