@@ -98,7 +98,7 @@ built_at_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EOF
 
 cat > "${RUNTIME_DIR}/README.txt" <<'EOF'
-Generated runtime bundle location for AegisOS Operator Panel.
+Generated runtime bundle location for ImperaOS Operator Console.
 
 Release gate:
 1) python/bin/python is executable on macOS bundles

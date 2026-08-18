@@ -1,10 +1,10 @@
 [package]
 name = "aegisos_operator_panel"
 version = "0.5.0-beta.1"
-description = "AegisOS BinLiquid Operator Panel"
-authors = ["BinLiquid Contributors"]
-license = ""
-repository = ""
+description = "ImperaOS Operator Console"
+authors = ["ImperaOS Contributors"]
+license = "Apache-2.0"
+repository = "https://github.com/bakiacikgoz/ImperaOs"
 edition = "2021"
 rust-version = "1.77.2"
 

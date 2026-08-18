@@ -1,4 +1,4 @@
-Generated runtime bundle location for AegisOS Operator Panel.
+Generated runtime bundle location for ImperaOS Operator Console.
 
 Release gate:
 1) python/bin/python is executable on macOS bundles

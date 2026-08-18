@@ -16,6 +16,9 @@ on:
     branches:
       - "codex/enterprise-workspace-onboarding-agent-enrollment-v1"
 
+permissions:
+  contents: read
+
 jobs:
   enterprise-workspace-release-closure:
     runs-on: windows-latest

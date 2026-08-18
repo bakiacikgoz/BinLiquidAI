@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible ImperaOS defect
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: ImperaOS version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Control Plane
+        - Governed Runtime
+        - Team Runtime
+        - Provider Governance
+        - Memory
+        - Operator Console
+        - Qualified Execution/Computer Use
+        - Packaging/Installation
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, Python/uv, Node/pnpm and Rust versions as relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs
+      render: shell
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I removed secrets, customer data, private prompts and unredacted evidence.
+          required: true
+        - label: This is not a vulnerability that requires private disclosure.
+          required: true

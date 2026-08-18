@@ -3,13 +3,14 @@ requires = ["hatchling>=1.26.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "binliquid"
+name = "imperaos"
 version = "0.4.1"
-description = "AegisOS v0.4.1 Team Runtime MVP on BinLiquid core"
+description = "Self-hosted Agent Control Plane for governed AI agent production readiness"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
+license = "Apache-2.0"
 authors = [
-  { name = "BinLiquid Contributors" }
+  { name = "ImperaOS Contributors" }
 ]
 dependencies = [
   "pydantic>=2.10.0,<3.0.0",
@@ -34,6 +35,7 @@ hf = [
 ]
 
 [project.scripts]
+imperaos = "binliquid.cli:app"
 binliquid = "binliquid.cli:app"
 aegis = "binliquid.cli:app"
 

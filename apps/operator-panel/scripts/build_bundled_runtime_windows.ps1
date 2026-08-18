@@ -131,7 +131,7 @@ $manifest = @(
 $manifest | Set-Content -LiteralPath (Join-Path $RuntimeDir "RUNTIME_MANIFEST.txt") -Encoding utf8
 
 @"
-Generated Windows runtime bundle for AegisOS Operator Panel.
+Generated Windows runtime bundle for ImperaOS Operator Console.
 
 Release gate:
 1) python/Scripts/python.exe exists

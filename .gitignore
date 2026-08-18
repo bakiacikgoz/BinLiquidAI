@@ -8,6 +8,13 @@ build/
 *.egg-info/
 .binliquid/
 .worktrees/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 benchmarks/results/
 artifacts/
 test-results/
