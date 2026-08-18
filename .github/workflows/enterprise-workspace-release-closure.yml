@@ -48,6 +48,9 @@ jobs:
       - name: Sync Python dependencies
         run: uv sync --python 3.11 --extra dev
 
+      - name: Install Operator Console dependencies
+        run: pnpm --dir apps/operator-panel install --frozen-lockfile
+
       - name: Install Playwright Chromium
         run: pnpm --dir apps/operator-panel exec playwright install chromium
 
