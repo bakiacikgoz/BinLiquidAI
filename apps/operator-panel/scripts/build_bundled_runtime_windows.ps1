@@ -62,18 +62,19 @@ if (-not $RuntimeDir.StartsWith($RuntimeParentResolved, [System.StringComparison
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 
 if ([string]::IsNullOrWhiteSpace($WheelPath)) {
-  Write-Host "[runtime] building binliquid wheel"
+  Write-Host "[runtime] building ImperaOS wheel"
   Push-Location $RepoRoot
   try {
     Invoke-Checked -FilePath "uv" -Arguments @("build", "--wheel", "--out-dir", $DistDir)
   } finally {
     Pop-Location
   }
-  $latestWheel = Get-ChildItem -Path $DistDir -Filter "binliquid-*.whl" |
+  $latestWheel = Get-ChildItem -Path $DistDir -Filter "*.whl" |
+    Where-Object { $_.Name -like "imperaos-*.whl" -or $_.Name -like "binliquid-*.whl" } |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1
   if ($null -eq $latestWheel) {
-    throw "[runtime] no binliquid wheel found in $DistDir"
+    throw "[runtime] no ImperaOS-compatible wheel found in $DistDir"
   }
   $WheelPath = $latestWheel.FullName
 }

@@ -24,12 +24,17 @@ fi
 mkdir -p "${DIST_DIR}"
 
 if [[ -z "${WHEEL_PATH}" ]]; then
-  echo "[runtime] building binliquid wheel"
+  echo "[runtime] building ImperaOS wheel"
   (
     cd "${REPO_ROOT}"
     uv build --wheel --out-dir "${DIST_DIR}"
   )
-  WHEEL_PATH="$(ls -t "${DIST_DIR}"/binliquid-*.whl | head -n 1)"
+  WHEEL_PATH="$(
+    find "${DIST_DIR}" -maxdepth 1 -type f \
+      \( -name 'imperaos-*.whl' -o -name 'binliquid-*.whl' \) -print0 \
+      | xargs -0 ls -t \
+      | head -n 1
+  )"
 fi
 
 if [[ ! -f "${WHEEL_PATH}" ]]; then
