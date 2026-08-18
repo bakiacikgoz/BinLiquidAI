@@ -16,6 +16,9 @@ on:
     branches:
       - "codex/enterprise-workspace-onboarding-agent-enrollment-v1"
 
+permissions:
+  contents: read
+
 jobs:
   enterprise-workspace-release-closure:
     runs-on: windows-latest
@@ -44,6 +47,9 @@ jobs:
 
       - name: Sync Python dependencies
         run: uv sync --python 3.11 --extra dev
+
+      - name: Install Operator Console dependencies
+        run: pnpm --dir apps/operator-panel install --frozen-lockfile
 
       - name: Install Playwright Chromium
         run: pnpm --dir apps/operator-panel exec playwright install chromium

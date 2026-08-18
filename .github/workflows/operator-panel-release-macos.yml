@@ -6,6 +6,9 @@ on:
     tags:
       - 'operator-panel-v*'
 
+permissions:
+  contents: read
+
 jobs:
   build-and-notarize:
     strategy:

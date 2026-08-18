@@ -1,20 +1,37 @@
 # ImperaOS
 
-**ImperaOS** is a self-hosted Agent Control Plane for governed AI
-agent production readiness. It helps operators register agents, simulate policy
-decisions, enforce approval lifecycle, bind runs to verified identity, preserve
-audit/replay artifacts, export signed evidence packs, and block unsupported
-release claims before agents are trusted in production-like workflows.
+[![CI](https://github.com/bakiacikgoz/ImperaOs/actions/workflows/ci.yml/badge.svg)](https://github.com/bakiacikgoz/ImperaOs/actions/workflows/ci.yml)
+[![Operator Panel CI](https://github.com/bakiacikgoz/ImperaOs/actions/workflows/operator-panel-ci.yml/badge.svg)](https://github.com/bakiacikgoz/ImperaOs/actions/workflows/operator-panel-ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](pyproject.toml)
+
+**ImperaOS is a self-hosted Agent Control Plane for governed AI agents.** It sits
+between agent intent and real execution to enforce policy, approval, identity,
+audit/replay, evidence, and qualification boundaries before agent workflows are
+trusted in production-like environments.
+
+ImperaOS is not trying to be another unrestricted agent orchestrator. Its focus is
+operational trust: making agent behavior reviewable, policy-bound, replayable, and
+fail-closed when identity, approval, evidence, or platform qualification is missing.
 
 Product boundary: [Agent Control Plane Product Boundary](docs/AGENT_CONTROL_PLANE_PRODUCT_BOUNDARY.md).
 Governed Memory v1 is documented in [Governed Memory Layer](docs/GOVERNED_MEMORY_LAYER.md).
 
-ImperaOS currently provides four control-plane surfaces:
+## Why ImperaOS
 
-1. **Control Plane Core** — agent registry, run coordination, policy simulation, evidence pack export/verify, readiness checks and claim guard.
-2. **Governed Runtime** — existing core and team runtime execution backends with planning, routing, scoped memory, policy decisions, approvals, checkpointing and replayable audit traces.
-3. **Operator Console** — a Tauri-based control surface for dashboard, agents, runs, approvals, evidence, policy, system state and execution surfaces.
-4. **Qualified Execution Surfaces** — fail-closed execution adapters. Computer-use is retained only as a supervised, opt-in, qualification-gated surface and is disabled by default for live desktop operation.
+ImperaOS is built to answer operational questions that ordinary orchestration leaves
+open: Who authorized a mutation? Which policy allowed it? Can the run be reconstructed
+and verified? Was sensitive content redacted before provider submission? Is an
+execution surface qualified or merely implemented? Are release claims backed by
+evidence?
+
+| Surface | Purpose |
+|---|---|
+| Control Plane Core | Registration, policy simulation, run coordination, evidence, readiness, claim guard |
+| Governed Runtime | Planning, routing, memory, approvals, checkpoints, audit/replay |
+| Team Runtime | Governed DAG execution, handoff, scoped memory, bounded concurrency |
+| Operator Console | Tauri surface for agents, runs, approvals, evidence, policy, system state |
+| Qualified Execution Surfaces | Fail-closed adapters for higher-risk execution such as computer-use |
 
 > **Status summary**
 >
@@ -24,6 +41,32 @@ ImperaOS currently provides four control-plane surfaces:
 > readiness evidence for broader claims. Computer-use is a fail-closed,
 > qualification-gated execution surface; live desktop automation is disabled by
 > default and must not be described as generally available across platforms.
+
+---
+
+## Open Source and Maintenance
+
+ImperaOS is developed as an open-source project under the Apache-2.0 license.
+
+The project is actively maintained with automated linting, tests, governance gates,
+release-readiness checks, cross-platform validation, and evidence-oriented
+qualification workflows.
+
+Development is heavily AI-assisted, including extensive use of OpenAI Codex.
+AI-generated changes are treated as proposals: the maintainer remains responsible for
+review, testing, security boundaries, provenance, and release decisions. See the
+[Codex maintainer workflow](docs/CODEX_MAINTAINER_WORKFLOW.md).
+
+## Contributing and Security
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+- Security: [SECURITY.md](SECURITY.md)
+- Support: [SUPPORT.md](SUPPORT.md)
+- Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- License: [Apache-2.0](LICENSE)
+
+Security vulnerabilities should be reported privately. See [SECURITY.md](SECURITY.md).
 
 ---
 

@@ -6,6 +6,9 @@ on:
     tags:
       - 'operator-panel-v*'
 
+permissions:
+  contents: read
+
 jobs:
   runtime-matrix:
     strategy:

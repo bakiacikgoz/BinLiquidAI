@@ -1,0 +1,17 @@
+title = "ImperaOS Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic secret-detection fixtures and integrity hashes"
+paths = [
+  '''^apps/operator-panel/src/product-shell/styles/uiLabThemeManifest\.ts$''',
+  '''^benchmarks/tasks/memory/runtime_policy_cases\.jsonl$''',
+  '''^tests/test_artifact_context\.py$''',
+  '''^tests/test_local_product_evidence_verifier\.py$''',
+  '''^tests/test_macos_local_trial_gate\.py$''',
+  '''^tests/test_memory_runtime_policy_gateway\.py$''',
+  '''^tests/test_memory_runtime_policy_privacy\.py$''',
+  '''^tests/test_memory_workspace_authority\.py$''',
+]

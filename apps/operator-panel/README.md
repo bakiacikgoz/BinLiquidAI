@@ -1,4 +1,4 @@
-# AegisOS Operator Panel (v0.5.0-beta)
+# ImperaOS Operator Console (v0.5.0-beta)
 
 Tauri 2 + React control plane for BinLiquid core.
 
