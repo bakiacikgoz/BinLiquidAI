@@ -19,6 +19,10 @@
 
 ## Why ImperaOS
 
+For development on another machine or with a new AI agent, start with
+[AGENTS.md](AGENTS.md) and the [UI design and handoff guide](docs/UI_DESIGN_AND_HANDOFF.md).
+The guide records accepted design decisions, regression lessons and remaining limitations.
+
 Running an agent is one part of the job. Deciding what it may access, which
 actions need approval, and how to investigate its work matters just as much.
 

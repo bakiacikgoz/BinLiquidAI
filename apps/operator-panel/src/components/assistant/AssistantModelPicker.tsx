@@ -105,22 +105,14 @@ export function AssistantModelPicker({
   };
 
   const updateProvider = (value: string) => {
-    if (isOllamaProvider(value)) {
-      onRuntimeSettingsChange({ assistantProvider: value, assistantHfModelId: '' });
-      return;
-    }
-    if (isTransformersProvider(value)) {
-      onRuntimeSettingsChange({ assistantProvider: value, assistantModel: '' });
-      return;
-    }
-    onRuntimeSettingsChange({ assistantProvider: value });
+    onRuntimeSettingsChange({ assistantProvider: value, assistantModel: '', assistantHfModelId: '' });
   };
   const onRefreshModels = () => {
     modelDiscovery?.refresh();
   };
 
   const discoveryHelper =
-    discoveryError?.message ||
+    (discoveryError ? (locale === 'tr' ? 'Model listesi alınamadı. Çalışma motoru bağlantısını Ayarlar bölümünden kontrol edip yeniden deneyin.' : 'Could not load models. Check the runtime connection in Settings and retry.') : '') ||
     (discoveryStatus === 'empty'
       ? translateAssistantText('No local assistant models were discovered. Use refresh after installing a model.', locale)
       : isDiscovering
@@ -134,7 +126,7 @@ export function AssistantModelPicker({
   return (
     <div className="assistant-runtime-settings" aria-label="Assistant runtime settings">
       <label>
-        <span>{text.provider}</span>
+        <span>{locale === 'tr' ? 'Sağlayıcı' : text.provider}</span>
         <select
           aria-label="Assistant provider"
           value={provider === 'default' ? '' : provider}
@@ -241,7 +233,7 @@ export function AssistantModelPicker({
       ) : null}
 
       <label>
-        <span>{text.fallback}</span>
+        <span>{locale === 'tr' ? 'Yedek sağlayıcı' : text.fallback}</span>
         <select
           aria-label="Assistant fallback provider"
           value={runtimeSettings.assistantFallbackProvider}
@@ -287,7 +279,7 @@ export function AssistantModelPicker({
       </div>
 
       {discoveredProviders.length > 0 ? (
-        <div className="assistant-provider-registry" aria-label="Provider registry">
+        <details className="assistant-provider-registry" aria-label="Provider registry"><summary>{locale === 'tr' ? 'Sağlayıcı teknik ayrıntıları' : 'Provider technical details'}</summary>
           {discoveredProviders.map((item) => {
             const status = item.available ? 'enabled' : 'disabled';
             const detail = item.disabledReason || item.errorCode || '';
@@ -326,7 +318,7 @@ export function AssistantModelPicker({
               </div>
             );
           })}
-        </div>
+        </details>
       ) : null}
     </div>
   );

@@ -25,6 +25,7 @@ export function TerminalSurface({ active = true, onClose, projectRootRef, projec
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const [error, setError] = useState('');
   const [terminalStatus, setTerminalStatus] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchStatus, setSearchStatus] = useState('');
 
@@ -32,7 +33,7 @@ export function TerminalSurface({ active = true, onClose, projectRootRef, projec
 
   useEffect(() => {
     if (!hostRef.current) return;
-    const terminal = new Terminal({ cursorBlink: true, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', theme: { background: '#0b1016', foreground: '#e8eef7' } });
+    const terminal = new Terminal({ cursorBlink: true, fontSize: 12, lineHeight: 1.2, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', theme: { background: '#181818', foreground: '#e6e6e6', blue: '#e6e6e6', brightBlue: '#e6e6e6', cyan: '#e6e6e6', brightCyan: '#e6e6e6' } });
     const fit = new FitAddon(); const search = new SearchAddon();
     searchAddonRef.current = search;
     terminal.loadAddon(fit);
@@ -141,5 +142,5 @@ export function TerminalSurface({ active = true, onClose, projectRootRef, projec
     setSearchStatus(matched ? 'Terminal match found.' : 'No terminal match found.');
   };
 
-  return <section className="terminal-view native-terminal-surface" aria-label="Governed terminal"><header><strong>Terminal</strong><input type="search" aria-label="Search terminal output" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} /><button type="button" disabled={!searchQuery.trim()} onClick={() => find('previous')}>Find previous</button><button type="button" disabled={!searchQuery.trim()} onClick={() => find('next')}>Find next</button><button type="button" disabled={Boolean(terminalStatus)} onClick={interrupt}>Interrupt</button><button type="button" onClick={onClose}>Close</button></header><p className="ps-muted">User PTY · {projectRootRef ? `registered project root (${projectRootDisplayName || 'project'})` : 'verified ImperaOS runtime workspace'} · agent input denied</p>{error ? <p role="alert">{error}</p> : null}{terminalStatus ? <p role="status">{terminalStatus}</p> : null}{searchStatus ? <p role="status">{searchStatus}</p> : null}<div className="terminal-host" ref={hostRef} /></section>;
+  return <section className={`terminal-view native-terminal-surface${searchOpen ? ' is-search-open' : ''}`} aria-label="Governed terminal" onKeyDownCapture={(event) => { if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'f') { event.preventDefault(); setSearchOpen(true); requestAnimationFrame(() => hostRef.current?.parentElement?.querySelector<HTMLInputElement>('input[type="search"]')?.focus()); } if (event.key === 'Escape' && searchOpen) { setSearchOpen(false); } }}><header><strong>Terminal</strong><input type="search" aria-label="Search terminal output" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} /><button type="button" disabled={!searchQuery.trim()} onClick={() => find('previous')}>Find previous</button><button type="button" disabled={!searchQuery.trim()} onClick={() => find('next')}>Find next</button><button type="button" disabled={Boolean(terminalStatus)} onClick={interrupt}>Interrupt</button><button type="button" onClick={onClose}>Close</button></header><p className="ps-muted">User PTY · {projectRootRef ? `registered project root (${projectRootDisplayName || 'project'})` : 'verified ImperaOS runtime workspace'} · agent input denied</p>{error ? <p role="alert">{error}</p> : null}{terminalStatus ? <p role="status">{terminalStatus}</p> : null}{searchStatus ? <p role="status">{searchStatus}</p> : null}<div className="terminal-host" ref={hostRef} /></section>;
 }

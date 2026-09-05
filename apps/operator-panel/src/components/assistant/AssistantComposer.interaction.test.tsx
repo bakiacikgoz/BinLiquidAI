@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -66,6 +66,60 @@ const discoveredModels: AssistantModelDiscoveryState = {
 };
 
 describe('AssistantComposer runtime controls', () => {
+  it('allows configured models from available providers without a local installation', async () => {
+    const configured = { ...discoveredModels, models: [{ ...discoveredModels.models[0], provider: 'local-transformers', installed: false, configured: true }] };
+    const { user } = renderOperatorPanel(<ComposerHarness onSend={vi.fn()} variant="product" modelDiscovery={configured} />);
+    await user.click(screen.getByRole('button', { name: /profile default/i }));
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Choose model' }));
+    expect(screen.getByRole('radio', { name: /qwen3.5:4b/ })).toBeEnabled();
+  });
+  it('selects a discovered model from the compact list and adjusts reasoning', async () => {
+    const onSend = vi.fn();
+    const { user } = renderOperatorPanel(<ComposerHarness onSend={onSend} variant="product" modelDiscovery={discoveredModels} />);
+    await user.click(screen.getByRole('button', { name: /profile default/i }));
+    await user.click(screen.getByRole('button', { name: 'Choose model' }));
+    await user.click(screen.getByRole('radio', { name: /qwen3.5:4b/ }));
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose model' })).toHaveTextContent('qwen3.5:4b');
+    const effort = screen.getByRole('slider', { name: 'Reasoning effort' });
+    effort.focus();
+    await user.keyboard('{ArrowRight}');
+    await user.keyboard('{Escape}');
+    await user.type(screen.getByLabelText('Message'), 'Hello');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(onSend).toHaveBeenCalledWith('Hello', expect.objectContaining({ assistantModel: 'qwen3.5:4b' }), expect.any(Object));
+  });
+  it('blocks duplicate pending sends and preserves a newly selected command draft', async () => {
+    let finish!: () => void;
+    const onSend = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const { user, container } = renderOperatorPanel(<ComposerHarness onSend={onSend} />);
+    await user.type(screen.getByLabelText('Message'), 'Original request');
+    await user.dblClick(screen.getByRole('button', { name: 'Send' }));
+    expect(onSend).toHaveBeenCalledTimes(1);
+    const command = container.querySelector<HTMLButtonElement>('.assistant-composer-menu-panel button')!;
+    await user.click(command);
+    const nextDraft = (screen.getByLabelText('Message') as HTMLTextAreaElement).value;
+    expect(nextDraft).not.toBe('Original request');
+    await act(async () => finish());
+    expect(screen.getByLabelText('Message')).toHaveValue(nextDraft);
+  });
+  it('keeps the draft when sending fails', async () => {
+    const { user } = renderOperatorPanel(<ComposerHarness onSend={async () => false} />);
+    await user.type(screen.getByLabelText('Message'), 'Keep this request');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(screen.getByLabelText('Message')).toHaveValue('Keep this request');
+  });
+
+  it('opens model settings and dismisses them with Escape', async () => {
+    const { user } = renderOperatorPanel(<ComposerHarness onSend={vi.fn()} variant="product" />);
+    const trigger = screen.getByRole('button', { name: /profile default/i });
+    await user.click(trigger);
+    expect(screen.getByRole('dialog', { name: 'Model settings' })).toBeVisible();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Model settings' })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
   it('uses the UI Lab composer hierarchy for product surfaces', () => {
     const { container } = renderOperatorPanel(
       <ComposerHarness onSend={vi.fn()} variant="product" />,
@@ -89,6 +143,7 @@ describe('AssistantComposer runtime controls', () => {
     );
 
     expect(screen.getByText('Riske göre onay iste')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /profil varsayılanı/i }));
     await user.selectOptions(screen.getByLabelText('Approval profile'), 'policy_automatic');
     expect(screen.getByText('Politika içinde otomatik')).toBeInTheDocument();
   });

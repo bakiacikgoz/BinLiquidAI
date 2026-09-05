@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { ChevronLeft, ChevronRight, ExternalLink, RotateCw, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Globe2, RotateCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { nativeErrorMessage } from '../nativeErrorMessage';
@@ -18,7 +18,7 @@ function normalizeHistory(value: unknown): BrowserHistoryState {
 }
 
 export function BrowserSurface({ active = true, onClose, sessionLabel: persistedSessionLabel, onSessionChange }: { active?: boolean; onClose: () => void; sessionLabel?: string; onSessionChange?: (sessionLabel: string | null) => void }) {
-  const [address, setAddress] = useState('https://');
+  const [address, setAddress] = useState('');
   const [ownedSessionLabel, setOwnedSessionLabel] = useState<string | null>(null);
   const [history, setHistory] = useState<BrowserHistoryState>(emptyHistory);
   const [status, setStatus] = useState('');
@@ -145,6 +145,7 @@ export function BrowserSurface({ active = true, onClose, sessionLabel: persisted
           <span className="browser-lock" aria-hidden="true">●</span>
           <input
             aria-label="Browser address"
+            placeholder="HTTPS adresi gir"
             value={address}
             onChange={(event) => setAddress(event.target.value)}
             autoCapitalize="none"
@@ -152,13 +153,13 @@ export function BrowserSurface({ active = true, onClose, sessionLabel: persisted
             inputMode="url"
             spellCheck={false}
           />
-          <button type="submit" disabled={opening}>{opening ? 'Opening…' : sessionLabel ? 'Navigate HTTPS' : 'Open HTTPS'}<ExternalLink size={14} /></button>
+          <button type="submit" aria-label={opening ? 'Opening…' : sessionLabel ? 'Navigate HTTPS' : 'Open HTTPS'} title="Adresi aç" disabled={opening}><ExternalLink size={14} /></button>
         </form>
         <button type="button" aria-label="Close" onClick={close}><X size={16} /></button>
       </div>
-      <div ref={viewportRef} className="browser-page native-browser-viewport" aria-label="Browser page viewport" />
+      <div ref={viewportRef} className="browser-page native-browser-viewport" aria-label="Browser page viewport">{!sessionLabel && <div className="browser-empty-state"><Globe2 size={27} strokeWidth={1.4}/><strong>Göz atmaya başlayın</strong><p>Bir sayfa açmak için HTTPS adresi girin</p></div>}</div>
       {status ? <p className="native-surface-status" role="status">{status}</p> : null}
-      <p className="native-policy-note">User mode opens only explicitly entered HTTPS URLs. Each explicit history target and every redirect is revalidated by native policy.</p>
+      <details className="browser-policy-details"><summary>Bağlantı bilgisi</summary><p>Yalnızca HTTPS adresleri açılır. Yönlendirmeler bağlantı kurallarıyla doğrulanır.</p></details>
     </section>
   );
 }

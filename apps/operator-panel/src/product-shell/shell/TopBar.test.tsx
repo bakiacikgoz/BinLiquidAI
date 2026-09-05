@@ -23,8 +23,8 @@ describe('TopBar capability truth', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole('button', { name: 'Utility dock' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Bağlam paneli' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Terminal paneli' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sabitlenmiş özeti aç/kapat' })).not.toBeInTheDocument();
     expect(container.querySelectorAll('[data-disabled-reason="TASK_CONTEXT_REQUIRED"]')).toHaveLength(2);
   });
 
@@ -45,10 +45,18 @@ describe('TopBar capability truth', () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByTitle('Utility dock'));
-    await user.click(screen.getByTitle('Bağlam paneli'));
+    await user.click(screen.getByTitle('Terminal paneli'));
+    await user.click(screen.getByTitle('Sabitlenmiş özeti aç/kapat'));
 
     expect(useProductShellStore.getState().dockOpen).toBe(true);
     expect(useProductShellStore.getState().contextRailOpen).toBe(true);
   });
+  it('resolves the task when mounted outside the child Routes, as in AppShell', async () => {
+    useProductShellStore.setState({ sidebarCollapsed: false, tasks: [{ id: 'task-1', title: 'Release', createdAt: '', status: 'active' }] });
+    const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1']}><TopBar /><Routes><Route path="/task/:taskId" element={<div>Conversation</div>} /></Routes></MemoryRouter>);
+    expect(screen.getByText('Release')).toBeInTheDocument();
+    await user.click(screen.getByTitle('Sabitlenmiş özeti aç/kapat'));
+    expect(useProductShellStore.getState().contextRailOpen).toBe(true);
+  });
+
 });

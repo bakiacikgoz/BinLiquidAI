@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -17,6 +17,42 @@ import { renderOperatorPanel } from '../../test/render';
 import { AgentsPage, ApprovalsPage, LibraryPage } from './GovernedCollections';
 
 describe('LibraryPage', () => {
+  it('ignores old artifact detail after another artifact is selected', async () => {
+    artifacts.list.mockResolvedValue({ items: [
+      { artifactId: 'artifact-old', title: 'Old artifact', kind: 'document', status: 'active' },
+      { artifactId: 'artifact-new', title: 'New artifact', kind: 'document', status: 'active' },
+    ] });
+    let finishOld!: (value: unknown) => void;
+    artifacts.get.mockImplementation(({ artifactId }) => artifactId === 'artifact-old'
+      ? new Promise((resolve) => { finishOld = resolve; })
+      : Promise.resolve({ revision: { revisionId: 'revision-new' } }));
+    const { user } = renderOperatorPanel(<MemoryRouter><LibraryPage /></MemoryRouter>);
+    await waitFor(() => expect(finishOld).toBeDefined());
+    await user.click(await screen.findByRole('button', { name: /New artifact/ }));
+    expect(await screen.findByText('revision-new')).toBeInTheDocument();
+    await act(async () => { finishOld({ revision: { revisionId: 'revision-old' } }); });
+    expect(screen.queryByText('revision-old')).not.toBeInTheDocument();
+    expect(screen.getByText('revision-new')).toBeInTheDocument();
+  });
+
+  it('ignores old approval evidence after the selected approval changes', async () => {
+    bridge.fetchApprovals.mockResolvedValue({ pending: [
+      { approval_id: 'approval-old', target_kind: 'deployment', status: 'pending' },
+      { approval_id: 'approval-new', target_kind: 'deployment', status: 'pending' },
+    ] });
+    let finishOld!: (value: unknown) => void;
+    bridge.showApproval.mockImplementation((_settings, id) => id === 'approval-old'
+      ? new Promise((resolve) => { finishOld = resolve; })
+      : Promise.resolve({ ticket: { target_ref: 'new-target' } }));
+    const { user } = renderOperatorPanel(<MemoryRouter><ApprovalsPage /></MemoryRouter>);
+    await waitFor(() => expect(finishOld).toBeDefined());
+    await user.click(await screen.findByRole('button', { name: /approval-new/ }));
+    expect(await screen.findByText('new-target')).toBeInTheDocument();
+    await act(async () => { finishOld({ ticket: { target_ref: 'old-target' } }); });
+    expect(screen.queryByText('old-target')).not.toBeInTheDocument();
+    expect(screen.getByText('new-target')).toBeInTheDocument();
+  });
+
   it('opens the canonical detail for a selected governed artifact', async () => {
     artifacts.list.mockResolvedValue({
       items: [{ artifactId: 'artifact-release', title: 'Release plan', kind: 'document', status: 'active' }],

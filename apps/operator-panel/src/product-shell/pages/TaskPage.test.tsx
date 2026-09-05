@@ -1,4 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,17 +41,20 @@ vi.mock('../workspace/WorkspaceTabs', () => ({
     tabs,
     activeTabId,
     onOpen,
+    onClose,
     projectRootRef,
   }: {
     tabs: Array<{ id: string; title: string }>;
     activeTabId: string | null;
     onOpen: (kind: 'artifacts') => void;
+    onClose: (tabId: string) => void;
     projectRootRef?: string;
   }) => <div>
     <p>Workspace tabs: {tabs.map((tab) => tab.title).join(', ') || 'none'}</p>
     <p>Active workspace tab: {tabs.find((tab) => tab.id === activeTabId)?.title ?? 'none'}</p>
     <p>Terminal root: {projectRootRef ?? 'runtime-root'}</p>
     <button type="button" onClick={() => onOpen('artifacts')}>Open another artifact tab</button>
+    {tabs.map((tab) => <button key={tab.id} type="button" onClick={() => onClose(tab.id)}>Close {tab.title}</button>)}
   </div>,
 }));
 
@@ -63,6 +67,74 @@ function LocationProbe() {
 }
 
 describe('TaskPage', () => {
+  it('preserves the draft when the native assistant reports startup failure', async () => {
+    assistant.actions.send.mockResolvedValueOnce(false);
+    const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1']}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter>);
+    await user.type(screen.getByRole('textbox', { name: 'Governed assistant' }), 'Keep this runtime request');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(assistant.actions.send).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    expect(screen.getByRole('textbox', { name: 'Governed assistant' })).toHaveValue('Keep this runtime request');
+  });
+
+  it('reuses the persisted user message when retrying the same failed startup', async () => {
+    assistant.actions.send.mockResolvedValueOnce(false).mockResolvedValueOnce(true).mockResolvedValueOnce(true);
+    const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1']}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter>);
+    const draft = screen.getByRole('textbox', { name: 'Governed assistant' });
+    await user.type(draft, 'Retry this request');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(assistant.actions.send).toHaveBeenCalledTimes(2);
+    expect(workspace.addMessage).toHaveBeenCalledTimes(1);
+    expect(draft).toHaveValue('');
+    await user.type(draft, 'Retry this request');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(workspace.addMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns to the conversation after closing the final workspace tab', async () => {
+    const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1/workspace']}><LocationProbe /><Routes><Route path="/task/:taskId" element={<TaskPage />} /><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Open another artifact tab' }));
+    await user.click(await screen.findByRole('button', { name: 'Close Artifacts' }));
+    await waitFor(() => expect(screen.getByText('Current route: /task/task-1')).toBeInTheDocument());
+    expect(screen.queryByText('Workspace tabs: Artifacts')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open artifacts' })).toBeInTheDocument();
+  });
+
+  it('reports a rejected task runtime setting without pretending it was applied', async () => {
+    workspace.updateTask.mockRejectedValue(new Error('Runtime update denied'));
+    const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1']}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: /profile default/i }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Reasoning effort' }), 'high');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Runtime update denied');
+    expect(screen.getByRole('combobox', { name: 'Reasoning effort' })).toHaveValue('medium');
+  });
+
+  it('shows a persistence failure without starting an assistant turn', async () => {
+    workspace.addMessage.mockRejectedValue(new Error('Message storage unavailable'));
+    const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1']}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter>);
+    await user.type(screen.getByRole('textbox', { name: 'Governed assistant' }), 'Keep this message');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Message storage unavailable');
+    expect(assistant.actions.send).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Governed assistant' })).toHaveValue('Keep this message');
+  });
+
+  it('restores a cached task project after StrictMode effect replay', async () => {
+    useProductShellStore.setState({
+      projects: [],
+      tasks: [{ id: 'task-1', projectId: 'project-1', title: 'Prepare release', createdAt: '2026-07-24T12:00:00Z', status: 'active' }],
+    });
+    workspace.listProjects.mockResolvedValue({
+      projects: [{ projectId: 'project-1', rootRef: 'root-release', rootDisplayName: 'Release workspace', title: 'Release', status: 'active' }],
+      nextCursor: null,
+    });
+    renderOperatorPanel(<StrictMode><MemoryRouter initialEntries={['/task/task-1']}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter></StrictMode>);
+
+    expect(await screen.findByRole('heading', { name: 'Prepare release' })).toBeInTheDocument();
+    expect(useProductShellStore.getState().projects).toContainEqual(expect.objectContaining({ projectId: 'project-1', rootRef: 'root-release' }));
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
@@ -101,6 +173,7 @@ describe('TaskPage', () => {
   it('persists a changed task reasoning profile before the next assistant turn', async () => {
     const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1']}><Routes><Route path="/task/:taskId" element={<TaskPage />} /></Routes></MemoryRouter>);
 
+    await user.click(screen.getByRole('button', { name: /profile default/i }));
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Reasoning effort' }), 'high');
 
     await waitFor(() => expect(workspace.updateTask).toHaveBeenCalledWith('task-1', {
@@ -196,11 +269,10 @@ describe('TaskPage', () => {
     expect(await screen.findByText('Terminal root: runtime-root')).toBeInTheDocument();
   });
 
-  it('restores the workspace surface from the durable workspace route', async () => {
+  it('starts with the workspace chooser when no tabs were saved', async () => {
     renderOperatorPanel(<MemoryRouter initialEntries={['/task/task-1/workspace']}><Routes><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes></MemoryRouter>);
 
-    expect(await screen.findByText('Workspace tabs: Artifacts')).toBeInTheDocument();
-    expect(screen.getByText('Active workspace tab: Artifacts')).toBeInTheDocument();
+    expect(await screen.findByText('Workspace tabs: none')).toBeInTheDocument();
   });
 
   it('restores task-scoped workspace tabs and focus after the renderer remounts', async () => {
@@ -241,30 +313,12 @@ describe('TaskPage', () => {
         <Routes><Route path="/task/:taskId/workspace" element={<TaskPage />} /></Routes>
       </MemoryRouter>,
     );
-    await screen.findByText('Workspace tabs: Artifacts');
+    await screen.findByText('Workspace tabs: none');
+    await user.click(screen.getByRole('button', { name: 'Open another artifact tab' }));
 
     await user.click(screen.getByRole('button', { name: 'Open another artifact tab' }));
 
     expect(await screen.findByText('Workspace tabs: Artifacts, Artifacts')).toBeInTheDocument();
-  });
-
-  it('focuses the existing terminal session when the dock Terminal tab is opened again', async () => {
-    useProductShellStore.setState({ dockOpen: true });
-    const { user } = renderOperatorPanel(
-      <MemoryRouter initialEntries={['/task/task-1']}>
-        <Routes>
-          <Route path="/task/:taskId" element={<TaskPage />} />
-          <Route path="/task/:taskId/workspace" element={<TaskPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Terminal' }));
-    expect(await screen.findByText('Workspace tabs: Terminal')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Terminal' }));
-
-    expect(screen.getByText('Workspace tabs: Terminal')).toBeInTheDocument();
-    expect(screen.queryByText('Workspace tabs: Terminal, Terminal')).not.toBeInTheDocument();
   });
 
   it('persists completed assistant action references as durable task links', async () => {

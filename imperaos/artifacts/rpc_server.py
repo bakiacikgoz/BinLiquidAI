@@ -455,6 +455,7 @@ class ArtifactRpcServer:
                     workspace_id,
                     _required_string(params, "taskId"),
                     status=status,
+                    title=params.get("title"),
                     priority=priority,
                     pinned=pinned,
                     manual_order=manual_order,

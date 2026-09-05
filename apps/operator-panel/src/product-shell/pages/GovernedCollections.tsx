@@ -103,9 +103,13 @@ export function LibraryPage() {
     }
   }, [items, searchParams]);
   useEffect(() => {
-    if (!selectedArtifactId) { setDetail(null); return; }
-    void artifactBridge.get({ artifactId: selectedArtifactId }).then(setDetail)
-      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Artifact detail is unavailable.'));
+    let active = true;
+    setDetail(null);
+    if (!selectedArtifactId) return;
+    setError('');
+    void artifactBridge.get({ artifactId: selectedArtifactId }).then((value) => { if (active) setDetail(value); })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Çalışma ayrıntısı yüklenemedi. Yenile düğmesini kullanarak tekrar deneyin.'); });
+    return () => { active = false; };
   }, [selectedArtifactId]);
 
   return (
@@ -179,9 +183,13 @@ export function ApprovalsPage() {
   }, [searchParams, settings]);
   useEffect(load, [load]);
   useEffect(() => {
-    if (!selected) { setDetail(null); return; }
-    void showApproval(settings, selected.approvalId).then(setDetail)
-      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Approval detail is unavailable.'));
+    let active = true;
+    setDetail(null);
+    if (!selected) return;
+    setError('');
+    void showApproval(settings, selected.approvalId).then((value) => { if (active) setDetail(value); })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Onay ayrıntısı yüklenemedi. Yenile düğmesini kullanarak tekrar deneyin.'); });
+    return () => { active = false; };
   }, [selected, settings]);
   const decide = async (approve: boolean) => {
     if (!selected || !settings.operatorId.trim()) return;
@@ -193,7 +201,7 @@ export function ApprovalsPage() {
       setError(cause instanceof Error ? cause.message : 'Approval decision failed.');
     }
   };
-  const canDecide = Boolean(selected && settings.operatorId.trim());
+  const canDecide = Boolean(selected && detail && settings.operatorId.trim());
 
   return (
     <CollectionFrame

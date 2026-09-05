@@ -1,6 +1,5 @@
 import {
   ArrowUp,
-  ChevronDown,
   Folder,
   GitBranch,
   Laptop,
@@ -30,12 +29,14 @@ import { assistantUiText, translateAssistantText, type UiLocale } from '../../i1
 import { Button } from '../primitives/Button';
 import { Icon } from '../primitives/Icon';
 import { AssistantModelPicker } from './AssistantModelPicker';
+import { AssistantQuickModelSettings } from './AssistantQuickModelSettings';
+import { AssistantRuntimePopover } from './AssistantRuntimePopover';
 
 function runtimeDisplayLabel(settings: AssistantRuntimeSettings, locale: UiLocale): string {
   const defaultLabel = locale === 'tr' ? 'profil varsayılanı' : 'profile default';
   const provider = settings.assistantProvider.trim() || defaultLabel;
   const model = settings.assistantModel.trim() || settings.assistantHfModelId.trim() || defaultLabel;
-  return `${provider} / ${model}`;
+  return provider === defaultLabel && model === defaultLabel ? defaultLabel : `${provider} / ${model}`;
 }
 
 export function AssistantComposer({
@@ -50,6 +51,7 @@ export function AssistantComposer({
   locale = 'en',
   variant = 'operator',
   projectControl,
+  showRuntimeContext = true,
   onRuntimeSettingsChange,
   onSend,
   onCancel,
@@ -65,12 +67,13 @@ export function AssistantComposer({
   locale?: UiLocale;
   variant?: 'operator' | 'product';
   projectControl?: ReactNode;
+  showRuntimeContext?: boolean;
   onRuntimeSettingsChange: (next: Partial<AssistantRuntimeSettings>) => void;
   onSend: (
     message: string,
     runtimeSettings: AssistantRuntimeSettings,
     controls: AssistantComposerControls,
-  ) => void;
+  ) => void | boolean | Promise<void | boolean>;
   onCancel?: () => void;
 }) {
   const text = assistantUiText[locale];
@@ -89,6 +92,9 @@ export function AssistantComposer({
     { intent: 'draft_remediation_plan', label: text.draftPlan },
     { intent: 'prepare_approval_review', label: text.prepareApprovalReview },
   ];
+  const sendingRef = useRef(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const [draft, setDraft] = useState(initialValue);
   const [contextAttachmentKinds, setContextAttachmentKinds] = useState<AssistantContextAttachmentKind[]>(
     contextOptions.map((option) => option.kind),
@@ -129,7 +135,7 @@ export function AssistantComposer({
     ...toolIntents,
     ...(slashCommand?.toolIntents ?? []),
   ]));
-  const canSend = messageToSend.trim().length > 0 && !disabled && !validationMessage && !slashValidationMessage;
+  const canSend = messageToSend.trim().length > 0 && !disabled && !sending && !validationMessage && !slashValidationMessage;
   const canCancel = disabled && Boolean(onCancel);
   const cancelLabel = locale === 'tr' ? 'Durdur' : 'Stop';
   const visibleStatusLabel = statusLabel && statusLabel !== 'idle' ? statusLabel : '';
@@ -166,12 +172,20 @@ export function AssistantComposer({
       previous.includes(intent) ? previous.filter((item) => item !== intent) : [...previous, intent],
     );
   };
-  const submitDraft = () => {
-    if (!canSend) {
-      return;
+  const submitDraft = async () => {
+    if (!canSend || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    setSendError(false);
+    try {
+      const result = await onSend(messageToSend, runtimeSettings, controls);
+      if (result !== false) setDraft((current) => current === draft ? '' : current);
+    } catch {
+      setSendError(true);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
     }
-    onSend(messageToSend, runtimeSettings, controls);
-    setDraft('');
   };
 
   const messageInput = (
@@ -185,7 +199,7 @@ export function AssistantComposer({
         placeholder={placeholder}
         rows={isProductComposer ? 1 : 3}
         value={draft}
-        disabled={disabled}
+        disabled={disabled || sending}
         title={composerDisabledReason}
         data-disabled-reason={composerDisabledReason}
         onChange={(event) => {
@@ -206,9 +220,9 @@ export function AssistantComposer({
   );
   const runtimeProfiles = (
     <div className="assistant-runtime-profiles" aria-label="Assistant runtime profiles">
-      <label>Reasoning effort<select aria-label="Reasoning effort" value={runtimeSettings.reasoningEffort ?? 'medium'} onChange={(event) => onRuntimeSettingsChange({ reasoningEffort: event.target.value as NonNullable<AssistantRuntimeSettings['reasoningEffort']> })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="very_high">Very high</option></select></label>
-      <label>Speed<select aria-label="Speed profile" value={runtimeSettings.speedProfile ?? 'standard'} onChange={(event) => onRuntimeSettingsChange({ speedProfile: event.target.value as NonNullable<AssistantRuntimeSettings['speedProfile']> })}><option value="standard">Standard</option><option value="fast">Fast</option></select></label>
-      <label>Approval<select aria-label="Approval profile" value={runtimeSettings.approvalProfile ?? 'risk_based'} onChange={(event) => onRuntimeSettingsChange({ approvalProfile: event.target.value as NonNullable<AssistantRuntimeSettings['approvalProfile']> })}><option value="always_ask">Always ask</option><option value="risk_based">Risk based</option><option value="policy_automatic">Within policy boundaries</option></select></label>
+      <label>{locale === 'tr' ? 'Düşünme düzeyi' : 'Reasoning effort'}<select aria-label="Reasoning effort" value={runtimeSettings.reasoningEffort ?? 'medium'} onChange={(event) => onRuntimeSettingsChange({ reasoningEffort: event.target.value as NonNullable<AssistantRuntimeSettings['reasoningEffort']> })}><option value="low">{locale === 'tr' ? 'Düşük' : 'Low'}</option><option value="medium">{locale === 'tr' ? 'Orta' : 'Medium'}</option><option value="high">{locale === 'tr' ? 'Yüksek' : 'High'}</option><option value="very_high">{locale === 'tr' ? 'Çok yüksek' : 'Very high'}</option></select></label>
+      <label>{locale === 'tr' ? 'Hız' : 'Speed'}<select aria-label="Speed profile" value={runtimeSettings.speedProfile ?? 'standard'} onChange={(event) => onRuntimeSettingsChange({ speedProfile: event.target.value as NonNullable<AssistantRuntimeSettings['speedProfile']> })}><option value="standard">{locale === 'tr' ? 'Standart' : 'Standard'}</option><option value="fast">{locale === 'tr' ? 'Hızlı' : 'Fast'}</option></select></label>
+      <label>{locale === 'tr' ? 'Onay davranışı' : 'Approval'}<select aria-label="Approval profile" value={runtimeSettings.approvalProfile ?? 'risk_based'} onChange={(event) => onRuntimeSettingsChange({ approvalProfile: event.target.value as NonNullable<AssistantRuntimeSettings['approvalProfile']> })}><option value="always_ask">{locale === 'tr' ? 'Her zaman sor' : 'Always ask'}</option><option value="risk_based">{locale === 'tr' ? 'Riske göre sor' : 'Risk based'}</option><option value="policy_automatic">{locale === 'tr' ? 'Politika sınırları içinde' : 'Within policy boundaries'}</option></select></label>
     </div>
   );
   const runtimeControls = (
@@ -283,15 +297,9 @@ export function AssistantComposer({
       </div>
       <div className={`assistant-composer-submit${isProductComposer ? ' composer-actions-right' : ''}`}>
         {isProductComposer ? (
-          <details className="model-picker">
-            <summary className="composer-model">
-              <span>{selectedRuntimeLabel}</span>
-              <ChevronDown size={14} strokeWidth={1.75} />
-            </summary>
-            <div className="model-menu product-model-menu" role="dialog" aria-label="Model settings">
-              {runtimeControls}
-            </div>
-          </details>
+          <AssistantRuntimePopover label={selectedRuntimeLabel} locale={locale}>
+            <AssistantQuickModelSettings settings={runtimeSettings} discovery={modelDiscovery} locale={locale} onChange={onRuntimeSettingsChange}>{runtimeControls}</AssistantQuickModelSettings>
+          </AssistantRuntimePopover>
         ) : (
           <span className="assistant-model-summary" aria-label={text.selectedAssistantModel}>
             <span>{text.model}</span>
@@ -353,6 +361,7 @@ export function AssistantComposer({
         <div className="composer-entry">
           {messageInput}
           {validation}
+          {sendError ? <p role="alert" className="assistant-runtime-validation">{locale === 'tr' ? 'Mesaj gönderilemedi. Yazdıklarınız korundu; yeniden deneyin.' : 'Message could not be sent. Your draft is preserved; try again.'}</p> : null}
           {composerActions}
         </div>
       ) : (
@@ -360,6 +369,7 @@ export function AssistantComposer({
           {messageInput}
           {runtimeControls}
           {validation}
+          {sendError ? <p role="alert" className="assistant-runtime-validation">{locale === 'tr' ? 'Mesaj gönderilemedi. Yazdıklarınız korundu; yeniden deneyin.' : 'Message could not be sent. Your draft is preserved; try again.'}</p> : null}
           {composerActions}
         </>
       )}
@@ -376,6 +386,7 @@ export function AssistantComposer({
               <span>ImperaOS</span>
             </span>
           )}
+          {showRuntimeContext && <>
           <span className="composer-chip" title={locale === 'tr' ? 'Yerel masaüstü runtime' : 'Local desktop runtime'}>
             <Laptop size={14} strokeWidth={1.6} />
             <span>{locale === 'tr' ? 'Yerel' : 'Local'}</span>
@@ -388,6 +399,7 @@ export function AssistantComposer({
             <GitBranch size={14} strokeWidth={1.6} />
             <span>{locale === 'tr' ? 'Branch yok' : 'No branch'}</span>
           </span>
+          </>}
         </div>
         {form}
       </div>

@@ -427,3 +427,18 @@ def test_product_workspace_mutations_require_bound_keys_and_replay_retries(tmp_p
     assert first.ok and replay.ok
     assert first.result["projectId"] == replay.result["projectId"]
     assert len(server.product_workspace.list_projects("workspace-a")) == 1
+
+
+def test_task_rename_is_durable_validated_and_scoped(tmp_path):
+    import pytest
+    database = tmp_path / "rename.sqlite3"
+    service = ProductWorkspaceService(ProductWorkspaceStore(database))
+    project = service.create_project("workspace-a", "Project")
+    task = service.create_task("workspace-a", project.project_id, "Before")
+    service.update_task("workspace-a", task.task_id, title=" After ")
+    restored = ProductWorkspaceService(ProductWorkspaceStore(database))
+    assert restored.get_task("workspace-a", task.task_id).title == "After"
+    with pytest.raises(ValueError):
+        service.update_task("workspace-a", task.task_id, title=" ")
+    with pytest.raises(PermissionError):
+        service.update_task("workspace-b", task.task_id, title="Escape")

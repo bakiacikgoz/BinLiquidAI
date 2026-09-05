@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Bug, Folder, Hammer, Radar, RefreshCw } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Bug, Hammer, Radar, RefreshCw } from 'lucide-react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAssistantModels } from '../../assistant/useAssistantModels';
-import type { AssistantProviderKind } from '../../assistant/modelDiscovery';
 import type { AssistantComposerControls } from '../../assistant/assistantTypes';
 import { AssistantComposer } from '../../components/assistant/AssistantComposer';
 import {
@@ -16,6 +15,8 @@ import {
 } from '../../settings';
 import { useProductShellStore } from '../state/productShellStore';
 import { productWorkspaceClient, type ProductWorkspaceProject } from '../adapters/productWorkspaceClient';
+import { ComposerProjectPicker } from '../shell/ComposerProjectPicker';
+import { ProjectConnectionNotice } from '../shell/ProjectConnectionNotice';
 
 const suggestions = [
   {
@@ -45,28 +46,57 @@ const suggestions = [
 ];
 
 export function NewWorkPage() {
+  const location = useLocation();
+  return <NewWorkContent key={location.key} />;
+}
+
+function NewWorkContent() {
   const upsertTasks = useProductShellStore((state) => state.upsertTasks);
   const upsertProjects = useProductShellStore((state) => state.upsertProjects);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
+  const [projectLoadError, setProjectLoadError] = useState('');
+  const [projectLoadAttempt, setProjectLoadAttempt] = useState(0);
   const [projects, setProjects] = useState<ProductWorkspaceProject[]>([]);
   const [projectId, setProjectId] = useState('');
+  const [projectSelectionError, setProjectSelectionError] = useState('');
+  const [projectsReady, setProjectsReady] = useState(false);
   const [seedPrompt, setSeedPrompt] = useState('');
   const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
-  const modelProvider = settings.assistantProvider.trim()
-    ? settings.assistantProvider.trim() as AssistantProviderKind
-    : 'all';
+  const pendingTask = useRef<{
+    projectSelection: string;
+    message: string;
+    task: Awaited<ReturnType<typeof productWorkspaceClient.createTask>>;
+  } | null>(null);
   const modelDiscovery = useAssistantModels({
     settings,
     profile: settings.profile,
-    provider: modelProvider,
+    provider: 'all',
   });
   useEffect(() => {
     let active = true;
-    void productWorkspaceClient.listProjects().then(({ projects }) => {
+    setProjectsReady(false);
+    setProjectLoadError('');
+    setProjectSelectionError('');
+    const loadProjects = async () => {
+      const projects: ProductWorkspaceProject[] = [];
+      const visitedCursors = new Set<string>();
+      let cursor: string | undefined;
+      do {
+        const page = await productWorkspaceClient.listProjects({ cursor, status: 'active', limit: 100 });
+        if (!active) return [];
+        projects.push(...page.projects);
+        cursor = page.nextCursor ?? undefined;
+        if (cursor && visitedCursors.has(cursor)) throw new Error('Proje listesi tamamlanamadı. Sayfayı yenileyip tekrar deneyin.');
+        if (cursor) visitedCursors.add(cursor);
+      } while (cursor);
+      return projects;
+    };
+    void loadProjects().then((projects) => {
       if (!active) return;
       const activeProjects = projects.filter((project) => project.status !== 'archived');
+      setProjectsReady(true);
       setProjects(activeProjects);
       upsertProjects(activeProjects.map((project) => ({
         projectId: project.projectId,
@@ -74,16 +104,20 @@ export function NewWorkPage() {
         rootDisplayName: project.rootDisplayName,
       })));
       const requestedProjectId = searchParams.get('project');
-      if (requestedProjectId && activeProjects.some((project) => project.projectId === requestedProjectId)) {
+      if (requestedProjectId && !activeProjects.some((project) => project.projectId === requestedProjectId)) {
         setProjectId(requestedProjectId);
+        setProjectSelectionError('Seçilen proje bulunamadı veya arşivlendi. Devam etmek için listeden bir proje seçin.');
+      } else if (requestedProjectId) {
+        setProjectId(requestedProjectId);
+        setProjectSelectionError('');
       } else {
-        setProjectId((current) => current || activeProjects[0]?.projectId || '');
+        setProjectId((current) => current);
       }
     }).catch((cause) => {
-      if (active) setError(cause instanceof Error ? cause.message : 'Could not load governed projects.');
+      if (active) setProjectLoadError(cause instanceof Error ? cause.message : 'PROJECT_LIST_UNAVAILABLE');
     });
     return () => { active = false; };
-  }, [searchParams, upsertProjects]);
+  }, [projectLoadAttempt, searchParams, upsertProjects]);
   const updateRuntimeSettings = (next: Partial<AssistantRuntimeSettings>) => {
     setSettings((current) => {
       const updated = { ...current, ...next };
@@ -96,19 +130,32 @@ export function NewWorkPage() {
     runtimeSettings: AssistantRuntimeSettings,
     controls: AssistantComposerControls,
   ) => {
+    if (!projectsReady || projectSelectionError) return false;
+    if (!projectId) { setError('Başlamak için bir proje seçin.'); return false; }
     try {
       setError('');
-      const selectedProjectId = projectId || (await productWorkspaceClient.getOrCreateProject('Operator work')).projectId;
-      const assistantSessionId = `product-session-${crypto.randomUUID()}`;
-      const task = await productWorkspaceClient.createTask(selectedProjectId, message, assistantSessionId, {
-        reasoningEffort: runtimeSettings.reasoningEffort ?? 'medium',
-        speedProfile: runtimeSettings.speedProfile ?? 'standard',
-        approvalProfile: runtimeSettings.approvalProfile ?? 'risk_based',
-      });
+      let task = pendingTask.current?.projectSelection === projectId && pendingTask.current.message === message
+        ? pendingTask.current.task : undefined;
+      if (!task) {
+        const selectedProjectId = projectId;
+        const assistantSessionId = `product-session-${crypto.randomUUID()}`;
+        task = await productWorkspaceClient.createTask(selectedProjectId, message, assistantSessionId, {
+          reasoningEffort: runtimeSettings.reasoningEffort ?? 'medium',
+          speedProfile: runtimeSettings.speedProfile ?? 'standard',
+          approvalProfile: runtimeSettings.approvalProfile ?? 'risk_based',
+        });
+        pendingTask.current = { projectSelection: projectId, message, task };
+      }
       await productWorkspaceClient.addMessage(task.taskId, 'user', message);
+      pendingTask.current = null;
       upsertTasks([{ id: task.taskId, projectId: task.projectId, title: task.title, createdAt: task.createdAtUtc, updatedAt: task.updatedAtUtc, status: task.status, priority: task.priority, pinned: task.pinned, manualOrder: task.manualOrder, archivedAt: task.archivedAtUtc, assistantSessionId: task.assistantSessionId ?? undefined, reasoningEffort: task.reasoningEffort, speedProfile: task.speedProfile, approvalProfile: task.approvalProfile }]);
+      useProductShellStore.getState().setContextRailOpen(true);
       navigate(`/task/${task.taskId}`, { state: { initialMessage: message, runtimeSettings, controls } });
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create governed work.'); }
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Görev oluşturulamadı. Mesajınızı koruyarak tekrar deneyin.');
+      return false;
+    }
   };
   return (
     <main className="new-work-page codex-home">
@@ -126,7 +173,7 @@ export function NewWorkPage() {
               <path d="M15 15.5l2 2-2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h1>Ne oluşturalım?</h1>
+          <h1>{projects.find((project) => project.projectId === projectId)?.title ? `${projects.find((project) => project.projectId === projectId)?.title} projesinde ne oluşturalım?` : 'Ne oluşturalım?'}</h1>
           <div className="suggestion-grid codex-suggestions">
             {suggestions.map(({ title, icon: SuggestionIcon, tone, prompt }) => (
               <button
@@ -144,34 +191,32 @@ export function NewWorkPage() {
           </div>
         </div>
         <div className="welcome-composer">
-          {error ? <p className="product-home-error" role="alert">{error}</p> : null}
+          {projectLoadError ? <ProjectConnectionNotice detail={projectLoadError} onRetry={() => setProjectLoadAttempt((attempt) => attempt + 1)} /> : null}
+          {error || projectSelectionError ? <p className="product-home-error" role="alert">{error || projectSelectionError}</p> : null}
           <AssistantComposer
             label="Governed assistant"
             placeholder="İstediğin şeyi yap"
             sendLabel="Başlat"
-            disabled={false}
+            disabled={!projectsReady || Boolean(projectSelectionError)}
             initialValue={seedPrompt}
             runtimeSettings={getAssistantRuntimeSettings(settings)}
             modelDiscovery={modelDiscovery}
             locale={resolveLocale(settings.locale)}
             variant="product"
-            projectControl={(
-              <label className="composer-chip product-project-control">
-                <Folder size={14} strokeWidth={1.6} />
-                <select
-                  aria-label="Project"
-                  value={projectId}
-                  onChange={(event) => setProjectId(event.target.value)}
-                >
-                  <option value="">Yeni “Operator work” projesi oluştur</option>
-                  {projects.map((project) => (
-                    <option key={project.projectId} value={project.projectId}>{project.title}</option>
-                  ))}
-                </select>
-              </label>
-            )}
+            showRuntimeContext={false}
+            projectControl={<ComposerProjectPicker projects={projects} projectId={projectId} ready={projectsReady}
+              onSelect={(id) => { setProjectId(id); setProjectSelectionError(''); setError(''); }}
+              onCreate={async () => {
+                try {
+                  const project = await productWorkspaceClient.registerProjectFromFolder();
+                  if (!project) return;
+                  setProjects((current) => [...current.filter((item) => item.projectId !== project.projectId), project]);
+                  setProjectId(project.projectId); setProjectSelectionError(''); setError('');
+                  window.dispatchEvent(new Event('imperaos-projects-changed'));
+                } catch (cause) { setError(cause instanceof Error ? cause.message : 'Proje eklenemedi. Yeniden deneyin.'); }
+              }} />}
             onRuntimeSettingsChange={updateRuntimeSettings}
-            onSend={(message, runtimeSettings, controls) => void start(message, runtimeSettings, controls)}
+            onSend={start}
           />
         </div>
       </div>

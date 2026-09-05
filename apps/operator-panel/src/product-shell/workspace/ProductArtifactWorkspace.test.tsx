@@ -90,7 +90,7 @@ describe('ProductArtifactWorkspace', () => {
       <ProductArtifactWorkspace state={getAssistantFixture('running')} openRequest={1} />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Open artifacts' }));
+    await user.click(screen.getByRole('button', { name: 'Çıktıları yenile' }));
 
     expect(workspace.loadCatalog).toHaveBeenCalledOnce();
   });

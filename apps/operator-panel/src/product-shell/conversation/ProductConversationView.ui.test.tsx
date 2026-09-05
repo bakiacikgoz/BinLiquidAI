@@ -58,10 +58,7 @@ describe('ProductConversationView artifacts', () => {
     await user.click(await screen.findByRole('button', { name: 'Open approval' }));
 
     expect(onOpenApproval).toHaveBeenCalledWith('approval-release');
-    expect(screen.getByRole('button', { name: 'Feedback unavailable' })).toHaveAttribute(
-      'data-disabled-reason',
-      'ASSISTANT_FEEDBACK_CAPABILITY_UNAVAILABLE',
-    );
+    expect(screen.queryByRole('button', { name: 'Feedback unavailable' })).not.toBeInTheDocument();
   });
 
   it('keeps durable artifact and approval actions available after a task reload', async () => {

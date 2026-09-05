@@ -10,9 +10,8 @@ import {
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useAssistantModels } from '../../assistant/useAssistantModels';
-import type { AssistantProviderKind } from '../../assistant/modelDiscovery';
 import type { AssistantComposerControls } from '../../assistant/assistantTypes';
-import { BottomDock } from '../bottom-dock/BottomDock';
+import { TerminalDock } from '../bottom-dock/TerminalDock';
 import { ContextRail } from '../context-rail/ContextRail';
 import { ProductConversationView } from '../conversation/ProductConversationView';
 import { useProductAssistant } from '../adapters/useProductAssistant';
@@ -132,7 +131,6 @@ export function TaskPage() {
   const upsertProjects = useProductShellStore((state) => state.upsertProjects);
   const [loadError, setLoadError] = useState('');
   const [projectLoadError, setProjectLoadError] = useState('');
-  const projectLookupRef = useRef<string | null>(null);
   useEffect(() => {
     if (taskId) selectTask(task?.status === 'archived' ? null : taskId);
   }, [selectTask, task?.status, taskId]);
@@ -153,8 +151,7 @@ export function TaskPage() {
     : undefined;
   useEffect(() => {
     const projectId = task?.projectId;
-    if (!projectId || owningProject || projectLookupRef.current === projectId) return;
-    projectLookupRef.current = projectId;
+    if (!projectId || owningProject) return;
     let active = true;
     setProjectLoadError('');
     void findOwningProject(projectId).then((project) => {
@@ -196,18 +193,19 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>(initialWorkspaceSnapshot.tabs);
   const [activeWorkspaceTabId, setActiveWorkspaceTabId] = useState<string | null>(initialWorkspaceSnapshot.activeTabId);
   const [conversationWidth, setConversationWidth] = useState(54);
+  const [terminalMounted, setTerminalMounted] = useState(dockOpen);
+  useEffect(() => { if (dockOpen) setTerminalMounted(true); }, [dockOpen]);
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
+  const [actionError, setActionError] = useState('');
+  const persistedPendingMessage = useRef<{ taskId: string; message: string } | null>(null);
   const [settings, setSettings] = useState<PanelSettings>(() => loadSettings());
   const persistedAssistantTurns = useRef(new Set<string>());
   const persistedTaskLinks = useRef(new Set<string>());
   const initialTurnStarted = useRef(false);
-  const modelProvider = settings.assistantProvider.trim()
-    ? settings.assistantProvider.trim() as AssistantProviderKind
-    : 'all';
   const modelDiscovery = useAssistantModels({
     settings,
     profile: settings.profile,
-    provider: modelProvider,
+    provider: 'all',
   });
   const taskRuntimeSettings: AssistantRuntimeSettings = {
     ...getAssistantRuntimeSettings(settings),
@@ -280,9 +278,10 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
       approvalProfile: next.approvalProfile ?? taskRuntimeSettings.approvalProfile ?? 'risk_based',
     };
     if (next.reasoningEffort || next.speedProfile || next.approvalProfile) {
+      setActionError('');
       void productWorkspaceClient.updateTask(task.id, { runtime })
         .then((updated) => upsertTasks([shellTask(updated)]))
-        .catch(() => undefined);
+        .catch((cause) => setActionError(cause instanceof Error ? cause.message : 'Görev ayarı kaydedilemedi. Tekrar deneyin.'));
     }
   };
   const send = async (
@@ -290,16 +289,26 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     runtimeSettings?: AssistantRuntimeSettings,
     controls?: AssistantComposerControls,
   ) => {
-    await productWorkspaceClient.addMessage(task.id, 'user', message);
-    setMessageRefreshToken((current) => current + 1);
-    await assistant.actions.send(message, runtimeSettings, controls);
+    try {
+      setActionError('');
+      if (persistedPendingMessage.current?.taskId !== task.id || persistedPendingMessage.current.message !== message) {
+        await productWorkspaceClient.addMessage(task.id, 'user', message);
+        persistedPendingMessage.current = { taskId: task.id, message };
+        setMessageRefreshToken((current) => current + 1);
+      }
+      useProductShellStore.getState().setContextRailOpen(true);
+      const accepted = await assistant.actions.send(message, runtimeSettings, controls);
+      if (accepted) persistedPendingMessage.current = null;
+      return accepted;
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'Mesaj gönderilemedi. Tekrar deneyin.');
+      return false;
+    }
   };
   const openWorkspaceTab = useCallback((kind: WorkspaceTabKind, artifactId?: string) => {
-    setWorkspaceTabs((current) => {
-      const next = createWorkspaceTab(kind, artifactId);
-      setActiveWorkspaceTabId(next.id);
-      return [...current, next];
-    });
+    const next = createWorkspaceTab(kind, artifactId);
+    setActiveWorkspaceTabId(next.id);
+    setWorkspaceTabs((current) => [...current, next]);
     if (!location.pathname.endsWith('/workspace')) {
       navigate(`/task/${task.id}/workspace`, { state: location.state });
     }
@@ -320,27 +329,27 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
     }
   }, [location.pathname, location.state, navigate, task.id]);
   const closeWorkspaceTab = (tabId: string) => {
+    const closesLastTab = workspaceTabs.length === 1 && workspaceTabs[0]?.id === tabId;
     setWorkspaceTabs((current) => {
       const next = current.filter((tab) => tab.id !== tabId);
       setActiveWorkspaceTabId((active) => active === tabId ? (next.at(-1)?.id ?? null) : active);
       return next;
     });
+    if (closesLastTab) navigate(`/task/${task.id}`, { replace: true, state: location.state });
   };
   const updateWorkspaceTab = (tabId: string, changes: Partial<WorkspaceTab>) => {
     setWorkspaceTabs((current) => current.map((tab) => tab.id === tabId ? { ...tab, ...changes } : tab));
   };
-  useEffect(() => {
-    if (location.pathname.endsWith('/workspace') && !workspaceTabs.length && !activeWorkspaceTabId) {
-      openWorkspaceTab('artifacts');
-    }
-  }, [activeWorkspaceTabId, location.pathname, openWorkspaceTab, workspaceTabs.length]);
   const resizeConversation = (event: ReactPointerEvent<HTMLDivElement>) => {
     const frame = event.currentTarget.parentElement;
     if (!frame) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = conversationWidth;
+    const frameWidth = frame.getBoundingClientRect().width;
     const move = (moveEvent: PointerEvent) => {
-      const box = frame.getBoundingClientRect();
-      const nextWidth = ((moveEvent.clientX - box.left) / box.width) * 100;
-      setConversationWidth(Math.min(65, Math.max(30, nextWidth)));
+      const nextWidth = startWidth + ((moveEvent.clientX - startX) / frameWidth) * 100;
+      setConversationWidth(Math.min(75, Math.max(20, nextWidth)));
     };
     const end = () => {
       window.removeEventListener('pointermove', move);
@@ -353,10 +362,10 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
   };
   const resizeConversationWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? 10 : 2;
-    if (event.key === 'ArrowLeft') setConversationWidth((current) => Math.max(30, current - step));
-    else if (event.key === 'ArrowRight') setConversationWidth((current) => Math.min(65, current + step));
-    else if (event.key === 'Home') setConversationWidth(30);
-    else if (event.key === 'End') setConversationWidth(65);
+    if (event.key === 'ArrowLeft') setConversationWidth((current) => Math.max(20, current - step));
+    else if (event.key === 'ArrowRight') setConversationWidth((current) => Math.min(75, current + step));
+    else if (event.key === 'Home') setConversationWidth(20);
+    else if (event.key === 'End') setConversationWidth(75);
     else return;
     event.preventDefault();
   };
@@ -367,7 +376,8 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
         <h1 className="sr-only">{task.title}</h1>
         {readOnly ? <p className="ps-archive-banner" role="status">This task is archived and read-only.</p> : null}
         <div className="task-layout">
-          <div className="conversation-pane" style={{ width: hasWorkspace ? `${conversationWidth}%` : '100%' }}>
+          <div className="conversation-group" style={{ width: hasWorkspace ? `${conversationWidth}%` : '100%' }}>
+          <div className="conversation-pane">
             <ProductConversationView
               state={assistant.state}
               taskId={task.id}
@@ -377,9 +387,11 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
               onRegenerate={(turnId) => void assistant.actions.regenerate(turnId, taskRuntimeSettings)}
             />
             <div className="sticky-composer">
+              {assistant.state.referencedArtifacts.some((item) => item.openable && item.artifactId) && <button className="conversation-output-indicator" type="button" onClick={() => openWorkspaceTab('artifacts')}><Folder size={13} />{new Set(assistant.state.referencedArtifacts.filter((item) => item.openable && item.artifactId).map((item) => item.artifactId)).size} çıktı hazır <span>İncele</span></button>}
+              {actionError ? <p className="product-home-error" role="alert">{actionError}</p> : null}
               <AssistantComposer
                 label="Governed assistant"
-                placeholder="Describe the next outcome…"
+                placeholder="İstediğin şeyi yaptır"
                 sendLabel="Send"
                 disabled={running || readOnly}
                 statusLabel={assistant.state.status}
@@ -387,6 +399,7 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
                 modelDiscovery={modelDiscovery}
                 locale={resolveLocale(settings.locale)}
                 variant="product"
+                showRuntimeContext={false}
                 projectControl={(
                   <span className="composer-chip">
                     <Folder size={14} strokeWidth={1.6} />
@@ -394,7 +407,7 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
                   </span>
                 )}
                 onRuntimeSettingsChange={updateRuntimeSettings}
-                onSend={(message, runtimeSettings, controls) => void send(message, runtimeSettings, controls)}
+                onSend={send}
                 onCancel={() => void (async () => {
                   await assistant.actions.cancel();
                   const updated = await productWorkspaceClient.updateTask(task.id, { status: 'cancelled' });
@@ -403,21 +416,25 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
               />
             </div>
           </div>
-          {hasWorkspace ? (
+        {contextRailOpen ? <ContextRail task={task} state={assistant.state} onOpenArtifacts={(id) => openWorkspaceTab('artifacts', id)} onOpenTerminal={focusOrOpenTerminal} /> : null}
+          </div>
+          {hasWorkspace || workspaceTabs.length > 0 ? (
             <>
               <div
+                hidden={!hasWorkspace}
                 className="split-resize"
                 role="separator"
                 tabIndex={0}
                 aria-orientation="vertical"
-                aria-valuemin={30}
-                aria-valuemax={65}
+                aria-valuemin={20}
+                aria-valuemax={75}
                 aria-valuenow={conversationWidth}
                 onPointerDown={resizeConversation}
                 onKeyDown={resizeConversationWithKeyboard}
               />
-              <div className="work-surface workspace-tabbed-surface">
+              <div hidden={!hasWorkspace} className="work-surface workspace-tabbed-surface">
                 <WorkspaceTabs
+                  visible={hasWorkspace}
                   tabs={workspaceTabs}
                   activeTabId={activeWorkspaceTabId}
                   assistantState={assistant.state}
@@ -443,9 +460,9 @@ function TaskWorkspace({ task }: { task: ProductTask }) {
             />
           )}
         </div>
-        {contextRailOpen ? <ContextRail task={task} state={assistant.state} /> : null}
+
       </div>
-      {dockOpen ? <BottomDock state={assistant.state} onOpenTerminal={focusOrOpenTerminal} /> : null}
+      {terminalMounted ? <TerminalDock open={dockOpen} projectRootRef={projectRootRef} projectRootDisplayName={projectRoot?.rootDisplayName} /> : null}
     </main>
   );
 }

@@ -118,7 +118,7 @@ export class ProductWorkspaceClient {
     return this.call('bridge_product_task_list', { projectId }, z.object({ tasks: z.array(task) }).strict());
   }
   createTask(projectId: string, title: string, assistantSessionId?: string, runtime?: ProductTaskRuntimeOptions) { return this.call('bridge_product_task_create', { projectId, title, assistantSessionId, runtime }, task, `task-${crypto.randomUUID()}`); }
-  updateTask(taskId: string, changes: { status?: ProductWorkspaceTask['status']; priority?: number; pinned?: boolean; manualOrder?: number; runtime?: Partial<ProductTaskRuntimeOptions> }) {
+  updateTask(taskId: string, changes: { title?: string; status?: ProductWorkspaceTask['status']; priority?: number; pinned?: boolean; manualOrder?: number; runtime?: Partial<ProductTaskRuntimeOptions> }) {
     return this.call('bridge_product_task_update', { taskId, ...changes }, task, `task-update-${crypto.randomUUID()}`);
   }
   archiveTask(taskId: string, reason: string) {

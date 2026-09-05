@@ -21,9 +21,7 @@ describe('ContextRail', () => {
     expect(container.querySelector('.environment-rows')).toBeInTheDocument();
     expect(container.querySelector('.environment-section')).toBeInTheDocument();
     expect(screen.getByText('run-release')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open approval apr-release' })).toHaveAttribute('href', '#/approvals');
-    expect(screen.getByText('attachment · active_run')).toBeInTheDocument();
-    expect(screen.getByText('safe intent · inspect_run')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Branch context unavailable' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Onayı incele' })).toHaveAttribute('href', '#/approvals?approval=apr-release');
+    expect(screen.getByText('Etkin çalışma')).toBeInTheDocument();
   });
 });

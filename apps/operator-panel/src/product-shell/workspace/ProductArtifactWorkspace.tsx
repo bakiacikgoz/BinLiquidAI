@@ -1,3 +1,4 @@
+import { FileSearch, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
@@ -48,6 +49,14 @@ export function ProductArtifactWorkspace({ state, openRequest, requestedArtifact
 
   if (!workspace.open) return null;
 
+  if (!workspace.catalog.length && !workspace.state.tabs.length && !state.referencedArtifacts.length) {
+    return <section className="product-inspect-empty" aria-label="İncele">
+      <header><span>Çıktılar</span><button type="button" aria-label="Çıktıları yenile" title="Yenile" disabled={workspace.catalogLoading} onClick={() => void workspace.actions.loadCatalog()}><RefreshCw size={14}/></button></header>
+      <div className="inspect-empty-content"><FileSearch size={28} strokeWidth={1.4}/><h2>{workspace.catalogLoading ? 'Çıktılar yükleniyor' : workspace.error ? 'Çıktılara erişilemiyor' : 'Henüz çıktı yok'}</h2><p>{workspace.error ? 'Çıktı hizmeti şu anda kullanılamıyor. Yeniden deneyebilirsiniz.' : 'Oluşturulan dosya ve belgeleri burada inceleyebilirsiniz.'}</p>
+      {workspace.error && <details><summary>Bağlantı ayrıntısı</summary><p role="alert">{workspace.error.message}</p></details>}</div>
+    </section>;
+  }
+
   const exportArtifact = (artifactId: string, format: ArtifactExportFormat, sheetId?: string) => {
     const kind = workspace.state.tabs.find((tab) => tab.artifact.artifactId === artifactId)?.artifact.kind;
     if (format === 'source' || format === 'txt') void workspace.actions.exportCode(artifactId, format);
@@ -64,7 +73,7 @@ export function ProductArtifactWorkspace({ state, openRequest, requestedArtifact
     } else void workspace.actions.exportDocument(artifactId, format);
   };
 
-  return <AssistantWorkbench
+  return <div className="product-inspect-workbench"><AssistantWorkbench
     state={state}
     artifacts={workspace.legacyArtifacts}
     selectedArtifactName={workspace.selectedLegacyArtifactName}
@@ -102,5 +111,5 @@ export function ProductArtifactWorkspace({ state, openRequest, requestedArtifact
     onImportAsset={workspace.actions.importAsset}
     onResolveAsset={workspace.actions.resolveAsset}
     onExportArtifact={exportArtifact}
-  />;
+  /></div>;
 }

@@ -3,11 +3,11 @@ import {
   ExternalLink,
   FileText,
   RefreshCw,
-  ThumbsDown,
-  ThumbsUp,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { MarkdownAnswer } from '../../components/assistant/AssistantMessage';
+import { TurnActivity } from './TurnActivity';
 import type { AssistantSessionState } from '../../assistant/assistantTypes';
 import { productWorkspaceClient, type ProductTaskLink } from '../adapters/productWorkspaceClient';
 import { transientConversationTurns, type StoredMessage } from './conversationState';
@@ -36,8 +36,6 @@ function MessageFeedback({
     <div className="message-feedback">
       <button type="button" title="Copy" onClick={() => copyMessage(body)}><Copy size={15} /></button>
       {onRegenerate ? <button type="button" title="Regenerate" onClick={onRegenerate}><RefreshCw size={15} /></button> : null}
-      <button type="button" title="Like" disabled data-disabled-reason="ASSISTANT_FEEDBACK_CAPABILITY_UNAVAILABLE"><ThumbsUp size={15} /></button>
-      <button type="button" title="Dislike" disabled data-disabled-reason="ASSISTANT_FEEDBACK_CAPABILITY_UNAVAILABLE"><ThumbsDown size={15} /></button>
     </div>
   );
 }
@@ -50,28 +48,40 @@ export function ProductConversationView({
   onOpenApproval,
   onRegenerate,
 }: ProductConversationViewProps) {
+  const scrollPane = useRef<HTMLElement>(null);
+  const followLatest = useRef(true);
+  const [showLatest, setShowLatest] = useState(false);
   const [stored, setStored] = useState<StoredMessage[]>([]);
   const [links, setLinks] = useState<ProductTaskLink[]>([]);
   const [loadError, setLoadError] = useState('');
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
+    let active = true;
     setLoadError('');
     void Promise.all([productWorkspaceClient.listMessages(taskId), productWorkspaceClient.listLinks(taskId)])
       .then(([{ messages }, { links: nextLinks }]) => {
+        if (!active) return;
         setStored(messages);
         setLinks(nextLinks);
       })
       .catch((cause) => {
+        if (!active) return;
         setLoadError(cause instanceof Error ? cause.message : 'Could not load the durable conversation.');
       });
+    return () => { active = false; };
   }, [refreshToken, retryToken, taskId]);
+
+  useEffect(() => {
+    if (followLatest.current && scrollPane.current) scrollPane.current.scrollTop = scrollPane.current.scrollHeight;
+  }, [state.turns, stored]);
 
   const transient = transientConversationTurns(state, stored);
   const empty = !loadError && !state.turns.length && !stored.length;
 
   return (
-    <section className="conversation-view" aria-label="Assistant conversation">
+    <section ref={scrollPane} className="conversation-view" aria-label="Assistant conversation" onScroll={() => { const el = scrollPane.current; if (!el) return; followLatest.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; setShowLatest(!followLatest.current); }}>
+      {showLatest && <button type="button" className="conversation-jump" onClick={() => { followLatest.current = true; if (scrollPane.current) scrollPane.current.scrollTop = scrollPane.current.scrollHeight; setShowLatest(false); }}>Son mesaja git ↓</button>}
       <div className="conversation-inner">
         {loadError ? (
           <section className="conversation-empty" role="alert">
@@ -94,8 +104,9 @@ export function ProductConversationView({
             </article>
           ) : (
             <div className="assistant-message-block" key={message.messageId}>
+              {(() => { const completed = state.turns.find((turn) => turn.status === 'completed' && turn.assistantMessage.text.trim() === message.body); return completed ? <TurnActivity turn={completed} /> : null; })()}
               <article className="completion-message">
-                <p>{message.body}</p>
+                <MarkdownAnswer text={message.body} />
               </article>
               <MessageFeedback body={message.body} />
             </div>
@@ -109,40 +120,13 @@ export function ProductConversationView({
           return (
             <div className="assistant-turn" key={turn.id}>
               {turn.user ? <article className="user-message"><p>{turn.user}</p></article> : null}
-              {turn.status ? (
-                <div className="conversation-session-divider">
-                  <span>{turn.status}</span>
-                </div>
-              ) : null}
-              {isWorking ? (
-                <section className="assistant-working" aria-live="polite" aria-label="Assistant is working">
-                  <div className="assistant-working-header">
-                    <span className="assistant-working-orb" aria-hidden="true" />
-                    <span>{turn.status || 'Working'}</span>
-                  </div>
-                  <div className="assistant-working-divider" aria-hidden="true" />
-                  {turn.assistant ? <p className="assistant-working-copy">{turn.assistant}</p> : null}
-                </section>
-              ) : turn.assistant ? (
-                <article className="completion-message"><p>{turn.assistant}</p></article>
-              ) : null}
-              {(turn.assistant || turn.user) ? (
+              {sourceTurn && <TurnActivity turn={sourceTurn} />}
+              {turn.assistant ? <article className={isWorking ? 'completion-message is-streaming' : 'completion-message'}><MarkdownAnswer text={turn.assistant} /></article> : null}
+              {(approval || (!isWorking && turn.assistant)) ? (
                 <>
                   <div className="conversation-actions">
                     {approval && onOpenApproval ? (
-                      <button type="button" onClick={() => onOpenApproval(approval.approvalId)}>
-                        Open approval
-                      </button>
-                    ) : null}
-                    {turn.assistant ? (
-                      <button
-                        type="button"
-                        disabled
-                        title="No governed feedback sink is registered for assistant turns."
-                        data-disabled-reason="ASSISTANT_FEEDBACK_CAPABILITY_UNAVAILABLE"
-                      >
-                        Feedback unavailable
-                      </button>
+                      <div className="conversation-approval-card"><span><strong>{approval.title || 'Onay gerekiyor'}</strong><small>Devam etmek için işlemi inceleyin.</small></span><button type="button" aria-label="Open approval" onClick={() => onOpenApproval(approval.approvalId)}>İncele</button></div>
                     ) : null}
                   </div>
                   <MessageFeedback
@@ -157,8 +141,7 @@ export function ProductConversationView({
 
         {state.referencedArtifacts.filter((artifact) => artifact.openable && artifact.artifactId).length ? (
           <section className="reference-documents" aria-label="Referenced artifacts">
-            {state.referencedArtifacts
-              .filter((artifact) => artifact.openable && artifact.artifactId)
+            {[...new Map(state.referencedArtifacts.filter((artifact) => artifact.openable && artifact.artifactId).map((artifact) => [artifact.artifactId, artifact])).values()]
               .map((artifact) => (
                 <button
                   type="button"
@@ -172,7 +155,7 @@ export function ProductConversationView({
                     <strong>{artifact.name}</strong>
                     <small>{artifact.kind ?? 'artifact'} · {artifact.summary ?? 'Governed artifact available'}</small>
                   </span>
-                  <span className="reference-document-open">Open in workspace <ExternalLink size={15} /></span>
+                  <span className="reference-document-open">İncele <ExternalLink size={15} /></span>
                 </button>
               ))}
           </section>
@@ -182,7 +165,7 @@ export function ProductConversationView({
           <section className="change-summary-card durable-task-links" aria-label="Durable task links">
             <header>
               <span className="change-summary-icon"><FileText size={19} /></span>
-              <span><strong>Durable task links</strong><small>{links.length} governed reference{links.length === 1 ? '' : 's'}</small></span>
+              <span><strong>Çalışma kaynakları</strong><small>{links.length} governed reference{links.length === 1 ? '' : 's'}</small></span>
             </header>
             {links.map((link) => (
               <div className="changed-file-row" key={link.linkId}>

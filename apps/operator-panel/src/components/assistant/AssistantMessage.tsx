@@ -197,7 +197,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   );
 }
 
-function MarkdownAnswer({ text }: { text: string }) {
+export function MarkdownAnswer({ text }: { text: string }) {
   const blocks = parseMarkdownBlocks(text);
   return (
     <div className="assistant-answer assistant-markdown">

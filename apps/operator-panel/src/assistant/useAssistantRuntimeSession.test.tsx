@@ -53,6 +53,16 @@ function event(
 }
 
 describe('AI SDK assistant runtime cutover', () => {
+  it.each([false, true])('reports native startup failure to the caller (AI SDK: %s)', async (enabled) => {
+    bridgeMocks.startAssistantTurn.mockRejectedValueOnce(new Error('Native runtime unavailable'));
+    const { result } = renderHook(() => useAssistantRuntimeSession(DEFAULT_SETTINGS, () => emptyContext, { enabled }));
+    let accepted: unknown;
+    await act(async () => { accepted = await result.current.actions.send('Preserve this request'); });
+    expect(bridgeMocks.startAssistantTurn).toHaveBeenCalledTimes(1);
+    expect(accepted).toBe(false);
+    expect(result.current.state.status).toBe('failed');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     bridgeMocks.isBridgePreviewMode.mockReturnValue(false);
@@ -80,7 +90,7 @@ describe('AI SDK assistant runtime cutover', () => {
     expect(result.current.state.sessionId).toBe('persisted-task-session');
 
     await act(async () => {
-      await result.current.actions.send('Continue the persisted task.');
+      expect(await result.current.actions.send('Continue the persisted task.')).toBe(true);
     });
 
     expect(bridgeMocks.startAssistantTurn).toHaveBeenCalledWith(
@@ -103,7 +113,7 @@ describe('AI SDK assistant runtime cutover', () => {
       }),
     );
 
-    let sendPromise!: Promise<void>;
+    let sendPromise!: Promise<boolean>;
     act(() => {
       sendPromise = result.current.actions.send('Create a governed document.');
     });
@@ -124,6 +134,7 @@ describe('AI SDK assistant runtime cutover', () => {
     });
 
     await act(async () => sendPromise);
+    expect(await sendPromise).toBe(true);
 
     await waitFor(() => expect(result.current.state.status).toBe('completed'));
     expect(result.current.state.turns).toHaveLength(1);

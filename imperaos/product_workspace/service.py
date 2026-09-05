@@ -485,6 +485,7 @@ class ProductWorkspaceService:
         task_id: str,
         *,
         status: str | None = None,
+        title: str | None = None,
         priority: int | None = None,
         pinned: bool | None = None,
         manual_order: int | None = None,
@@ -492,7 +493,8 @@ class ProductWorkspaceService:
         idempotency_key: str | None = None,
     ) -> ProductTask:
         if (
-            status is None
+            title is None
+            and status is None
             and priority is None
             and pinned is None
             and manual_order is None
@@ -503,8 +505,13 @@ class ProductWorkspaceService:
             raise ValueError("task priority is invalid")
         if manual_order is not None and manual_order < 0:
             raise ValueError("task manual order is invalid")
+        if title is not None:
+            if not isinstance(title, str) or not title.strip() or len(title.strip()) > 240:
+                raise ValueError("task title is invalid")
+            title = title.strip()
         payload = {
             "taskId": task_id,
+            "title": title,
             "status": status,
             "priority": priority,
             "pinned": pinned,
@@ -529,7 +536,7 @@ class ProductWorkspaceService:
                 taskId=current.task_id,
                 workspaceId=current.workspace_id,
                 projectId=current.project_id,
-                title=current.title,
+                title=current.title if title is None else title,
                 status=status if status is not None else current.status,
                 priority=current.priority if priority is None else priority,
                 pinned=current.pinned if pinned is None else pinned,
@@ -546,12 +553,13 @@ class ProductWorkspaceService:
             )
             db.execute(
                 """UPDATE product_tasks
-                SET status=?, priority=?, pinned=?, manual_order=?, reasoning_effort=?,
+                SET title=?, status=?, priority=?, pinned=?, manual_order=?, reasoning_effort=?,
                 speed_profile=?,
                 approval_profile=?,
                 updated_at_utc=?
                 WHERE workspace_id=? AND task_id=?""",
                 (
+                    updated.title,
                     updated.status,
                     updated.priority,
                     int(updated.pinned),

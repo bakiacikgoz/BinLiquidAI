@@ -1,5 +1,5 @@
 import { useChat } from '@ai-sdk/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   cancelAssistantTurn,
@@ -356,7 +356,14 @@ export function useAssistantRuntimeSession(
     [cancelNative, compilePrompt, listen, start],
   );
 
-  const chat = useChat<ImperaUIMessage>({ id: chatId, transport, experimental_throttle: 25 });
+  // The SDK stores transport errors rather than rejecting sendMessage's promise.
+  const sendErrorRevision = useRef(0);
+  const chat = useChat<ImperaUIMessage>({
+    id: chatId,
+    transport,
+    experimental_throttle: 25,
+    onError: () => { sendErrorRevision.current += 1; },
+  });
   const projected = useMemo(
     () =>
       applyOverlays(
@@ -380,7 +387,8 @@ export function useAssistantRuntimeSession(
       controls?: AssistantComposerControls,
     ) => {
       const text = message.trim();
-      if (!text || chat.status === 'submitted' || chat.status === 'streaming') return;
+      if (!text || chat.status === 'submitted' || chat.status === 'streaming') return false;
+      const initialErrorRevision = sendErrorRevision.current;
       pendingTurn.setOptions(runtimeSettings, controls);
       const context = getContext();
       await chat.sendMessage({
@@ -392,6 +400,7 @@ export function useAssistantRuntimeSession(
           controls,
         },
       });
+      return sendErrorRevision.current === initialErrorRevision;
     },
     [chat, getContext, pendingTurn],
   );

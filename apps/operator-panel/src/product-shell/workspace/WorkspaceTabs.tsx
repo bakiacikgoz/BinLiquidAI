@@ -30,6 +30,7 @@ const workspaceActions = [
 
 export function WorkspaceTabs({
   tabs,
+  visible = true,
   activeTabId,
   assistantState,
   taskId,
@@ -41,6 +42,7 @@ export function WorkspaceTabs({
   onOpen,
 }: {
   tabs: WorkspaceTab[];
+  visible?: boolean;
   activeTabId: string | null;
   assistantState: AssistantSessionState;
   taskId: string;
@@ -88,7 +90,7 @@ export function WorkspaceTabs({
                     onClick={() => onActivate(tab.id)}
                   >
                     <TabIcon size={14} />
-                    <span>{tab.title}</span>
+                    <span title={tab.kind === 'terminal' ? projectRootDisplayName || tab.title : tab.title}>{tab.kind === 'terminal' ? projectRootDisplayName || tab.title : tab.title}</span>
                   </button>
                   <button
                     type="button"
@@ -127,7 +129,7 @@ export function WorkspaceTabs({
                   >
                     <ActionIcon size={15} />
                     <span>{label}</span>
-                    <kbd>{shortcut}</kbd>
+                    <span className="sr-only">{shortcut}</span>
                   </button>
                 ))}
               </div>
@@ -141,15 +143,15 @@ export function WorkspaceTabs({
           return (
             <div className="workspace-runtime-surface" key={tab.id} hidden={!isActive} aria-hidden={!isActive}>
               {tab.kind === 'artifacts' ? <ProductArtifactWorkspace state={assistantState} openRequest={1} requestedArtifactId={tab.artifactId} /> : null}
-              {tab.kind === 'terminal' ? <TerminalSurface active={isActive} onClose={() => onClose(tab.id)} projectRootRef={projectRootRef} projectRootDisplayName={projectRootDisplayName} /> : null}
-              {tab.kind === 'browser' ? <BrowserSurface active={isActive} onClose={() => onClose(tab.id)} sessionLabel={tab.nativeSessionLabel} onSessionChange={(nativeSessionLabel) => onUpdate(tab.id, { nativeSessionLabel: nativeSessionLabel ?? undefined })} /> : null}
-              {tab.kind === 'preview' ? <PreviewSurface taskId={taskId} active={isActive} onClose={() => onClose(tab.id)} sessionLabel={tab.nativeSessionLabel} onSessionChange={(nativeSessionLabel) => onUpdate(tab.id, { nativeSessionLabel: nativeSessionLabel ?? undefined })} /> : null}
+              {tab.kind === 'terminal' ? <TerminalSurface active={visible && isActive} onClose={() => onClose(tab.id)} projectRootRef={projectRootRef} projectRootDisplayName={projectRootDisplayName} /> : null}
+              {tab.kind === 'browser' ? <BrowserSurface active={visible && isActive} onClose={() => onClose(tab.id)} sessionLabel={tab.nativeSessionLabel} onSessionChange={(nativeSessionLabel) => onUpdate(tab.id, { nativeSessionLabel: nativeSessionLabel ?? undefined })} /> : null}
+              {tab.kind === 'preview' ? <PreviewSurface taskId={taskId} active={visible && isActive} onClose={() => onClose(tab.id)} sessionLabel={tab.nativeSessionLabel} onSessionChange={(nativeSessionLabel) => onUpdate(tab.id, { nativeSessionLabel: nativeSessionLabel ?? undefined })} /> : null}
               {tab.kind === 'data' ? <DataExplorerSurface taskId={taskId} /> : null}
               {tab.kind === 'files' ? <FilesNavigatorSurface onOpenArtifact={(artifactId) => onOpen('artifacts', artifactId)} /> : null}
             </div>
           );
         })}
-      </div> : <p className="ps-muted">Open an artifact or runtime surface to create a governed workspace tab.</p>}
+      </div> : <div className="workspace-surface-picker" aria-label="Çalışma alanı seç"><p>Çalışma alanına ekle</p>{workspaceActions.map(({kind, label, icon: ActionIcon}) => <button type="button" key={kind} onClick={() => onOpen(kind)}><ActionIcon size={16}/><span>{({artifacts:'İncele',terminal:'Terminal',browser:'Tarayıcı',preview:'Önizleme',files:'Dosyalar',data:'Veriler'})[kind] || label}</span></button>)}</div>}
     </section>
   );
 }

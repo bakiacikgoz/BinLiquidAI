@@ -1,10 +1,11 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const workspace = vi.hoisted(() => ({
   listProjects: vi.fn(),
   getOrCreateProject: vi.fn(),
+  registerProjectFromFolder: vi.fn(),
   createTask: vi.fn(),
   addMessage: vi.fn(),
 }));
@@ -44,6 +45,42 @@ const existingProject = {
 };
 
 describe('NewWorkPage', () => {
+  it('retries the initial message on the already created task after persistence failure', async () => {
+    workspace.addMessage.mockRejectedValueOnce(new Error('Message storage unavailable')).mockResolvedValue({ messageId: 'message-1' });
+    const { user } = renderOperatorPanel(<MemoryRouter><NewWorkPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Project' }));
+    await user.click(screen.getByRole('option', { name: 'Release work' }));
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Message storage unavailable');
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+    expect(workspace.createTask).toHaveBeenCalledOnce();
+    expect(workspace.addMessage).toHaveBeenNthCalledWith(1, 'task-1', 'user', 'Prepare a release');
+    expect(workspace.addMessage).toHaveBeenNthCalledWith(2, 'task-1', 'user', 'Prepare a release');
+    expect(navigate).toHaveBeenCalledWith('/task/task-1', expect.any(Object));
+  });
+
+  it('recovers a failed project load through retry without offering a fake project', async () => {
+    workspace.listProjects.mockRejectedValueOnce(new Error('Desktop runtime disconnected'));
+    const { user } = renderOperatorPanel(<MemoryRouter><NewWorkPage /></MemoryRouter>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Projeler yüklenemedi');
+    expect(screen.getByRole('alert').closest('.welcome-composer')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Bildirimi küçült' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Bağlantı uyarısı' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Projeler yüklenemedi');
+    expect(screen.getByRole('button', { name: 'Project' })).toBeDisabled();
+    expect(screen.queryByRole('option', { name: 'Yeni “Operator work” projesi oluştur' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Projeleri yeniden yükle' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Project' }));
+    await user.click(screen.getByRole('option', { name: 'Release work' }));
+    expect(screen.getByRole('button', { name: 'Project' })).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+    expect(workspace.createTask).toHaveBeenCalledWith('project-existing', expect.any(String), expect.any(String), expect.any(Object));
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     useProductShellStore.setState({ tasks: [], selectedTaskId: null });
@@ -61,8 +98,9 @@ describe('NewWorkPage', () => {
     expect(document.querySelector('.new-work-page.codex-home')).toBeInTheDocument();
     expect(document.querySelector('.suggestion-grid.codex-suggestions')).toBeInTheDocument();
     expect(screen.getByTestId('assistant-composer')).toHaveAttribute('data-variant', 'product');
-    await screen.findByRole('option', { name: 'Release work' });
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Project' }), 'project-existing');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Project' }));
+    await user.click(screen.getByRole('option', { name: 'Release work' }));
     await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
 
     expect(workspace.createTask).toHaveBeenCalledWith('project-existing', 'Prepare a release', expect.stringMatching(/^product-session-/), {
@@ -83,28 +121,57 @@ describe('NewWorkPage', () => {
     });
   });
 
-  it('truthfully labels and creates the fallback project when no durable project exists', async () => {
+  it('requires selection and registers a folder through the compact picker', async () => {
     workspace.listProjects.mockResolvedValue({ projects: [] });
-    workspace.getOrCreateProject.mockResolvedValue({ projectId: 'project-created' });
+    workspace.registerProjectFromFolder.mockResolvedValue({ ...existingProject, projectId: 'project-created' });
     const { user } = renderOperatorPanel(<MemoryRouter><NewWorkPage /></MemoryRouter>);
-
-    expect(await screen.findByRole('option', { name: 'Yeni “Operator work” projesi oluştur' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveTextContent('Proje seç');
     await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+    expect(workspace.createTask).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Project' }));
+    await user.click(screen.getByRole('button', { name: 'Yeni proje' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project' })).toHaveTextContent('Release work'));
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+    expect(workspace.registerProjectFromFolder).toHaveBeenCalledOnce();
+    expect(workspace.createTask).toHaveBeenCalledWith('project-created', expect.any(String), expect.any(String), expect.any(Object));
+  });
 
-    expect(workspace.getOrCreateProject).toHaveBeenCalledWith('Operator work');
-    expect(workspace.createTask).toHaveBeenCalledWith(
-      'project-created',
-      'Prepare a release',
-      expect.stringMatching(/^product-session-/),
-      expect.any(Object),
-    );
+  it('honors a sidebar project selection beyond the first project page', async () => {
+    workspace.listProjects.mockResolvedValueOnce({ projects: [existingProject], nextCursor: 'page-2' });
+    workspace.listProjects.mockResolvedValueOnce({
+      projects: [{ ...existingProject, projectId: 'project-later', title: 'Later project' }], nextCursor: null,
+    });
+    const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/?project=project-later']}><NewWorkPage /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project' })).toHaveTextContent('Later project'));
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+    expect(workspace.createTask).toHaveBeenCalledWith('project-later', expect.any(String), expect.any(String), expect.any(Object));
+  });
+
+  it('does not silently create work in another project when the requested project is unavailable', async () => {
+    const { user } = renderOperatorPanel(<MemoryRouter initialEntries={['/?project=missing-project']}><NewWorkPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+    expect(workspace.createTask).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Seçilen proje');
+  });
+
+  it('waits for project discovery before accepting a new task', async () => {
+    workspace.listProjects.mockReturnValue(new Promise(() => {}));
+    const { user } = renderOperatorPanel(<MemoryRouter><NewWorkPage /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
+    expect(workspace.getOrCreateProject).not.toHaveBeenCalled();
+    expect(workspace.createTask).not.toHaveBeenCalled();
   });
 
   it('stays on New Work when the initial message cannot be persisted', async () => {
     workspace.addMessage.mockRejectedValue(new Error('Initial message persistence failed.'));
     const { user } = renderOperatorPanel(<MemoryRouter><NewWorkPage /></MemoryRouter>);
 
-    await screen.findByRole('option', { name: 'Release work' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Project' }));
+    await user.click(screen.getByRole('option', { name: 'Release work' }));
     await user.click(screen.getByRole('button', { name: 'Submit composed work' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Initial message persistence failed.');

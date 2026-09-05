@@ -1495,11 +1495,22 @@ fn trusted_artifact_bridge_config() -> BridgeConfig {
 }
 
 fn trusted_artifact_profile() -> String {
-    std::env::var("IMPERAOS_PROFILE")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty() && !value.contains('\0'))
-        .unwrap_or_else(|| "enterprise".to_string())
+    trusted_profile_from_host(
+        std::env::var("IMPERAOS_PROFILE").ok().as_deref(),
+        cfg!(debug_assertions),
+    )
+}
+
+fn trusted_profile_from_host(profile: Option<&str>, development_build: bool) -> String {
+    match profile {
+        Some(value) if !value.trim().is_empty() && !value.contains('\0') => {
+            value.trim().to_string()
+        }
+        // A source desktop runs the existing local policy unless its host explicitly
+        // selects enterprise. Packaged builds retain the enterprise default.
+        None if development_build => "balanced".to_string(),
+        _ => "enterprise".to_string(),
+    }
 }
 
 fn trusted_artifact_command_config(config: &BridgeConfig) -> BridgeConfig {
@@ -4033,10 +4044,39 @@ fn resolve_cli_command(
         });
     }
 
+    // Developer builds may use only the checkout that built this native host.
+    // Never discover executables from renderer paths or the process working directory.
+    #[cfg(debug_assertions)]
+    if let Some(runtime) = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(3)
+        .and_then(source_checkout_cli)
+    {
+        return Ok(runtime);
+    }
+
     Ok(ResolvedCli {
         mode: CoreMode::External,
         program: "imperaos".to_string(),
         prefix_args: vec![],
+    })
+}
+
+#[cfg(debug_assertions)]
+fn source_checkout_cli(root: &Path) -> Option<ResolvedCli> {
+    if !root.join("pyproject.toml").is_file() || !root.join("imperaos/__main__.py").is_file() {
+        return None;
+    }
+    let python = root.join(if cfg!(windows) {
+        ".venv/Scripts/python.exe"
+    } else {
+        ".venv/bin/python"
+    });
+    python.is_file().then(|| ResolvedCli {
+        mode: CoreMode::External,
+        program: python.to_string_lossy().into_owned(),
+        // Isolated mode uses the installed core, not arbitrary modules in the cwd.
+        prefix_args: vec!["-I".to_string(), "-m".to_string(), "imperaos".to_string()],
     })
 }
 
@@ -5193,7 +5233,7 @@ mod tests {
             .any(|pair| { pair[0] == "--artifact-prompt-data-class" && pair[1] == "regulated" }));
         assert!(args
             .windows(2)
-            .any(|pair| pair[0] == "--profile" && pair[1] == "enterprise"));
+            .any(|pair| pair[0] == "--profile" && pair[1] == trusted_artifact_profile()));
         assert!(args
             .windows(2)
             .any(|pair| pair[0] == "--reasoning-effort" && pair[1] == "high"));
@@ -5567,6 +5607,153 @@ mod tests {
         assert_eq!(resolved.mode, CoreMode::Bundled);
         assert_eq!(resolved.program, python.to_string_lossy());
         assert_eq!(resolved.prefix_args, vec!["-m", "imperaos"]);
+    }
+
+    #[test]
+    fn explicit_enterprise_and_packaged_profiles_remain_fail_closed() {
+        assert_eq!(
+            trusted_profile_from_host(Some("enterprise"), true),
+            "enterprise"
+        );
+        assert_eq!(trusted_profile_from_host(None, false), "enterprise");
+        assert_eq!(trusted_profile_from_host(Some(""), true), "enterprise");
+        assert_eq!(
+            trusted_profile_from_host(Some("balanced\0"), true),
+            "enterprise"
+        );
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn source_desktop_supervisor_creates_and_lists_real_projects() {
+        let config = trusted_artifact_bridge_config();
+        let resolved = resolve_cli_command(&config, None).unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let launch = WorkspaceRpcLaunch::new(
+            resolved.program,
+            resolved.prefix_args,
+            temp.path().join("artifacts"),
+            config.profile(),
+        )
+        .unwrap();
+        let supervisor = crate::artifact_rpc::WorkspaceRpcSupervisor::new(launch);
+        let identity = TrustedArtifactIdentity::new(
+            "local",
+            "local-user",
+            "user",
+            vec!["artifact_admin".to_string()],
+        )
+        .unwrap();
+        tauri::async_runtime::block_on(async {
+            supervisor
+                .start()
+                .await
+                .expect("real workspace RPC handshake");
+            let create = build_trusted_request(
+                "project.create",
+                json!({"title": "Kişisel test", "idempotencyKey": "create-project"}),
+                &identity,
+                Some("create-project".to_string()),
+                5000,
+            )
+            .unwrap();
+            let project = supervisor
+                .call(create, Duration::from_secs(5))
+                .await
+                .expect("real project creation");
+            assert_eq!(project["title"], "Kişisel test");
+            let list =
+                build_trusted_request("project.list", json!({}), &identity, None, 5000).unwrap();
+            let page = supervisor
+                .call(list, Duration::from_secs(5))
+                .await
+                .expect("real project list");
+            assert_eq!(page["projects"].as_array().unwrap().len(), 1);
+            let create_task = build_trusted_request("task.create", json!({"projectId": project["projectId"], "title": "Yeni konuşma", "idempotencyKey": "create-task"}), &identity, Some("create-task".to_string()), 5000).unwrap();
+            let task = supervisor
+                .call(create_task, Duration::from_secs(5))
+                .await
+                .expect("real task creation");
+            assert_eq!(task["title"], "Yeni konuşma");
+            let list_tasks = build_trusted_request(
+                "task.list",
+                json!({"projectId": project["projectId"]}),
+                &identity,
+                None,
+                5000,
+            )
+            .unwrap();
+            let tasks = supervisor
+                .call(list_tasks, Duration::from_secs(5))
+                .await
+                .expect("real task list");
+            assert_eq!(tasks["tasks"].as_array().unwrap().len(), 1);
+            supervisor.shutdown().await.unwrap();
+        });
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn source_desktop_defaults_to_supported_local_profile() {
+        if std::env::var_os("IMPERAOS_PROFILE").is_none() {
+            assert_eq!(trusted_artifact_profile(), "balanced");
+        }
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn auto_runtime_launches_installed_source_checkout_without_path_entry() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(3)
+            .unwrap();
+        let python = root.join(if cfg!(windows) {
+            ".venv/Scripts/python.exe"
+        } else {
+            ".venv/bin/python"
+        });
+        // This integration check applies to developer checkouts with the core installed.
+        if !python.is_file() {
+            return;
+        }
+        let config = trusted_artifact_bridge_config();
+        let resolved = resolve_cli_command(&config, None).expect("source runtime");
+        assert_eq!(Path::new(&resolved.program), python);
+        let output = tauri::async_runtime::block_on(run_cli_raw_with_resource_dir(
+            &config,
+            vec!["--version".to_string()],
+            None,
+        ))
+        .expect("launch installed core with the native sanitized environment");
+        assert!(output
+            .stdout
+            .trim()
+            .split('.')
+            .take(2)
+            .all(|part| part.parse::<u32>().is_ok()));
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn source_checkout_runtime_preserves_unicode_and_requires_core_markers() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().join("HERŞEY Kişisel");
+        let python = root.join(if cfg!(windows) {
+            ".venv/Scripts/python.exe"
+        } else {
+            ".venv/bin/python"
+        });
+        fs::create_dir_all(python.parent().unwrap()).unwrap();
+        fs::write(&python, "placeholder").unwrap();
+        assert!(source_checkout_cli(&root).is_none());
+        fs::create_dir_all(root.join("imperaos")).unwrap();
+        fs::write(root.join("imperaos/__main__.py"), "").unwrap();
+        fs::write(root.join("pyproject.toml"), "").unwrap();
+        let resolved = source_checkout_cli(&root).expect("checkout runtime");
+        assert_eq!(Path::new(&resolved.program), python);
+        assert_eq!(resolved.prefix_args, vec!["-I", "-m", "imperaos"]);
+        fs::remove_file(&python).unwrap();
+        assert!(source_checkout_cli(&root).is_none());
     }
 
     #[test]

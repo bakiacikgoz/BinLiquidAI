@@ -29,6 +29,10 @@ const cspSafeDependencyRoots = {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [cspSafeDependencyRoots, react()],
+  server: {
+    // Rust owns these files; watching locked Windows build outputs kills Vite.
+    watch: { ignored: ['**/src-tauri/**'] },
+  },
   preview: {
     headers: {
       'Content-Security-Policy': productionCsp,

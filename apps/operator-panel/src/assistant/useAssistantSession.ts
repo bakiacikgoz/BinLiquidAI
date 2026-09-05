@@ -44,7 +44,7 @@ export type AssistantSessionActions = {
     message: string,
     runtimeSettings?: AssistantRuntimeSettings,
     controls?: AssistantComposerControls,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   newChat: () => void;
   regenerate: (turnId: string, runtimeSettings?: AssistantRuntimeSettings) => Promise<void>;
   cancel: () => Promise<void>;
@@ -176,7 +176,7 @@ export function useAssistantSession(
     ) => {
       const userMessage = message.trim();
       if (!enabled || !userMessage || ['starting', 'streaming'].includes(stateRef.current.status)) {
-        return;
+        return false;
       }
 
       const context = getContext();
@@ -223,6 +223,7 @@ export function useAssistantSession(
         } else {
           armTurnTimeout(turn.id, stateRef.current.sessionId);
         }
+        return true;
       } catch (error) {
         const normalized = normalizeAssistantError(error);
         clearTurnTimeout(turn.id);
@@ -240,6 +241,7 @@ export function useAssistantSession(
             previous,
           ),
         );
+        return false;
       }
     },
     [applyEvent, armTurnTimeout, clearTurnTimeout, enabled, getContext, settings],
