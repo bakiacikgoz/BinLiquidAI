@@ -195,7 +195,8 @@ migration_dir = ".imperaos/enterprise/migrations"
 support_bundle_dir = ".imperaos/enterprise/support"
 
 [computer_use]
-enabled = true
+# Retained for the optional, paused computer-use extension.
+enabled = false
 runtime_mode = "legacy_pilot"
 vision_enabled = false
 vision_provider = "none"

@@ -150,7 +150,8 @@ class ClaimGuard:
 
     def _live_macos_computer_use_claim(self, root: Path) -> ClaimItem:
         report = root / "computer_use" / "macos_qualification_report.json"
-        blockers = []
+        # Historical configuration/evidence cannot re-enable a retired core surface.
+        blockers = ["COMPUTER_USE_OUTSIDE_CORE_PRODUCT"]
         if not self.config.computer_use.macos_live_enabled:
             blockers.append("MACOS_LIVE_DISABLED")
         if not report.exists():
@@ -159,7 +160,7 @@ class ClaimGuard:
             blockers.append("RAW_SCREENSHOT_PERSISTED")
         return ClaimItem(
             claim_id="live-macos-computer-use",
-            status=ClaimStatus.CONDITIONAL if not blockers else ClaimStatus.BLOCKED,
+            status=ClaimStatus.BLOCKED,
             required_evidence=["supervised_opt_in", "platform_qualification"],
             blocking_reasons=blockers,
         )

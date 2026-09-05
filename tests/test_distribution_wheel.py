@@ -47,6 +47,12 @@ def test_wheel_uses_imperaos_distribution_and_package(built_wheel: Path) -> None
     assert metadata["Summary"] == "ImperaOS governed AI workforce operating platform"
     assert metadata["Author"] == "ImperaOS Contributors"
     assert any(name.startswith("imperaos/") for name in names)
+    assert not any(
+        name.startswith(("imperaos/computer_use/", "imperaos_computer_use/")) for name in names
+    )
+    assert not any(
+        "imperaos-computer-use" in value for value in metadata.get_all("Requires-Dist", [])
+    )
     compatibility_package = "bin" + "liquid"
     assert any(name.startswith(f"{compatibility_package}/") for name in names)
 

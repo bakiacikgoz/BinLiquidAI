@@ -1,5 +1,11 @@
 # RELEASE_CHECKLIST
 
+Core releases exclude the paused computer-use extension and do not require its
+platform qualification. Legacy disabled capability evidence remains acceptable;
+new core evidence reports `COMPUTER_USE_EXTENSION_NOT_INSTALLED`. See
+[extension policy](COMPUTER_USE_EXTENSION.md).
+
+
 ## RC Release Decision
 
 ```bash
@@ -107,8 +113,8 @@ Treat `conditional` as expected until real human sign-off files verify. Do not p
 - [ ] Promote workflow runs `uv run python scripts/evaluate_windows_release_gate.py ... --fail-on-blocked`
 - [ ] `windows-public-release-gate.json` reports `status=pass`, `public_release_allowed=true`, and `blocking_reasons=[]` before public/enterprise Windows release
 - [ ] Unsigned/internal smoke reports `public_release_allowed=false`
-- [x] `operator capabilities --json` reports Windows live computer-use disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
-- [ ] `windows-installer-smoke.json` also reports `computer_use_live_enabled=false` and `computer_use_reason_code=WINDOWS_COMPUTER_USE_NOT_QUALIFIED`
+- [x] `operator capabilities --json` reports Windows live computer-use disabled with `COMPUTER_USE_EXTENSION_NOT_INSTALLED`
+- [ ] `windows-installer-smoke.json` also reports `computer_use_live_enabled=false` and `computer_use_reason_code=COMPUTER_USE_EXTENSION_NOT_INSTALLED`
 - [ ] Do not ship if `windows-public-release-gate.json` is missing, blocked, failed, has blocking reasons, used unsigned smoke, has `clean_vm_claimed != true`, or has an installer hash mismatch
 
 ## macOS Signing + Notarization (v0.5)

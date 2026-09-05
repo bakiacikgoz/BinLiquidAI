@@ -1213,12 +1213,6 @@ def _quick_actions(
             enabled=bool(evidence_packs),
             disabled_reason=None if evidence_packs else "NO_EVIDENCE_PACKS",
         ),
-        QuickActionSummary(
-            action_id="computer-use.live-start",
-            label="Start live computer-use",
-            enabled=False,
-            disabled_reason="COMPUTER_USE_CLAIM_BLOCKED",
-        ),
     ]
 
 

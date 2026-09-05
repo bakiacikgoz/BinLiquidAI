@@ -173,6 +173,11 @@ const visionRuntime = {
 };
 
 describe('capability handshake validation', () => {
+  it('accepts core capabilities without optional desktop command support', () => {
+    const commands = Object.fromEntries(Object.entries(baseCommands).filter(([key]) => !key.startsWith('computerUse')));
+    expect(hasContractMismatch({ capabilities: { contractVersion: '3.0', commands } })).toBe(false);
+  });
+
   it('accepts fully compatible capabilities', () => {
     expect(
       hasContractMismatch({

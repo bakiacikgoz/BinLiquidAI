@@ -10,7 +10,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from imperaos.computer_use.vision_runtime.platforms import evaluate_platform_matrix  # noqa: E402
+from imperaos_computer_use.vision_runtime.platforms import evaluate_platform_matrix  # noqa: E402
+
 from imperaos.runtime.config import resolve_runtime_config  # noqa: E402
 from imperaos.runtime.platform import current_platform  # noqa: E402
 

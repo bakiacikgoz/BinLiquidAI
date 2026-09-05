@@ -501,3 +501,23 @@ def test_fail_on_blocked_exit_code_is_two(tmp_path):
     )
 
     assert result.returncode == 2
+
+
+def test_core_release_accepts_absent_extension_without_platform_qualification():
+    report = evaluate(
+        capabilities=operator_capabilities(reasonCode="COMPUTER_USE_EXTENSION_NOT_INSTALLED"),
+        smoke=installer_smoke(computer_use_reason_code="COMPUTER_USE_EXTENSION_NOT_INSTALLED"),
+    )
+    assert report["status"] == "pass"
+    assert report["public_release_allowed"] is True
+    assert report["computer_use_live_enabled"] is False
+
+
+def test_absent_extension_reason_does_not_excuse_enabled_desktop_control():
+    report = evaluate(
+        capabilities=operator_capabilities(
+            enabled=True, reasonCode="COMPUTER_USE_EXTENSION_NOT_INSTALLED"
+        ),
+        smoke=installer_smoke(computer_use_reason_code="COMPUTER_USE_EXTENSION_NOT_INSTALLED"),
+    )
+    assert_blocked(report, "computer_use_enabled")

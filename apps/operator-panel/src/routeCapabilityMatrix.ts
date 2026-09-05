@@ -135,16 +135,6 @@ const bridgeActions: Partial<Record<RouteId, RouteCapability['primaryActions']>>
       noShipIfInert: true,
     },
   ],
-  surfaces: [
-    {
-      actionId: 'computer_use.live_execute',
-      label: 'Live execute',
-      state: 'disabled_with_reason',
-      disabledReasonCode: 'COMPUTER_USE_NOT_QUALIFIED',
-      requiredPermission: 'computer_use.execute',
-      noShipIfInert: true,
-    },
-  ],
   settings: [
     {
       actionId: 'settings.bridge_handshake',

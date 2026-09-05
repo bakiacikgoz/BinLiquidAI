@@ -11,7 +11,10 @@ from typing import Any
 
 SCHEMA_VERSION = "windows-public-release-gate/v1"
 DECISION_SOURCE = "scripts/evaluate_windows_release_gate.py"
-EXPECTED_COMPUTER_USE_REASON = "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+EXPECTED_COMPUTER_USE_REASONS = {
+    "COMPUTER_USE_EXTENSION_NOT_INSTALLED",
+    "WINDOWS_COMPUTER_USE_NOT_QUALIFIED",  # Previously issued disabled evidence.
+}
 EXPECTED_RUNTIME_PYTHON = "python/Scripts/python.exe"
 WINDOWS_RUNTIME_MANIFEST_KEYS = frozenset(
     {
@@ -342,7 +345,7 @@ def evaluate_gate(
         _add_reason(blocking_reasons, "smoke_computer_use_enabled")
     if (
         smoke_payload
-        and smoke_payload.get("computer_use_reason_code") != EXPECTED_COMPUTER_USE_REASON
+        and smoke_payload.get("computer_use_reason_code") not in EXPECTED_COMPUTER_USE_REASONS
     ):
         _add_reason(blocking_reasons, "smoke_computer_use_reason_code_mismatch")
     if smoke_payload and str(smoke_payload.get("webview2_status", "")).lower() not in {
@@ -359,7 +362,7 @@ def evaluate_gate(
 
     if computer_use_enabled:
         _add_reason(blocking_reasons, "computer_use_enabled")
-    if computer_use_reason_code != EXPECTED_COMPUTER_USE_REASON:
+    if computer_use_reason_code not in EXPECTED_COMPUTER_USE_REASONS:
         _add_reason(blocking_reasons, "computer_use_reason_code_mismatch")
     if computer_use_platform not in (None, "windows"):
         _add_reason(blocking_reasons, "computer_use_platform_mismatch")

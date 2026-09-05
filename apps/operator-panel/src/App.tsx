@@ -16,8 +16,6 @@ import {
   fetchControlPlaneDoctor,
   fetchControlPlaneSnapshot,
   fetchApprovals,
-  getComputerUseSummary,
-  getComputerUseSessionState,
   fetchGaReadiness,
   fetchIdentity,
   fetchKeysStatus,
@@ -29,19 +27,15 @@ import {
   handshake,
   isBridgePreviewMode,
   listRuns,
-  pauseComputerUseSession,
   planMigration,
   readArtifact,
   resolveConfig,
-  resumeComputerUseSession,
   resumeTeamRun,
   rotateKeyPlan,
   runInstallRehearsal,
   runQualification,
   simulateControlPlanePolicy,
   snapshotMetrics,
-  stopComputerUseSession,
-  submitComputerUseRun,
   submitTeamRun,
   tailEvents,
   verifyControlPlaneEvidence,
@@ -51,14 +45,7 @@ import {
   verifyControlPlaneClaims,
   showApproval,
 } from './bridge';
-import {
-  getComputerUseCapability,
-  getComputerUseVisionRuntimeBlockers,
-  getComputerUseVisionRuntimeCapability,
-  hasContractMismatch,
-  isComputerUseSessionStartAllowed,
-  type ComputerUseRuntimeChoice,
-} from './capabilities';
+import { hasContractMismatch } from './capabilities';
 import { ThemeProvider } from './context/ThemeContext';
 import { dictionaries } from './i18n';
 import { actorForOperator, canMutateWithOperatorId } from './operator';
@@ -97,8 +84,6 @@ import { useAssistantModels } from './assistant/useAssistantModels';
 import type { AssistantProviderKind } from './assistant/modelDiscovery';
 import { MissionControlView } from './components/mission/MissionControlView';
 import type { SessionEventFilter, SessionEventItem } from './components/mission/SessionEventsCard';
-import { ComputerUseOperationsCard } from './components/mission/ComputerUseOperationsCard';
-import { ComputerUseBlockerChecklist } from './components/mission/ComputerUseBlockerChecklist';
 import { AssistantView, type AssistantViewCopy } from './components/assistant/AssistantView';
 import { AssistantWorkbench } from './components/assistant/AssistantWorkbench';
 import {
@@ -156,7 +141,6 @@ import type { RouteId } from './routeRegistry';
 type ViewKey = RouteId;
 type RunTabKey = 'overview' | 'stream' | 'approvals' | 'artifacts' | 'replay' | 'diagnostics';
 type OperationTabKey = 'identity' | 'qualification' | 'security' | 'keys' | 'support' | 'maintenance';
-type AutomationMode = 'assisted' | 'supervised';
 
 type Toast = {
   id: number;
@@ -349,23 +333,6 @@ function manifestPathForEvidencePack(pack: EvidencePackSummary | null | undefine
   return pack?.exportPath ? `${pack.exportPath.replace(/\/$/, '')}/manifest.json` : '';
 }
 
-function mergeRunStatusWithSessionState(runStatusPayload: unknown, sessionStatePayload: unknown): unknown {
-  const runRecord = asRecord(runStatusPayload);
-  const sessionRecord = asRecord(sessionStatePayload);
-  const next: Record<string, unknown> = { ...runRecord };
-  const sessionJob = asRecord(sessionRecord.job);
-  const sessionComputerUse = asRecord(sessionRecord.computer_use);
-
-  if (Object.keys(sessionJob).length > 0) {
-    next.job = { ...asRecord(runRecord.job), ...sessionJob };
-  }
-  if (Object.keys(sessionComputerUse).length > 0) {
-    next.computer_use = { ...asRecord(runRecord.computer_use), ...sessionComputerUse };
-  }
-
-  return next;
-}
-
 function AppContent({ settings, updateSettings }: AppContentProps) {
   const previewMode = isBridgePreviewMode();
   const rendererArtifactFeatureFlags = resolveArtifactFeatureFlags(import.meta.env, {
@@ -380,10 +347,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [runTab, setRunTab] = useState<RunTabKey>('overview');
   const [operationTab, setOperationTab] = useState<OperationTabKey>('identity');
-  const [automationMode, setAutomationMode] = useState<AutomationMode>('assisted');
-  const [computerUseRuntimeChoice, setComputerUseRuntimeChoice] =
-    useState<ComputerUseRuntimeChoice>('vision-first');
-  const [stepMode, setStepMode] = useState(true);
   const [askBeforeExternal, setAskBeforeExternal] = useState(true);
   const [askBeforeDeletion, setAskBeforeDeletion] = useState(true);
   const [askBeforeSend, setAskBeforeSend] = useState(true);
@@ -418,8 +381,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const [runsData, setRunsData] = useState<unknown>({ items: [] });
   const [selectedRunId, setSelectedRunId] = useState('');
   const [runStatus, setRunStatus] = useState<unknown>(null);
-  const [computerUseState, setComputerUseState] = useState<unknown>(null);
-  const [computerUseSummaryData, setComputerUseSummaryData] = useState<unknown>(null);
   const [runReplay, setRunReplay] = useState<unknown>(null);
   const [artifactsByName, setArtifactsByName] = useState<Record<string, unknown>>({});
   const [selectedArtifactName, setSelectedArtifactName] = useState<string>('status.json');
@@ -517,35 +478,15 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const doctor = asRecord(handshakeRecord.doctor);
   const supportedProfiles = readArray(capabilities, 'profiles');
   const contractMismatch = hasContractMismatch(handshakeData);
-  const computerUseCapability = getComputerUseCapability(handshakeData);
-  const computerUseVisionCapability = getComputerUseVisionRuntimeCapability(handshakeData);
-  const computerUseVisionPlatformStatuses = Object.values(computerUseVisionCapability.platforms);
-  const computerUseLiveEnabled = isComputerUseSessionStartAllowed(handshakeData, computerUseRuntimeChoice);
-  const computerUseVisionBlockers = getComputerUseVisionRuntimeBlockers(handshakeData);
-  const computerUseDisabledReason = computerUseLiveEnabled
-    ? ''
-    : computerUseRuntimeChoice === 'legacy-pilot'
-      ? computerUseCapability.summary ||
-        (computerUseCapability.reasonCode
-          ? `Computer-use legacy pilot disabled: ${computerUseCapability.reasonCode}`
-          : 'Computer-use legacy pilot requires an explicit qualified macOS pilot handshake.')
-      : computerUseVisionBlockers.length > 0
-        ? `Computer-use vision runtime blocked: ${computerUseVisionBlockers.join(', ')}`
-        : computerUseVisionCapability.summary ||
-          'Computer-use vision runtime requires a qualified fail-closed capability handshake.';
   const operatorIdValid = isOperatorIdValid(settings.operatorId);
   const canMutate = canMutateWithOperatorId(settings.operatorId, contractMismatch);
-
   const pendingApprovals = readArray(asRecord(approvalsData), 'pending');
   const runItems = readArray(asRecord(runsData), 'items');
   const selectedApproval = asRecord(approvalDetail);
   const runStatusRecord = asRecord(runStatus);
   const runJob = asRecord(runStatusRecord.job);
   const runComputerUse = asRecord(runStatusRecord.computer_use);
-  const controlRegistry = asRecord(asRecord(computerUseState).registry);
   const runStatusValue = readString(runJob, 'status');
-  const isComputerUseRun =
-    Object.keys(runComputerUse).length > 0 || readString(runJob, 'team_id') === 'imperaos-computer-use';
   const linkedApprovals = pendingApprovals.filter(
     (item) => readString(asRecord(item), 'run_id') === selectedRunId,
   );
@@ -636,23 +577,10 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       if (!selectedRunId && items.length > 0) {
         setSelectedRunId(readString(asRecord(items[0]), 'job_id'));
       }
-      void refreshComputerUseSummary();
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
         pushToast('error', `${parsed.code}: ${parsed.message}`);
-      }
-    }
-  }
-
-  async function refreshComputerUseSummary() {
-    try {
-      const payload = await getComputerUseSummary(settings, 20);
-      setComputerUseSummaryData(payload);
-    } catch (error) {
-      const parsed = getErrorPayload(error);
-      if (parsed) {
-        setComputerUseSummaryData({ status: 'error', error: parsed.message, code: parsed.code });
       }
     }
   }
@@ -718,13 +646,11 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
 
     try {
-      const [statusPayload, replayPayload, sessionStatePayload] = await Promise.all([
+      const [statusPayload, replayPayload] = await Promise.all([
         getRunStatus(settings, runId),
         getRunReplay(settings, runId),
-        getComputerUseSessionState(settings, runId).catch(() => null),
       ]);
-      setRunStatus(mergeRunStatusWithSessionState(statusPayload, sessionStatePayload));
-      setComputerUseState(sessionStatePayload);
+      setRunStatus(statusPayload);
       setRunReplay(replayPayload);
 
       const nextArtifacts: Record<string, unknown> = {};
@@ -817,7 +743,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     setSessionEventFilter('all');
     setSessionEventVisibleLimit(20);
     setSessionEventsHasMore(false);
-    setComputerUseState(null);
     void loadRunContext(selectedRunId);
   }, [selectedRunId, settings.profile, settings.rootDir]);
 
@@ -835,12 +760,8 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       }
 
       try {
-        const [statusPayload, sessionStatePayload] = await Promise.all([
-          getRunStatus(settings, selectedRunId),
-          getComputerUseSessionState(settings, selectedRunId).catch(() => null),
-        ]);
-        setRunStatus(mergeRunStatusWithSessionState(statusPayload, sessionStatePayload));
-        setComputerUseState(sessionStatePayload);
+        const statusPayload = await getRunStatus(settings, selectedRunId);
+        setRunStatus(statusPayload);
 
         const stream = await tailEvents(settings, selectedRunId, cursorRef.current, 96 * 1024, 200);
         if (stream.reset) {
@@ -982,74 +903,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
     }
   }
 
-  async function onSubmitComputerUseSession() {
-    if (!computerUseLiveEnabled) {
-      pushToast('error', computerUseDisabledReason);
-      return;
-    }
-
-    if (!taskForm.request.trim()) {
-      pushToast('error', t.sessionValidation);
-      return;
-    }
-
-    const mode: 'dry_run' | 'step_approval' | 'execute' =
-      automationMode === 'assisted' || stepMode ? 'step_approval' : 'execute';
-
-    try {
-      const payload = await submitComputerUseRun(settings, {
-        request: taskForm.request,
-        caseId: taskForm.caseId || undefined,
-        jobId: taskForm.jobId || undefined,
-        mode,
-        runtime: computerUseRuntimeChoice,
-        provider: taskForm.provider || undefined,
-        fallbackProvider: taskForm.fallbackProvider || undefined,
-        model: taskForm.model || undefined,
-        hfModelId: taskForm.hfModelId || undefined,
-        safetyOptions: {
-          askBeforeExternalAction: askBeforeExternal,
-          askBeforeDelete: askBeforeDeletion,
-          askBeforeSend,
-        },
-      });
-      const jobId = extractJobId(payload);
-      if (jobId) {
-        setSelectedRunId(jobId);
-        setRunStatus({
-          job: {
-            job_id: jobId,
-            request: taskForm.request,
-            status: 'running',
-            team_id: 'imperaos-computer-use',
-          },
-          computer_use: {
-            mode,
-            runtime: computerUseRuntimeChoice,
-            lifecycle_state: 'running',
-            stage: 'plan',
-            paused: false,
-            stopped: false,
-          },
-        });
-      }
-      setActiveView('workspace');
-      pushToast('ok', `${t.startSession} OK`);
-      void refreshRuns();
-      window.setTimeout(() => {
-        void refreshRuns();
-        if (jobId) {
-          void loadRunContext(jobId, false);
-        }
-      }, 1200);
-    } catch (error) {
-      const parsed = getErrorPayload(error);
-      if (parsed) {
-        pushToast('error', `${parsed.code}: ${parsed.message}`);
-      }
-    }
-  }
-
   async function onResumeRun() {
     if (!selectedRunId || !resumeForm.specPath.trim()) {
       pushToast('error', t.resumeValidation);
@@ -1075,49 +928,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
       window.setTimeout(() => {
         void refreshRuns();
       }, 1200);
-    } catch (error) {
-      const parsed = getErrorPayload(error);
-      if (parsed) {
-        pushToast('error', `${parsed.code}: ${parsed.message}`);
-      }
-    }
-  }
-
-  async function onControlSession(command: 'pause' | 'resume' | 'stop') {
-    if (!selectedRunId || !isComputerUseRun) {
-      return;
-    }
-
-    try {
-      const label = command === 'pause' ? t.pause : command === 'resume' ? t.resumeRun : t.stopNow;
-      let controlPayload: unknown;
-      if (command === 'pause') {
-        controlPayload = await pauseComputerUseSession(settings, selectedRunId);
-      } else if (command === 'resume') {
-        controlPayload = await resumeComputerUseSession(settings, selectedRunId);
-      } else {
-        const confirmed = window.confirm(`${t.stopNow}\n${selectedRunId}`);
-        if (!confirmed) {
-          return;
-        }
-        controlPayload = await stopComputerUseSession(settings, selectedRunId);
-      }
-
-      const statePayload = await getComputerUseSessionState(settings, selectedRunId).catch(() => null);
-      setComputerUseState(statePayload);
-      const controlRecord = asRecord(controlPayload);
-      const outcome = readString(controlRecord, 'outcome', 'accepted');
-      const reason = readString(controlRecord, 'reason');
-      const outcomeLabel = humanizeCode(outcome);
-      if (outcome === 'rejected') {
-        pushToast('error', `${label}: ${outcomeLabel}${reason ? ` (${humanizeCode(reason)})` : ''}`);
-      } else {
-        pushToast('ok', `${label}: ${outcomeLabel}${reason ? ` (${humanizeCode(reason)})` : ''}`);
-      }
-      window.setTimeout(() => {
-        void loadRunContext(selectedRunId, false);
-        void refreshRuns();
-      }, 500);
     } catch (error) {
       const parsed = getErrorPayload(error);
       if (parsed) {
@@ -1287,16 +1097,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const selectedEvidenceManifestPath = manifestPathForEvidencePack(selectedEvidencePack);
   const workspaceSnapshot = buildWorkspaceSnapshot({
     runStatus,
-    sessionState: computerUseState,
     events,
     pendingApprovals,
     linkedApprovals,
     artifactsByName,
   });
   const workspaceProgress = readWorkspaceProgress(workspaceSnapshot);
-  const canResumeSession =
-    Boolean(selectedRunId) && isComputerUseRun && computerUseLiveEnabled && workspaceSnapshot.runtimeState.canResume;
-
   function workspaceStageLabel(stage: WorkspaceStageKey): string {
     return {
       planning: t.stagePlanning,
@@ -1428,7 +1234,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
   const startedAt = formatTimestamp(selectedCreatedAt, previewMode ? '14 May 2025 14:32' : '-');
   const duration = readString(runJob, 'duration') || readString(runComputerUse, 'duration') || (previewMode ? '00:03:18' : '-');
   const sessionId =
-    readString(controlRegistry, 'session_id') ||
     readString(runComputerUse, 'session_id') ||
     (previewMode ? 'session_7f3a' : '-');
   const missionStatusCode =
@@ -1572,26 +1377,12 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
         value: payload,
       };
     });
-  const computerUseLiveActionBlocked = isComputerUseRun && !computerUseLiveEnabled;
-  const canResumeFromQuickAction =
-    !computerUseLiveActionBlocked &&
-    (canResumeSession || (Boolean(selectedRunId) && Boolean(resumeForm.specPath.trim())));
+  const canResumeFromQuickAction = Boolean(selectedRunId) && Boolean(resumeForm.specPath.trim());
   const resumeDisabledReason = !selectedRunId
     ? 'Seçili çalıştırma yok.'
     : !canResumeFromQuickAction
       ? 'Devam için görev spec yolu veya resumable oturum gerekli.'
       : '';
-  const cancelDisabled =
-    !selectedRunId || !isComputerUseRun || computerUseLiveActionBlocked || !workspaceSnapshot.runtimeState.canStop;
-  const cancelDisabledReason = !selectedRunId
-    ? 'Seçili çalıştırma yok.'
-    : !isComputerUseRun
-      ? 'İptal yalnızca aktif computer-use oturumlarında kullanılabilir.'
-      : computerUseLiveActionBlocked
-        ? computerUseDisabledReason
-      : !workspaceSnapshot.runtimeState.canStop
-        ? 'Runtime bu durumda durdurma kabul etmiyor.'
-        : '';
   function openRunTerminalView() {
     setActiveView('runs');
     setRunTab('stream');
@@ -1885,8 +1676,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             resumeDisabledReason={resumeDisabledReason}
             exportDisabled={!selectedRunId}
             exportDisabledReason={!selectedRunId ? 'Seçili çalıştırma yok.' : ''}
-            cancelDisabled={cancelDisabled}
-            cancelDisabledReason={cancelDisabledReason}
             onDismissNotification={(id) => setDismissedNotifications((prev) => [...prev, id])}
             onRefreshContext={() => {
               void refreshCore();
@@ -1894,16 +1683,9 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 void loadRunContext(selectedRunId);
               }
             }}
-            onResume={() => {
-              if (canResumeSession) {
-                void onControlSession('resume');
-              } else {
-                void onResumeRun();
-              }
-            }}
+            onResume={() => void onResumeRun()}
             onOpenTerminal={openRunTerminalView}
             onExport={() => void onExportArtifacts()}
-            onCancel={() => void onControlSession('stop')}
             onViewDetails={() => setActiveView('runs')}
             onViewApprovals={() => setActiveView('approvals')}
           />
@@ -2042,7 +1824,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
 
         {activeView === 'surfaces' ? (
           <ExecutionSurfacesView
-            computerUseCapability={computerUseVisionCapability.capabilityResolution}
             locale={locale}
           />
         ) : null}
@@ -2071,8 +1852,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             }
             sessionEventsLoadingMore={sessionEventsLoadingMore}
             runtimeSummary={runtimeSummary}
-            rawSummary={{ runStatus, computerUseState, configData, handshakeData }}
-            computerUseCapabilityResolution={computerUseVisionCapability.capabilityResolution}
+            rawSummary={{ runStatus, configData, handshakeData }}
             debugRawEnabled={settings.debugRaw}
             hasApproval={hasApproval}
             approvalLabel={approvalLabel}
@@ -2162,15 +1942,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 <button className="ghost-btn" type="button" onClick={() => void refreshRuns()}>
                   {t.refreshRuns}
                 </button>
-                <button
-                  className="ghost-btn"
-                  type="button"
-                  disabled={!computerUseLiveEnabled}
-                  title={computerUseDisabledReason}
-                  onClick={() => void onSubmitComputerUseSession()}
-                >
-                  {t.startSession}
-                </button>
                 <button className="action-btn" type="button" onClick={() => void onSubmitTask()}>
                   {t.submitRun}
                 </button>
@@ -2180,28 +1951,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
             <div className="section-grid two-up">
               <article className="page-card">
                 <h3>{t.taskWorkspace}</h3>
-                <div className="toolbar-row">
-                  <button
-                    className={automationMode === 'assisted' ? 'tab-btn tab-btn-active' : 'tab-btn'}
-                    type="button"
-                    onClick={() => {
-                      setAutomationMode('assisted');
-                      setStepMode(true);
-                    }}
-                  >
-                    {t.assistedMode}
-                  </button>
-                  <button
-                    className={automationMode === 'supervised' ? 'tab-btn tab-btn-active' : 'tab-btn'}
-                    type="button"
-                    onClick={() => {
-                      setAutomationMode('supervised');
-                      setStepMode(false);
-                    }}
-                  >
-                    {t.supervisedMode}
-                  </button>
-                </div>
                 <div className="control-switches">
                   <label className="field field-inline">
                     <span>{t.askBeforeExternalAction}</span>
@@ -2228,12 +1977,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     />
                   </label>
                 </div>
-                <ComputerUseBlockerChecklist
-                  blocked={!computerUseLiveEnabled}
-                  reason={computerUseDisabledReason}
-                  blockers={computerUseVisionBlockers}
-                  onOpenSettings={() => setActiveView('settings')}
-                />
                 <div className="form-grid">
                   <label className="field">
                     <span>{t.profile}</span>
@@ -2319,16 +2062,6 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                 </details>
               </article>
 
-              <ComputerUseOperationsCard
-                legacyCapability={computerUseCapability}
-                visionCapability={computerUseVisionCapability}
-                summary={computerUseSummaryData}
-                runtimeChoice={computerUseRuntimeChoice}
-                startAllowed={computerUseLiveEnabled}
-                disabledReason={computerUseDisabledReason}
-                blockers={computerUseVisionBlockers}
-                onRuntimeChoiceChange={setComputerUseRuntimeChoice}
-              />
 
               <article className="page-card">
                 <h3>{t.submitReadiness}</h3>
@@ -2349,62 +2082,7 @@ function AppContent({ settings, updateSettings }: AppContentProps) {
                     <span>{t.workflowParity}</span>
                     <strong>{readBool(features, 'operatorWorkflowParity') ? t.enabled : t.disabled}</strong>
                   </div>
-                  <div className="metric-row">
-                    <span>Runtime</span>
-                    <strong>{computerUseRuntimeChoice}</strong>
-                  </div>
-                  <div className="metric-row">
-                    <span>Computer-use live</span>
-                    <strong>{computerUseLiveEnabled ? t.enabled : 'Qualification required'}</strong>
-                  </div>
-                  <div className="metric-row">
-                    <span>Reason code</span>
-                    <strong>
-                      {computerUseRuntimeChoice === 'legacy-pilot'
-                        ? computerUseCapability.reasonCode || '-'
-                        : computerUseVisionCapability.reasonCode ||
-                          computerUseVisionCapability.capabilityResolution?.reasonCode ||
-                          '-'}
-                    </strong>
-                  </div>
-                  <div className="metric-row">
-                    <span>Vision runtime</span>
-                    <strong>{computerUseVisionCapability.stage}</strong>
-                  </div>
-                  <div className="metric-row">
-                    <span>Vision provider</span>
-                    <strong>
-                      {computerUseVisionCapability.provider.kind}
-                      {computerUseVisionCapability.provider.model
-                        ? ` / ${computerUseVisionCapability.provider.model}`
-                        : ''}
-                    </strong>
-                  </div>
-                  <div className="metric-row">
-                    <span>Vision safety</span>
-                    <strong>
-                      {computerUseVisionCapability.safety.rawScreenshotPersistence} /{' '}
-                      {computerUseVisionCapability.safety.terminalControl}
-                    </strong>
-                  </div>
-                  {computerUseVisionPlatformStatuses.length > 0 ? (
-                    <div className="platform-gate-list" aria-label="Computer-use platform gates">
-                      {computerUseVisionPlatformStatuses.map((platformStatus) => (
-                        <span
-                          className="platform-gate-pill"
-                          key={platformStatus.platform}
-                          title={platformStatus.reasonCode || platformStatus.stage}
-                        >
-                          <span>{platformStatus.platform}</span>
-                          <strong>{platformStatus.liveEnabled ? 'live' : platformStatus.stage}</strong>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
-                {!computerUseLiveEnabled ? (
-                  <div className="warning-inline">{computerUseDisabledReason}</div>
-                ) : null}
                 <div className="stack-actions">
                   <button className="action-btn" type="button" onClick={() => void onSubmitTask()}>
                     {t.submitRun}

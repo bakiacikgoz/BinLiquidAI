@@ -147,7 +147,8 @@ approval_ttl_seconds = 86400
 decision_engine_version = "v0.3"
 
 [computer_use]
-enabled = true
+# Retained for the optional, paused computer-use extension.
+enabled = false
 runtime_mode = "legacy_pilot"
 vision_enabled = false
 vision_provider = "none"

@@ -96,3 +96,10 @@ def test_macos_local_trial_gate_redacts_secret_like_tail(tmp_path: Path, monkeyp
     assert report["secretLeakScan"]["redactedFindings"] == [
         "SECRET_LIKE_OUTPUT_REDACTED:imperaos_version"
     ]
+
+
+def test_core_trial_plan_never_requires_optional_desktop_extension():
+    for full in (False, True):
+        plan = gate.build_command_plan("balanced", full=full)
+        assert plan
+        assert all("computer-use" not in item["command"] for item in plan)

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title desc">
+  <title id="title">ImperaOS</title>
+  <desc id="desc">Governed AI work, on your infrastructure. Tasks, policy, approvals and evidence.</desc>
+  <rect width="1280" height="360" rx="20" fill="#101820"/>
+  <path d="M0 1H1280" stroke="#5de4c7" stroke-width="3"/>
+  <g fill="none" stroke="#233b43" stroke-width="1">
+    <path d="M824 0V360M912 0V360M1000 0V360M1088 0V360M1176 0V360"/>
+    <path d="M768 92H1280M768 180H1280M768 268H1280"/>
+  </g>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="68" y="80" fill="#5de4c7" font-size="14" letter-spacing="4">SELF-HOSTED AGENT CONTROL PLANE</text>
+    <text x="64" y="167" fill="#f3f7f8" font-size="72" font-weight="650" letter-spacing="-3">ImperaOS</text>
+    <text x="68" y="218" fill="#b6c7cd" font-size="24">Governed AI work, on your infrastructure.</text>
+    <text x="68" y="294" fill="#78949f" font-size="14" letter-spacing="2">TASKS / POLICY / APPROVALS / EVIDENCE</text>
+  </g>
+  <g fill="#101820" stroke="#5de4c7" stroke-width="2">
+    <path d="M872 180H1152"/>
+    <rect x="844" y="152" width="56" height="56" rx="12"/>
+    <rect x="984" y="152" width="56" height="56" rx="12"/>
+    <rect x="1124" y="152" width="56" height="56" rx="12"/>
+    <path d="M860 180H884M872 168V192M999 181L1008 190L1025 171M1140 171H1164M1140 180H1164M1140 189H1156"/>
+  </g>
+</svg>

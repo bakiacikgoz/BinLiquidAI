@@ -22,7 +22,6 @@ from imperaos.contracts import (
 )
 from imperaos.governance.runtime import GovernanceRuntime
 from imperaos.runtime.config import RuntimeConfig
-from imperaos.runtime.platform import current_platform
 from imperaos.schemas.models import OrchestratorResult
 
 runner = CliRunner()
@@ -63,9 +62,7 @@ class _ApprovalAwareFakeTeamOrchestrator:
         del use_router
         session_context = session_context or {}
         run_id = str(
-            session_context.get("governance_run_id")
-            or session_context.get("job_id")
-            or "job-test"
+            session_context.get("governance_run_id") or session_context.get("job_id") or "job-test"
         )
         override_id = session_context.get("governance_approval_id")
         decision, ticket = self.governance_runtime.evaluate_task(
@@ -356,7 +353,7 @@ def test_operator_capabilities_payload_matches_contract() -> None:
     jsonschema.Draft202012Validator(schema).validate(json.loads(result.stdout))
 
     assert payload.contract_version == "3.0"
-    assert payload.commands.computer_use_summary_json is True
+    assert payload.commands.computer_use_summary_json is False
     vision_runtime = json.loads(result.stdout)["features"]["computerUseVisionRuntime"]
     assert set(vision_runtime["platforms"]) == {"macos", "windows", "linux"}
     assert vision_runtime["platforms"]["windows"]["liveEnabled"] is False
@@ -378,23 +375,14 @@ def test_operator_capabilities_payload_matches_contract() -> None:
     assert "rawScreenshotPath" not in encoded
     assert "raw_screenshot_path" not in encoded
     assert "Users" not in str(resolution["evidence"]["source"])
-    assert (
-        vision_runtime["platforms"]["windows"]["reasonCode"]
-        == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
-    )
-    assert (
-        vision_runtime["platforms"]["linux"]["reasonCode"]
-        == "LINUX_COMPUTER_USE_NOT_QUALIFIED"
-    )
-    if current_platform().label == "windows":
-        assert payload.features.computer_use_pilot.enabled is False
+    for platform in ("windows", "linux", "macos"):
         assert (
-            payload.features.computer_use_pilot.reason_code
-            == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+            vision_runtime["platforms"][platform]["reasonCode"]
+            == "COMPUTER_USE_EXTENSION_NOT_INSTALLED"
         )
-        assert payload.features.computer_use_pilot.adapter_status == "windows_scaffold"
-    else:
-        assert payload.features.computer_use_pilot.adapter_status == "safari_applescript"
+    assert payload.features.computer_use_pilot.enabled is False
+    assert payload.features.computer_use_pilot.reason_code == "COMPUTER_USE_EXTENSION_NOT_INSTALLED"
+    assert payload.features.computer_use_pilot.adapter_status == "not_installed"
 
 
 def test_operator_capabilities_contract_accepts_legacy_payload_without_resolution() -> None:
@@ -424,9 +412,7 @@ def test_operator_capabilities_contract_rejects_resolver_live_enabled_true() -> 
     result = runner.invoke(app, ["operator", "capabilities", "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    payload["features"]["computerUseVisionRuntime"]["capabilityResolution"][
-        "liveEnabled"
-    ] = True
+    payload["features"]["computerUseVisionRuntime"]["capabilityResolution"]["liveEnabled"] = True
 
     with pytest.raises(ValidationError):
         OperatorCapabilitiesPayload.model_validate(payload)

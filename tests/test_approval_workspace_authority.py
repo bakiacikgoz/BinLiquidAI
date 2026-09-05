@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 
 import imperaos.cli as cli
-import imperaos.computer_use.runtime as computer_use_runtime
 import imperaos.team.supervisor as team_supervisor
 from imperaos.control_plane.models import ControlPlaneRunSummary, RunStatus
 from imperaos.control_plane.run_coordinator import ControlPlaneRunCoordinator
@@ -399,6 +398,5 @@ def test_operator_panel_uses_trusted_workspace_and_verified_decision_actor(monke
     ]
 
 
-def test_supervisor_and_computer_use_do_not_bypass_scoped_runtime_lookup() -> None:
+def test_supervisor_does_not_bypass_scoped_runtime_lookup() -> None:
     assert ".approval_store.get(" not in inspect.getsource(team_supervisor)
-    assert ".approval_store.get(" not in inspect.getsource(computer_use_runtime)

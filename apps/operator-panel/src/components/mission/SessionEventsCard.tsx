@@ -20,7 +20,6 @@ const EVENT_FILTER_OPTIONS: Array<{ value: SessionEventFilter; label: string }> 
   { value: 'approval', label: 'Approval' },
   { value: 'warning', label: 'Warning' },
   { value: 'error', label: 'Error' },
-  { value: 'computer_use', label: 'Computer-use' },
   { value: 'assistant', label: 'Assistant' },
 ];
 

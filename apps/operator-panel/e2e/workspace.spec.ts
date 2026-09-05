@@ -8,8 +8,7 @@ test('workspace smoke renders preview mission control without critical console e
   await expect(page.getByRole('heading', { name: 'Mission Control', exact: true })).toBeVisible();
   await expect(page.getByTestId('runtime-truth-banner')).toHaveCount(0);
   await expect(page.locator('.system-health-card')).toContainText('SİSTEM SAĞLIĞI');
-  await expect(page.getByLabel('Computer-use capability')).toBeVisible();
-  await expect(page.getByText('MACOS_COMPUTER_USE_NOT_QUALIFIED', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Computer-use capability')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Onayla ve Devam Et/i })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Onayla ve Devam Et/i })).toHaveAttribute(
     'title',

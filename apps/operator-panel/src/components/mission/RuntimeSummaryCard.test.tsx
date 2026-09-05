@@ -70,7 +70,7 @@ describe('RuntimeSummaryCard', () => {
     expect(html).not.toContain('/tmp/private-screen.png');
   });
 
-  it('renders read-only computer-use capability resolver status without raw paths', () => {
+  it('does not advertise optional desktop capabilities even for legacy capability data', () => {
     const capabilityResolution = {
       schemaVersion: 1,
       platform: 'windows',
@@ -121,14 +121,14 @@ describe('RuntimeSummaryCard', () => {
       />,
     );
 
-    expect(html).toContain('Computer-use capability');
-    expect(html).toContain('Live execution');
-    expect(html).toContain('Disabled');
-    expect(html).toContain('WINDOWS_COMPUTER_USE_NOT_QUALIFIED');
-    expect(html).toContain('COMPUTER_USE_EVIDENCE_MISSING');
-    expect(html).toContain('Evidence');
-    expect(html).toContain('missing');
-    expect(html).toContain('Public live claim');
+    expect(html).not.toContain('Computer-use capability');
+    expect(html).not.toContain('Live execution');
+    expect(html).not.toContain('Disabled');
+    expect(html).not.toContain('WINDOWS_COMPUTER_USE_NOT_QUALIFIED');
+    expect(html).not.toContain('COMPUTER_USE_EVIDENCE_MISSING');
+    expect(html).not.toContain('Evidence');
+    expect(html).not.toContain('missing');
+    expect(html).not.toContain('Public live claim');
     expect(html).not.toContain('C:/Users/duzey');
     expect(html).not.toContain('Start live');
   });

@@ -56,18 +56,19 @@ describe('RightRail interactions', () => {
   });
 
   it('keeps disabled quick actions inert and explains why', async () => {
-    const onCancel = vi.fn();
+    const onResume = vi.fn();
     const { user } = renderRail({
-      cancelDisabled: true,
-      cancelDisabledReason: 'Cancel unavailable.',
-      onCancel,
+      resumeDisabled: true,
+      resumeDisabledReason: 'Resume unavailable.',
+      onResume,
     });
-    const cancel = screen.getByRole('button', { name: /Çalıştırmayı İptal Et/i });
+    const cancel = screen.getByRole('button', { name: /Çalıştırmayı Devam Ettir/i });
+    expect(screen.queryByRole('button', { name: /Çalıştırmayı İptal Et/i })).not.toBeInTheDocument();
 
     expect(cancel).toBeDisabled();
-    expect(cancel).toHaveAttribute('title', 'Cancel unavailable.');
-    expect(cancel).toHaveAttribute('data-disabled-reason', 'Cancel unavailable.');
+    expect(cancel).toHaveAttribute('title', 'Resume unavailable.');
+    expect(cancel).toHaveAttribute('data-disabled-reason', 'Resume unavailable.');
     await user.click(cancel);
-    expect(onCancel).not.toHaveBeenCalled();
+    expect(onResume).not.toHaveBeenCalled();
   });
 });

@@ -65,14 +65,11 @@ export function RightRail({
   resumeDisabledReason = '',
   exportDisabled = false,
   exportDisabledReason = '',
-  cancelDisabled = false,
-  cancelDisabledReason = '',
   onDismissNotification,
   onRefreshContext,
   onResume,
   onOpenTerminal,
   onExport,
-  onCancel,
   onViewDetails,
   onViewApprovals,
 }: {
@@ -96,7 +93,7 @@ export function RightRail({
   onResume: () => void;
   onOpenTerminal: () => void;
   onExport: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   onViewDetails: () => void;
   onViewApprovals: () => void;
 }) {
@@ -223,16 +220,6 @@ export function RightRail({
           onClick={onExport}
         >
           Logları Dışa Aktar
-        </Button>
-        <Button
-          disabled={cancelDisabled}
-          icon={<Icon name="reject" />}
-          title={cancelDisabledReason || undefined}
-          data-disabled-reason={cancelDisabled ? cancelDisabledReason || 'Cancel is not available for this run.' : undefined}
-          variant="danger"
-          onClick={onCancel}
-        >
-          Çalıştırmayı İptal Et
         </Button>
       </section>
     </aside>

@@ -10,9 +10,7 @@ const copy = {
     ready: 'ready',
     teamRuntime: 'Team Runtime',
     teamRuntimeState: 'pilot / enterprise gated',
-    computerUse: 'Computer-use',
     blocked: 'blocked',
-    liveDisabled: 'Live start disabled until qualification evidence is present.',
     publicInstaller: 'Public desktop installer',
     externalAdapters: 'External adapters',
     contractOnly: 'contract only',
@@ -32,9 +30,7 @@ const copy = {
     ready: 'hazır',
     teamRuntime: 'Team runtime',
     teamRuntimeState: 'pilot / enterprise kapılı',
-    computerUse: 'Computer-use',
     blocked: 'bloke',
-    liveDisabled: 'Qualification evidence gelene kadar live başlangıç kapalı.',
     publicInstaller: 'Public desktop installer',
     externalAdapters: 'Harici adapterlar',
     contractOnly: 'yalnızca sözleşme',
@@ -49,16 +45,12 @@ const copy = {
 } satisfies Record<UiLocale, Record<string, string>>;
 
 export function ExecutionSurfacesView({
-  computerUseCapability,
   locale = 'en',
 }: {
-  computerUseCapability: unknown;
+  computerUseCapability?: unknown;
   locale?: UiLocale;
 }) {
   const text = copy[locale];
-  const capability = asRecord(computerUseCapability);
-  const computerUseReason =
-    typeof capability.reasonCode === 'string' ? capability.reasonCode : 'COMPUTER_USE_CLAIM_BLOCKED';
   return (
     <section className="workspace" data-testid="page-primary-region">
       <div className="workspace-header">
@@ -76,12 +68,6 @@ export function ExecutionSurfacesView({
         <article className="page-card">
           <h3>{text.teamRuntime}</h3>
           <p className="metric">{text.teamRuntimeState}</p>
-        </article>
-        <article className="page-card">
-          <h3>{text.computerUse}</h3>
-          <p className="metric">{String(capability.status ?? text.blocked)}</p>
-          <small>{formatReasonCode(computerUseReason, locale)}</small>
-          <div className="warning-inline">{text.liveDisabled}</div>
         </article>
         <article className="page-card">
           <h3>{text.publicInstaller}</h3>
@@ -113,8 +99,4 @@ export function ExecutionSurfacesView({
       </div>
     </section>
   );
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }

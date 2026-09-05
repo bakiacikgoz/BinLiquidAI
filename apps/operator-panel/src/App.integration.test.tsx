@@ -140,16 +140,17 @@ describe('App integration flows', () => {
     NAVIGATION_TEST_TIMEOUT_MS,
   );
 
-  it('keeps computer-use start fail-closed when the vision runtime is not qualified', async () => {
+  it('keeps optional desktop execution out of core tasks and background requests', async () => {
+    const summary = vi.spyOn(bridge, 'getComputerUseSummary');
+    const state = vi.spyOn(bridge, 'getComputerUseSessionState');
     const { user } = renderApp({ operatorId: 'qa-operator' });
-
+    await screen.findByRole('heading', { name: 'Mission Control' });
     await openView(user, 'Görevler');
-    const startButton = screen.getByRole('button', { name: 'Start session' });
-
-    expect(startButton).toBeDisabled();
-    expect(startButton.getAttribute('title') ?? '').toContain('Computer-use vision runtime blocked');
-    await user.click(startButton);
-    expect(bridge.submitComputerUseRun).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Start session' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Computer-use live')).not.toBeInTheDocument();
+    expect(summary).not.toHaveBeenCalled();
+    expect(state).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('button', { name: 'Submit run' }).length).toBeGreaterThan(0);
   });
 
   it('executes the Mission Control approval CTA through explicit bridge args', async () => {

@@ -101,28 +101,13 @@ enterprise-gate:
 	uv run imperaos keys verify --profile enterprise --path artifacts/ga_readiness_report.json --json
 	uv run imperaos support bundle export --profile enterprise --json
 
+# Paused extension checks are explicitly opt-in and excluded from mainline-gate.
 vision-gate:
-	uv run --extra dev pytest -q \
-		tests/test_computer_use_vision_contracts.py \
-		tests/test_computer_use_vision_provider.py \
-		tests/test_computer_use_vision_planner.py \
-		tests/test_computer_use_vision_policy.py \
-		tests/test_computer_use_vision_approval.py \
-		tests/test_computer_use_vision_verifier.py \
-		tests/test_computer_use_vision_runtime.py \
-		tests/test_computer_use_vision_qualification.py \
-		tests/test_computer_use_vision_replay.py \
-		tests/test_computer_use_macos_supervised_v2_gate.py
-	uv run python -m imperaos computer-use doctor --json
-	uv run python scripts/evaluate_computer_use_platform_matrix.py \
-		--profile balanced \
-		--output artifacts/computer_use/platform_matrix.json \
-		--markdown artifacts/computer_use/PLATFORM_MATRIX.md
-	uv run python scripts/evaluate_macos_supervised_vision_gate.py \
-		--evidence-root artifacts/computer_use \
-		--output artifacts/computer_use/macos_supervised_v2_gate.json \
-		--markdown artifacts/computer_use/MACOS_SUPERVISED_V2_GATE.md \
-		--json
+	uv sync --extra dev
+	uv pip install --python .venv --no-deps -e extensions/computer-use
+	uv run --no-sync pytest -q extensions/computer-use/tests
+	uv run --no-sync imperaos-computer-use doctor --json
+
 
 provider-native-gate:
 	uv run python scripts/run_provider_native_adapter_gate.py --profile enterprise --json
@@ -746,7 +731,6 @@ mainline-gate:
 	$(MAKE) design-partner-pilot-candidate-gate
 	$(MAKE) design-partner-rc-audit-gate
 	$(MAKE) control-plane-gate
-	$(MAKE) vision-gate
 	$(MAKE) ui-gate
 	$(MAKE) rust-gate
 	git diff --check

@@ -300,48 +300,13 @@ uv run imperaos ga readiness --profile enterprise --report artifacts/ga_readines
 - do not claim GA readiness while `ga readiness` is `yellow` or `red`
 - do not promote enterprise deployment claims without a signed `qualification_report.json`
 
-## 12. Vision-First Computer-Use Operations
+## 12. Optional computer-use extension
 
-### Default Posture
+Computer use is outside core operations and active development is paused.
+Normal startup, operator validation and release readiness require no desktop
+permissions, vision provider or platform qualification. Core `operator capabilities`
+returns disabled compatibility fields with `COMPUTER_USE_EXTENSION_NOT_INSTALLED`.
 
-The `[computer_use]` profile block defaults to:
-
-```toml
-runtime_mode = "legacy_pilot"
-vision_enabled = false
-raw_screenshot_retention = "disabled"
-terminal_control = "deny"
-platform_qualification_required = true
-```
-
-### Operator Checks
-
-```bash
-uv run imperaos operator capabilities --json
-uv run imperaos computer-use run --once "read current screen" --runtime vision-first --json
-```
-
-Expected result without a configured vision provider: fail-closed with `VISION_RUNTIME_NOT_CONFIGURED` or `VISION_PROVIDER_UNAVAILABLE`; no raw screenshots are persisted.
-
-### Stop Conditions
-
-- raw screenshots appear without explicit debug opt-in
-- Windows reports live execution enabled without signed qualification
-- terminal control is enabled outside a reviewed policy change
-- sensitive surface detection does not stop execution
-- replay hash-chain verification fails
-## Supervised macOS Vision Pilot
-
-Use the vision-first runtime only as a supervised macOS pilot. Start with deterministic qualification:
-
-```bash
-uv run imperaos computer-use qualify --runtime vision-first --suite smoke --mode deterministic --json
-```
-
-Before any live macOS run, inspect readiness:
-
-```bash
-uv run imperaos computer-use vision doctor --profile balanced --json
-```
-
-Do not automate macOS Screen Recording or Accessibility permission grants. If readiness reports missing permissions, the operator must grant them manually in macOS Privacy & Security. Windows live computer-use remains disabled with `WINDOWS_COMPUTER_USE_NOT_QUALIFIED`.
+Use [the extension guide](COMPUTER_USE_EXTENSION.md) only for explicit work on
+the separately installed module. Historical computer-use operation and
+qualification RFCs remain reference material, not current core runbook steps.

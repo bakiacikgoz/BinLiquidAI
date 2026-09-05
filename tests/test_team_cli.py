@@ -9,7 +9,6 @@ from typer.testing import CliRunner
 from imperaos.cli import app
 from imperaos.governance.runtime import GovernanceRuntime
 from imperaos.runtime.config import RuntimeConfig
-from imperaos.runtime.platform import current_platform
 from imperaos.schemas.models import OrchestratorResult
 
 runner = CliRunner()
@@ -563,17 +562,13 @@ def test_operator_capabilities_exposes_workspace_parity_flags() -> None:
     assert payload["features"]["operatorWorkflowParity"] is True
     assert payload["features"]["enterpriseOpsParity"] is True
     computer_use = payload["features"]["computerUsePilot"]
-    if current_platform().label == "windows":
-        assert computer_use["enabled"] is False
-        assert computer_use["reasonCode"] == "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
-        assert computer_use["adapterStatus"] == "windows_scaffold"
-    else:
-        assert computer_use["scope"] == "browser+desktop+file"
-        assert computer_use["adapterStatus"] == "safari_applescript"
+    assert computer_use["enabled"] is False
+    assert computer_use["reasonCode"] == "COMPUTER_USE_EXTENSION_NOT_INSTALLED"
+    assert computer_use["adapterStatus"] == "not_installed"
     assert payload["commands"]["teamSubmit"] is True
     assert payload["commands"]["teamResumeSubmit"] is True
-    assert payload["commands"]["computerUseSubmit"] is True
-    assert payload["commands"]["computerUsePause"] is True
-    assert payload["commands"]["computerUseResume"] is True
-    assert payload["commands"]["computerUseStop"] is True
+    assert payload["commands"]["computerUseSubmit"] is False
+    assert payload["commands"]["computerUsePause"] is False
+    assert payload["commands"]["computerUseResume"] is False
+    assert payload["commands"]["computerUseStop"] is False
     assert "balanced" in payload["profiles"]

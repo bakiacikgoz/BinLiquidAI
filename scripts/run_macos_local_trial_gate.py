@@ -138,20 +138,6 @@ def build_command_plan(profile: str, *, full: bool = False) -> list[dict[str, An
             "required": True,
         },
         {
-            "name": "computer_use_doctor",
-            "command": [
-                "uv",
-                "run",
-                "python",
-                "-m",
-                "imperaos",
-                "computer-use",
-                "doctor",
-                "--json",
-            ],
-            "required": True,
-        },
-        {
             "name": "first_run_readiness_gate",
             "command": [
                 "uv",

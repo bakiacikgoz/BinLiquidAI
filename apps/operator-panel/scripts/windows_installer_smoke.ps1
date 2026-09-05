@@ -149,7 +149,7 @@ if (($HashContinuityStatus -eq "fail") -or (-not $Signed -and -not $AllowUnsigne
     doctor_status = "blocked"
     computer_use_live_enabled = $false
     computer_use_enabled = $false
-    computer_use_reason_code = "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+    computer_use_reason_code = "COMPUTER_USE_EXTENSION_NOT_INSTALLED"
     uninstall_status = "not_run"
     reason = $blockedReason
   }
@@ -253,7 +253,7 @@ if ($RunUninstall) {
   }
 }
 
-$reasonCode = "WINDOWS_COMPUTER_USE_NOT_QUALIFIED"
+$reasonCode = "COMPUTER_USE_EXTENSION_NOT_INSTALLED"
 if ($Capabilities -and $Capabilities.features.computerUsePilot.reasonCode) {
   $reasonCode = $Capabilities.features.computerUsePilot.reasonCode
 }

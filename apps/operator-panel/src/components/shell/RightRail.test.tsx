@@ -76,7 +76,7 @@ describe('RightRail', () => {
     expect(html).toContain('aria-valuenow="55"');
     expect(html).toContain('Terminal Aç');
     expect(html).toContain('Resume unavailable');
-    expect(html).toContain('Durdurulamaz');
+    expect(html).not.toContain('Çalıştırmayı İptal Et');
     expect(html).toContain('data-disabled-reason="Resume unavailable"');
     expect(html).toContain('disabled=""');
   });

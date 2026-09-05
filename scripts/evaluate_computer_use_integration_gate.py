@@ -11,18 +11,19 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from imperaos import __version__
-from imperaos.computer_use.models import ComputerUseMode, RiskClass
-from imperaos.computer_use.vision_runtime.approval import validate_approval_snapshot
-from imperaos.computer_use.vision_runtime.models import (
+from imperaos_computer_use.models import ComputerUseMode, RiskClass
+from imperaos_computer_use.vision_runtime.approval import validate_approval_snapshot
+from imperaos_computer_use.vision_runtime.models import (
     InputActionType,
     NormalizedBBox,
     SurfaceKind,
     VisionAction,
     VisionObservation,
 )
-from imperaos.computer_use.vision_runtime.policy import UniversalComputerUsePolicy
-from imperaos.computer_use.vision_runtime.replay import verify_replay
+from imperaos_computer_use.vision_runtime.policy import UniversalComputerUsePolicy
+from imperaos_computer_use.vision_runtime.replay import verify_replay
+
+from imperaos import __version__
 from imperaos.contracts import OperatorCapabilitiesPayload
 from imperaos.runtime.config import ComputerUseRuntimeConfig, resolve_runtime_config
 from imperaos.runtime.platform import current_platform
@@ -183,10 +184,7 @@ def _evaluate_defaults(repo: Path, profile: str) -> dict[str, Any]:
         "profile": profile,
         "ok": all(item["ok"] for item in checks.values()),
         "checks": checks,
-        "source_map": {
-            key: source_map.get(f"computer_use.{key}", "unknown")
-            for key in checks
-        },
+        "source_map": {key: source_map.get(f"computer_use.{key}", "unknown") for key in checks},
     }
 
 
@@ -313,9 +311,11 @@ def _evaluate_operator_contract(repo: Path) -> dict[str, Any]:
     if current_platform().label == "windows":
         report["windows_live_blocked"] = (
             computer_use_pilot.get("enabled") is False
-            and computer_use_pilot.get("reasonCode") == WINDOWS_NOT_QUALIFIED
+            and computer_use_pilot.get("reasonCode")
+            in {WINDOWS_NOT_QUALIFIED, "COMPUTER_USE_EXTENSION_NOT_INSTALLED"}
             and vision_runtime.get("enabled") is False
-            and vision_runtime.get("reasonCode") == WINDOWS_NOT_QUALIFIED
+            and vision_runtime.get("reasonCode")
+            in {WINDOWS_NOT_QUALIFIED, "COMPUTER_USE_EXTENSION_NOT_INSTALLED"}
         )
     else:
         report["windows_live_blocked"] = True
@@ -431,15 +431,16 @@ def _evaluate_docs_and_tests(repo: Path) -> dict[str, Any]:
         "privacy_model": repo / "docs" / "PRIVACY_MODEL.md",
         "security_model": repo / "docs" / "SECURITY_MODEL.md",
         "console_entrypoint_test": repo / "tests" / "test_console_entrypoint_unicode_path.py",
-        "integration_gate_test": repo / "tests" / "test_computer_use_integration_gate.py",
+        "integration_gate_test": repo
+        / "extensions"
+        / "computer-use"
+        / "tests"
+        / "test_computer_use_integration_gate.py",
         "privacy_regression_test": repo / "tests" / "test_privacy_regression.py",
         "policy_fail_closed_test": repo / "tests" / "test_policy_fail_closed.py",
         "operator_contract_test": repo / "tests" / "test_operator_contracts.py",
     }
-    checks = {
-        name: {"path": str(path), "ok": path.exists()}
-        for name, path in required.items()
-    }
+    checks = {name: {"path": str(path), "ok": path.exists()} for name, path in required.items()}
     return {"ok": all(item["ok"] for item in checks.values()), "checks": checks}
 
 
@@ -490,11 +491,7 @@ def evaluate_integration_gate(
         "security_invariants": security_invariants["ok"],
         "docs_and_tests_present": docs_and_tests["ok"],
     }
-    blockers = [
-        name
-        for name, ok in checks.items()
-        if not ok
-    ]
+    blockers = [name for name, ok in checks.items() if not ok]
     merge_ready = not blockers
     status = "pass" if merge_ready else "blocked"
     platform_info = current_platform()
@@ -513,9 +510,7 @@ def evaluate_integration_gate(
         "platform_gates": {
             "current_platform": asdict(platform_info),
             "windows_not_qualified_reason": WINDOWS_NOT_QUALIFIED,
-            "live_macos_qualification_blocks_public_claims": bool(
-                release_status["live_blockers"]
-            ),
+            "live_macos_qualification_blocks_public_claims": bool(release_status["live_blockers"]),
             "live_macos_qualification_blocks_foundation_merge": False,
         },
         "operator_contract": operator_contract,

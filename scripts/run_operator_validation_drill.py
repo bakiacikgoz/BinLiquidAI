@@ -62,10 +62,6 @@ def _default_commands() -> list[CommandSpec]:
             [*base, "team", "list", "--root-dir", TEAM_ARTIFACT_ROOT, "--json"],
         ),
         CommandSpec(
-            "computer_use_doctor_all",
-            [*base, "computer-use", "doctor", "--platform", "all", "--json"],
-        ),
-        CommandSpec(
             "enterprise_keys_status",
             [*base, "keys", "status", "--profile", "enterprise", "--json"],
         ),

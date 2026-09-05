@@ -272,9 +272,11 @@ class MaintenanceConfig(BaseModel):
 
 
 class ComputerUseRuntimeConfig(BaseModel):
+    """Compatibility configuration for the separately installed, paused extension."""
+
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    enabled: bool = True
+    enabled: bool = False
     runtime_mode: Literal["legacy_pilot", "vision_first", "auto"] = "legacy_pilot"
     vision_enabled: bool = False
     vision_provider: Literal["mock", "ollama", "none"] = "none"
@@ -696,7 +698,7 @@ class RuntimeConfig(BaseModel):
                 ),
             ),
             computer_use=ComputerUseRuntimeConfig(
-                enabled=computer_use_data.get("enabled", True),
+                enabled=computer_use_data.get("enabled", False),
                 runtime_mode=computer_use_data.get("runtime_mode", "legacy_pilot"),
                 vision_enabled=computer_use_data.get("vision_enabled", False),
                 vision_provider=computer_use_data.get("vision_provider", "none"),

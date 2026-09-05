@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling>=1.26.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "imperaos-computer-use"
+version = "0.1.0"
+description = "Paused, opt-in desktop automation research extension for ImperaOS"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = ["imperaos>=0.4.1,<0.5", "editables>=0.3,<1.0"]
+
+[project.scripts]
+imperaos-computer-use = "imperaos_computer_use.cli:app"
+
+[tool.hatch.build.targets.wheel]
+dev-mode-exact = true
+packages = ["src/imperaos_computer_use"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

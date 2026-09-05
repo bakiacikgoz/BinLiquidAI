@@ -45,26 +45,14 @@
 - Experimental: direct sLTC active routing in research profile.
 - Deferred: desktop UI thin-shell.
 
-## Vision-First Computer-Use Foundation
+## Optional computer-use extension
 
-The existing bounded computer-use pilot remains the default runtime. A new additive package, `imperaos/computer_use/vision_runtime/`, introduces typed ports and contracts for a future vision-first desktop/web/file action loop.
+The desktop-control implementation lives under
+`extensions/computer-use/src/imperaos_computer_use/`. It is a separate optional
+distribution depending on core governance and runtime contracts. Core imports,
+startup and release qualification never import or probe this extension.
 
-The foundation is structured around:
-
-```text
-observe -> interpret -> decide -> policy -> approval -> execute -> verify -> checkpoint
-```
-
-Production defaults keep this path fail-closed: `runtime_mode="legacy_pilot"`, `vision_enabled=false`, raw screenshot retention disabled, terminal control denied, and platform qualification required.
-
-The operator panel receives an additive `computerUseVisionRuntime` capability next to the existing `computerUsePilot` field, allowing the UI to surface readiness without enabling live execution.
-## Vision-First Computer-Use Phase 2
-
-The vision-first runtime lives under `imperaos/computer_use/vision_runtime/`. Phase 2 adds macOS-specific readiness, screenshot capture, guarded input execution, an Ollama-compatible strict JSON vision interpreter, approval snapshot validation, replay verification, and qualification reporting. These components are additive to the legacy Safari/Finder/TextEdit pilot and do not enable Windows or Linux live execution.
-
-Default architecture remains fail-closed:
-
-- `vision_provider="none"` blocks runtime execution.
-- `macos_input_backend="disabled"` blocks OS input.
-- `raw_screenshot_max_count=0` prevents raw screenshot persistence.
-- operator panel reads the additive `computerUseVisionRuntime` capability.
+Core capability fields remain disabled for compatibility; the panel does not
+render desktop-control operations. Active development is paused. See
+[extension policy](COMPUTER_USE_EXTENSION.md) and the historical RFCs for retained
+implementation context and safety boundaries.

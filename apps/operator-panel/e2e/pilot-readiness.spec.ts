@@ -49,9 +49,9 @@ test('pilot readiness flow exposes governed run, approval, evidence, reports, an
   await expect(operationOutput(page)).toContainText('imperaos-support.zip');
 
   await openPrimaryView(page, 'Execution Surfaces', 'Execution Surfaces');
-  await expect(page.getByTestId('page-primary-region')).toContainText('Computer-use');
+  await expect(page.getByTestId('page-primary-region')).not.toContainText('Computer-use');
   await expect(page.getByTestId('page-primary-region')).toContainText('blocked');
-  await expect(page.getByTestId('page-primary-region')).toContainText('Live start disabled');
+  await expect(page.getByTestId('page-primary-region')).toContainText('Core Runtime');
 
   consoleHealth.assertNoCriticalErrors();
 });

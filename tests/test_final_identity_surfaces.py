@@ -12,16 +12,6 @@ CANONICAL_SURFACES = {
         "You are ImperaOS assistant in product mode.",
         "You are ImperaOS response synthesizer.",
     ),
-    "imperaos/computer_use/adapters/browser_adapter.py": (
-        '"User-Agent": "ImperaOS/real-acceptance"',
-    ),
-    "imperaos/computer_use/runtime.py": (
-        "Run ImperaOS computer-use on a macOS pilot machine.",
-    ),
-    "imperaos/computer_use/vision_runtime/qualification.py": (
-        "I understand ImperaOS will control my macOS desktop",
-        "<title>ImperaOS Local Fixture</title>",
-    ),
     "apps/operator-panel/src/routeCapabilityMatrix.ts": (
         "imperaos control-plane agent register",
         "imperaos operator snapshot",
