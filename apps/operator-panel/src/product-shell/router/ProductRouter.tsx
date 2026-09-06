@@ -9,7 +9,7 @@ import { SettingsShell } from '../settings/SettingsShell';
 import { LegacyOperatorApp } from '../legacy/LegacyOperatorApp';
 
 function ProductShellRoutes() {
-  return <AppShell><Routes><Route path="/" element={<NewWorkPage />} /><Route path="/task/:taskId" element={<TaskPage />} /><Route path="/task/:taskId/workspace" element={<TaskPage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/approvals" element={<ApprovalsPage />} /><Route path="/agents" element={<AgentsPage />} /><Route path="/automations" element={<CollectionPage title="Automations" body="Automation capabilities are not registered for this desktop runtime." />} /><Route path="/settings" element={<SettingsShell />} /><Route path="/settings/:section" element={<SettingsShell />} /><Route path="*" element={<NewWorkPage />} /></Routes></AppShell>;
+  return <AppShell><Routes><Route path="/" element={<NewWorkPage />} /><Route path="/task/:taskId" element={<TaskPage />} /><Route path="/task/:taskId/workspace" element={<TaskPage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/approvals" element={<ApprovalsPage />} /><Route path="/agents" element={<AgentsPage />} /><Route path="/automations" element={<CollectionPage />} /><Route path="/settings" element={<SettingsShell />} /><Route path="/settings/:section" element={<SettingsShell />} /><Route path="*" element={<NewWorkPage />} /></Routes></AppShell>;
 }
 
 /** The former panel stays directly reachable for advanced/system workflows. */

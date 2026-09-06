@@ -95,3 +95,54 @@ def test_provider_models_reports_unavailable_ollama(monkeypatch) -> None:
     assert provider["available"] is False
     assert provider["errorCode"] == "OLLAMA_NOT_INSTALLED"
     assert provider["models"][0]["source"] == "config"
+
+
+def test_transformers_model_name_does_not_imply_installed_runtime(monkeypatch) -> None:
+    monkeypatch.setattr("importlib.util.find_spec", lambda _name: None)
+    result = runner.invoke(
+        app, ["provider", "models", "--profile", "balanced", "--provider", "transformers", "--json"]
+    )
+    assert result.exit_code == 0, result.stdout
+    provider = json.loads(result.stdout)["providers"][0]
+    assert provider["models"][0]["configured"] is True
+    assert provider["available"] is False
+    assert provider["errorCode"] == "TRANSFORMERS_NOT_INSTALLED"
+
+
+def test_assistant_doctor_requires_setup_without_transformers_package(monkeypatch) -> None:
+    monkeypatch.setattr("importlib.util.find_spec", lambda _name: None)
+    result = runner.invoke(
+        app,
+        ["assistant", "doctor", "--profile", "balanced", "--provider", "transformers", "--json"],
+    )
+    assert result.exit_code == 3, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "setup_required"
+    assert payload["modelDiscovery"]["selectedDefault"] is None
+    assert "TRANSFORMERS_NOT_INSTALLED" in payload["blockingReasons"]
+    assert payload["nextActions"]
+
+
+def test_transformers_requires_the_pytorch_backend(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "importlib.util.find_spec", lambda name: object() if name == "transformers" else None
+    )
+    result = runner.invoke(
+        app, ["provider", "models", "--profile", "balanced", "--provider", "transformers", "--json"]
+    )
+    assert result.exit_code == 0, result.stdout
+    provider = json.loads(result.stdout)["providers"][0]
+    assert provider["available"] is False
+    assert provider["errorCode"] == "TORCH_NOT_INSTALLED"
+
+
+def test_transformers_dependencies_do_not_claim_a_cached_model(monkeypatch) -> None:
+    monkeypatch.setattr("importlib.util.find_spec", lambda _name: object())
+    result = runner.invoke(
+        app, ["provider", "models", "--profile", "balanced", "--provider", "transformers", "--json"]
+    )
+    assert result.exit_code == 0, result.stdout
+    provider = json.loads(result.stdout)["providers"][0]
+    assert provider["available"] is True
+    assert provider["models"][0]["installed"] is False
+    assert provider["models"][0]["warnings"]

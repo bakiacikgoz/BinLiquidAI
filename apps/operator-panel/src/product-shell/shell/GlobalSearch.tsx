@@ -25,9 +25,9 @@ type SearchLoadResult = { data: SearchData; unavailableSources: string[] };
 const EMPTY_DATA: SearchData = { projects: [], tasks: [], artifacts: [], approvals: [], agents: [] };
 const ROUTES: SearchResult[] = [
   { id: 'route:new', kind: 'route', title: 'Yeni görev', detail: 'Yönetilen çalışma oluştur', path: '/' },
-  { id: 'route:library', kind: 'route', title: 'Siteler', detail: 'Yönetilen artifact’lar', path: '/library' },
+  { id: 'route:library', kind: 'route', title: 'Çalışma kütüphanesi', detail: 'Yönetilen artifact’lar', path: '/library' },
   { id: 'route:approvals', kind: 'route', title: 'Onaylar', detail: 'Bekleyen yönetilen kararlar', path: '/approvals' },
-  { id: 'route:agents', kind: 'route', title: 'Eklentiler', detail: 'Yönetilen ajan kaydı', path: '/agents' },
+  { id: 'route:agents', kind: 'route', title: 'Ajanlar', detail: 'Yönetilen ajan kaydı', path: '/agents' },
   { id: 'route:settings', kind: 'route', title: 'Ayarlar', detail: 'Ürün ve runtime ayarları', path: '/settings' },
 ];
 

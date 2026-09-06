@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -956,6 +957,21 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
 
     if any(item.provider_id == "local-transformers" for item in selected_records):
         hf_model_id = resolved.hf_model_id
+        # Discovery is read-only: inspect dependencies without importing pipelines
+        # or downloading model weights. A configured name is not an installed runtime.
+        dependency_error = None
+        dependency_message = None
+        if not hf_model_id:
+            dependency_error = "HF_MODEL_NOT_CONFIGURED"
+            dependency_message = "No transformers HF model id is configured."
+        elif importlib.util.find_spec("transformers") is None:
+            dependency_error = "TRANSFORMERS_NOT_INSTALLED"
+            dependency_message = (
+                "Install the Transformers runtime dependencies before selecting this provider."
+            )
+        elif importlib.util.find_spec("torch") is None:
+            dependency_error = "TORCH_NOT_INSTALLED"
+            dependency_message = "Install the PyTorch backend before selecting this provider."
         providers.append(
             {
                 "provider": "local-transformers",
@@ -974,16 +990,14 @@ def _provider_models_payload(profile: str, requested_provider: str) -> dict[str,
                 "budgetReason": "PROVIDER_BUDGET_ALLOWED" if hf_model_id else None,
                 **_provider_conformance_payload(conformance_by_provider.get("local-transformers")),
                 **_provider_native_payload(None),
-                "available": bool(hf_model_id),
+                "available": dependency_error is None,
                 "selectedByConfig": (
                     _normalize_provider_name(resolved.llm_provider) == "transformers"
                     or _normalize_provider_name(resolved.fallback_provider) == "transformers"
                 ),
-                "disabledReason": None if hf_model_id else "HF_MODEL_NOT_CONFIGURED",
-                "errorCode": None if hf_model_id else "HF_MODEL_NOT_CONFIGURED",
-                "errorMessage": (
-                    None if hf_model_id else "No transformers HF model id is configured."
-                ),
+                "disabledReason": dependency_error,
+                "errorCode": dependency_error,
+                "errorMessage": dependency_message,
                 "models": [
                     _model_candidate(
                         provider="local-transformers",

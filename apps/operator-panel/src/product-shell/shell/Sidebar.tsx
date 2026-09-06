@@ -23,6 +23,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
+import { productText } from '../ui/productCopy';
 import { productWorkspaceClient, type ProductWorkspaceProject } from '../adapters/productWorkspaceClient';
 import { SidebarTaskMenu } from './SidebarTaskMenu';
 import { SidebarInfoRow } from './SidebarInfoRow';
@@ -34,7 +35,7 @@ const primaryLinks = [
   { label: 'Yeni görev', icon: SquarePen, to: '/', trailingIcon: CirclePlus },
   { label: 'Onaylar', icon: GitPullRequest, to: '/approvals' },
   { label: 'Çalışma kütüphanesi', icon: Blocks, to: '/library' },
-  { label: 'Zamanlananlar', icon: Clock3, to: '/automations' },
+  { label: 'Zamanlananlar · Yakında', icon: Clock3, to: '/automations' },
   { label: 'Ajanlar', icon: Orbit, to: '/agents' },
 ];
 
@@ -111,6 +112,7 @@ function SidebarRowActions({
 }
 
 export function Sidebar() {
+  const t = productText();
   const navigate = useNavigate();
   const tasks = useProductShellStore((state) => state.tasks);
   const selectedTaskId = useProductShellStore((state) => state.selectedTaskId);
@@ -238,7 +240,7 @@ export function Sidebar() {
       style={{ width: collapsed ? undefined : sidebarWidth }}
       aria-label="Product navigation"
     >
-      <div className="sidebar-utility">
+      <div className="sidebar-utility" data-tauri-drag-region>
         <button
           className="sidebar-toggle"
           type="button"
@@ -308,9 +310,10 @@ export function Sidebar() {
             </div>
           )}
           {error && (
-            <p className={`sidebar-error ${error.includes('desktop runtime') ? 'sidebar-runtime-notice' : ''}`} role="alert">
-              {error}
-            </p>
+            <div className={`sidebar-error ${error.includes('desktop runtime') ? 'sidebar-runtime-notice' : ''}`} role="alert">
+              <p>{t('This view could not be loaded. Retry, or check the desktop connection.')}</p>
+              <details><summary>{t('Technical details')}</summary><p>{error}</p></details>
+            </div>
           )}
           <div className="project-list">
             {projects.map((project) => {

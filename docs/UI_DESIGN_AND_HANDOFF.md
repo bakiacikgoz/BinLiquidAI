@@ -9,7 +9,7 @@ Kullanıcı kompakt, sakin, Codex benzeri koyu bir masaüstü arayüzü istiyor.
 | Alan | Kabul edilen ölçü / görünüm |
 |---|---|
 | Ana yüzey, terminal, workspace | `#181818` |
-| Sidebar | `#202020`; hover `#2b2b2b`, seçili `#303030` |
+| Sidebar | macOS: native Sidebar vibrancy üzerinde saydam koyu/açık yüzey; diğer platformlar ve web: `#202020`; hover/seçim düşük opaklıklı |
 | Kartlar / ayırıcılar | Yaklaşık `#2b2b2b` / `#303030`, düşük kontrast |
 | Üst başlık | 46 px; 13 px başlık; 28 px simge düğmeleri |
 | Sohbet ve composer | 736 px azami içerik genişliği; dış alanda 24 px boşluk |
@@ -101,3 +101,37 @@ cargo test --manifest-path apps/operator-panel/src-tauri/Cargo.toml --lib
 Playwright yapılandırmasını okuyun: varsayılan yapılandırma build/preview başlatabilir. Geliştirme sunucusu kullanılıyorsa yerel geçici config oluşturup sadece o dosyayı kaldırın. `task-shell-layout.spec.ts`, `sidebar-layout.spec.ts` ve `product-model-settings.spec.ts` önemli regresyon akışlarıdır.
 
 Görsel kontrolde gerçek kabuğu 1920 px, 1400 px ve workspace sürüklenerek daraltılmış sohbet alanında açın. Ortam kartının gizlenip geri gelmesini, composer merkezlenmesini, tüm panellerin birlikte taşmamasını, sekme adlarını, terminal rengini ve İncele boş/hata durumlarını kontrol edin. Mock browser testi native PTY veya gerçek model entegrasyonu kanıtı değildir. Sonuçları tarih ve gerçek test kapsamıyla kaydedin.
+
+## 6 Eylül 2026 — UI durumları ve ayar kullanılabilirliği
+
+- Product Shell tarayıcıda açıldığında kalıcı, kompakt bir önizleme/bağlantı açıklaması gösterir. Geliştirme köprüsünün örnek onay, ajan ve model kayıtları canlı masaüstü verisi sayılmaz; native uygulamada önizleme şeridi gösterilmez.
+- Composer `disabledReason` kabul eder. Yeni görev ekranı proje yükleniyor, bağlantı başarısız ve proje seçimi hatası durumlarını gerçek yanıt işleme durumundan ayırır.
+- Ayar araması bölüm başlıklarının yanında alan adlarını da tarar. “model” sorgusu Asistan ve AI Sağlayıcıları bölümlerini bulur; eşleşme yoksa açık sonuç mesajı gösterilir.
+- AI Sağlayıcıları bölümü mevcut model keşif servisine bağlıdır. Kullanılamayan modeller devre dışıdır; keşif başarısız olduğunda kayıtlı seçim korunur. Yerel Transformers seçimi HF model alanına kaydedilir. Kurulum bağlantısı ve yeniden keşif eylemi sunulur; kimlik bilgileri otomatik kurulmaz.
+- Ayarlar ve koleksiyonların kullanıcı metinleri `product-shell/ui/productCopy.ts` üzerinden Türkçe/İngilizce sunulur. Sistem ayarlarına geçiş korunur; teknik kimlikler ve runtime kodları veri olarak kalır. Bu çalışma bütün eski panelin çeviri kapsamını tamamladığı anlamına gelmez.
+- Koleksiyonlarda yükleme durumu, anlaşılır hata ve kapalı teknik ayrıntılar vardır. Kütüphane yenilemesi seçili çıktının ayrıntısını da tekrar yükler; yalnız listeyi yenilemek kurtarma için yeterli değildir.
+- Ajan listesi kompakt satırlar kullanır; ayrıntıda hazırlık ve kanıt bilgileri korunur. Eski kartın `::before` gradyanı ürün CSS katmanında kapatılır. Frozen UI Lab dosyaları değiştirilmez.
+- Zamanlananlar mevcut sürümde desteklenmiyor olarak açıkça belirtilir; elle yeni görev başlatma bağlantısı sunulur. Otomasyon motoru eklenmemiştir.
+
+Doğrulama: 144 Vitest dosyasında 601 test geçti; `pnpm build`, `pnpm lint` ve `git diff --check` başarılı. Bu makinede testler Node 24 ile `NODE_OPTIONS=--no-experimental-webstorage` kullanılarak çalıştırıldı; Node 26 global depolama davranışı test ortamıyla uyumlu değildi. Derleme büyük chunk uyarısı veriyor; paket bölme bu değişikliğin kapsamı dışında.
+
+Görsel kontrol gerçek AppShell üzerinden Chrome'da ana ekran, ayar araması/model seçimi, ajanlar, kütüphane hata durumu ve Zamanlananlar için yapıldı. Ayarlar 1200 ve 1000 px, ajanlar 1200 px genişlikte ayrıca incelendi; geçici viewport sıfırlandı. Native uygulama başlatıldı, ancak canlı provider çağrısı, PTY ve dolu sohbet + workspace + alt terminal birleşimi bu turda görsel olarak yeniden doğrulanmadı.
+
+## 6 Eylül 2026 — Native doğrulama ve model keşfi düzeltmesi
+
+Debug macOS `.app` paketi derlendi ve gerçek Tauri AppShell üzerinde kontrol edildi. Mevcut proje ve sohbet açıldı; yeni model mesajı gönderilmedi. Test için açılan gerçek zsh PTY, `__IMPERAOS_NATIVE_PTY_OK__` işaretini yazdırdı. Alt panel gizlenip yeniden açıldığında çıktı korundu. Sohbet, workspace ve alt terminal birlikte açıkken özet alanı daralan sohbet genişliğinde gizlendi; workspace kapatılınca geri geldi. Test terminali kontrol sonunda kapatıldı. Native uygulamada tarayıcı önizleme şeridi gösterilmedi. Bu kontroller önceki bölümdeki native PTY ve birleşik panel doğrulama boşluğunu kapatır.
+
+Model keşfinde yapılandırılmış bir HF model adının, Transformers kurulu olmasa bile sağlayıcıyı kullanılabilir göstermesi düzeltildi. Keşif artık `transformers` ve `torch` bağımlılıklarının varlığını denetler; eksik bağımlılığı açık hata koduyla bildirir. Model ağırlıkları indirilmez ve önbellek kontrol edilmiş sayılmaz. Bu makinede assistant doctor artık `setup_required`, native model ayarları “Kullanılabilir model bulunamadı” gösteriyor. Canlı model yanıtı hâlâ doğrulanmadı; kullanılabilir sağlayıcı kurulumu gerekir.
+
+Doğrulama: `tests/test_operator_provider_models.py`, `tests/test_assistant_cli.py` ve `tests/test_assistant_real_runtime_gate.py` içindeki 14 Python testi geçti. Değişen Python dosyaları Ruff kontrolünden geçti. Rust `terminal::tests` kapsamındaki 5 test, gerçek PTY uçtan uca testi dahil, geçti. Debug Tauri uygulama paketi başarıyla derlendi. Bağımlılık keşfi, modelin ağırlıklarının mevcut olduğunu veya çıkarımın başarılı olacağını kanıtlamaz.
+
+
+## 6 Eylül 2026 — macOS cam sidebar ve bütünleşik başlık
+
+Kullanıcının yeni referansı sidebar için masaüstü renklerini geçiren gerçek bulanıklık ve uygulama yüzeyiyle birleşen başlık gerektirir. macOS platform yapılandırması `Overlay`, gizli pencere başlığı ve native `sidebar` efekti kullanır. Sistem pencere düğmeleri korunur; sidebar araç satırı ve kapalı sidebar üst başlığı düğmeler için 96 px ayırır. Boş başlık alanlarından pencere sürüklenebilir.
+
+Native NSVisualEffectView masaüstünü gerçekten bulanıklaştırır; üstündeki saydam mavi/yeşil renk katmanı referansın tonlarını korur. Yalnız native macOS Product Shell kökleri saydamdır; sohbet/workspace yüzeyleri opak kalır. Native materyal uygulamanın açık/koyu temasıyla eşleştirilir. Web ve diğer platformlar mevcut opak yüzeyi korur. Frozen UI Lab dosyaları değiştirilmez.
+
+Tauri macOS saydam webview için `macos-private-api` özelliğini gerektirir; bu dağıtım yöntemi Mac App Store kabul koşullarıyla uyumlu değildir. İleride App Store hedeflenirse native pencere yaklaşımı yeniden değerlendirilmelidir. Sistem saydamlığı azaltma tercihi ve masaüstü arka planı camın görünümünü etkiler.
+
+Doğrulama: macOS debug `.app` paketi yeniden derlenip açıldı. Native ana ekran, sohbet başlığı ve sidebar kapalı durumu görsel olarak kontrol edildi; ayrı standart başlık şeridi kaldırıldı, pencere düğmeleri için boşluk korundu. Tema senkronizasyonu/temizliği ve mevcut sidebar/başlık sözleşmeleri dahil 4 Vitest dosyasında 23 test geçti; frontend build, ESLint ve `git diff --check` başarılı. Sistem düzeyindeki saydamlığı azaltma tercihi değiştirilmedi; Windows/Linux native görünümü bu makinede çalıştırılmadı.

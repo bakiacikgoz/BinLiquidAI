@@ -198,6 +198,9 @@ function NewWorkContent() {
             placeholder="İstediğin şeyi yap"
             sendLabel="Başlat"
             disabled={!projectsReady || Boolean(projectSelectionError)}
+            disabledReason={projectSelectionError || (resolveLocale(settings.locale) === 'tr'
+              ? (projectLoadError ? 'Projeler yüklenemedi. Bağlantıyı yeniden deneyin.' : 'Projeler yükleniyor…')
+              : (projectLoadError ? 'Projects could not be loaded. Retry the connection.' : 'Loading projects…'))}
             initialValue={seedPrompt}
             runtimeSettings={getAssistantRuntimeSettings(settings)}
             modelDiscovery={modelDiscovery}

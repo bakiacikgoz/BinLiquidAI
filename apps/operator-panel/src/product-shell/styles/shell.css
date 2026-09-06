@@ -1370,3 +1370,106 @@
 .product-inspect-workbench button, .product-inspect-workbench input, .product-inspect-workbench select { min-height: 28px; font-size: 12px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text-primary); }
 .product-inspect-workbench .assistant-empty-state, .product-inspect-workbench .artifact-workspace-banner { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 :root[data-theme='dark'] .product-inspect-empty, :root[data-theme='dark'] .product-inspect-workbench { background: #181818; }
+
+/* Connection and collection states share the compact product shell. */
+.imperaos-product-shell-v2 .product-runtime-notice {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.imperaos-product-shell-v2 .collection-page > header { position: relative; }
+.imperaos-product-shell-v2 .collection-refresh { display: flex; margin-top: 16px; gap: 6px; }
+.imperaos-product-shell-v2 .collection-error {
+  margin-top: 12px;
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.imperaos-product-shell-v2 .collection-error details { margin-top: 8px; font-size: 12px; }
+.imperaos-product-shell-v2 .collection-agent-registry .page-card {
+  min-width: 0;
+  background: var(--surface);
+  background-image: none;
+  box-shadow: none;
+}
+.imperaos-product-shell-v2 .collection-agent-registry .run-list { display: grid; gap: 6px; }
+.imperaos-product-shell-v2 .collection-agent-registry .run-list-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+}
+.imperaos-product-shell-v2 .collection-agent-registry .run-list-item[aria-pressed="true"] { background: var(--surface-selected); }
+.imperaos-product-shell-v2 .collection-agent-registry .run-list-main { min-width: 0; overflow-wrap: anywhere; }
+.imperaos-product-shell-v2 .collection-agent-registry .metric-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.imperaos-product-shell-v2 .collection-agent-registry .metric-row strong { text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.imperaos-product-shell-v2 .model-setup { padding: 12px 0; color: var(--text-secondary); font-size: 13px; }
+.imperaos-product-shell-v2 .model-setup details { margin-top: 12px; overflow-wrap: anywhere; }
+.imperaos-product-shell-v2 .model-setup .settings-actions { flex-wrap: wrap; }
+.imperaos-product-shell-v2 .settings-row :is(input, select) { max-width: 100%; min-width: 0; }
+.imperaos-product-shell-v2 .settings-row > div { min-width: 0; }
+.imperaos-product-shell-v2 .collection-manual-task { display: inline-block; margin-top: 16px; color: var(--text-primary); }
+@media (max-width: 1100px) {
+  .imperaos-product-shell-v2 .collection-agent-registry .section-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.imperaos-product-shell-v2 .collection-agent-registry .page-card::before { display: none; }
+.imperaos-product-shell-v2 .collection-agent-registry .section-grid { align-items: start; }
+.imperaos-product-shell-v2 .collection-agent-registry .metric-list { display: grid; gap: 0; }
+.imperaos-product-shell-v2 .collection-agent-registry .metric-row { padding: 6px 0; }
+.imperaos-product-shell-v2 .model-setup a { color: var(--text-primary); }
+.imperaos-product-shell-v2 .sidebar-error { overflow-wrap: anywhere; }
+.imperaos-product-shell-v2 .sidebar-error p { margin: 0 0 6px; }
+
+/* Native macOS glass: the NSVisualEffectView supplies the desktop blur.
+ * Keep every ancestor transparent; the conversation remains opaque. */
+html.product-native-mac,
+.product-native-mac body,
+.product-native-mac #root,
+.product-native-mac .imperaos-product-shell-v2.app-shell {
+  background: transparent;
+}
+.product-native-mac .imperaos-product-shell-v2 {
+  --product-sidebar-surface: linear-gradient(160deg, rgb(22 43 62 / 65%), rgb(22 37 42 / 58%) 52%, rgb(20 43 35 / 65%));
+  --product-sidebar-muted: #9aa9af;
+  --product-sidebar-surface-hover: rgb(255 255 255 / 7%);
+  --product-sidebar-surface-selected: rgb(255 255 255 / 11%);
+  --product-sidebar-edge: rgb(255 255 255 / 10%);
+}
+.product-native-mac[data-theme='light'] .imperaos-product-shell-v2 {
+  --product-sidebar-surface: rgb(245 248 250 / 32%);
+  --product-sidebar-surface-hover: rgb(0 0 0 / 5%);
+  --product-sidebar-surface-selected: rgb(0 0 0 / 9%);
+  --product-sidebar-edge: rgb(0 0 0 / 12%);
+}
+.product-native-mac .imperaos-product-shell-v2 .sidebar-utility {
+  height: 46px;
+  min-height: 46px;
+  padding-left: 96px;
+}
+.product-native-mac .imperaos-product-shell-v2 .closed-panels-topbar {
+  padding-left: 96px;
+}
+.product-native-mac .sidebar-utility,
+.product-native-mac .topbar {
+  user-select: none;
+}

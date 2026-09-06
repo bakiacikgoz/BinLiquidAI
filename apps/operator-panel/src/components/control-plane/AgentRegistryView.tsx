@@ -22,32 +22,34 @@ const copy = {
     signedPackRequired: 'signed pack required',
   },
   tr: {
-    kicker: 'Registry',
-    title: 'Agentlar',
-    lead: 'Yönetişimli agent ve workflow spesifikasyonları.',
-    registry: 'Registry',
-    policy: 'Policy',
-    evidence: 'Evidence',
-    noRegisteredAgents: 'Kayıtlı agent yok',
-    registerWithCli: 'Control-plane CLI ile bir agent spec kaydedin.',
-    governedActions: 'Yönetişimli aksiyonlar',
-    externalGateway: 'Harici gateway',
+    kicker: 'Ajan kaydı',
+    title: 'Ajanlar',
+    lead: 'Kayıtlı ajanlar ve iş akışları.',
+    registry: 'Ajan kaydı',
+    policy: 'Politika',
+    evidence: 'Kanıt',
+    noRegisteredAgents: 'Kayıtlı ajan yok',
+    registerWithCli: 'Sistem panelinden ajan kaydını yapılandırın.',
+    governedActions: 'İzinli işlemler',
+    externalGateway: 'Harici bağlantı',
     configured: 'yapılandırıldı',
     notRegistered: 'kayıtlı değil',
     approvalBoundary: 'Onay sınırı',
     externalWritesGated: 'harici yazmalar onaya bağlı',
-    evidenceStatus: 'Evidence durumu',
-    signedPackRequired: 'imzalı pack gerekli',
+    evidenceStatus: 'Kanıt durumu',
+    signedPackRequired: 'imzalı kanıt paketi gerekli',
   },
 } satisfies Record<UiLocale, Record<string, string>>;
 
 export function AgentRegistryView({
   agents,
+  compact = false,
   locale = 'en',
   selectedAgentId,
   onSelectAgent,
 }: {
   agents: unknown;
+  compact?: boolean;
   locale?: UiLocale;
   selectedAgentId?: string | null;
   onSelectAgent?: (agentId: string) => void;
@@ -72,16 +74,16 @@ export function AgentRegistryView({
               const content = <>
                 <div className="run-list-main">
                   <strong>{agent.display_name || agent.agent_id}</strong>
-                  <div className="run-list-meta">
+                  {!compact && <div className="run-list-meta">
                     <CodeToken>{agent.agent_type}</CodeToken>
                     <CodeToken>{agent.runtime_kind}</CodeToken>
                     <span>{`${text.policy} ${agent.policy_pack_id}`}</span>
                     <span>{agent.risk_profile}</span>
                     <span>{`${text.evidence} ${agent.last_evidence_status}`}</span>
-                  </div>
+                  </div>}
                 </div>
                 <StatusBadge tone={agent.status === 'active' ? 'success' : 'warning'}>
-                  {`${agent.status} / ${agent.readiness}`}
+                  {compact ? (locale === 'tr' ? ({ active: 'Etkin', registered: 'Kayıtlı', disabled: 'Devre dışı' }[agent.status] ?? agent.status) : agent.status) : `${agent.status} / ${agent.readiness}`}
                 </StatusBadge>
               </>;
               return onSelectAgent ? <button type="button" className="run-list-item" key={agent.agent_id} aria-pressed={selectedAgent?.agent_id === agent.agent_id} onClick={() => onSelectAgent(agent.agent_id)}>{content}</button> : <article className="run-list-item" key={agent.agent_id}>{content}</article>;
@@ -100,9 +102,10 @@ export function AgentRegistryView({
         <article className="page-card">
           <h3>{selectedAgent ? `${selectedAgent.display_name || selectedAgent.agent_id}` : text.governedActions}</h3>
           {selectedAgent ? <div className="metric-list">
-            <div className="metric-row"><span>Agent ID</span><strong>{selectedAgent.agent_id}</strong></div>
-            <div className="metric-row"><span>Runtime</span><strong>{selectedAgent.runtime_kind}</strong></div>
+            <div className="metric-row"><span>{locale === 'tr' ? 'Ajan kimliği' : 'Agent ID'}</span><strong>{selectedAgent.agent_id}</strong></div>
+            <div className="metric-row"><span>{locale === 'tr' ? 'Çalışma ortamı' : 'Runtime'}</span><strong>{selectedAgent.runtime_kind}</strong></div>
             <div className="metric-row"><span>{text.policy}</span><strong>{selectedAgent.policy_pack_id}</strong></div>
+            {compact && <div className="metric-row"><span>{locale === 'tr' ? 'Hazırlık' : 'Readiness'}</span><strong>{selectedAgent.readiness}</strong></div>}
             <div className="metric-row"><span>{text.evidence}</span><strong>{selectedAgent.last_evidence_status}</strong></div>
           </div> : null}
           <h3>{text.governedActions}</h3>

@@ -287,3 +287,10 @@ describe('AssistantComposer runtime controls', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 });
+
+ it('explains a blocked workspace without claiming a running turn', () => {
+   renderOperatorPanel(<AssistantComposer label="Message" placeholder="Message" sendLabel="Send"
+     disabled disabledReason="Projects could not be loaded. Retry the connection."
+     runtimeSettings={DEFAULT_ASSISTANT_RUNTIME_SETTINGS} onRuntimeSettingsChange={vi.fn()} onSend={vi.fn()} />);
+   expect(screen.getByRole('textbox', { name: 'Message' })).toHaveAttribute('title', 'Projects could not be loaded. Retry the connection.');
+ });

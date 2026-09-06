@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar';
 import { useProductShellStore } from '../state/productShellStore';
 import { ProductTheme } from '../styles/ProductTheme';
 import { GlobalSearch } from './GlobalSearch';
+import { RuntimeNotice } from '../ui/RuntimeNotice';
 import { TopBar } from './TopBar';
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -23,6 +24,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar />
       <section className="app-frame">
         {(!isHome || sidebarCollapsed) && <TopBar />}
+        <RuntimeNotice />
         {children}
       </section>
       <GlobalSearch />

@@ -44,6 +44,7 @@ export function AssistantComposer({
   placeholder,
   sendLabel,
   disabled,
+  disabledReason,
   initialValue = '',
   statusLabel = '',
   runtimeSettings,
@@ -60,6 +61,7 @@ export function AssistantComposer({
   placeholder: string;
   sendLabel: string;
   disabled: boolean;
+  disabledReason?: string;
   initialValue?: string;
   statusLabel?: string;
   runtimeSettings: AssistantRuntimeSettings;
@@ -153,12 +155,12 @@ export function AssistantComposer({
     translateAssistantText(validationMessage, locale) ||
     slashValidationMessage ||
     (disabled
-      ? translateAssistantText('Assistant is currently processing a turn.', locale)
+      ? (disabledReason || translateAssistantText('Assistant is currently processing a turn.', locale))
         : messageToSend.trim().length === 0
         ? translateAssistantText('Enter a message to send.', locale)
         : undefined);
   const composerDisabledReason = disabled
-    ? translateAssistantText('Assistant is currently processing a turn.', locale)
+    ? (disabledReason || translateAssistantText('Assistant is currently processing a turn.', locale))
     : undefined;
   const isProductComposer = variant === 'product';
 

@@ -30,7 +30,7 @@ export function TopBar() {
 
   if (sidebarCollapsed) {
     return (
-      <header className="topbar closed-panels-topbar">
+      <header data-tauri-drag-region className="topbar closed-panels-topbar">
         <div className="closed-panels-leading">
           <button className="icon-button" type="button" onClick={() => setSidebarCollapsed(false)} title="Kenar çubuğunu aç" aria-label="Kenar çubuğunu aç">
             <PanelLeftOpen size={18} />
@@ -65,7 +65,7 @@ export function TopBar() {
   }
 
   return (
-    <header className={`topbar ${taskId ? 'task-reference-header' : ''}`}>
+    <header data-tauri-drag-region className={`topbar ${taskId ? 'task-reference-header' : ''}`}>
       <div className="topbar-leading task-header-title">
         <Folder size={15} aria-hidden="true" />
         <span className="task-crumb">{task?.title ?? 'ImperaOS'}</span>{task && <TaskMenu task={task}/>}

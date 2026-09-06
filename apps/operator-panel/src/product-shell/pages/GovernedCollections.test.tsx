@@ -111,3 +111,12 @@ describe('LibraryPage', () => {
     expect(await screen.findByText('release-policy')).toBeInTheDocument();
   });
 });
+
+it('retries a failed selected artifact detail when refreshing the library', async () => {
+  artifacts.list.mockResolvedValue({ items: [{ artifactId: 'only-output', title: 'Only output', kind: 'document', status: 'active' }] });
+  artifacts.get.mockRejectedValueOnce(new Error('Detail connection failed')).mockResolvedValue({ revision: { revisionId: 'recovered-revision' } });
+  const { user } = renderOperatorPanel(<MemoryRouter><LibraryPage /></MemoryRouter>);
+  expect(await screen.findByRole('alert')).toHaveTextContent(/could not be loaded|yüklenemedi/);
+  await user.click(screen.getByRole('button', { name: /Refresh|Yenile/ }));
+  expect(await screen.findByText('recovered-revision')).toBeInTheDocument();
+});
